@@ -906,11 +906,11 @@ private final class BoardManHistoryRowView: NSTableRowView {
             path.fill()
         } else if row >= 0 {
             (useLiquidGlass
-                ? NSColor.textBackgroundColor.withAlphaComponent(0.34)
+                ? NSColor.textBackgroundColor.withAlphaComponent(0.12)
                 : NSColor.textBackgroundColor.withAlphaComponent(0.36)).setFill()
             path.fill()
             if useLiquidGlass {
-                NSColor.separatorColor.withAlphaComponent(0.16).setStroke()
+                NSColor.white.withAlphaComponent(0.12).setStroke()
                 path.lineWidth = 1
                 path.stroke()
             }
@@ -1013,6 +1013,10 @@ private final class BoardManHistoryCellView: NSTableCellView {
 class BoardManPanel: NSPanel {
 
     private var glassBackgroundView: NSVisualEffectView?
+    private var searchGlassView: NSVisualEffectView?
+    private var tabsGlassView: NSVisualEffectView?
+    private var settingsGlassView: NSVisualEffectView?
+    private var listGlassView: NSVisualEffectView?
     private var searchField: NSSearchField?
     private var segmentedControl: NSSegmentedControl?
     private var settingsBackgroundView: NSView?
@@ -1132,13 +1136,28 @@ class BoardManPanel: NSPanel {
         }
     }
 
+    private func makeGlassSurface(blendingMode: NSVisualEffectView.BlendingMode) -> NSVisualEffectView {
+        let glass = NSVisualEffectView(frame: .zero)
+        glass.autoresizingMask = []
+        glass.blendingMode = blendingMode
+        glass.material = .hudWindow
+        glass.state = .active
+        glass.wantsLayer = true
+        glass.layer?.cornerRadius = 12
+        glass.layer?.masksToBounds = true
+        glass.layer?.borderWidth = 1
+        return glass
+    }
+
     private func setupGlassBackgroundIfNeeded() {
         guard glassBackgroundView == nil, let contentView = contentView else { return }
         let glass = NSVisualEffectView(frame: contentView.bounds)
         glass.autoresizingMask = [.width, .height]
         glass.blendingMode = .behindWindow
-        glass.material = .popover
+        glass.material = .hudWindow
         glass.state = .active
+        glass.wantsLayer = true
+        glass.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.10).cgColor
         glass.isHidden = true
         contentView.addSubview(glass, positioned: .below, relativeTo: nil)
         glassBackgroundView = glass
@@ -1147,6 +1166,11 @@ class BoardManPanel: NSPanel {
     private func setupUI() {
         guard let contentView = contentView else { return }
         setupGlassBackgroundIfNeeded()
+
+        let searchGlass = makeGlassSurface(blendingMode: .withinWindow)
+        searchGlass.isHidden = true
+        contentView.addSubview(searchGlass)
+        searchGlassView = searchGlass
 
         // Search field at top - clean margins
         let search = NSSearchField(frame: .zero)
@@ -1157,6 +1181,11 @@ class BoardManPanel: NSPanel {
         search.focusRingType = .none
         contentView.addSubview(search)
         searchField = search
+
+        let tabsGlass = makeGlassSurface(blendingMode: .withinWindow)
+        tabsGlass.isHidden = true
+        contentView.addSubview(tabsGlass)
+        tabsGlassView = tabsGlass
 
         // Tabs: rounded style avoids harsh black blocks; History tab default and visible
         let tabs = NSSegmentedControl(frame: .zero)
@@ -1173,6 +1202,11 @@ class BoardManPanel: NSPanel {
         }
         contentView.addSubview(tabs)
         segmentedControl = tabs
+
+        let settingsGlass = makeGlassSurface(blendingMode: .withinWindow)
+        settingsGlass.isHidden = true
+        contentView.addSubview(settingsGlass)
+        settingsGlassView = settingsGlass
 
         let settingsBackground = NSView(frame: .zero)
         settingsBackground.wantsLayer = true
@@ -1256,6 +1290,11 @@ class BoardManPanel: NSPanel {
         heightLabel = heightText
 
         // Scroll list: stable margins and taller rows for readability; paste behavior stays on click/Enter.
+        let listGlass = makeGlassSurface(blendingMode: .withinWindow)
+        listGlass.isHidden = true
+        contentView.addSubview(listGlass)
+        listGlassView = listGlass
+
         let scroll = NSScrollView(frame: .zero)
         scroll.hasVerticalScroller = true
         scroll.borderType = .noBorder
@@ -1328,30 +1367,43 @@ class BoardManPanel: NSPanel {
         backgroundColor = useGlass ? .clear : .windowBackgroundColor
         isOpaque = !useGlass
         glassBackgroundView?.isHidden = !useGlass
+        glassBackgroundView?.material = .hudWindow
+        glassBackgroundView?.layer?.backgroundColor = NSColor.black.withAlphaComponent(useGlass ? 0.10 : 0).cgColor
         contentView?.layer?.backgroundColor = (useGlass
-            ? NSColor.controlBackgroundColor.withAlphaComponent(0.30)
+            ? NSColor.clear
             : NSColor.controlBackgroundColor).cgColor
+        contentView?.layer?.isOpaque = !useGlass
+        [searchGlassView, tabsGlassView, settingsGlassView, listGlassView].forEach { glass in
+            glass?.isHidden = !useGlass
+            glass?.material = .hudWindow
+            glass?.state = .active
+            glass?.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.10).cgColor
+            glass?.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+            glass?.layer?.borderWidth = useGlass ? 1 : 0
+        }
         searchField?.wantsLayer = true
         searchField?.layer?.cornerRadius = useGlass ? 10 : 6
         searchField?.layer?.backgroundColor = (useGlass
-            ? NSColor.textBackgroundColor.withAlphaComponent(0.34)
+            ? NSColor.clear
             : NSColor.clear).cgColor
         segmentedControl?.wantsLayer = true
         segmentedControl?.layer?.cornerRadius = useGlass ? 10 : 6
         segmentedControl?.layer?.backgroundColor = (useGlass
-            ? NSColor.textBackgroundColor.withAlphaComponent(0.22)
+            ? NSColor.clear
             : NSColor.clear).cgColor
         settingsBackgroundView?.layer?.backgroundColor = (useGlass
-            ? NSColor.textBackgroundColor.withAlphaComponent(0.28)
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.08)
             : NSColor.controlBackgroundColor).cgColor
         settingsBackgroundView?.layer?.cornerRadius = useGlass ? 12 : 6
-        settingsBackgroundView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.28 : 0).cgColor
+        settingsBackgroundView?.layer?.borderColor = (useGlass ? NSColor.white : NSColor.separatorColor).withAlphaComponent(useGlass ? 0.18 : 0).cgColor
         settingsBackgroundView?.layer?.borderWidth = useGlass ? 1 : 0
         scrollView?.layer?.backgroundColor = (useGlass
-            ? NSColor.textBackgroundColor.withAlphaComponent(0.24)
+            ? NSColor.clear
             : NSColor.controlBackgroundColor).cgColor
         scrollView?.layer?.cornerRadius = useGlass ? 11 : 8
-        scrollView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.30 : 0.55).cgColor
+        scrollView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.18 : 0.55).cgColor
+        scrollView?.drawsBackground = !useGlass
+        placeholderList?.backgroundColor = .clear
         footerNote?.textColor = NSColor.secondaryLabelColor.withAlphaComponent(useGlass ? 0.98 : 0.95)
         previewBubblePanel?.contentView?.layer?.cornerRadius = useGlass ? 11 : 8
         placeholderList?.reloadData()
@@ -1370,9 +1422,13 @@ class BoardManPanel: NSPanel {
         bubble.backgroundColor = .clear
         bubble.isOpaque = false
         bubble.ignoresMouseEvents = true
-        bubble.contentView = NSView(frame: bubble.contentRect(forFrameRect: bubble.frame))
+        let bubbleContent = NSVisualEffectView(frame: bubble.contentRect(forFrameRect: bubble.frame))
+        bubbleContent.blendingMode = .behindWindow
+        bubbleContent.material = .hudWindow
+        bubbleContent.state = .active
+        bubble.contentView = bubbleContent
         bubble.contentView?.wantsLayer = true
-        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.98).cgColor
+        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.18).cgColor
         bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.42).cgColor
         bubble.contentView?.layer?.borderWidth = 1
         bubble.contentView?.layer?.cornerRadius = 8
@@ -1386,9 +1442,12 @@ class BoardManPanel: NSPanel {
         let margin: CGFloat = 18
         let width = bounds.width - (margin * 2)
         let top = bounds.height - 52
+        searchGlassView?.frame = NSRect(x: margin, y: top, width: width, height: 32)
         searchField?.frame = NSRect(x: margin, y: top, width: width, height: 32)
+        tabsGlassView?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         let settingsY = top - 82
+        settingsGlassView?.frame = NSRect(x: margin, y: settingsY - 34, width: width, height: 66)
         settingsBackgroundView?.isHidden = false
         settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 34, width: width, height: 66)
         rowNumbersButton?.isHidden = false
@@ -1408,6 +1467,7 @@ class BoardManPanel: NSPanel {
         heightStepper?.isHidden = true
         footerNote?.frame = NSRect(x: margin, y: 8, width: width, height: 16)
         let scrollTop = settingsY - 44
+        listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
         scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
         placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, scrollTop - 30))
         placeholderList?.tableColumns.first?.width = width
@@ -1712,7 +1772,11 @@ class BoardManPanel: NSPanel {
         label.frame = NSRect(x: 10, y: 9, width: bubbleWidth - 20, height: bubbleHeight - 18)
         bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
         let useGlass = isLiquidGlassEnabled
-        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.88 : 0.98).cgColor
+        if let effectView = bubble.contentView as? NSVisualEffectView {
+            effectView.material = useGlass ? .hudWindow : .popover
+            effectView.blendingMode = useGlass ? .behindWindow : .withinWindow
+        }
+        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.16 : 0.98).cgColor
         bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
         label.textColor = useGlass ? .labelColor : .labelColor
 
