@@ -842,6 +842,10 @@ fileprivate enum BoardManPanelTab: Int {
     }
 }
 
+fileprivate enum BoardManInlineSettingsCategory: Int {
+    case view, behavior, history, privacy
+}
+
 fileprivate enum BoardManPanelItemSource {
     case clip
     case snippet
@@ -1020,14 +1024,24 @@ class BoardManPanel: NSPanel {
     private var searchField: NSSearchField?
     private var segmentedControl: NSSegmentedControl?
     private var settingsBackgroundView: NSView?
+    private var settingsCategoryControl: NSSegmentedControl?
     private var scrollView: NSScrollView?
     private var placeholderList: NSTableView?
     private var rowNumbersButton: NSButton?
-    private var liquidGlassButton: NSButton?
     private var timestampLabel: NSTextField?
     private var timestampPopup: NSPopUpButton?
     private var usageCountButton: NSButton?
     private var usageStylePopup: NSPopUpButton?
+    private var clickActionLabel: NSTextField?
+    private var clickActionPopup: NSPopUpButton?
+    private var enterActionLabel: NSTextField?
+    private var enterActionPopup: NSPopUpButton?
+    private var autoCloseButton: NSButton?
+    private var dedupeButton: NSButton?
+    private var reuseTopButton: NSButton?
+    private var clearHistoryButton: NSButton?
+    private var pauseRecordingButton: NSButton?
+    private var excludedAppsButton: NSButton?
     private var heightControlLabel: NSTextField?
     private var heightStepper: NSStepper?
     private var heightLabel: NSTextField?
@@ -1039,6 +1053,7 @@ class BoardManPanel: NSPanel {
     private var selectedIndex: Int = -1
     private var hoveredRow: Int = -1
     private var activeTab: BoardManPanelTab = .history
+    private var activeSettingsCategory: BoardManInlineSettingsCategory = .view
     fileprivate var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
@@ -1215,6 +1230,21 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(settingsBackground)
         settingsBackgroundView = settingsBackground
 
+        let categoryControl = NSSegmentedControl(frame: .zero)
+        categoryControl.segmentCount = 4
+        categoryControl.setLabel("View", forSegment: 0)
+        categoryControl.setLabel("Behavior", forSegment: 1)
+        categoryControl.setLabel("History", forSegment: 2)
+        categoryControl.setLabel("Privacy", forSegment: 3)
+        categoryControl.selectedSegment = 0
+        categoryControl.target = self
+        categoryControl.action = #selector(settingsCategoryChanged(_:))
+        if #available(macOS 10.10, *) {
+            categoryControl.segmentStyle = .rounded
+        }
+        contentView.addSubview(categoryControl)
+        settingsCategoryControl = categoryControl
+
         let numbers = NSButton(checkboxWithTitle: "Rows", target: self, action: #selector(rowNumbersChanged(_:)))
         numbers.state = (AppEnvironment.current.defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true) ? .on : .off
         numbers.font = NSFont.systemFont(ofSize: 11)
@@ -1223,15 +1253,6 @@ class BoardManPanel: NSPanel {
         }
         contentView.addSubview(numbers)
         rowNumbersButton = numbers
-
-        let glassToggle = NSButton(checkboxWithTitle: "Liquid Glass", target: self, action: #selector(liquidGlassChanged(_:)))
-        glassToggle.state = isLiquidGlassEnabled ? .on : .off
-        glassToggle.font = NSFont.systemFont(ofSize: 11)
-        if #available(macOS 10.14, *) {
-            glassToggle.contentTintColor = .labelColor
-        }
-        contentView.addSubview(glassToggle)
-        liquidGlassButton = glassToggle
 
         let timeText = NSTextField(labelWithString: "Time")
         timeText.font = NSFont.systemFont(ofSize: 11)
@@ -1265,6 +1286,88 @@ class BoardManPanel: NSPanel {
         usageStyle.action = #selector(usageStyleChanged(_:))
         contentView.addSubview(usageStyle)
         usageStylePopup = usageStyle
+
+        let clickText = NSTextField(labelWithString: "Click")
+        clickText.font = NSFont.systemFont(ofSize: 11)
+        clickText.textColor = .labelColor
+        contentView.addSubview(clickText)
+        clickActionLabel = clickText
+
+        let clickPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        clickPopup.addItems(withTitles: ["Paste", "Copy only"])
+        clickPopup.selectItem(withTitle: "Paste")
+        clickPopup.font = NSFont.systemFont(ofSize: 11)
+        clickPopup.isEnabled = false
+        clickPopup.toolTip = "Planned: click behavior is kept as paste for safety."
+        contentView.addSubview(clickPopup)
+        clickActionPopup = clickPopup
+
+        let enterText = NSTextField(labelWithString: "Enter")
+        enterText.font = NSFont.systemFont(ofSize: 11)
+        enterText.textColor = .labelColor
+        contentView.addSubview(enterText)
+        enterActionLabel = enterText
+
+        let enterPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        enterPopup.addItems(withTitles: ["Paste", "Copy only"])
+        enterPopup.selectItem(withTitle: "Paste")
+        enterPopup.font = NSFont.systemFont(ofSize: 11)
+        enterPopup.isEnabled = false
+        enterPopup.toolTip = "Planned: Enter behavior is kept as paste for safety."
+        contentView.addSubview(enterPopup)
+        enterActionPopup = enterPopup
+
+        let autoClose = NSButton(checkboxWithTitle: "Auto close", target: nil, action: nil)
+        autoClose.state = .on
+        autoClose.font = NSFont.systemFont(ofSize: 11)
+        autoClose.isEnabled = false
+        autoClose.toolTip = "Current paste behavior closes the panel."
+        if #available(macOS 10.14, *) {
+            autoClose.contentTintColor = .labelColor
+        }
+        contentView.addSubview(autoClose)
+        autoCloseButton = autoClose
+
+        let dedupe = NSButton(checkboxWithTitle: "Dedupe", target: self, action: #selector(dedupeChanged(_:)))
+        dedupe.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.copySameHistory) ? .off : .on
+        dedupe.font = NSFont.systemFont(ofSize: 11)
+        if #available(macOS 10.14, *) {
+            dedupe.contentTintColor = .labelColor
+        }
+        contentView.addSubview(dedupe)
+        dedupeButton = dedupe
+
+        let reuseTop = NSButton(checkboxWithTitle: "Reuse top", target: self, action: #selector(reuseTopChanged(_:)))
+        reuseTop.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting) ? .on : .off
+        reuseTop.font = NSFont.systemFont(ofSize: 11)
+        if #available(macOS 10.14, *) {
+            reuseTop.contentTintColor = .labelColor
+        }
+        contentView.addSubview(reuseTop)
+        reuseTopButton = reuseTop
+
+        let clear = NSButton(title: "Clear", target: self, action: #selector(clearHistoryRequested(_:)))
+        clear.font = NSFont.systemFont(ofSize: 11)
+        clear.bezelStyle = .rounded
+        contentView.addSubview(clear)
+        clearHistoryButton = clear
+
+        let pause = NSButton(checkboxWithTitle: "Pause", target: nil, action: nil)
+        pause.state = .off
+        pause.font = NSFont.systemFont(ofSize: 11)
+        pause.isEnabled = false
+        pause.toolTip = "Planned: recording pause needs backend support."
+        if #available(macOS 10.14, *) {
+            pause.contentTintColor = .labelColor
+        }
+        contentView.addSubview(pause)
+        pauseRecordingButton = pause
+
+        let exclude = NSButton(title: "Exclude", target: self, action: #selector(openExcludedAppsSettings(_:)))
+        exclude.font = NSFont.systemFont(ofSize: 11)
+        exclude.bezelStyle = .rounded
+        contentView.addSubview(exclude)
+        excludedAppsButton = exclude
 
         let heightTitle = NSTextField(labelWithString: "Height")
         heightTitle.font = NSFont.systemFont(ofSize: 11)
@@ -1447,31 +1550,58 @@ class BoardManPanel: NSPanel {
         tabsGlassView?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         let settingsY = top - 82
-        settingsGlassView?.frame = NSRect(x: margin, y: settingsY - 34, width: width, height: 66)
+        let settingsHeight: CGFloat = 78
+        settingsGlassView?.frame = NSRect(x: margin, y: settingsY - 46, width: width, height: settingsHeight)
         settingsBackgroundView?.isHidden = false
-        settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 34, width: width, height: 66)
-        rowNumbersButton?.isHidden = false
-        rowNumbersButton?.frame = NSRect(x: margin + 12, y: settingsY + 8, width: 64, height: 18)
-        liquidGlassButton?.isHidden = false
-        liquidGlassButton?.frame = NSRect(x: margin + 88, y: settingsY + 8, width: 128, height: 18)
-        timestampLabel?.isHidden = false
-        timestampLabel?.frame = NSRect(x: margin + 12, y: settingsY - 20, width: 32, height: 14)
-        timestampPopup?.isHidden = false
-        timestampPopup?.frame = NSRect(x: margin + 50, y: settingsY - 25, width: 138, height: 24)
-        usageCountButton?.isHidden = false
-        usageCountButton?.frame = NSRect(x: margin + 204, y: settingsY - 20, width: 68, height: 18)
-        usageStylePopup?.isHidden = false
-        usageStylePopup?.frame = NSRect(x: margin + 278, y: settingsY - 25, width: 92, height: 24)
+        settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 46, width: width, height: settingsHeight)
+        settingsCategoryControl?.frame = NSRect(x: margin + 12, y: settingsY + 6, width: width - 24, height: 24)
+        let controlsY = settingsY - 28
+        layoutInlineSettingsControls(margin: margin, width: width, controlY: controlsY)
         heightControlLabel?.isHidden = true
         heightLabel?.isHidden = true
         heightStepper?.isHidden = true
         footerNote?.frame = NSRect(x: margin, y: 8, width: width, height: 16)
-        let scrollTop = settingsY - 44
+        let scrollTop = settingsY - 56
         listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
         scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
         placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, scrollTop - 30))
         placeholderList?.tableColumns.first?.width = width
         hidePreviewBubble()
+    }
+
+    private func layoutInlineSettingsControls(margin: CGFloat, width: CGFloat, controlY: CGFloat) {
+        let category = activeSettingsCategory
+        let viewControls: [NSView?] = [rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStylePopup]
+        let behaviorControls: [NSView?] = [clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton]
+        let historyControls: [NSView?] = [dedupeButton, reuseTopButton, clearHistoryButton]
+        let privacyControls: [NSView?] = [pauseRecordingButton, excludedAppsButton]
+        [viewControls, behaviorControls, historyControls, privacyControls].flatMap { $0 }.forEach { $0?.isHidden = true }
+
+        switch category {
+        case .view:
+            viewControls.forEach { $0?.isHidden = false }
+            rowNumbersButton?.frame = NSRect(x: margin + 12, y: controlY + 1, width: 62, height: 18)
+            timestampLabel?.frame = NSRect(x: margin + 80, y: controlY + 3, width: 32, height: 14)
+            timestampPopup?.frame = NSRect(x: margin + 116, y: controlY - 2, width: 132, height: 24)
+            usageCountButton?.frame = NSRect(x: margin + 260, y: controlY + 1, width: 66, height: 18)
+            usageStylePopup?.frame = NSRect(x: margin + 332, y: controlY - 2, width: 86, height: 24)
+        case .behavior:
+            behaviorControls.forEach { $0?.isHidden = false }
+            clickActionLabel?.frame = NSRect(x: margin + 12, y: controlY + 3, width: 34, height: 14)
+            clickActionPopup?.frame = NSRect(x: margin + 50, y: controlY - 2, width: 92, height: 24)
+            enterActionLabel?.frame = NSRect(x: margin + 154, y: controlY + 3, width: 38, height: 14)
+            enterActionPopup?.frame = NSRect(x: margin + 198, y: controlY - 2, width: 92, height: 24)
+            autoCloseButton?.frame = NSRect(x: margin + 304, y: controlY + 1, width: 100, height: 18)
+        case .history:
+            historyControls.forEach { $0?.isHidden = false }
+            dedupeButton?.frame = NSRect(x: margin + 12, y: controlY + 1, width: 82, height: 18)
+            reuseTopButton?.frame = NSRect(x: margin + 112, y: controlY + 1, width: 96, height: 18)
+            clearHistoryButton?.frame = NSRect(x: margin + width - 84, y: controlY - 2, width: 72, height: 24)
+        case .privacy:
+            privacyControls.forEach { $0?.isHidden = false }
+            pauseRecordingButton?.frame = NSRect(x: margin + 12, y: controlY + 1, width: 82, height: 18)
+            excludedAppsButton?.frame = NSRect(x: margin + 112, y: controlY - 2, width: 84, height: 24)
+        }
     }
 
     fileprivate func reloadHistoryItems(_ items: [BoardManHistoryItem]) {
@@ -1498,11 +1628,6 @@ class BoardManPanel: NSPanel {
     @objc private func rowNumbersChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowRowNumbers)
         onRefreshRequested?()
-    }
-
-    @objc private func liquidGlassChanged(_ sender: NSButton) {
-        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManLiquidGlass)
-        applyLiquidGlassStyle()
     }
 
     @objc private func timestampFormatChanged(_ sender: NSPopUpButton) {
@@ -1540,6 +1665,36 @@ class BoardManPanel: NSPanel {
         hoveredRow = -1
         hidePreviewBubble()
         applyCurrentFilter()
+    }
+
+    @objc private func settingsCategoryChanged(_ sender: NSSegmentedControl) {
+        activeSettingsCategory = BoardManInlineSettingsCategory(rawValue: sender.selectedSegment) ?? .view
+        layoutPanelSubviews()
+    }
+
+    @objc private func dedupeChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .off, forKey: Constants.UserDefaults.copySameHistory)
+    }
+
+    @objc private func reuseTopChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.reorderClipsAfterPasting)
+        onRefreshRequested?()
+    }
+
+    @objc private func clearHistoryRequested(_ sender: NSButton) {
+        let alert = NSAlert()
+        alert.messageText = "Clear History"
+        alert.informativeText = "Clear all clipboard history?"
+        alert.addButton(withTitle: "Clear")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        AppEnvironment.current.clipService.clearAll()
+        onRefreshRequested?()
+    }
+
+    @objc private func openExcludedAppsSettings(_ sender: NSButton) {
+        (NSApp.delegate as? AppDelegate)?.showPreferenceWindow()
     }
 
     @objc private func searchTextChanged(_ sender: NSSearchField) {
