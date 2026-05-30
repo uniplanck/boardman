@@ -50,6 +50,8 @@ final class CPYPreferencesWindowController: NSWindowController {
     private var toolbarButtons: [NSButton] {
         return [generalButton, menuButton, typeButton, excludeButton, shortcutsButton, updatesButton, betaButton]
     }
+    private var settingsGlassBackgroundView: NSVisualEffectView?
+    private var toolbarGlassView: NSVisualEffectView?
     private let boardManCategoryTitles = ["General", "History", "Paste", "Privacy", "Shortcuts", "Updates", "Advanced"]
     private let paneTextRewrites = [
         "Input \"⌘ + V\" after menu item selection": "Paste automatically after choosing an item",
@@ -154,18 +156,54 @@ private extension CPYPreferencesWindowController {
         if let contentView = window.contentView {
             contentView.wantsLayer = true
             contentView.layer?.backgroundColor = (useLiquidGlass
-                ? NSColor.controlBackgroundColor.withAlphaComponent(0.46)
+                ? NSColor.clear
                 : NSColor.windowBackgroundColor).cgColor
             contentView.layer?.cornerRadius = useLiquidGlass ? 12 : 0
             contentView.layer?.masksToBounds = useLiquidGlass
+            configureSettingsGlassBackground(in: contentView, enabled: useLiquidGlass)
         }
+    }
+
+    func makeSettingsGlassSurface(blendingMode: NSVisualEffectView.BlendingMode) -> NSVisualEffectView {
+        let glass = NSVisualEffectView(frame: .zero)
+        glass.blendingMode = blendingMode
+        glass.material = .hudWindow
+        glass.state = .active
+        glass.wantsLayer = true
+        glass.layer?.cornerRadius = 12
+        glass.layer?.masksToBounds = true
+        glass.layer?.borderWidth = 1
+        return glass
+    }
+
+    func configureSettingsGlassBackground(in contentView: NSView, enabled: Bool) {
+        if settingsGlassBackgroundView == nil {
+            let glass = makeSettingsGlassSurface(blendingMode: .behindWindow)
+            glass.autoresizingMask = [.width, .height]
+            contentView.addSubview(glass, positioned: .below, relativeTo: nil)
+            settingsGlassBackgroundView = glass
+        }
+        settingsGlassBackgroundView?.frame = contentView.bounds
+        settingsGlassBackgroundView?.isHidden = !enabled
+        settingsGlassBackgroundView?.layer?.backgroundColor = NSColor.black.withAlphaComponent(enabled ? 0.10 : 0).cgColor
+        settingsGlassBackgroundView?.layer?.borderColor = NSColor.white.withAlphaComponent(enabled ? 0.16 : 0).cgColor
     }
 
     func styleToolbar() {
         let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
+        if toolbarGlassView == nil {
+            let glass = makeSettingsGlassSurface(blendingMode: .withinWindow)
+            glass.autoresizingMask = [.width, .height]
+            toolBar.addSubview(glass, positioned: .below, relativeTo: nil)
+            toolbarGlassView = glass
+        }
+        toolbarGlassView?.frame = toolBar.bounds
+        toolbarGlassView?.isHidden = !useLiquidGlass
+        toolbarGlassView?.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(useLiquidGlass ? 0.10 : 0).cgColor
+        toolbarGlassView?.layer?.borderColor = NSColor.white.withAlphaComponent(useLiquidGlass ? 0.14 : 0).cgColor
         toolBar.wantsLayer = true
         toolBar.layer?.backgroundColor = (useLiquidGlass
-            ? NSColor.textBackgroundColor.withAlphaComponent(0.30)
+            ? NSColor.clear
             : NSColor.controlBackgroundColor).cgColor
         toolBar.layer?.cornerRadius = useLiquidGlass ? 10 : 0
         toolBar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.26 : 0.6).cgColor
@@ -270,7 +308,7 @@ private extension CPYPreferencesWindowController {
         let newView = viewController[index].view
         // Remove current views without toolbar
         window?.contentView?.subviews.forEach { view in
-            if view != toolBar {
+            if view != toolBar && (settingsGlassBackgroundView == nil || view !== settingsGlassBackgroundView!) {
                 view.removeFromSuperview()
             }
         }
@@ -289,11 +327,24 @@ private extension CPYPreferencesWindowController {
         let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
         view.wantsLayer = true
         view.layer?.backgroundColor = (useLiquidGlass
-            ? NSColor.textBackgroundColor.withAlphaComponent(0.24)
+            ? NSColor.clear
             : NSColor.windowBackgroundColor).cgColor
         view.layer?.cornerRadius = useLiquidGlass ? 12 : 0
-        view.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.20 : 0).cgColor
+        view.layer?.borderColor = NSColor.white.withAlphaComponent(useLiquidGlass ? 0.14 : 0).cgColor
         view.layer?.borderWidth = useLiquidGlass ? 1 : 0
+        let paneGlassIdentifier = NSUserInterfaceItemIdentifier("BoardManSettingsPaneGlass")
+        view.subviews
+            .filter { $0.identifier == paneGlassIdentifier }
+            .forEach { $0.removeFromSuperview() }
+        if useLiquidGlass {
+            let paneGlass = makeSettingsGlassSurface(blendingMode: .withinWindow)
+            paneGlass.identifier = paneGlassIdentifier
+            paneGlass.frame = view.bounds
+            paneGlass.autoresizingMask = [.width, .height]
+            paneGlass.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.08).cgColor
+            paneGlass.layer?.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
+            view.addSubview(paneGlass, positioned: .below, relativeTo: nil)
+        }
         stylePreferenceSubviews(in: view, depth: 0)
     }
 
@@ -332,12 +383,13 @@ private extension CPYPreferencesWindowController {
                 let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
                 scrollView.wantsLayer = true
                 scrollView.layer?.backgroundColor = (useLiquidGlass
-                    ? NSColor.controlBackgroundColor.withAlphaComponent(0.34)
+                    ? NSColor.clear
                     : NSColor.controlBackgroundColor).cgColor
                 scrollView.layer?.cornerRadius = useLiquidGlass ? 10 : 7
-                scrollView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.28 : 1).cgColor
+                scrollView.layer?.borderColor = (useLiquidGlass ? NSColor.white : NSColor.separatorColor).withAlphaComponent(useLiquidGlass ? 0.14 : 1).cgColor
                 scrollView.layer?.borderWidth = 1
                 scrollView.borderType = .noBorder
+                scrollView.drawsBackground = !useLiquidGlass
             }
             stylePreferenceSubviews(in: subview, depth: depth + 1)
         }
