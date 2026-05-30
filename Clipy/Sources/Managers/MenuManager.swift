@@ -922,7 +922,7 @@ class BoardManPanel: NSPanel {
     private var selectedIndex: Int = -1
     private var hoveredRow: Int = -1
     private var activeTab: BoardManPanelTab = .history
-    var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
+    fileprivate var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
         return historyItems.count
@@ -996,9 +996,6 @@ class BoardManPanel: NSPanel {
         tabs.action = #selector(tabChanged(_:))
         if #available(macOS 10.10, *) {
             tabs.segmentStyle = .rounded
-        }
-        if #available(macOS 10.14, *) {
-            tabs.contentTintColor = NSColor.controlAccentColor
         }
         contentView.addSubview(tabs)
         segmentedControl = tabs
