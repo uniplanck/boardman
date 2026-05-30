@@ -898,17 +898,22 @@ private final class BoardManHistoryRowView: NSTableRowView {
         let path = NSBezierPath(roundedRect: rowRect, xRadius: useLiquidGlass ? 11 : 8, yRadius: useLiquidGlass ? 11 : 8)
         if previewOwner?.isSelectedRow(row) == true {
             (useLiquidGlass
-                ? NSColor.controlAccentColor.withAlphaComponent(0.34)
+                ? NSColor.controlAccentColor.withAlphaComponent(0.30)
                 : NSColor.selectedContentBackgroundColor.withAlphaComponent(0.82)).setFill()
             path.fill()
         } else if previewOwner?.isHoveredRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.18 : 0.16).setFill()
+            NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.14 : 0.16).setFill()
             path.fill()
         } else if row >= 0 {
             (useLiquidGlass
-                ? NSColor.textBackgroundColor.withAlphaComponent(0.26)
+                ? NSColor.textBackgroundColor.withAlphaComponent(0.34)
                 : NSColor.textBackgroundColor.withAlphaComponent(0.36)).setFill()
             path.fill()
+            if useLiquidGlass {
+                NSColor.separatorColor.withAlphaComponent(0.16).setStroke()
+                path.lineWidth = 1
+                path.stroke()
+            }
         } else {
             super.drawBackground(in: dirtyRect)
         }
@@ -977,13 +982,15 @@ private final class BoardManHistoryCellView: NSTableCellView {
             primaryLabel.textColor = .selectedMenuItemTextColor
             metadataLabel.textColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.86)
             countBadge.textColor = .selectedMenuItemTextColor
-            countBadge.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(useLiquidGlass ? 0.24 : 0.18).cgColor
+            countBadge.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(useLiquidGlass ? 0.20 : 0.18).cgColor
         } else {
             primaryLabel.textColor = .labelColor
-            metadataLabel.textColor = .secondaryLabelColor
+            metadataLabel.textColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.92) : .secondaryLabelColor
             countBadge.textColor = .labelColor
-            countBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.22 : 0.18).cgColor
+            countBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.18 : 0.18).cgColor
         }
+        countBadge.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.30 : 0).cgColor
+        countBadge.layer?.borderWidth = useLiquidGlass ? 1 : 0
         needsLayout = true
     }
 
@@ -1174,7 +1181,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(settingsBackground)
         settingsBackgroundView = settingsBackground
 
-        let numbers = NSButton(checkboxWithTitle: "Number", target: self, action: #selector(rowNumbersChanged(_:)))
+        let numbers = NSButton(checkboxWithTitle: "Rows", target: self, action: #selector(rowNumbersChanged(_:)))
         numbers.state = (AppEnvironment.current.defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true) ? .on : .off
         numbers.font = NSFont.systemFont(ofSize: 11)
         if #available(macOS 10.14, *) {
@@ -1183,7 +1190,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(numbers)
         rowNumbersButton = numbers
 
-        let glassToggle = NSButton(checkboxWithTitle: "Liquid Glass (Beta)", target: self, action: #selector(liquidGlassChanged(_:)))
+        let glassToggle = NSButton(checkboxWithTitle: "Liquid Glass", target: self, action: #selector(liquidGlassChanged(_:)))
         glassToggle.state = isLiquidGlassEnabled ? .on : .off
         glassToggle.font = NSFont.systemFont(ofSize: 11)
         if #available(macOS 10.14, *) {
@@ -1322,18 +1329,29 @@ class BoardManPanel: NSPanel {
         isOpaque = !useGlass
         glassBackgroundView?.isHidden = !useGlass
         contentView?.layer?.backgroundColor = (useGlass
-            ? NSColor.controlBackgroundColor.withAlphaComponent(0.42)
+            ? NSColor.controlBackgroundColor.withAlphaComponent(0.30)
             : NSColor.controlBackgroundColor).cgColor
+        searchField?.wantsLayer = true
+        searchField?.layer?.cornerRadius = useGlass ? 10 : 6
+        searchField?.layer?.backgroundColor = (useGlass
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.34)
+            : NSColor.clear).cgColor
+        segmentedControl?.wantsLayer = true
+        segmentedControl?.layer?.cornerRadius = useGlass ? 10 : 6
+        segmentedControl?.layer?.backgroundColor = (useGlass
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.22)
+            : NSColor.clear).cgColor
         settingsBackgroundView?.layer?.backgroundColor = (useGlass
-            ? NSColor.controlBackgroundColor.withAlphaComponent(0.38)
-            : NSColor.controlBackgroundColor).cgColor
-        settingsBackgroundView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.32 : 0).cgColor
-        settingsBackgroundView?.layer?.borderWidth = useGlass ? 1 : 0
-        scrollView?.layer?.backgroundColor = (useGlass
             ? NSColor.textBackgroundColor.withAlphaComponent(0.28)
             : NSColor.controlBackgroundColor).cgColor
+        settingsBackgroundView?.layer?.cornerRadius = useGlass ? 12 : 6
+        settingsBackgroundView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.28 : 0).cgColor
+        settingsBackgroundView?.layer?.borderWidth = useGlass ? 1 : 0
+        scrollView?.layer?.backgroundColor = (useGlass
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.24)
+            : NSColor.controlBackgroundColor).cgColor
         scrollView?.layer?.cornerRadius = useGlass ? 11 : 8
-        scrollView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.34 : 0.55).cgColor
+        scrollView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.30 : 0.55).cgColor
         footerNote?.textColor = NSColor.secondaryLabelColor.withAlphaComponent(useGlass ? 0.98 : 0.95)
         previewBubblePanel?.contentView?.layer?.cornerRadius = useGlass ? 11 : 8
         placeholderList?.reloadData()
@@ -1370,26 +1388,26 @@ class BoardManPanel: NSPanel {
         let top = bounds.height - 52
         searchField?.frame = NSRect(x: margin, y: top, width: width, height: 32)
         segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
-        let settingsY = top - 78
+        let settingsY = top - 82
         settingsBackgroundView?.isHidden = false
-        settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 28, width: width, height: 56)
+        settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 34, width: width, height: 66)
         rowNumbersButton?.isHidden = false
-        rowNumbersButton?.frame = NSRect(x: margin + 10, y: settingsY + 7, width: 74, height: 18)
+        rowNumbersButton?.frame = NSRect(x: margin + 12, y: settingsY + 8, width: 64, height: 18)
         liquidGlassButton?.isHidden = false
-        liquidGlassButton?.frame = NSRect(x: margin + 92, y: settingsY + 7, width: 150, height: 18)
+        liquidGlassButton?.frame = NSRect(x: margin + 88, y: settingsY + 8, width: 128, height: 18)
         timestampLabel?.isHidden = false
-        timestampLabel?.frame = NSRect(x: margin + 10, y: settingsY - 17, width: 30, height: 14)
+        timestampLabel?.frame = NSRect(x: margin + 12, y: settingsY - 20, width: 32, height: 14)
         timestampPopup?.isHidden = false
-        timestampPopup?.frame = NSRect(x: margin + 44, y: settingsY - 22, width: 136, height: 24)
+        timestampPopup?.frame = NSRect(x: margin + 50, y: settingsY - 25, width: 138, height: 24)
         usageCountButton?.isHidden = false
-        usageCountButton?.frame = NSRect(x: margin + 190, y: settingsY - 17, width: 64, height: 18)
+        usageCountButton?.frame = NSRect(x: margin + 204, y: settingsY - 20, width: 68, height: 18)
         usageStylePopup?.isHidden = false
-        usageStylePopup?.frame = NSRect(x: margin + 254, y: settingsY - 22, width: 86, height: 24)
+        usageStylePopup?.frame = NSRect(x: margin + 278, y: settingsY - 25, width: 92, height: 24)
         heightControlLabel?.isHidden = true
         heightLabel?.isHidden = true
         heightStepper?.isHidden = true
         footerNote?.frame = NSRect(x: margin, y: 8, width: width, height: 16)
-        let scrollTop = settingsY - 38
+        let scrollTop = settingsY - 44
         scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
         placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, scrollTop - 30))
         placeholderList?.tableColumns.first?.width = width
@@ -1694,8 +1712,9 @@ class BoardManPanel: NSPanel {
         label.frame = NSRect(x: 10, y: 9, width: bubbleWidth - 20, height: bubbleHeight - 18)
         bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
         let useGlass = isLiquidGlassEnabled
-        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.86 : 0.98).cgColor
-        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(useGlass ? 0.48 : 0.42).cgColor
+        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.88 : 0.98).cgColor
+        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+        label.textColor = useGlass ? .labelColor : .labelColor
 
         let panelFrame = frame
         let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? panelFrame.insetBy(dx: -bubbleWidth, dy: -bubbleHeight)
