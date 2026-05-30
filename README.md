@@ -1,5 +1,9 @@
 # Board-Man
 
+[English](README.md) / [日本語](README.ja.md)
+
+
+
 Board-Man is a macOS clipboard productivity utility derived from Clipy.
 
 It extends the clipboard manager concept with workflow-oriented features such as paste activity visibility, menu bar feedback, and operator-friendly usage for people who repeatedly write, paste, edit, and move text across apps.
