@@ -52,6 +52,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
 
     // MARK: - Menu Actions
     @objc func showPreferenceWindow() {
+        AppEnvironment.current.menuManager.hideBoardManPanelForPreferences()
         NSApp.activate(ignoringOtherApps: true)
         CPYPreferencesWindowController.sharedController.showWindow(self)
     }

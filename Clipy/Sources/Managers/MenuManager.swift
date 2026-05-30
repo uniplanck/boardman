@@ -60,6 +60,11 @@ final class MenuManager: NSObject {
         bind()
     }
 
+    func hideBoardManPanelForPreferences() {
+        boardManPanel?.orderOut(nil)
+        previousFrontmostApplication = nil
+    }
+
 }
 
 // MARK: - Popup Menu
@@ -885,10 +890,10 @@ private final class BoardManHistoryRowView: NSTableRowView {
         let rowRect = bounds.insetBy(dx: 4, dy: 3)
         let path = NSBezierPath(roundedRect: rowRect, xRadius: 7, yRadius: 7)
         if previewOwner?.isSelectedRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(0.16).setFill()
+            NSColor.controlAccentColor.withAlphaComponent(0.22).setFill()
             path.fill()
         } else if previewOwner?.isHoveredRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(0.07).setFill()
+            NSColor.controlAccentColor.withAlphaComponent(0.10).setFill()
             path.fill()
         } else {
             super.drawBackground(in: dirtyRect)
@@ -1060,7 +1065,7 @@ class BoardManPanel: NSPanel {
         scroll.borderType = .noBorder
         scroll.autohidesScrollers = true
         scroll.wantsLayer = true
-        scroll.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.84).cgColor
+        scroll.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         scroll.layer?.cornerRadius = 8
         scroll.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
         scroll.layer?.borderWidth = 1
@@ -1099,7 +1104,7 @@ class BoardManPanel: NSPanel {
         let note = NSTextField(labelWithString: "Click or press Enter to paste - right-click to pin")
         note.alignment = .center
         note.textColor = .secondaryLabelColor
-        note.font = NSFont.systemFont(ofSize: 10)
+        note.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         note.backgroundColor = .clear
         note.drawsBackground = false
         contentView.addSubview(note)
@@ -1565,6 +1570,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
                     ], range: fullRange)
                 }
                 cell?.attributedStringValue = attributedTitle
+                cell?.backgroundColor = .clear
                 cell?.drawsBackground = true
             } else {
                 cell?.stringValue = item.title
