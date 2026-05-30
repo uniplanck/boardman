@@ -154,8 +154,10 @@ private extension CPYPreferencesWindowController {
         if let contentView = window.contentView {
             contentView.wantsLayer = true
             contentView.layer?.backgroundColor = (useLiquidGlass
-                ? NSColor.windowBackgroundColor.withAlphaComponent(0.78)
+                ? NSColor.controlBackgroundColor.withAlphaComponent(0.46)
                 : NSColor.windowBackgroundColor).cgColor
+            contentView.layer?.cornerRadius = useLiquidGlass ? 12 : 0
+            contentView.layer?.masksToBounds = useLiquidGlass
         }
     }
 
@@ -163,29 +165,32 @@ private extension CPYPreferencesWindowController {
         let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
         toolBar.wantsLayer = true
         toolBar.layer?.backgroundColor = (useLiquidGlass
-            ? NSColor.controlBackgroundColor.withAlphaComponent(0.62)
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.30)
             : NSColor.controlBackgroundColor).cgColor
-        toolBar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.38 : 0.6).cgColor
+        toolBar.layer?.cornerRadius = useLiquidGlass ? 10 : 0
+        toolBar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.26 : 0.6).cgColor
         toolBar.layer?.borderWidth = 1
         for (index, label) in toolbarLabels.enumerated() {
             label.stringValue = boardManCategoryTitles[safe: index] ?? label.stringValue
             label.font = NSFont.systemFont(ofSize: 10, weight: .medium)
-            label.textColor = .secondaryLabelColor
+            label.textColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.96) : .secondaryLabelColor
             label.backgroundColor = .clear
             label.drawsBackground = false
         }
         toolbarButtons.forEach { button in
             button.wantsLayer = true
-            button.layer?.cornerRadius = 7
+            button.layer?.cornerRadius = useLiquidGlass ? 9 : 7
             button.layer?.backgroundColor = NSColor.clear.cgColor
+            button.layer?.borderWidth = 0
         }
         toolbarImages.forEach { imageView in
-            imageView.contentTintColor = .secondaryLabelColor
+            imageView.contentTintColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.96) : .secondaryLabelColor
             imageView.image?.isTemplate = true
         }
     }
 
     func resetImages() {
+        let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
         generalImageView.image = boardManSymbol("gearshape", fallback: NSImage(resource: .prefGeneral))
         menuImageView.image = boardManSymbol("list.bullet.rectangle", fallback: NSImage(resource: .prefMenu))
         typeImageView.image = boardManSymbol("doc.on.clipboard", fallback: NSImage(resource: .prefType))
@@ -194,19 +199,21 @@ private extension CPYPreferencesWindowController {
         updatesImageView.image = boardManSymbol("arrow.triangle.2.circlepath", fallback: NSImage(resource: .prefUpdate))
         betaImageView.image = boardManSymbol("sparkles", fallback: NSImage(resource: .prefBeta))
 
-        generalTextField.textColor = NSColor(resource: .tabTitle)
-        menuTextField.textColor = NSColor(resource: .tabTitle)
-        typeTextField.textColor = NSColor(resource: .tabTitle)
-        excludeTextField.textColor = NSColor(resource: .tabTitle)
-        shortcutsTextField.textColor = NSColor(resource: .tabTitle)
-        updatesTextField.textColor = NSColor(resource: .tabTitle)
-        betaTextField.textColor = NSColor(resource: .tabTitle)
+        let inactiveLabelColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.96) : NSColor(resource: .tabTitle)
+        generalTextField.textColor = inactiveLabelColor
+        menuTextField.textColor = inactiveLabelColor
+        typeTextField.textColor = inactiveLabelColor
+        excludeTextField.textColor = inactiveLabelColor
+        shortcutsTextField.textColor = inactiveLabelColor
+        updatesTextField.textColor = inactiveLabelColor
+        betaTextField.textColor = inactiveLabelColor
         toolbarImages.forEach { imageView in
-            imageView.contentTintColor = .secondaryLabelColor
+            imageView.contentTintColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.96) : .secondaryLabelColor
             imageView.image?.isTemplate = true
         }
         toolbarButtons.forEach { button in
             button.layer?.backgroundColor = NSColor.clear.cgColor
+            button.layer?.borderWidth = 0
         }
     }
 
@@ -253,7 +260,10 @@ private extension CPYPreferencesWindowController {
             betaImageView.contentTintColor = NSColor.controlAccentColor
         default: break
         }
-        toolbarButtons[safe: index]?.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
+        let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
+        toolbarButtons[safe: index]?.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.16 : 0.12).cgColor
+        toolbarButtons[safe: index]?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.30 : 0).cgColor
+        toolbarButtons[safe: index]?.layer?.borderWidth = useLiquidGlass ? 1 : 0
     }
 
     func switchView(_ index: Int) {
@@ -279,8 +289,11 @@ private extension CPYPreferencesWindowController {
         let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
         view.wantsLayer = true
         view.layer?.backgroundColor = (useLiquidGlass
-            ? NSColor.windowBackgroundColor.withAlphaComponent(0.72)
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.24)
             : NSColor.windowBackgroundColor).cgColor
+        view.layer?.cornerRadius = useLiquidGlass ? 12 : 0
+        view.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.20 : 0).cgColor
+        view.layer?.borderWidth = useLiquidGlass ? 1 : 0
         stylePreferenceSubviews(in: view, depth: 0)
     }
 
@@ -290,29 +303,39 @@ private extension CPYPreferencesWindowController {
                 if let rewritten = paneTextRewrites[label.stringValue] {
                     label.stringValue = rewritten
                 }
-                label.textColor = label.isEnabled ? .labelColor : .tertiaryLabelColor
+                let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
+                label.textColor = label.isEnabled
+                    ? (useLiquidGlass ? NSColor.labelColor.withAlphaComponent(0.98) : .labelColor)
+                    : .tertiaryLabelColor
                 label.backgroundColor = .clear
                 label.drawsBackground = false
                 if label.font?.fontDescriptor.symbolicTraits.contains(.bold) == true {
                     label.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-                    label.textColor = .labelColor
+                    label.textColor = useLiquidGlass ? NSColor.labelColor.withAlphaComponent(0.98) : .labelColor
                 } else if label.font?.pointSize ?? 0 <= 11 {
                     label.font = NSFont.systemFont(ofSize: max(11, label.font?.pointSize ?? 11), weight: .regular)
                 }
             } else if let button = subview as? NSButton {
+                let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
                 if let rewritten = paneTextRewrites[button.title] {
                     button.title = rewritten
                 }
                 button.font = NSFont.systemFont(ofSize: 12, weight: .regular)
-                button.contentTintColor = button.isEnabled ? .labelColor : .tertiaryLabelColor
+                button.contentTintColor = button.isEnabled
+                    ? (useLiquidGlass ? NSColor.labelColor.withAlphaComponent(0.98) : .labelColor)
+                    : .tertiaryLabelColor
             } else if let tableView = subview as? NSTableView {
-                tableView.backgroundColor = .controlBackgroundColor
-                tableView.gridColor = .separatorColor
+                let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
+                tableView.backgroundColor = useLiquidGlass ? .clear : .controlBackgroundColor
+                tableView.gridColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.35 : 1)
             } else if let scrollView = subview as? NSScrollView {
+                let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
                 scrollView.wantsLayer = true
-                scrollView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-                scrollView.layer?.cornerRadius = 7
-                scrollView.layer?.borderColor = NSColor.separatorColor.cgColor
+                scrollView.layer?.backgroundColor = (useLiquidGlass
+                    ? NSColor.controlBackgroundColor.withAlphaComponent(0.34)
+                    : NSColor.controlBackgroundColor).cgColor
+                scrollView.layer?.cornerRadius = useLiquidGlass ? 10 : 7
+                scrollView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.28 : 1).cgColor
                 scrollView.layer?.borderWidth = 1
                 scrollView.borderType = .noBorder
             }
