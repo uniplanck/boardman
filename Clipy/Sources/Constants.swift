@@ -76,6 +76,7 @@ struct Constants {
         static let boardManPanelHeight = "BoardManPanelHeight"
         static let boardManShowUsageCount = "BoardManShowUsageCount"
         static let boardManUsageCountStyle = "BoardManUsageCountStyle"
+        static let boardManLiquidGlass = "BoardManLiquidGlass"
     }
 
     struct Beta {
