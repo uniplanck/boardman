@@ -894,15 +894,20 @@ private final class BoardManHistoryRowView: NSTableRowView {
     override func drawBackground(in dirtyRect: NSRect) {
         let row = (superview as? NSTableView)?.row(for: self) ?? -1
         let rowRect = bounds.insetBy(dx: 6, dy: 4)
-        let path = NSBezierPath(roundedRect: rowRect, xRadius: 8, yRadius: 8)
+        let useLiquidGlass = previewOwner?.isLiquidGlassEnabled == true
+        let path = NSBezierPath(roundedRect: rowRect, xRadius: useLiquidGlass ? 11 : 8, yRadius: useLiquidGlass ? 11 : 8)
         if previewOwner?.isSelectedRow(row) == true {
-            NSColor.selectedContentBackgroundColor.withAlphaComponent(0.82).setFill()
+            (useLiquidGlass
+                ? NSColor.controlAccentColor.withAlphaComponent(0.34)
+                : NSColor.selectedContentBackgroundColor.withAlphaComponent(0.82)).setFill()
             path.fill()
         } else if previewOwner?.isHoveredRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(0.16).setFill()
+            NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.18 : 0.16).setFill()
             path.fill()
         } else if row >= 0 {
-            NSColor.textBackgroundColor.withAlphaComponent(0.36).setFill()
+            (useLiquidGlass
+                ? NSColor.textBackgroundColor.withAlphaComponent(0.26)
+                : NSColor.textBackgroundColor.withAlphaComponent(0.36)).setFill()
             path.fill()
         } else {
             super.drawBackground(in: dirtyRect)
@@ -960,7 +965,8 @@ private final class BoardManHistoryCellView: NSTableCellView {
 
     func configure(item: BoardManHistoryItem,
                    isSelected: Bool,
-                   usageStyle: String) {
+                   usageStyle: String,
+                   useLiquidGlass: Bool) {
         primaryLabel.stringValue = item.primaryTitle
         metadataLabel.stringValue = item.metadataText
         let badgePrefix = usageStyle == "compact" ? "used " : "x"
@@ -971,12 +977,12 @@ private final class BoardManHistoryCellView: NSTableCellView {
             primaryLabel.textColor = .selectedMenuItemTextColor
             metadataLabel.textColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.86)
             countBadge.textColor = .selectedMenuItemTextColor
-            countBadge.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.18).cgColor
+            countBadge.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(useLiquidGlass ? 0.24 : 0.18).cgColor
         } else {
             primaryLabel.textColor = .labelColor
             metadataLabel.textColor = .secondaryLabelColor
             countBadge.textColor = .labelColor
-            countBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+            countBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.22 : 0.18).cgColor
         }
         needsLayout = true
     }
@@ -999,12 +1005,14 @@ private final class BoardManHistoryCellView: NSTableCellView {
 // MARK: - BoardManPanel MVP Shell (embedded in MenuManager.swift per constraints)
 class BoardManPanel: NSPanel {
 
+    private var glassBackgroundView: NSVisualEffectView?
     private var searchField: NSSearchField?
     private var segmentedControl: NSSegmentedControl?
     private var settingsBackgroundView: NSView?
     private var scrollView: NSScrollView?
     private var placeholderList: NSTableView?
     private var rowNumbersButton: NSButton?
+    private var liquidGlassButton: NSButton?
     private var timestampLabel: NSTextField?
     private var timestampPopup: NSPopUpButton?
     private var usageCountButton: NSButton?
@@ -1024,6 +1032,9 @@ class BoardManPanel: NSPanel {
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
         return historyItems.count
+    }
+    fileprivate var isLiquidGlassEnabled: Bool {
+        return AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
     }
 
     static func preferredPanelHeight() -> CGFloat {
@@ -1100,6 +1111,7 @@ class BoardManPanel: NSPanel {
         setupModernContainer()
         setupUI()
         setupPreviewBubble()
+        applyLiquidGlassStyle()
     }
 
     private func setupModernContainer() {
@@ -1113,8 +1125,21 @@ class BoardManPanel: NSPanel {
         }
     }
 
+    private func setupGlassBackgroundIfNeeded() {
+        guard glassBackgroundView == nil, let contentView = contentView else { return }
+        let glass = NSVisualEffectView(frame: contentView.bounds)
+        glass.autoresizingMask = [.width, .height]
+        glass.blendingMode = .behindWindow
+        glass.material = .popover
+        glass.state = .active
+        glass.isHidden = true
+        contentView.addSubview(glass, positioned: .below, relativeTo: nil)
+        glassBackgroundView = glass
+    }
+
     private func setupUI() {
         guard let contentView = contentView else { return }
+        setupGlassBackgroundIfNeeded()
 
         // Search field at top - clean margins
         let search = NSSearchField(frame: .zero)
@@ -1157,6 +1182,15 @@ class BoardManPanel: NSPanel {
         }
         contentView.addSubview(numbers)
         rowNumbersButton = numbers
+
+        let glassToggle = NSButton(checkboxWithTitle: "Liquid Glass (Beta)", target: self, action: #selector(liquidGlassChanged(_:)))
+        glassToggle.state = isLiquidGlassEnabled ? .on : .off
+        glassToggle.font = NSFont.systemFont(ofSize: 11)
+        if #available(macOS 10.14, *) {
+            glassToggle.contentTintColor = .labelColor
+        }
+        contentView.addSubview(glassToggle)
+        liquidGlassButton = glassToggle
 
         let timeText = NSTextField(labelWithString: "Time")
         timeText.font = NSFont.systemFont(ofSize: 11)
@@ -1282,6 +1316,29 @@ class BoardManPanel: NSPanel {
         table.reloadData()
     }
 
+    private func applyLiquidGlassStyle() {
+        let useGlass = isLiquidGlassEnabled
+        backgroundColor = useGlass ? .clear : .windowBackgroundColor
+        isOpaque = !useGlass
+        glassBackgroundView?.isHidden = !useGlass
+        contentView?.layer?.backgroundColor = (useGlass
+            ? NSColor.controlBackgroundColor.withAlphaComponent(0.42)
+            : NSColor.controlBackgroundColor).cgColor
+        settingsBackgroundView?.layer?.backgroundColor = (useGlass
+            ? NSColor.controlBackgroundColor.withAlphaComponent(0.38)
+            : NSColor.controlBackgroundColor).cgColor
+        settingsBackgroundView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.32 : 0).cgColor
+        settingsBackgroundView?.layer?.borderWidth = useGlass ? 1 : 0
+        scrollView?.layer?.backgroundColor = (useGlass
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.28)
+            : NSColor.controlBackgroundColor).cgColor
+        scrollView?.layer?.cornerRadius = useGlass ? 11 : 8
+        scrollView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.34 : 0.55).cgColor
+        footerNote?.textColor = NSColor.secondaryLabelColor.withAlphaComponent(useGlass ? 0.98 : 0.95)
+        previewBubblePanel?.contentView?.layer?.cornerRadius = useGlass ? 11 : 8
+        placeholderList?.reloadData()
+    }
+
     private func setupPreviewBubble() {
         guard let label = previewBubbleLabel else { return }
         let bubble = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 260, height: 120),
@@ -1315,22 +1372,24 @@ class BoardManPanel: NSPanel {
         segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         let settingsY = top - 78
         settingsBackgroundView?.isHidden = false
-        settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 2, width: width, height: 30)
+        settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 28, width: width, height: 56)
         rowNumbersButton?.isHidden = false
-        rowNumbersButton?.frame = NSRect(x: margin + 10, y: settingsY + 5, width: 74, height: 18)
+        rowNumbersButton?.frame = NSRect(x: margin + 10, y: settingsY + 7, width: 74, height: 18)
+        liquidGlassButton?.isHidden = false
+        liquidGlassButton?.frame = NSRect(x: margin + 92, y: settingsY + 7, width: 150, height: 18)
         timestampLabel?.isHidden = false
-        timestampLabel?.frame = NSRect(x: margin + 92, y: settingsY + 7, width: 30, height: 14)
+        timestampLabel?.frame = NSRect(x: margin + 10, y: settingsY - 17, width: 30, height: 14)
         timestampPopup?.isHidden = false
-        timestampPopup?.frame = NSRect(x: margin + 126, y: settingsY + 2, width: 136, height: 24)
+        timestampPopup?.frame = NSRect(x: margin + 44, y: settingsY - 22, width: 136, height: 24)
         usageCountButton?.isHidden = false
-        usageCountButton?.frame = NSRect(x: margin + 272, y: settingsY + 5, width: 64, height: 18)
+        usageCountButton?.frame = NSRect(x: margin + 190, y: settingsY - 17, width: 64, height: 18)
         usageStylePopup?.isHidden = false
-        usageStylePopup?.frame = NSRect(x: margin + 336, y: settingsY + 2, width: min(86, max(74, width - 346)), height: 24)
+        usageStylePopup?.frame = NSRect(x: margin + 254, y: settingsY - 22, width: 86, height: 24)
         heightControlLabel?.isHidden = true
         heightLabel?.isHidden = true
         heightStepper?.isHidden = true
         footerNote?.frame = NSRect(x: margin, y: 8, width: width, height: 16)
-        let scrollTop = settingsY - 12
+        let scrollTop = settingsY - 38
         scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
         placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, scrollTop - 30))
         placeholderList?.tableColumns.first?.width = width
@@ -1361,6 +1420,11 @@ class BoardManPanel: NSPanel {
     @objc private func rowNumbersChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowRowNumbers)
         onRefreshRequested?()
+    }
+
+    @objc private func liquidGlassChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManLiquidGlass)
+        applyLiquidGlassStyle()
     }
 
     @objc private func timestampFormatChanged(_ sender: NSPopUpButton) {
@@ -1629,8 +1693,9 @@ class BoardManPanel: NSPanel {
         let bubbleHeight = min(166, max(44, ceil(textSize.height) + 18))
         label.frame = NSRect(x: 10, y: 9, width: bubbleWidth - 20, height: bubbleHeight - 18)
         bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
-        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.98).cgColor
-        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.42).cgColor
+        let useGlass = isLiquidGlassEnabled
+        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.86 : 0.98).cgColor
+        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(useGlass ? 0.48 : 0.42).cgColor
 
         let panelFrame = frame
         let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? panelFrame.insetBy(dx: -bubbleWidth, dy: -bubbleHeight)
@@ -1713,7 +1778,8 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
         cell.toolTip = nil
         cell.configure(item: item,
                        isSelected: selectedIndex == row,
-                       usageStyle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)))
+                       usageStyle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)),
+                       useLiquidGlass: isLiquidGlassEnabled)
         return cell
     }
 

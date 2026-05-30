@@ -145,21 +145,27 @@ private extension CPYPreferencesWindowController {
         window.collectionBehavior = [.moveToActiveSpace]
         window.styleMask.insert([.titled, .closable, .miniaturizable])
         window.styleMask.remove(.nonactivatingPanel)
-        window.backgroundColor = .windowBackgroundColor
-        window.isOpaque = true
+        let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
+        window.backgroundColor = useLiquidGlass ? .clear : .windowBackgroundColor
+        window.isOpaque = !useLiquidGlass
         window.hasShadow = true
         window.delegate = self
 
         if let contentView = window.contentView {
             contentView.wantsLayer = true
-            contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            contentView.layer?.backgroundColor = (useLiquidGlass
+                ? NSColor.windowBackgroundColor.withAlphaComponent(0.78)
+                : NSColor.windowBackgroundColor).cgColor
         }
     }
 
     func styleToolbar() {
+        let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
         toolBar.wantsLayer = true
-        toolBar.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        toolBar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.6).cgColor
+        toolBar.layer?.backgroundColor = (useLiquidGlass
+            ? NSColor.controlBackgroundColor.withAlphaComponent(0.62)
+            : NSColor.controlBackgroundColor).cgColor
+        toolBar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.38 : 0.6).cgColor
         toolBar.layer?.borderWidth = 1
         for (index, label) in toolbarLabels.enumerated() {
             label.stringValue = boardManCategoryTitles[safe: index] ?? label.stringValue
@@ -270,8 +276,11 @@ private extension CPYPreferencesWindowController {
     }
 
     func stylePreferencePane(_ view: NSView) {
+        let useLiquidGlass = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
         view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        view.layer?.backgroundColor = (useLiquidGlass
+            ? NSColor.windowBackgroundColor.withAlphaComponent(0.72)
+            : NSColor.windowBackgroundColor).cgColor
         stylePreferenceSubviews(in: view, depth: 0)
     }
 
