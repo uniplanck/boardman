@@ -46,7 +46,7 @@ Validates logic, shows what it would do, no changes to app or build.
 - Installs to fixed path `/Applications/Board-Man.app`
 - Runs lightweight (output reduced)
 - Preserves your `BoardManUsePanelUI` setting
-- Ends with digest copied to clipboard and `~/MyWorkspace/copy.txt`
+- Ends with digest copied to clipboard and a local digest file when configured.
 
 For quick re-install without rebuild:
 ```bash

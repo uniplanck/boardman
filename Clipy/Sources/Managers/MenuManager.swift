@@ -123,9 +123,9 @@ extension MenuManager {
         }
         if let panel = boardManPanel {
             // V4B-13: position and show first. Heavy Realm/defaults reload happens after first paint.
-            let panelSize = NSSize(width: 420, height: BoardManPanel.preferredPanelHeight())
+            let panelSize = NSSize(width: 460, height: BoardManPanel.preferredPanelHeight())
             let mouseLoc = NSEvent.mouseLocation
-            var originX = mouseLoc.x - 220
+            var originX = mouseLoc.x - (panelSize.width / 2)
             var originY = mouseLoc.y - (panelSize.height / 2)
             if let screen = NSScreen.main {
                 let visibleFrame = screen.visibleFrame
@@ -827,9 +827,9 @@ fileprivate enum BoardManPanelTab: Int {
     var emptyMessage: String {
         switch self {
         case .history: return "No clipboard history yet"
-        case .pinned: return "No pinned items yet"
-        case .snippets: return "No snippets yet"
-        case .favorites: return "No favorites yet"
+        case .pinned: return "No pinned items yet - pin rows from the context menu"
+        case .snippets: return "No snippets yet - add reusable text in Snippets"
+        case .favorites: return "No favorites yet - saved favorites will appear here"
         }
     }
 }
@@ -882,12 +882,14 @@ private final class BoardManHistoryRowView: NSTableRowView {
 
     override func drawBackground(in dirtyRect: NSRect) {
         let row = (superview as? NSTableView)?.row(for: self) ?? -1
+        let rowRect = bounds.insetBy(dx: 4, dy: 3)
+        let path = NSBezierPath(roundedRect: rowRect, xRadius: 7, yRadius: 7)
         if previewOwner?.isSelectedRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(0.18).setFill()
-            dirtyRect.fill()
+            NSColor.controlAccentColor.withAlphaComponent(0.16).setFill()
+            path.fill()
         } else if previewOwner?.isHoveredRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
-            dirtyRect.fill()
+            NSColor.controlAccentColor.withAlphaComponent(0.07).setFill()
+            path.fill()
         } else {
             super.drawBackground(in: dirtyRect)
         }
@@ -941,7 +943,7 @@ class BoardManPanel: NSPanel {
     }
 
     convenience init() {
-        let contentRect = NSRect(x: 0, y: 0, width: 420, height: BoardManPanel.preferredPanelHeight())
+        let contentRect = NSRect(x: 0, y: 0, width: 460, height: BoardManPanel.preferredPanelHeight())
         self.init(contentRect: contentRect,
                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView],  // no .hudWindow = no harsh black footer/band
                   backing: .buffered,
@@ -953,9 +955,6 @@ class BoardManPanel: NSPanel {
         self.level = .popUpMenu
         self.backgroundColor = NSColor.windowBackgroundColor
         self.hasShadow = true
-        if #available(macOS 10.14, *) {
-            self.appearance = NSAppearance(named: .aqua)
-        }
         setupModernContainer()
         setupUI()
         setupPreviewBubble()
@@ -968,7 +967,7 @@ class BoardManPanel: NSPanel {
                 contentView.layer?.cornerRadius = 12  // softer, less aggressive look
                 contentView.layer?.masksToBounds = true
             }
-            contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            contentView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         }
     }
 
@@ -977,7 +976,7 @@ class BoardManPanel: NSPanel {
 
         // Search field at top - clean margins
         let search = NSSearchField(frame: .zero)
-        search.placeholderString = "Search Board-Man"
+        search.placeholderString = "Search history, pinned items, and snippets"
         search.target = self
         search.action = #selector(searchTextChanged(_:))
         search.sendsSearchStringImmediately = true
@@ -996,7 +995,7 @@ class BoardManPanel: NSPanel {
         tabs.target = self
         tabs.action = #selector(tabChanged(_:))
         if #available(macOS 10.10, *) {
-            tabs.segmentStyle = .texturedRounded
+            tabs.segmentStyle = .rounded
         }
         if #available(macOS 10.14, *) {
             tabs.contentTintColor = NSColor.controlAccentColor
@@ -1058,11 +1057,16 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(heightText)
         heightLabel = heightText
 
-        // Scroll list: stable 20px margins, row height 40 for readability (38-44 spec), single-line truncated
+        // Scroll list: stable margins and taller rows for readability; paste behavior stays on click/Enter.
         let scroll = NSScrollView(frame: .zero)
         scroll.hasVerticalScroller = true
         scroll.borderType = .noBorder
         scroll.autohidesScrollers = true
+        scroll.wantsLayer = true
+        scroll.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.84).cgColor
+        scroll.layer?.cornerRadius = 8
+        scroll.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
+        scroll.layer?.borderWidth = 1
 
         let table = BoardManHistoryTableView(frame: .zero)
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(rawValue: "main"))
@@ -1070,7 +1074,7 @@ class BoardManPanel: NSPanel {
         column.width = 360
         table.addTableColumn(column)
         table.headerView = nil  // no oversized header
-        table.rowHeight = 44
+        table.rowHeight = 46
         table.usesAlternatingRowBackgroundColors = false
         table.backgroundColor = .clear
         table.allowsEmptySelection = false
@@ -1095,7 +1099,7 @@ class BoardManPanel: NSPanel {
         scrollView = scroll
         placeholderList = table
 
-        let note = NSTextField(labelWithString: "Click or press Enter to paste")
+        let note = NSTextField(labelWithString: "Click or press Enter to paste - right-click to pin")
         note.alignment = .center
         note.textColor = .secondaryLabelColor
         note.font = NSFont.systemFont(ofSize: 10)
@@ -1136,9 +1140,7 @@ class BoardManPanel: NSPanel {
         bubble.ignoresMouseEvents = true
         bubble.contentView = NSView(frame: bubble.contentRect(forFrameRect: bubble.frame))
         bubble.contentView?.wantsLayer = true
-        bubble.appearance = NSAppearance(named: .aqua)
-        bubble.contentView?.appearance = NSAppearance(named: .aqua)
-        bubble.contentView?.layer?.backgroundColor = NSColor(calibratedWhite: 0.98, alpha: 0.98).cgColor
+        bubble.contentView?.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.98).cgColor
         bubble.contentView?.layer?.borderColor = NSColor.separatorColor.cgColor
         bubble.contentView?.layer?.borderWidth = 1
         bubble.contentView?.layer?.cornerRadius = 8
@@ -1149,11 +1151,11 @@ class BoardManPanel: NSPanel {
     private func layoutPanelSubviews() {
         guard let contentView = contentView else { return }
         let bounds = contentView.bounds
-        let margin: CGFloat = 14
+        let margin: CGFloat = 18
         let width = bounds.width - (margin * 2)
-        let top = bounds.height - 46
-        searchField?.frame = NSRect(x: margin, y: top, width: width, height: 28)
-        segmentedControl?.frame = NSRect(x: margin, y: top - 36, width: width, height: 26)
+        let top = bounds.height - 52
+        searchField?.frame = NSRect(x: margin, y: top, width: width, height: 32)
+        segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         // V4B-13: remove broken inline settings row from the panel. Keep settings in Preferences later.
         settingsBackgroundView?.isHidden = true
         rowNumbersButton?.isHidden = true
@@ -1163,10 +1165,10 @@ class BoardManPanel: NSPanel {
         heightLabel?.isHidden = true
         heightStepper?.isHidden = true
         footerNote?.frame = NSRect(x: margin, y: 8, width: width, height: 16)
-        let scrollTop = top - 50
-        scrollView?.frame = NSRect(x: margin, y: 28, width: width, height: max(220, scrollTop - 28))
-        placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, scrollTop - 28))
-        placeholderList?.tableColumns.first?.width = width - 20
+        let scrollTop = top - 58
+        scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
+        placeholderList?.frame = NSRect(x: 4, y: 0, width: width - 8, height: max(220, scrollTop - 30))
+        placeholderList?.tableColumns.first?.width = width - 24
         hidePreviewBubble()
     }
 
@@ -1451,7 +1453,7 @@ class BoardManPanel: NSPanel {
         let bubbleHeight = min(166, max(44, ceil(textSize.height) + 18))
         label.frame = NSRect(x: 10, y: 9, width: bubbleWidth - 20, height: bubbleHeight - 18)
         bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
-        bubble.contentView?.layer?.backgroundColor = NSColor(calibratedWhite: 0.98, alpha: 0.98).cgColor
+        bubble.contentView?.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.98).cgColor
         bubble.contentView?.layer?.borderColor = NSColor.separatorColor.cgColor
 
         let panelFrame = frame
@@ -1540,6 +1542,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
             cell?.backgroundColor = .clear
             cell?.drawsBackground = false
             cell?.alignment = .center
+            cell?.font = NSFont.systemFont(ofSize: 12, weight: .medium)
         } else if let item = historyItems[safe: row] {
             cell?.alignment = .left
             cell?.toolTip = nil
@@ -1552,7 +1555,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
                 if item.pasteCount == 0 || item.isPinned {
                     attributedTitle.addAttributes([
                         .foregroundColor: NSColor.labelColor,
-                        .font: NSFont.boldSystemFont(ofSize: 13)
+                        .font: NSFont.systemFont(ofSize: 13, weight: .semibold)
                     ], range: fullRange)
                     if item.pasteCount == 0 {
                         // V4B-13: no inline background marker; row selection/hover owns background contrast.
@@ -1561,7 +1564,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
                 if isSelected {
                     attributedTitle.addAttributes([
                         .foregroundColor: NSColor.labelColor,
-                        .font: NSFont.systemFont(ofSize: 13)
+                        .font: NSFont.systemFont(ofSize: 13, weight: .medium)
                     ], range: fullRange)
                 }
                 cell?.attributedStringValue = attributedTitle
@@ -1575,12 +1578,14 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
         }
 
         // font fallback; attributed zero-count rows keep their explicit attributes.
-        cell?.font = NSFont.systemFont(ofSize: 13)
+        if !historyItems.isEmpty {
+            cell?.font = NSFont.systemFont(ofSize: 13)
+        }
         return cell
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        return 42  // V4B-10: slightly increased for cleaner spacing/readability (within safe 38-44 range)
+        return 46
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
