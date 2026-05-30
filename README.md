@@ -6,6 +6,10 @@ It extends the clipboard manager concept with workflow-oriented features such as
 
 > Status: public candidate. This repository is a sanitized open-source edition prepared from an actively developed private build.
 
+## Screenshot
+
+![Board-Man clipboard history](docs/images/boardman-history.png)
+
 ## Why Board-Man exists
 
 Many clipboard managers help users store snippets, but they do not clearly show how often clipboard actions are used during real work.
