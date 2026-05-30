@@ -1,0 +1,69 @@
+name: Build Clipy PasteCount
+
+on:
+  push:
+    branches:
+      - clipy-pastecount-v2-2-direct-20260524_131921
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode and show environment
+        run: |
+          set -euxo pipefail
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
+          xcodebuild -version
+          swift --version
+          ruby -v
+          pwd
+          ls -la
+
+      - name: Setup Ruby bundle
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Build using existing CI fastlane path
+        timeout-minutes: 18
+        run: |
+          set -euxo pipefail
+          rm -rf "$PWD/artifacts" "$PWD/ClipyPasteCount.app"
+          mkdir -p "$PWD/artifacts"
+          bundle exec fastlane test
+
+      - name: Locate built Clipy app
+        run: |
+          set -euxo pipefail
+          find "$HOME/Library/Developer/Xcode/DerivedData" -type d -name "Clipy.app" -print || true
+          APP_PATH="$(find "$HOME/Library/Developer/Xcode/DerivedData" -type d -path "*/Build/Products/*/Clipy.app" -print | head -n 1)"
+          test -n "$APP_PATH"
+          test -d "$APP_PATH"
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+          echo "app_path: $APP_PATH"
+
+      - name: Package app
+        run: |
+          set -euxo pipefail
+          rm -rf "$PWD/ClipyPasteCount.app" "$PWD/artifacts"
+          mkdir -p "$PWD/artifacts"
+          ditto "$APP_PATH" "$PWD/ClipyPasteCount.app"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleName ClipyPasteCount" "$PWD/ClipyPasteCount.app/Contents/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Clipy PasteCount" "$PWD/ClipyPasteCount.app/Contents/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.uniplanck.ClipyPasteCount" "$PWD/ClipyPasteCount.app/Contents/Info.plist" || true
+          codesign --force --deep --sign - --timestamp=none "$PWD/ClipyPasteCount.app" || true
+          ditto -c -k --sequesterRsrc --keepParent "$PWD/ClipyPasteCount.app" "$PWD/artifacts/ClipyPasteCount.app.zip"
+          ls -lah "$PWD/artifacts"
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ClipyPasteCount-app
+          path: artifacts/ClipyPasteCount.app.zip
+          if-no-files-found: error

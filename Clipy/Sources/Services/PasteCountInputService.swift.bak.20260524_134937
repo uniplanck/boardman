@@ -1,0 +1,103 @@
+//
+//  PasteCountInputService.swift
+//
+//  Clipy
+//
+
+import Cocoa
+import ApplicationServices
+
+final class PasteCountInputService {
+
+    static let shared = PasteCountInputService()
+
+    private enum AXRole {
+        static let textField = "AXTextField"
+        static let textArea = "AXTextArea"
+        static let comboBox = "AXComboBox"
+        static let webArea = "AXWebArea"
+    }
+
+    private var keyDownMonitor: Any?
+    private var suppressGlobalPasteUntil = Date.distantPast
+    private let suppressionInterval: TimeInterval = 1.0
+    private let pasteReadDelay: TimeInterval = 0.05
+
+    func startMonitoring() {
+        guard keyDownMonitor == nil else { return }
+        keyDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleKeyDown(event)
+        }
+    }
+
+    func suppressNextGlobalPaste() {
+        suppressGlobalPasteUntil = Date().addingTimeInterval(suppressionInterval)
+    }
+
+    func isFocusedTargetInputLike() -> Bool {
+        return focusedElement().map(isInputLike(_:)) ?? false
+    }
+
+    private func handleKeyDown(_ event: NSEvent) {
+        guard isCommandV(event), Date() >= suppressGlobalPasteUntil else { return }
+        guard isFocusedTargetInputLike() else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + pasteReadDelay) { [weak self] in
+            self?.incrementNewestClipIfPasteboardMatches()
+        }
+    }
+
+    private func incrementNewestClipIfPasteboardMatches() {
+        guard let string = currentPasteboardString() else { return }
+        guard let key = PasteCountStore.shared.keyForLatestClip(matching: string) else { return }
+        PasteCountStore.shared.increment(forKey: key)
+    }
+
+    private func currentPasteboardString() -> String? {
+        return NSPasteboard.general.string(forType: .string)
+    }
+
+    private func isCommandV(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags.contains(.command), !flags.contains(.option), !flags.contains(.control) else { return false }
+        return event.charactersIgnoringModifiers?.lowercased() == "v"
+    }
+
+    private func focusedElement() -> AXUIElement? {
+        let systemWideElement = AXUIElementCreateSystemWide()
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &value) == .success else {
+            return nil
+        }
+        return value as? AXUIElement
+    }
+
+    private func isInputLike(_ element: AXUIElement) -> Bool {
+        guard boolAttribute(kAXEnabledAttribute, element: element) != false else { return false }
+        if stringAttribute(kAXSubroleAttribute, element: element)?.lowercased().contains("secure") == true {
+            return false
+        }
+
+        guard let role = stringAttribute(kAXRoleAttribute, element: element) else { return false }
+        let inputRoles = [AXRole.textField, AXRole.textArea, AXRole.comboBox]
+        if inputRoles.contains(role) {
+            return true
+        }
+        if role == AXRole.webArea {
+            var settable = DarwinBoolean(false)
+            return AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &settable) == .success && settable.boolValue
+        }
+        return false
+    }
+
+    private func stringAttribute(_ attribute: String, element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return value as? String
+    }
+
+    private func boolAttribute(_ attribute: String, element: AXUIElement) -> Bool? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return value as? Bool
+    }
+}

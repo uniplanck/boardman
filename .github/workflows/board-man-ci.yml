@@ -1,0 +1,43 @@
+name: Board-Man CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  repo-checks:
+    name: repository checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Repository structure
+        run: |
+          test -d Board-Man.xcodeproj
+          test -f Board-Man.xcodeproj/xcshareddata/xcschemes/Board-Man.xcscheme
+          test -d Clipy/Sources
+          test -d scripts/boardman
+
+      - name: YAML syntax
+        run: ruby -e 'require "yaml"; YAML.load_file(".github/workflows/board-man-ci.yml")'
+
+      - name: Shell syntax
+        run: |
+          bash -n scripts/boardman/install-dev-stable.sh
+          bash -n scripts/boardman/status-tcc-friendly.sh
+          bash -n scripts/boardman_digest.sh
+
+      - name: Whitespace check
+        run: |
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then
+            git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+            git diff --check "origin/$GITHUB_BASE_REF...HEAD"
+          else
+            git diff --check HEAD~1..HEAD
+          fi
