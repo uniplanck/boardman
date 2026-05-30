@@ -88,16 +88,11 @@ final class CPYPreferencesWindowController: NSWindowController {
     // MARK: - Window Life Cycle
     override func windowDidLoad() {
         super.windowDidLoad()
-        self.window?.collectionBehavior = .canJoinAllSpaces
-        // V2 UI polish: dynamic colors for light/dark, fix hardcoded near-white bg that fails in dark mode. Set title.
-        self.window?.backgroundColor = NSColor.windowBackgroundColor
-        installBoardManVisualEffect()
-        self.window?.title = "Board-Man Settings"
+        configureSettingsWindow()
         if #available(OSX 10.10, *) {
             self.window?.titlebarAppearsTransparent = true
         }
         styleToolbar()
-        // Safe NSVisualEffectView polish for glass effect held minimal to not break xib layout (full in V3)
         toolBarItemTapped(generalButton)
         generalButton.sendAction(on: .leftMouseDown)
         menuButton.sendAction(on: .leftMouseDown)
@@ -109,8 +104,12 @@ final class CPYPreferencesWindowController: NSWindowController {
     }
 
     override func showWindow(_ sender: Any?) {
+        NSApp.activate(ignoringOtherApps: true)
+        configureSettingsWindow()
         super.showWindow(sender)
+        window?.centerIfNeeded()
         window?.makeKeyAndOrderFront(self)
+        NSApp.activate(ignoringOtherApps: true)
     }
 }
 
@@ -132,40 +131,46 @@ extension CPYPreferencesWindowController: NSWindowDelegate {
         if let window = window, !window.makeFirstResponder(window) {
             window.endEditing(for: nil)
         }
-        NSApp.deactivate()
     }
 }
 
 // MARK: - Layout
 private extension CPYPreferencesWindowController {
-    func installBoardManVisualEffect() {
-        guard let window = window, let contentView = window.contentView else { return }
-        guard !contentView.subviews.contains(where: { $0.identifier?.rawValue == "BoardManVisualEffectView" }) else { return }
+    func configureSettingsWindow() {
+        guard let window = window else { return }
+        window.title = "Board-Man Settings"
+        window.level = .normal
+        (window as? NSPanel)?.hidesOnDeactivate = false
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.moveToActiveSpace]
+        window.styleMask.insert([.titled, .closable, .miniaturizable])
+        window.styleMask.remove(.nonactivatingPanel)
+        window.backgroundColor = .windowBackgroundColor
+        window.isOpaque = true
+        window.hasShadow = true
+        window.delegate = self
 
-        let effectView = NSVisualEffectView(frame: contentView.bounds)
-        effectView.identifier = NSUserInterfaceItemIdentifier("BoardManVisualEffectView")
-        effectView.autoresizingMask = [.width, .height]
-        effectView.blendingMode = .behindWindow
-        effectView.material = .sidebar
-        effectView.state = .active
-
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        contentView.wantsLayer = true
-        contentView.addSubview(effectView, positioned: .below, relativeTo: nil)
+        if let contentView = window.contentView {
+            contentView.wantsLayer = true
+            contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        }
     }
 
     func styleToolbar() {
         toolBar.wantsLayer = true
-        toolBar.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.88).cgColor
+        toolBar.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        toolBar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.6).cgColor
+        toolBar.layer?.borderWidth = 1
         for (index, label) in toolbarLabels.enumerated() {
             label.stringValue = boardManCategoryTitles[safe: index] ?? label.stringValue
             label.font = NSFont.systemFont(ofSize: 10, weight: .medium)
             label.textColor = .secondaryLabelColor
+            label.backgroundColor = .clear
+            label.drawsBackground = false
         }
         toolbarButtons.forEach { button in
             button.wantsLayer = true
-            button.layer?.cornerRadius = 8
+            button.layer?.cornerRadius = 7
             button.layer?.backgroundColor = NSColor.clear.cgColor
         }
         toolbarImages.forEach { imageView in
@@ -249,7 +254,7 @@ private extension CPYPreferencesWindowController {
         let newView = viewController[index].view
         // Remove current views without toolbar
         window?.contentView?.subviews.forEach { view in
-            if view != toolBar && view.identifier?.rawValue != "BoardManVisualEffectView" {
+            if view != toolBar {
                 view.removeFromSuperview()
             }
         }
@@ -266,7 +271,7 @@ private extension CPYPreferencesWindowController {
 
     func stylePreferencePane(_ view: NSView) {
         view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.96).cgColor
+        view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         stylePreferenceSubviews(in: view, depth: 0)
     }
 
@@ -292,21 +297,24 @@ private extension CPYPreferencesWindowController {
                 button.font = NSFont.systemFont(ofSize: 12, weight: .regular)
                 button.contentTintColor = button.isEnabled ? .labelColor : .tertiaryLabelColor
             } else if let tableView = subview as? NSTableView {
-                tableView.backgroundColor = .clear
+                tableView.backgroundColor = .controlBackgroundColor
                 tableView.gridColor = .separatorColor
             } else if let scrollView = subview as? NSScrollView {
                 scrollView.wantsLayer = true
-                scrollView.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.7).cgColor
+                scrollView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
                 scrollView.layer?.cornerRadius = 7
+                scrollView.layer?.borderColor = NSColor.separatorColor.cgColor
+                scrollView.layer?.borderWidth = 1
                 scrollView.borderType = .noBorder
-            } else if depth > 0 && !subview.subviews.isEmpty {
-                subview.wantsLayer = true
-                subview.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.62).cgColor
-                subview.layer?.cornerRadius = 9
-                subview.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
-                subview.layer?.borderWidth = 1
             }
             stylePreferenceSubviews(in: subview, depth: depth + 1)
         }
+    }
+}
+
+private extension NSWindow {
+    func centerIfNeeded() {
+        guard isVisible == false else { return }
+        center()
     }
 }
