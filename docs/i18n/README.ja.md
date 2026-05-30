@@ -1,12 +1,13 @@
 # Board-Man
 
-[English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md) / [Español](README.es.md) / [Português (Brasil)](README.pt-BR.md) / [한국어](README.ko.md) / [Deutsch](README.de.md) / [Français](README.fr.md)
+[English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
+
 
 Board-Man は、Clipy から派生したオープンソースの macOS 向けクリップボード生産性ツールです。
 
 単にクリップボード履歴を保存するだけではなく、貼り付け作業やコピペ中心のワークフローを見える化することを目的にしています。
 
-![Board-Man clipboard history](docs/images/boardman-history.png)
+![Board-Man clipboard history](../images/boardman-history.png)
 
 ## 何ができるか
 

@@ -1,12 +1,13 @@
 # Board-Man
 
-[English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md) / [Español](README.es.md) / [Português (Brasil)](README.pt-BR.md) / [한국어](README.ko.md) / [Deutsch](README.de.md) / [Français](README.fr.md)
+[English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
+
 
 Board-Man est un outil open-source de productivité pour le presse-papiers sur macOS, dérivé de Clipy.
 
 Il ne sert pas seulement à conserver l’historique du presse-papiers. Son objectif est de rendre plus visibles les flux de travail basés sur la copie, le collage, l’édition et le déplacement de texte entre applications.
 
-![Board-Man clipboard history](docs/images/boardman-history.png)
+![Board-Man clipboard history](../images/boardman-history.png)
 
 ## Ce que fait Board-Man
 
