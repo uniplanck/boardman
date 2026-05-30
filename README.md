@@ -16,6 +16,14 @@ It extends the clipboard manager concept with workflow-oriented features such as
 
 ![Board-Man clipboard history](docs/images/boardman-history.png)
 
+## Download
+
+- [Download Board-Man v0.1.2](https://github.com/uniplanck/boardman/releases/tag/v0.1.2)
+- macOS app archive: `Board-Man-v0.1.2.zip`
+
+> Note: Board-Man is an early public release. macOS may require opening it manually from System Settings if Gatekeeper blocks the first launch.
+
+
 ## Why Board-Man exists
 
 Many clipboard managers help users store snippets, but they do not clearly show how often clipboard actions are used during real work.
