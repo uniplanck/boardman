@@ -3,9 +3,8 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 workspace_root="${WORKSPACE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-project_root="$workspace_root/clipy-pastecount"
-copy_dir="$project_root/_copy"
-past_dir="$copy_dir/past_logs"
+digest_dir="${BOARDMAN_DIGEST_DIR:-$workspace_root/boardman-digests}"
+past_dir="$digest_dir/past"
 timestamp="$(date +%Y%m%d_%H%M%S)"
 
 mkdir -p "$past_dir"
@@ -42,7 +41,7 @@ trap 'rm -f "$tmp"' EXIT
 
 cp "$tmp" "$workspace_root/boardman.copy.txt"
 cp "$tmp" "$workspace_root/copy.txt"
-cp "$tmp" "$copy_dir/latest.digest.txt"
+cp "$tmp" "$digest_dir/latest.digest.txt"
 cp "$tmp" "$past_dir/$timestamp.digest.txt"
 
-echo "$copy_dir/latest.digest.txt"
+echo "$digest_dir/latest.digest.txt"

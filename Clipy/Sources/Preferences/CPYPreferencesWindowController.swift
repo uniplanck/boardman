@@ -41,6 +41,41 @@ final class CPYPreferencesWindowController: NSWindowController {
     @IBOutlet private weak var shortcutsButton: NSButton!
     @IBOutlet private weak var updatesButton: NSButton!
     @IBOutlet private weak var betaButton: NSButton!
+    private var toolbarLabels: [NSTextField] {
+        return [generalTextField, menuTextField, typeTextField, excludeTextField, shortcutsTextField, updatesTextField, betaTextField]
+    }
+    private var toolbarImages: [NSImageView] {
+        return [generalImageView, menuImageView, typeImageView, excludeImageView, shortcutsImageView, updatesImageView, betaImageView]
+    }
+    private var toolbarButtons: [NSButton] {
+        return [generalButton, menuButton, typeButton, excludeButton, shortcutsButton, updatesButton, betaButton]
+    }
+    private let boardManCategoryTitles = ["General", "History", "Paste", "Privacy", "Shortcuts", "Updates", "Advanced"]
+    private let paneTextRewrites = [
+        "Input \"⌘ + V\" after menu item selection": "Paste automatically after choosing an item",
+        "Send crash report and error log (reflected at the next launch)": "Share crash reports and error logs after relaunch",
+        "Max clipboard history size:": "History capacity:",
+        "Sort history order by:": "History sort order:",
+        "Status Bar icon style:": "Menu bar icon style:",
+        "Number of items place inline:": "Items shown before folders:",
+        "Number of items place inside a folder:": "Items grouped inside folders:",
+        "Number of characters in the menu:": "Row title length:",
+        "Place already copied history at the top": "Move repeated history items to the top",
+        "Move instead of copying (removes the older one from the list)": "Move the existing item instead of duplicating it",
+        "Mark menu items with numbers": "Show quick number keys in rows",
+        "Menu items' title starts with 0": "Start quick number keys at 0",
+        "Display icons in menu items": "Show type icons in rows",
+        "Add key equivalents to numeric keys": "Use number keys as shortcuts",
+        "Add a menu item to clear clipboard history": "Show Clear History action",
+        "Show alert panel before clear history": "Confirm before clearing history",
+        "Show tool tip on a menu item": "Show full text preview on hover",
+        "Max length of tool tip string:": "Preview length:",
+        "Show Image": "Show image previews",
+        "Show color code preview": "Show color previews",
+        "Menu": "Board-Man Panel",
+        "Main:": "Board-Man Panel:",
+        "Clear History:": "Clear History:"
+    ]
     // ViewController
     private let viewController = [NSViewController(nibName: "CPYGeneralPreferenceViewController", bundle: nil),
                                   NSViewController(nibName: "CPYMenuPreferenceViewController", bundle: nil),
@@ -57,10 +92,11 @@ final class CPYPreferencesWindowController: NSWindowController {
         // V2 UI polish: dynamic colors for light/dark, fix hardcoded near-white bg that fails in dark mode. Set title.
         self.window?.backgroundColor = NSColor.windowBackgroundColor
         installBoardManVisualEffect()
-        self.window?.title = "Board-Man 設定"
+        self.window?.title = "Board-Man Settings"
         if #available(OSX 10.10, *) {
             self.window?.titlebarAppearsTransparent = true
         }
+        styleToolbar()
         // Safe NSVisualEffectView polish for glass effect held minimal to not break xib layout (full in V3)
         toolBarItemTapped(generalButton)
         generalButton.sendAction(on: .leftMouseDown)
@@ -115,7 +151,27 @@ private extension CPYPreferencesWindowController {
 
         window.isOpaque = false
         window.backgroundColor = .clear
+        contentView.wantsLayer = true
         contentView.addSubview(effectView, positioned: .below, relativeTo: nil)
+    }
+
+    func styleToolbar() {
+        toolBar.wantsLayer = true
+        toolBar.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.88).cgColor
+        for (index, label) in toolbarLabels.enumerated() {
+            label.stringValue = boardManCategoryTitles[safe: index] ?? label.stringValue
+            label.font = NSFont.systemFont(ofSize: 10, weight: .medium)
+            label.textColor = .secondaryLabelColor
+        }
+        toolbarButtons.forEach { button in
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 8
+            button.layer?.backgroundColor = NSColor.clear.cgColor
+        }
+        toolbarImages.forEach { imageView in
+            imageView.contentTintColor = .secondaryLabelColor
+            imageView.image?.isTemplate = true
+        }
     }
 
     func resetImages() {
@@ -134,6 +190,13 @@ private extension CPYPreferencesWindowController {
         shortcutsTextField.textColor = NSColor(resource: .tabTitle)
         updatesTextField.textColor = NSColor(resource: .tabTitle)
         betaTextField.textColor = NSColor(resource: .tabTitle)
+        toolbarImages.forEach { imageView in
+            imageView.contentTintColor = .secondaryLabelColor
+            imageView.image?.isTemplate = true
+        }
+        toolbarButtons.forEach { button in
+            button.layer?.backgroundColor = NSColor.clear.cgColor
+        }
     }
 
     func boardManSymbol(_ name: String, fallback: NSImage) -> NSImage {
@@ -152,26 +215,34 @@ private extension CPYPreferencesWindowController {
         case 0:
             generalImageView.image = NSImage(resource: .prefGeneralOn)
             generalTextField.textColor = NSColor.controlAccentColor
+            generalImageView.contentTintColor = NSColor.controlAccentColor
         case 1:
             menuImageView.image = NSImage(resource: .prefMenuOn)
             menuTextField.textColor = NSColor.controlAccentColor
+            menuImageView.contentTintColor = NSColor.controlAccentColor
         case 2:
             typeImageView.image = NSImage(resource: .prefTypeOn)
             typeTextField.textColor = NSColor.controlAccentColor
+            typeImageView.contentTintColor = NSColor.controlAccentColor
         case 3:
             excludeImageView.image = NSImage(resource: .prefExcludedOn)
             excludeTextField.textColor = NSColor.controlAccentColor
+            excludeImageView.contentTintColor = NSColor.controlAccentColor
         case 4:
             shortcutsImageView.image = NSImage(resource: .prefShortcutOn)
             shortcutsTextField.textColor = NSColor.controlAccentColor
+            shortcutsImageView.contentTintColor = NSColor.controlAccentColor
         case 5:
             updatesImageView.image = NSImage(resource: .prefUpdateOn)
             updatesTextField.textColor = NSColor.controlAccentColor
+            updatesImageView.contentTintColor = NSColor.controlAccentColor
         case 6:
             betaImageView.image = NSImage(resource: .prefBetaOn)
             betaTextField.textColor = NSColor.controlAccentColor
+            betaImageView.contentTintColor = NSColor.controlAccentColor
         default: break
         }
+        toolbarButtons[safe: index]?.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
     }
 
     func switchView(_ index: Int) {
@@ -189,6 +260,53 @@ private extension CPYPreferencesWindowController {
         newFrame.origin.y += frame.height - newFrame.height - toolBar.frame.height
         newFrame.size.height += toolBar.frame.height
         window?.setFrame(newFrame, display: true)
+        stylePreferencePane(newView)
         window?.contentView?.addSubview(newView)
+    }
+
+    func stylePreferencePane(_ view: NSView) {
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.96).cgColor
+        stylePreferenceSubviews(in: view, depth: 0)
+    }
+
+    func stylePreferenceSubviews(in view: NSView, depth: Int) {
+        for subview in view.subviews {
+            if let label = subview as? NSTextField {
+                if let rewritten = paneTextRewrites[label.stringValue] {
+                    label.stringValue = rewritten
+                }
+                label.textColor = label.isEnabled ? .labelColor : .tertiaryLabelColor
+                label.backgroundColor = .clear
+                label.drawsBackground = false
+                if label.font?.fontDescriptor.symbolicTraits.contains(.bold) == true {
+                    label.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+                    label.textColor = .labelColor
+                } else if label.font?.pointSize ?? 0 <= 11 {
+                    label.font = NSFont.systemFont(ofSize: max(11, label.font?.pointSize ?? 11), weight: .regular)
+                }
+            } else if let button = subview as? NSButton {
+                if let rewritten = paneTextRewrites[button.title] {
+                    button.title = rewritten
+                }
+                button.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+                button.contentTintColor = button.isEnabled ? .labelColor : .tertiaryLabelColor
+            } else if let tableView = subview as? NSTableView {
+                tableView.backgroundColor = .clear
+                tableView.gridColor = .separatorColor
+            } else if let scrollView = subview as? NSScrollView {
+                scrollView.wantsLayer = true
+                scrollView.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.7).cgColor
+                scrollView.layer?.cornerRadius = 7
+                scrollView.borderType = .noBorder
+            } else if depth > 0 && !subview.subviews.isEmpty {
+                subview.wantsLayer = true
+                subview.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.62).cgColor
+                subview.layer?.cornerRadius = 9
+                subview.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
+                subview.layer?.borderWidth = 1
+            }
+            stylePreferenceSubviews(in: subview, depth: depth + 1)
+        }
     }
 }
