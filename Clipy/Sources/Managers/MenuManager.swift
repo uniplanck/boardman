@@ -236,12 +236,7 @@ extension MenuManager {
         let defaults = AppEnvironment.current.defaults
         let showRowNumbers = defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true
         let timestampFormat = BoardManPanel.allowedTimestampFormat(defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat))
-        let dateFormatter: DateFormatter? = timestampFormat == "none" ? nil : {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "ja_JP")
-            formatter.dateFormat = timestampFormat
-            return formatter
-        }()
+        let showUsageCount = defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true
 
         let pinStore = PinnedSnippetStore.shared
         let panelHistoryLimit = min(maxHistory, 120)  // V4B-13: keep panel launch fast; full history remains in Realm/legacy menu.
@@ -256,14 +251,19 @@ extension MenuManager {
             if showRowNumbers {
                 parts.append("\(index + 1).")
             }
-            if let dateFormatter {
-                parts.append(dateFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(clip.updateTime))))
+            let timestamp = BoardManPanel.timestampText(for: clip.updateTime, format: timestampFormat)
+            if !timestamp.isEmpty {
+                parts.append(timestamp)
             }
             if isPinned {
                 parts.append("[PIN]")
             }
-            let displayTitle = (parts + ["\(PasteCountStore.shared.label(for: clip))\(clipped)"]).joined(separator: " ")
+            let countText = showUsageCount ? "\(pasteCount)" : ""
+            let displayTitle = (parts + [clipped]).joined(separator: " ")
             return BoardManHistoryItem(title: displayTitle,
+                                       primaryTitle: clipped,
+                                       metadataText: parts.joined(separator: "   "),
+                                       countText: countText,
                                        previewTitle: title,
                                        dataHash: clip.dataHash,
                                        pasteCount: pasteCount,
@@ -293,6 +293,9 @@ extension MenuManager {
                         let isPinned = pinStore.isPinned(snippet.identifier)
                         let pin = isPinned ? "[PIN] " : ""
                         return BoardManHistoryItem(title: "\(pin)\(prefix) / \(title)",
+                                                   primaryTitle: title,
+                                                   metadataText: "\(pin)\(prefix)",
+                                                   countText: "",
                                                    previewTitle: snippet.content,
                                                    dataHash: snippet.identifier,
                                                    pasteCount: 0,
@@ -847,6 +850,9 @@ fileprivate enum BoardManPanelItemSource {
 
 fileprivate struct BoardManHistoryItem {
     let title: String
+    let primaryTitle: String
+    let metadataText: String
+    let countText: String
     let previewTitle: String
     let dataHash: String
     let pasteCount: Int
@@ -887,13 +893,16 @@ private final class BoardManHistoryRowView: NSTableRowView {
 
     override func drawBackground(in dirtyRect: NSRect) {
         let row = (superview as? NSTableView)?.row(for: self) ?? -1
-        let rowRect = bounds.insetBy(dx: 4, dy: 3)
-        let path = NSBezierPath(roundedRect: rowRect, xRadius: 7, yRadius: 7)
+        let rowRect = bounds.insetBy(dx: 6, dy: 4)
+        let path = NSBezierPath(roundedRect: rowRect, xRadius: 8, yRadius: 8)
         if previewOwner?.isSelectedRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(0.22).setFill()
+            NSColor.selectedContentBackgroundColor.withAlphaComponent(0.82).setFill()
             path.fill()
         } else if previewOwner?.isHoveredRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(0.10).setFill()
+            NSColor.controlAccentColor.withAlphaComponent(0.16).setFill()
+            path.fill()
+        } else if row >= 0 {
+            NSColor.textBackgroundColor.withAlphaComponent(0.36).setFill()
             path.fill()
         } else {
             super.drawBackground(in: dirtyRect)
@@ -902,6 +911,88 @@ private final class BoardManHistoryRowView: NSTableRowView {
 
     override func drawSelection(in dirtyRect: NSRect) {
         drawBackground(in: dirtyRect)
+    }
+}
+
+private final class BoardManHistoryCellView: NSTableCellView {
+    private let primaryLabel = NSTextField(labelWithString: "")
+    private let metadataLabel = NSTextField(labelWithString: "")
+    private let countBadge = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    private func setup() {
+        wantsLayer = true
+        primaryLabel.lineBreakMode = .byTruncatingTail
+        primaryLabel.maximumNumberOfLines = 1
+        primaryLabel.backgroundColor = .clear
+        primaryLabel.drawsBackground = false
+        primaryLabel.font = NSFont.systemFont(ofSize: 13.5, weight: .semibold)
+
+        metadataLabel.lineBreakMode = .byTruncatingTail
+        metadataLabel.maximumNumberOfLines = 1
+        metadataLabel.backgroundColor = .clear
+        metadataLabel.drawsBackground = false
+        metadataLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .medium)
+
+        countBadge.alignment = .center
+        countBadge.lineBreakMode = .byTruncatingTail
+        countBadge.maximumNumberOfLines = 1
+        countBadge.isBordered = false
+        countBadge.isEditable = false
+        countBadge.wantsLayer = true
+        countBadge.layer?.cornerRadius = 9
+        countBadge.layer?.masksToBounds = true
+        countBadge.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+
+        addSubview(primaryLabel)
+        addSubview(metadataLabel)
+        addSubview(countBadge)
+    }
+
+    func configure(item: BoardManHistoryItem,
+                   isSelected: Bool,
+                   usageStyle: String) {
+        primaryLabel.stringValue = item.primaryTitle
+        metadataLabel.stringValue = item.metadataText
+        let badgePrefix = usageStyle == "compact" ? "used " : "x"
+        countBadge.stringValue = item.countText.isEmpty ? "" : "\(badgePrefix)\(item.countText)"
+        countBadge.isHidden = item.countText.isEmpty
+
+        if isSelected {
+            primaryLabel.textColor = .selectedMenuItemTextColor
+            metadataLabel.textColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.86)
+            countBadge.textColor = .selectedMenuItemTextColor
+            countBadge.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.18).cgColor
+        } else {
+            primaryLabel.textColor = .labelColor
+            metadataLabel.textColor = .secondaryLabelColor
+            countBadge.textColor = .labelColor
+            countBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+        }
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+        let insetX: CGFloat = 18
+        let topPadding: CGFloat = 8
+        let badgeWidth: CGFloat = countBadge.isHidden ? 0 : min(72, max(34, countBadge.intrinsicContentSize.width + 16))
+        let badgeX = bounds.width - insetX - badgeWidth
+        let textWidth = max(80, bounds.width - (insetX * 2) - badgeWidth - (badgeWidth > 0 ? 10 : 0))
+        primaryLabel.frame = NSRect(x: insetX, y: bounds.height - topPadding - 18, width: textWidth, height: 18)
+        metadataLabel.frame = NSRect(x: insetX, y: 8, width: textWidth, height: 15)
+        if !countBadge.isHidden {
+            countBadge.frame = NSRect(x: badgeX, y: (bounds.height - 20) / 2, width: badgeWidth, height: 20)
+        }
     }
 }
 
@@ -916,6 +1007,8 @@ class BoardManPanel: NSPanel {
     private var rowNumbersButton: NSButton?
     private var timestampLabel: NSTextField?
     private var timestampPopup: NSPopUpButton?
+    private var usageCountButton: NSButton?
+    private var usageStylePopup: NSPopUpButton?
     private var heightControlLabel: NSTextField?
     private var heightStepper: NSStepper?
     private var heightLabel: NSTextField?
@@ -942,9 +1035,53 @@ class BoardManPanel: NSPanel {
     }
 
     static func allowedTimestampFormat(_ value: String?) -> String {
-        let allowed = ["yyyy/MM/dd HH:mm", "HH:mm", "none"]
+        let allowed = ["relative", "HH:mm", "HH:mm:ss", "h:mm a", "h:mm:ss a", "MMM d HH:mm", "yyyy/MM/dd HH:mm", "none"]
         guard let value, allowed.contains(value) else { return "none" }
         return value
+    }
+
+    static func timestampText(for updateTime: Int, format: String) -> String {
+        guard format != "none" else { return "" }
+        let date = Date(timeIntervalSince1970: TimeInterval(updateTime))
+        if format == "relative" {
+            let seconds = max(0, Int(Date().timeIntervalSince(date)))
+            if seconds < 60 { return "now" }
+            if seconds < 3600 { return "\(seconds / 60)m ago" }
+            if seconds < 86_400 { return "\(seconds / 3600)h ago" }
+            return "\(seconds / 86_400)d ago"
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateFormat = format
+        return formatter.string(from: date)
+    }
+
+    private static func timestampMenuTitle(for value: String?) -> String {
+        switch allowedTimestampFormat(value) {
+        case "relative": return "Relative"
+        case "HH:mm": return "24-hour"
+        case "HH:mm:ss": return "24-hour + seconds"
+        case "h:mm a": return "12-hour"
+        case "h:mm:ss a": return "12-hour + seconds"
+        case "MMM d HH:mm", "yyyy/MM/dd HH:mm": return "Date + time"
+        default: return "Hidden"
+        }
+    }
+
+    private static func timestampFormat(forMenuTitle title: String?) -> String {
+        switch title {
+        case "Relative": return "relative"
+        case "24-hour": return "HH:mm"
+        case "24-hour + seconds": return "HH:mm:ss"
+        case "12-hour": return "h:mm a"
+        case "12-hour + seconds": return "h:mm:ss a"
+        case "Date + time": return "MMM d HH:mm"
+        default: return "none"
+        }
+    }
+
+    private static func allowedUsageCountStyle(_ value: String?) -> String {
+        return value == "compact" ? "compact" : "badge"
     }
 
     convenience init() {
@@ -1028,13 +1165,31 @@ class BoardManPanel: NSPanel {
         timestampLabel = timeText
 
         let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-        popup.addItems(withTitles: ["none", "HH:mm", "yyyy/MM/dd HH:mm"])
-        popup.selectItem(withTitle: BoardManPanel.allowedTimestampFormat(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)))
+        popup.addItems(withTitles: ["Relative", "24-hour", "24-hour + seconds", "12-hour", "12-hour + seconds", "Date + time", "Hidden"])
+        popup.selectItem(withTitle: BoardManPanel.timestampMenuTitle(for: AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)))
         popup.font = NSFont.systemFont(ofSize: 11)
         popup.target = self
         popup.action = #selector(timestampFormatChanged(_:))
         contentView.addSubview(popup)
         timestampPopup = popup
+
+        let usage = NSButton(checkboxWithTitle: "Count", target: self, action: #selector(usageCountChanged(_:)))
+        usage.state = (AppEnvironment.current.defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true) ? .on : .off
+        usage.font = NSFont.systemFont(ofSize: 11)
+        if #available(macOS 10.14, *) {
+            usage.contentTintColor = .labelColor
+        }
+        contentView.addSubview(usage)
+        usageCountButton = usage
+
+        let usageStyle = NSPopUpButton(frame: .zero, pullsDown: false)
+        usageStyle.addItems(withTitles: ["badge", "compact"])
+        usageStyle.selectItem(withTitle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)))
+        usageStyle.font = NSFont.systemFont(ofSize: 11)
+        usageStyle.target = self
+        usageStyle.action = #selector(usageStyleChanged(_:))
+        contentView.addSubview(usageStyle)
+        usageStylePopup = usageStyle
 
         let heightTitle = NSTextField(labelWithString: "Height")
         heightTitle.font = NSFont.systemFont(ofSize: 11)
@@ -1076,7 +1231,7 @@ class BoardManPanel: NSPanel {
         column.width = 360
         table.addTableColumn(column)
         table.headerView = nil  // no oversized header
-        table.rowHeight = 46
+        table.rowHeight = 50
         table.usesAlternatingRowBackgroundColors = false
         table.backgroundColor = .clear
         table.allowsEmptySelection = false
@@ -1103,7 +1258,7 @@ class BoardManPanel: NSPanel {
 
         let note = NSTextField(labelWithString: "Click or press Enter to paste - right-click to pin")
         note.alignment = .center
-        note.textColor = .secondaryLabelColor
+        note.textColor = NSColor.secondaryLabelColor.withAlphaComponent(0.95)
         note.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         note.backgroundColor = .clear
         note.drawsBackground = false
@@ -1112,7 +1267,7 @@ class BoardManPanel: NSPanel {
 
         let bubbleLabel = NSTextField(labelWithString: "")
         bubbleLabel.font = NSFont.systemFont(ofSize: 12)
-        bubbleLabel.textColor = NSColor(calibratedWhite: 0.08, alpha: 1.0)
+        bubbleLabel.textColor = .labelColor
         bubbleLabel.backgroundColor = .clear
         bubbleLabel.drawsBackground = false
         bubbleLabel.maximumNumberOfLines = 8
@@ -1142,8 +1297,8 @@ class BoardManPanel: NSPanel {
         bubble.ignoresMouseEvents = true
         bubble.contentView = NSView(frame: bubble.contentRect(forFrameRect: bubble.frame))
         bubble.contentView?.wantsLayer = true
-        bubble.contentView?.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.98).cgColor
-        bubble.contentView?.layer?.borderColor = NSColor.separatorColor.cgColor
+        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.98).cgColor
+        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.42).cgColor
         bubble.contentView?.layer?.borderWidth = 1
         bubble.contentView?.layer?.cornerRadius = 8
         bubble.contentView?.addSubview(label)
@@ -1158,19 +1313,27 @@ class BoardManPanel: NSPanel {
         let top = bounds.height - 52
         searchField?.frame = NSRect(x: margin, y: top, width: width, height: 32)
         segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
-        // V4B-13: remove broken inline settings row from the panel. Keep settings in Preferences later.
-        settingsBackgroundView?.isHidden = true
-        rowNumbersButton?.isHidden = true
-        timestampLabel?.isHidden = true
-        timestampPopup?.isHidden = true
+        let settingsY = top - 78
+        settingsBackgroundView?.isHidden = false
+        settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 2, width: width, height: 30)
+        rowNumbersButton?.isHidden = false
+        rowNumbersButton?.frame = NSRect(x: margin + 10, y: settingsY + 5, width: 74, height: 18)
+        timestampLabel?.isHidden = false
+        timestampLabel?.frame = NSRect(x: margin + 92, y: settingsY + 7, width: 30, height: 14)
+        timestampPopup?.isHidden = false
+        timestampPopup?.frame = NSRect(x: margin + 126, y: settingsY + 2, width: 136, height: 24)
+        usageCountButton?.isHidden = false
+        usageCountButton?.frame = NSRect(x: margin + 272, y: settingsY + 5, width: 64, height: 18)
+        usageStylePopup?.isHidden = false
+        usageStylePopup?.frame = NSRect(x: margin + 336, y: settingsY + 2, width: min(86, max(74, width - 346)), height: 24)
         heightControlLabel?.isHidden = true
         heightLabel?.isHidden = true
         heightStepper?.isHidden = true
         footerNote?.frame = NSRect(x: margin, y: 8, width: width, height: 16)
-        let scrollTop = top - 58
+        let scrollTop = settingsY - 12
         scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
-        placeholderList?.frame = NSRect(x: 4, y: 0, width: width - 8, height: max(220, scrollTop - 30))
-        placeholderList?.tableColumns.first?.width = width - 24
+        placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, scrollTop - 30))
+        placeholderList?.tableColumns.first?.width = width
         hidePreviewBubble()
     }
 
@@ -1201,8 +1364,19 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func timestampFormatChanged(_ sender: NSPopUpButton) {
-        let value = BoardManPanel.allowedTimestampFormat(sender.titleOfSelectedItem)
+        let value = BoardManPanel.timestampFormat(forMenuTitle: sender.titleOfSelectedItem)
         AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.boardManTimestampFormat)
+        onRefreshRequested?()
+    }
+
+    @objc private func usageCountChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowUsageCount)
+        onRefreshRequested?()
+    }
+
+    @objc private func usageStyleChanged(_ sender: NSPopUpButton) {
+        AppEnvironment.current.defaults.set(BoardManPanel.allowedUsageCountStyle(sender.titleOfSelectedItem),
+                                            forKey: Constants.UserDefaults.boardManUsageCountStyle)
         onRefreshRequested?()
     }
 
@@ -1455,8 +1629,8 @@ class BoardManPanel: NSPanel {
         let bubbleHeight = min(166, max(44, ceil(textSize.height) + 18))
         label.frame = NSRect(x: 10, y: 9, width: bubbleWidth - 20, height: bubbleHeight - 18)
         bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
-        bubble.contentView?.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.98).cgColor
-        bubble.contentView?.layer?.borderColor = NSColor.separatorColor.cgColor
+        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.98).cgColor
+        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.42).cgColor
 
         let panelFrame = frame
         let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? panelFrame.insetBy(dx: -bubbleWidth, dy: -bubbleHeight)
@@ -1518,77 +1692,33 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let identifier = NSUserInterfaceItemIdentifier("cell")
-        var cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTextField
-
-        if cell == nil {
-            cell = NSTextField()
-            cell?.identifier = identifier
-            cell?.isEditable = false
-            cell?.isBordered = false
-            cell?.backgroundColor = .clear
-            cell?.drawsBackground = false
-            // Single-line truncated text (no wrapping/messy long text) - per UI requirements
-            if let textFieldCell = cell?.cell {
-                textFieldCell.wraps = false
-                textFieldCell.lineBreakMode = .byTruncatingTail
-            }
-            cell?.maximumNumberOfLines = 1
-        }
-
-        let isSelected = selectedIndex == row
         if historyItems.isEmpty {
-            cell?.stringValue = activeTab.emptyMessage
-            cell?.toolTip = nil
-            cell?.textColor = .secondaryLabelColor
-            cell?.backgroundColor = .clear
-            cell?.drawsBackground = false
-            cell?.alignment = .center
-            cell?.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-        } else if let item = historyItems[safe: row] {
-            cell?.alignment = .left
-            cell?.toolTip = nil
-            // V4B-10 polish: clearer hover/selection affordance via explicit selected bg, subtle zero-count
-            // background/marker using PasteCountStore (safe, no schema/realm changes). Cleaner spacing/text via
-            // consistent attributed styling and row height tweak below. Single-click semantics untouched.
-            if item.pasteCount == 0 || item.isPinned || isSelected {
-                let attributedTitle = NSMutableAttributedString(string: item.title)
-                let fullRange = NSRange(location: 0, length: (item.title as NSString).length)
-                if item.pasteCount == 0 || item.isPinned {
-                    attributedTitle.addAttributes([
-                        .foregroundColor: NSColor.labelColor,
-                        .font: NSFont.systemFont(ofSize: 13, weight: .semibold)
-                    ], range: fullRange)
-                    if item.pasteCount == 0 {
-                        // V4B-13: no inline background marker; row selection/hover owns background contrast.
-                    }
-                }
-                if isSelected {
-                    attributedTitle.addAttributes([
-                        .foregroundColor: NSColor.labelColor,
-                        .font: NSFont.systemFont(ofSize: 13, weight: .medium)
-                    ], range: fullRange)
-                }
-                cell?.attributedStringValue = attributedTitle
-                cell?.backgroundColor = .clear
-                cell?.drawsBackground = true
-            } else {
-                cell?.stringValue = item.title
-                cell?.textColor = .labelColor
-                cell?.backgroundColor = .clear
-                cell?.drawsBackground = false
-            }
+            let identifier = NSUserInterfaceItemIdentifier("emptyCell")
+            let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTextField ?? NSTextField(labelWithString: "")
+            cell.identifier = identifier
+            cell.stringValue = activeTab.emptyMessage
+            cell.toolTip = nil
+            cell.textColor = .secondaryLabelColor
+            cell.backgroundColor = .clear
+            cell.drawsBackground = false
+            cell.alignment = .center
+            cell.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            return cell
         }
 
-        // font fallback; attributed zero-count rows keep their explicit attributes.
-        if !historyItems.isEmpty {
-            cell?.font = NSFont.systemFont(ofSize: 13)
-        }
+        guard let item = historyItems[safe: row] else { return nil }
+        let identifier = NSUserInterfaceItemIdentifier("BoardManHistoryCell")
+        let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? BoardManHistoryCellView ?? BoardManHistoryCellView(frame: .zero)
+        cell.identifier = identifier
+        cell.toolTip = nil
+        cell.configure(item: item,
+                       isSelected: selectedIndex == row,
+                       usageStyle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)))
         return cell
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        return 46
+        return 50
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {

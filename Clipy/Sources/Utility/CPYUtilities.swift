@@ -58,8 +58,10 @@ final class CPYUtilities {
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.showColorPreviewInTheMenu)
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManUsePanelUI)
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.boardManShowRowNumbers)
-        defaultValues.updateValue("none", forKey: Constants.UserDefaults.boardManTimestampFormat)
+        defaultValues.updateValue("relative", forKey: Constants.UserDefaults.boardManTimestampFormat)
         defaultValues.updateValue(NSNumber(value: 680), forKey: Constants.UserDefaults.boardManPanelHeight)
+        defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.boardManShowUsageCount)
+        defaultValues.updateValue("badge", forKey: Constants.UserDefaults.boardManUsageCountStyle)
 
         /* Updates */
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.Update.enableAutomaticCheck)
