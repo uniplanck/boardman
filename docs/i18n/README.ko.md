@@ -1,12 +1,13 @@
 # Board-Man
 
-[English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md) / [Español](README.es.md) / [Português (Brasil)](README.pt-BR.md) / [한국어](README.ko.md) / [Deutsch](README.de.md) / [Français](README.fr.md)
+[English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
+
 
 Board-Man은 Clipy에서 파생된 오픈소스 macOS 클립보드 생산성 도구입니다.
 
 단순히 클립보드 기록을 저장하는 것을 넘어서, 복사, 붙여넣기, 편집, 텍스트 이동이 많은 작업 흐름을 더 잘 보이게 만드는 것을 목표로 합니다.
 
-![Board-Man clipboard history](docs/images/boardman-history.png)
+![Board-Man clipboard history](../images/boardman-history.png)
 
 ## 무엇을 하나요
 

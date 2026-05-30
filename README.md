@@ -1,6 +1,7 @@
 # Board-Man
 
-[English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md) / [Español](README.es.md) / [Português (Brasil)](README.pt-BR.md) / [한국어](README.ko.md) / [Deutsch](README.de.md) / [Français](README.fr.md)
+[English](README.md) / [ja](docs/i18n/README.ja.md) / [zh-CN](docs/i18n/README.zh-CN.md) / [es](docs/i18n/README.es.md) / [pt-BR](docs/i18n/README.pt-BR.md) / [ko](docs/i18n/README.ko.md) / [de](docs/i18n/README.de.md) / [fr](docs/i18n/README.fr.md)
+
 
 
 

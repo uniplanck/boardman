@@ -1,12 +1,13 @@
 # Board-Man
 
-[English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md) / [Español](README.es.md) / [Português (Brasil)](README.pt-BR.md) / [한국어](README.ko.md) / [Deutsch](README.de.md) / [Français](README.fr.md)
+[English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
+
 
 Board-Man es una utilidad de productividad para el portapapeles en macOS, de código abierto y derivada de Clipy.
 
 No se centra solo en guardar el historial del portapapeles. Su objetivo es hacer más visible el trabajo basado en copiar, pegar, editar y mover texto entre aplicaciones.
 
-![Board-Man clipboard history](docs/images/boardman-history.png)
+![Board-Man clipboard history](../images/boardman-history.png)
 
 ## Qué hace
 

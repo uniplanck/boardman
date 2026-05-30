@@ -1,12 +1,13 @@
 # Board-Man
 
-[English](README.md) / [日本語](README.ja.md) / [简体中文](README.zh-CN.md) / [Español](README.es.md) / [Português (Brasil)](README.pt-BR.md) / [한국어](README.ko.md) / [Deutsch](README.de.md) / [Français](README.fr.md)
+[English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
+
 
 Board-Man ist ein Open-Source-Produktivitätstool für die macOS-Zwischenablage und wurde von Clipy abgeleitet.
 
 Es geht nicht nur darum, den Verlauf der Zwischenablage zu speichern. Ziel ist es, Arbeitsabläufe mit häufigem Kopieren, Einfügen, Bearbeiten und Verschieben von Text sichtbarer zu machen.
 
-![Board-Man clipboard history](docs/images/boardman-history.png)
+![Board-Man clipboard history](../images/boardman-history.png)
 
 ## Was es macht
 
