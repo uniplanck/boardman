@@ -61,6 +61,7 @@ final class CPYPreferencesWindowController: NSWindowController {
         if #available(OSX 10.10, *) {
             self.window?.titlebarAppearsTransparent = true
         }
+        configureBoardManLabels()
         // Safe NSVisualEffectView polish for glass effect held minimal to not break xib layout (full in V3)
         toolBarItemTapped(generalButton)
         generalButton.sendAction(on: .leftMouseDown)
@@ -121,11 +122,11 @@ private extension CPYPreferencesWindowController {
     func resetImages() {
         generalImageView.image = boardManSymbol("gearshape", fallback: NSImage(resource: .prefGeneral))
         menuImageView.image = boardManSymbol("list.bullet.rectangle", fallback: NSImage(resource: .prefMenu))
-        typeImageView.image = boardManSymbol("doc.on.clipboard", fallback: NSImage(resource: .prefType))
-        excludeImageView.image = boardManSymbol("minus.circle", fallback: NSImage(resource: .prefExcluded))
+        typeImageView.image = boardManSymbol("clock.arrow.circlepath", fallback: NSImage(resource: .prefType))
+        excludeImageView.image = boardManSymbol("hand.raised", fallback: NSImage(resource: .prefExcluded))
         shortcutsImageView.image = boardManSymbol("keyboard", fallback: NSImage(resource: .prefShortcut))
-        updatesImageView.image = boardManSymbol("arrow.triangle.2.circlepath", fallback: NSImage(resource: .prefUpdate))
-        betaImageView.image = boardManSymbol("sparkles", fallback: NSImage(resource: .prefBeta))
+        updatesImageView.image = boardManSymbol("wrench.and.screwdriver", fallback: NSImage(resource: .prefUpdate))
+        betaImageView.image = boardManSymbol("return", fallback: NSImage(resource: .prefBeta))
 
         generalTextField.textColor = NSColor(resource: .tabTitle)
         menuTextField.textColor = NSColor(resource: .tabTitle)
@@ -134,6 +135,22 @@ private extension CPYPreferencesWindowController {
         shortcutsTextField.textColor = NSColor(resource: .tabTitle)
         updatesTextField.textColor = NSColor(resource: .tabTitle)
         betaTextField.textColor = NSColor(resource: .tabTitle)
+    }
+
+    func configureBoardManLabels() {
+        generalTextField.stringValue = "General"
+        menuTextField.stringValue = "Menu"
+        typeTextField.stringValue = "History"
+        excludeTextField.stringValue = "Privacy"
+        shortcutsTextField.stringValue = "Shortcuts"
+        updatesTextField.stringValue = "Advanced"
+        betaTextField.stringValue = "Paste"
+
+        [generalButton, menuButton, typeButton, excludeButton, shortcutsButton, updatesButton, betaButton].forEach {
+            $0?.isBordered = false
+        }
+        toolBar.wantsLayer = true
+        toolBar.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.55).cgColor
     }
 
     func boardManSymbol(_ name: String, fallback: NSImage) -> NSImage {

@@ -1,19 +1,15 @@
-# Contributing to Clipy
+# Contributing to Board-Man
 
-:tada: Thank you for contributing to Clipy :tada:
+Board-Man is a macOS clipboard utility derived from Clipy. Keep public changes focused, buildable, and free of private local paths or secrets.
+
+## Guidelines
+
+- Use Board-Man product wording in public docs and UI-facing copy.
+- Preserve legal attribution to Clipy and ClipMenu.
+- Keep internal Clipy source names when renaming would risk breakage.
+- Do not commit build outputs, local logs, user-specific settings, signing material, tokens, or API keys.
+- Do not reset macOS TCC permissions from project scripts.
 
 ## Localization
 
-### Add New Language
-<img src="../Resources/new_localization.png" width="600">
-
-After adding the language, please make changes to the various `.strings` files as follows.
-
-### Modify an Existing Language
-The files to be localized are as follows.
-- Localizable.strings ( `Clipy/Resources/#{language_name}.lproj/Localizable.strings` )
-- Preferences ( `Clipy/Sources/Preferences/#{language_name}.lproj/*.strings` )
-- PreferencesPanels ( `Clipy/Sources/Preferences/Panels/#{language_name}.lproj/*.strings` )
-- SnippetsEditor ( `Clipy/Sources/Snippets/#{language_name}.lproj/*.strings` )
-
-**English localization only, please edit `.xib` files directly**
+Localization files live under `Clipy/Resources`, `Clipy/Sources/Preferences`, and `Clipy/Sources/Snippets`. English interface changes may require editing the related `.xib` files directly.

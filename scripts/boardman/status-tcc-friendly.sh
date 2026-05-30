@@ -17,9 +17,9 @@ fi
 
 echo "Installed App:"
 echo "  Path: $INSTALLED_PATH"
-echo "  Bundle ID: $(plutil -extract CFBundleIdentifier raw -o - \"$INSTALLED_PATH/Contents/Info.plist\" 2>/dev/null || echo \"$BUNDLE_ID\")"
-echo "  Name: $(plutil -extract CFBundleName raw -o - \"$INSTALLED_PATH/Contents/Info.plist\" 2>/dev/null || echo \"$APP_NAME\")"
-echo "  Executable: $INSTALLED_PATH/Contents/MacOS/$(plutil -extract CFBundleExecutable raw -o - \"$INSTALLED_PATH/Contents/Info.plist\" 2>/dev/null | tr -d '\"' || echo \"Board-Man\")"
+echo "  Bundle ID: $(plutil -extract CFBundleIdentifier raw -o - "$INSTALLED_PATH/Contents/Info.plist" 2>/dev/null || echo "$BUNDLE_ID")"
+echo "  Name: $(plutil -extract CFBundleName raw -o - "$INSTALLED_PATH/Contents/Info.plist" 2>/dev/null || echo "$APP_NAME")"
+echo "  Executable: $INSTALLED_PATH/Contents/MacOS/$(plutil -extract CFBundleExecutable raw -o - "$INSTALLED_PATH/Contents/Info.plist" 2>/dev/null | tr -d '"' || echo "Board-Man")"
 
 echo -n "  Codesign Verify: "
 if codesign --verify --deep --strict "$INSTALLED_PATH" >/dev/null 2>&1; then
@@ -51,11 +51,9 @@ fi
 
 echo ""
 echo "TCC Reminder (no changes made):"
-echo "  macOS TCC (Accessibility / Input Monitoring) permissions are tied to the app's codesign identity and path."
-echo "  This helper ensures consistent ad-hoc codesigning and quarantine removal to reduce 'stale permission' re-prompts."
-echo "  It CANNOT bypass or automate the initial TCC grant dialogs. You must manually approve in"
-echo "  System Settings > Privacy & Security if prompted after install/rebuild."
-echo "  For repeated issues: remove app from TCC lists manually via System Settings (or reset via Privacy & Security UI), then reinstall with this helper."
+echo "  macOS TCC permissions are tied to the app's codesign identity and path."
+echo "  This helper cannot bypass or automate the initial TCC grant dialogs."
+echo "  Manually approve Accessibility and Input Monitoring in System Settings if prompted."
 echo ""
-echo "Current git head: $(cd "$REPO_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo 'ea6ae8b')"
+echo "Current git head: $(cd "$REPO_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
 echo "=== End of Status ==="

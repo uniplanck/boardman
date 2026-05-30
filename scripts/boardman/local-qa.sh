@@ -9,9 +9,7 @@ SCHEME="Board-Man"
 CONFIGURATION="Debug"
 DERIVED_DATA="${TMPDIR:-/tmp}/BoardManLocalQA"
 INSTALLED_APP="/Applications/${APP_NAME}.app"
-WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$REPO_ROOT/.." && pwd)}"
-BOARDMAN_DIGEST="$WORKSPACE_ROOT/boardman.copy.txt"
-COPY_DIGEST="$WORKSPACE_ROOT/copy.txt"
+BOARDMAN_DIGEST="${BOARDMAN_DIGEST_OUT:-/tmp/boardman-local-qa.digest.txt}"
 
 run_build=true
 
@@ -115,7 +113,6 @@ trap 'rm -f "$tmp"' EXIT
 } > "$tmp"
 
 cp "$tmp" "$BOARDMAN_DIGEST"
-cp "$tmp" "$COPY_DIGEST"
 cat "$tmp"
 
 if [[ "$status" != "OK" ]]; then

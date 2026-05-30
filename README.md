@@ -1,42 +1,81 @@
 # Board-Man
 
-Board-Man is a macOS clipboard productivity utility derived from Clipy.
+Board-Man is a macOS clipboard productivity utility derived from Clipy. It keeps recent clipboard history close at hand and adds Board-Man-oriented workflow features for repeated paste work.
 
-It extends the clipboard manager concept with workflow-oriented features such as paste activity visibility, menu bar feedback, and operator-friendly usage for people who repeatedly write, paste, edit, and move text across apps.
+Board-Man is a modified derivative work. It is not endorsed by the upstream Clipy or ClipMenu maintainers.
 
-> Status: public candidate. This repository is a sanitized open-source edition prepared from an actively developed private build.
+## Features
+
+- History: browse recent clipboard items from the Board-Man panel.
+- Pinned: keep important history and snippet items easy to reach.
+- Snippets: store reusable text snippets.
+- Favorites: review pinned and favorite workflow items in one place.
+- Search: filter the active tab with the panel search field.
+- Paste: press Enter or click a row to paste into the active app.
 
 ## Screenshot
 
 ![Board-Man clipboard history](docs/images/boardman-history.png)
 
-## Why Board-Man exists
+### Screenshots to refresh after UI QA
 
-Many clipboard managers help users store snippets, but they do not clearly show how often clipboard actions are used during real work.
+- Refresh `docs/images/boardman-history.png` after a manual UI pass if the panel layout changes again.
 
-Board-Man focuses on clipboard activity as an operational signal:
+## Initial Permission Setup
 
-- writers can understand repetitive text workflows
-- developers can track repeated paste-heavy operations
-- marketers and operators can reduce manual copy/paste friction
-- power users can connect clipboard actions with local automation tools
+Board-Man needs macOS privacy permissions for normal paste workflows:
 
-## Current direction
+- Accessibility: required for paste/focus automation.
+- Input Monitoring: required for global shortcut handling.
 
-The public edition is planned to focus on:
+Open System Settings > Privacy & Security and enable Board-Man under Accessibility and Input Monitoring when macOS prompts. Do not reset TCC permissions during normal development.
 
-- paste count tracking
-- clipboard workflow visibility
-- menu bar status feedback
-- safe local-only operation
-- clear build instructions for macOS
-- documentation for contributors and fork maintainers
+## Preferences
+
+Board-Man preferences include:
+
+- General: launch and history behavior.
+- Menu: menu and panel display options.
+- Shortcuts: history, snippets, and clear-history hotkeys.
+- Types: clipboard content types to save.
+- Excluded Apps: apps Board-Man should ignore.
+- Updates and Beta: inherited settings panels kept for compatibility.
+
+Some internal source files and classes still use Clipy names to preserve project compatibility.
+
+## Local Build
+
+Requirements:
+
+- macOS
+- Xcode with command line tools
+- Git
+
+Build smoke:
+
+```bash
+xcodebuild -project "Board-Man.xcodeproj" \
+  -scheme "Board-Man" \
+  -configuration Debug \
+  -derivedDataPath /tmp/BoardManPublicBuild \
+  -destination 'generic/platform=macOS' \
+  -skipPackagePluginValidation \
+  -skipMacroValidation \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+Optional local install helper:
+
+```bash
+./scripts/boardman/install-dev-stable.sh --dry-run
+```
+
+The install helper cannot bypass macOS permission prompts. Grant permissions manually in System Settings if prompted.
 
 ## Attribution
 
-Board-Man is a heavily modified derivative work based on Clipy.
-
-This repository preserves upstream attribution and license notices.
+Board-Man is based on Clipy and preserves upstream license and attribution notices.
 
 See:
 
@@ -44,37 +83,6 @@ See:
 - `LICENSE`
 - `LICENSE_CLIPMENU`
 
-## Public release policy
+## Public Repository Policy
 
-This public repository should not contain:
-
-- private logs
-- personal absolute paths
-- signing certificates
-- provisioning profiles
-- API keys or tokens
-- local automation secrets
-- production-only scripts
-- private build artifacts
-- user-specific configuration
-
-## Planned v0.1 scope
-
-- Buildable sanitized source tree
-- Preserved upstream license and attribution
-- Basic README
-- Screenshot or short demo
-- Minimal release notes
-- Known limitations section
-
-## License
-
-Board-Man is distributed under the MIT license terms inherited from Clipy.
-
-The original license and attribution notices are preserved in:
-
-- `LICENSE`
-- `LICENSE_CLIPMENU`
-- `ATTRIBUTION.md`
-
-Board-Man is a modified derivative work and is not endorsed by the upstream Clipy or ClipMenu maintainers.
+Do not commit private logs, local absolute paths, signing material, provisioning profiles, API keys, tokens, production-only scripts, build artifacts, or user-specific configuration.
