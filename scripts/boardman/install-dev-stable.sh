@@ -145,6 +145,11 @@ else
   USE_UI="$CURRENT_UI"
   echo "Will preserve BoardManUsePanelUI=$USE_UI"
 fi
+if [ "$USE_UI" = "1" ] || [ "$USE_UI" = "true" ] || [ "$USE_UI" = "TRUE" ] || [ "$USE_UI" = "YES" ] || [ "$USE_UI" = "yes" ]; then
+  USE_UI_BOOL="true"
+else
+  USE_UI_BOOL="false"
+fi
 
 # Quit app safely
 echo "Quitting $APP_NAME safely..."
@@ -267,8 +272,8 @@ fi
 
 # Restore UI preference
 if [ "$DRY_RUN" = false ]; then
-  defaults write "$BUNDLE_ID" BoardManUsePanelUI -bool "$USE_UI"
-  echo "Set BoardManUsePanelUI=$USE_UI"
+  defaults write "$BUNDLE_ID" BoardManUsePanelUI -bool "$USE_UI_BOOL"
+  echo "Set BoardManUsePanelUI=$USE_UI_BOOL"
 fi
 
 # Reopen
