@@ -26,12 +26,18 @@ extension AccessibilityService {
         // For macOS 10.14 and later only, check accessibility permission at startup and paste
         guard #available(macOS 10.14, *) else { return true }
 
+        guard isPrompt else {
+            return AXIsProcessTrusted()
+        }
+
         let checkOptionPromptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
-        let opts = [checkOptionPromptKey: isPrompt] as CFDictionary
+        let opts = [checkOptionPromptKey: true] as CFDictionary
         return AXIsProcessTrustedWithOptions(opts)
     }
 
     func showAccessibilityAuthenticationAlert() {
+        guard !isAccessibilityEnabled(isPrompt: false) else { return }
+
         let now = Date()
         guard now.timeIntervalSince(lastBoardManPermissionAlertAt) > boardManPermissionAlertInterval else {
             return
@@ -46,6 +52,7 @@ extension AccessibilityService {
         NSApp.activate(ignoringOtherApps: true)
 
         if alert.runModal() == NSApplication.ModalResponse.alertFirstButtonReturn {
+            guard !isAccessibilityEnabled(isPrompt: false) else { return }
             guard !openAccessibilitySettingWindow() else { return }
             isAccessibilityEnabled(isPrompt: true)
         }
