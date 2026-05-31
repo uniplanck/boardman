@@ -128,7 +128,7 @@ extension MenuManager {
         }
         if let panel = boardManPanel {
             // V4B-13: position and show first. Heavy Realm/defaults reload happens after first paint.
-            let panelSize = NSSize(width: 460, height: BoardManPanel.preferredPanelHeight())
+            let panelSize = NSSize(width: BoardManPanel.preferredPanelWidth(), height: BoardManPanel.preferredPanelHeight())
             let mouseLoc = NSEvent.mouseLocation
             var originX = mouseLoc.x - (panelSize.width / 2)
             var originY = mouseLoc.y - (panelSize.height / 2)
@@ -398,7 +398,7 @@ private extension MenuManager {
         // V4B-14: Panel UI mode does not need legacy history/snippet menu rebuilds.
         // Keeping the status menu lightweight avoids slow rebuilds after Realm/paste-count changes.
         let menu = NSMenu(title: Constants.Application.name)
-        menu.addItem(NSMenuItem(title: String(localized: "Board-Man Settings"), action: #selector(AppDelegate.showPreferenceWindow)))
+        menu.addItem(NSMenuItem(title: String(localized: "Open Board-Man Settings"), action: #selector(AppDelegate.showPreferenceWindow)))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: String(localized: "Quit Board-Man"), action: #selector(AppDelegate.terminate)))
 
@@ -418,10 +418,9 @@ private extension MenuManager {
         historyMenu = NSMenu(title: Constants.Menu.history)
         snippetMenu = NSMenu(title: Constants.Menu.snippet)
 
-
         addPinnedSnippetItems(clipMenu!)
         addPinnedSnippetItems(snippetMenu!)
-addHistoryItems(clipMenu!)
+        addHistoryItems(clipMenu!)
         addHistoryItems(historyMenu!)
 
         addSnippetItems(clipMenu!, separateMenu: true)
@@ -434,7 +433,7 @@ addHistoryItems(clipMenu!)
         }
 
         clipMenu?.addItem(NSMenuItem(title: String(localized: "Edit Snippets"), action: #selector(AppDelegate.showSnippetEditorWindow)))
-        clipMenu?.addItem(NSMenuItem(title: String(localized: "Board-Man Settings"), action: #selector(AppDelegate.showPreferenceWindow)))
+        clipMenu?.addItem(NSMenuItem(title: String(localized: "Open Board-Man Settings"), action: #selector(AppDelegate.showPreferenceWindow)))
         clipMenu?.addItem(NSMenuItem.separator())
         clipMenu?.addItem(NSMenuItem(title: String(localized: "Quit Board-Man"), action: #selector(AppDelegate.terminate)))
 
@@ -1079,8 +1078,12 @@ class BoardManPanel: NSPanel {
         return CGFloat(clampedPanelHeight(AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManPanelHeight)))
     }
 
+    static func preferredPanelWidth() -> CGFloat {
+        return 560
+    }
+
     static func clampedPanelHeight(_ value: Int) -> Int {
-        return min(900, max(520, value == 0 ? 680 : value))
+        return min(900, max(520, value == 0 ? 760 : value))
     }
 
     static func allowedTimestampFormat(_ value: String?) -> String {
@@ -1141,11 +1144,12 @@ class BoardManPanel: NSPanel {
     }
 
     convenience init() {
-        let contentRect = NSRect(x: 0, y: 0, width: 460, height: BoardManPanel.preferredPanelHeight())
+        let contentRect = NSRect(x: 0, y: 0, width: BoardManPanel.preferredPanelWidth(), height: BoardManPanel.preferredPanelHeight())
         self.init(contentRect: contentRect,
                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView],  // no .hudWindow = no harsh black footer/band
                   backing: .buffered,
                   defer: false)
+        self.minSize = NSSize(width: 460, height: 520)
         self.title = "Board-Man"
         self.titlebarAppearsTransparent = true
         self.isMovableByWindowBackground = true
@@ -1228,7 +1232,7 @@ class BoardManPanel: NSPanel {
         tabs.setLabel("Pinned", forSegment: 1)
         tabs.setLabel("Snippets", forSegment: 2)
         tabs.setLabel("Favorites", forSegment: 3)
-        tabs.setLabel("Settings", forSegment: 4)
+        tabs.setLabel("Set", forSegment: 4)
         tabs.selectedSegment = 0
         tabs.target = self
         tabs.action = #selector(tabChanged(_:))
@@ -1641,8 +1645,9 @@ class BoardManPanel: NSPanel {
 
     private func updateTabWidths(totalWidth: CGFloat) {
         guard let segmentedControl else { return }
-        let settingsWidth: CGFloat = 66
-        let contentWidth = max(68, floor((totalWidth - settingsWidth) / 4))
+        let settingsWidth: CGFloat = 44
+        let minimumReadableWidth: CGFloat = 74
+        let contentWidth = max(minimumReadableWidth, floor((totalWidth - settingsWidth) / 4))
         for segment in 0...3 {
             segmentedControl.setWidth(contentWidth, forSegment: segment)
         }
@@ -1661,41 +1666,91 @@ class BoardManPanel: NSPanel {
         allControls.forEach { $0?.isHidden = !isVisible }
         guard isVisible else { return }
 
-        let left = margin + 16
-        let right = margin + max(220, width / 2 + 10)
         let rowH: CGFloat = 24
-        var currentY = topY - 34
+        let sectionGap: CGFloat = 22
+        let rowGap: CGFloat = 32
+        let fieldLabelWidth: CGFloat = 58
+        let contentX = margin + 18
+        let contentWidth = max(240, width - 36)
+        let useTwoColumns = width >= 620
+        let columnGap: CGFloat = 26
+        let columnWidth = useTwoColumns ? floor((contentWidth - columnGap) / 2) : contentWidth
+        let leftX = contentX
+        let rightX = contentX + columnWidth + columnGap
+        let firstY = topY - 34
 
-        viewSectionLabel?.frame = NSRect(x: left, y: currentY, width: 120, height: 18)
-        rowNumbersButton?.frame = NSRect(x: left, y: currentY - 30, width: 72, height: 18)
-        timestampLabel?.frame = NSRect(x: left + 96, y: currentY - 27, width: 34, height: 14)
-        timestampPopup?.frame = NSRect(x: left + 134, y: currentY - 32, width: 146, height: rowH)
-        usageCountButton?.frame = NSRect(x: left, y: currentY - 62, width: 74, height: 18)
-        usageStyleLabel?.frame = NSRect(x: left + 96, y: currentY - 59, width: 34, height: 14)
-        usageStylePopup?.frame = NSRect(x: left + 134, y: currentY - 64, width: 104, height: rowH)
-        densityLabel?.frame = NSRect(x: left, y: currentY - 91, width: 54, height: 14)
-        densityPopup?.frame = NSRect(x: left + 72, y: currentY - 96, width: 132, height: rowH)
+        [densityLabel, clickActionLabel, enterActionLabel].forEach {
+            $0?.textColor = .secondaryLabelColor
+        }
 
-        behaviorSectionLabel?.frame = NSRect(x: right, y: currentY, width: 120, height: 18)
-        clickActionLabel?.frame = NSRect(x: right, y: currentY - 27, width: 38, height: 14)
-        clickActionPopup?.frame = NSRect(x: right + 52, y: currentY - 32, width: 110, height: rowH)
-        enterActionLabel?.frame = NSRect(x: right, y: currentY - 59, width: 40, height: 14)
-        enterActionPopup?.frame = NSRect(x: right + 52, y: currentY - 64, width: 110, height: rowH)
-        autoCloseButton?.frame = NSRect(x: right, y: currentY - 92, width: 110, height: 18)
+        func popupWidth(in columnWidth: CGFloat, labelWidth: CGFloat = fieldLabelWidth) -> CGFloat {
+            return max(118, min(220, columnWidth - labelWidth - 12))
+        }
 
-        currentY -= 134
-        historySectionLabel?.frame = NSRect(x: left, y: currentY, width: 120, height: 18)
-        dedupeButton?.frame = NSRect(x: left, y: currentY - 30, width: 88, height: 18)
-        reuseTopButton?.frame = NSRect(x: left + 102, y: currentY - 30, width: 100, height: 18)
-        clearHistoryButton?.frame = NSRect(x: left, y: currentY - 66, width: 76, height: rowH)
+        func placeHeader(_ label: NSTextField?, originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            label?.frame = NSRect(x: originX, y: originY, width: width, height: 18)
+        }
 
-        privacySectionLabel?.frame = NSRect(x: right, y: currentY, width: 120, height: 18)
-        pauseRecordingButton?.frame = NSRect(x: right, y: currentY - 30, width: 82, height: 18)
-        excludedAppsButton?.frame = NSRect(x: right, y: currentY - 66, width: 82, height: rowH)
+        func placeLabeledRow(label: NSTextField?, control: NSView?, originX: CGFloat, originY: CGFloat, width: CGFloat, labelWidth: CGFloat = fieldLabelWidth) {
+            label?.frame = NSRect(x: originX, y: originY + 5, width: labelWidth, height: 14)
+            control?.frame = NSRect(x: originX + labelWidth + 12, y: originY, width: popupWidth(in: width, labelWidth: labelWidth), height: rowH)
+        }
 
-        currentY -= 104
-        labsSectionLabel?.frame = NSRect(x: left, y: currentY, width: 120, height: 18)
-        labsNoteLabel?.frame = NSRect(x: left, y: currentY - 28, width: width - 32, height: 18)
+        func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(viewSectionLabel, originX: originX, originY: originY, width: width)
+            rowNumbersButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 86, height: 18)
+            placeLabeledRow(label: timestampLabel, control: timestampPopup, originX: originX, originY: originY - (rowGap * 2) - 4, width: width)
+            usageCountButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 2, width: 82, height: 18)
+            placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX + 104, originY: originY - (rowGap * 3) - 6, width: max(150, width - 104), labelWidth: 38)
+            placeLabeledRow(label: densityLabel, control: densityPopup, originX: originX, originY: originY - (rowGap * 4) - 8, width: width)
+            heightControlLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 5) - 3, width: fieldLabelWidth, height: 14)
+            heightStepper?.frame = NSRect(x: originX + fieldLabelWidth + 12, y: originY - (rowGap * 5) - 8, width: 72, height: rowH)
+            heightLabel?.frame = NSRect(x: originX + fieldLabelWidth + 92, y: originY - (rowGap * 5) - 3, width: 42, height: 14)
+        }
+
+        func placeHistorySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(historySectionLabel, originX: originX, originY: originY, width: width)
+            dedupeButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 92, height: 18)
+            reuseTopButton?.frame = NSRect(x: originX + 106, y: originY - rowGap, width: 118, height: 18)
+            clearHistoryButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 6, width: 86, height: rowH)
+        }
+
+        func placeBehaviorSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(behaviorSectionLabel, originX: originX, originY: originY, width: width)
+            placeLabeledRow(label: clickActionLabel, control: clickActionPopup, originX: originX, originY: originY - rowGap - 6, width: width)
+            placeLabeledRow(label: enterActionLabel, control: enterActionPopup, originX: originX, originY: originY - (rowGap * 2) - 8, width: width)
+            autoCloseButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 4, width: 120, height: 18)
+        }
+
+        func placePrivacySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(privacySectionLabel, originX: originX, originY: originY, width: width)
+            pauseRecordingButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 92, height: 18)
+            excludedAppsButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 6, width: 92, height: rowH)
+        }
+
+        func placeLabsSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(labsSectionLabel, originX: originX, originY: originY, width: width)
+            labsNoteLabel?.frame = NSRect(x: originX, y: originY - 30, width: width, height: 18)
+        }
+
+        if useTwoColumns {
+            placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
+            placeHistorySection(originX: leftX, originY: firstY - 200, width: columnWidth)
+            placeLabsSection(originX: leftX, originY: firstY - 314, width: columnWidth)
+            placeBehaviorSection(originX: rightX, originY: firstY, width: columnWidth)
+            placePrivacySection(originX: rightX, originY: firstY - 146, width: columnWidth)
+        } else {
+            var sectionY = firstY
+            placeViewSection(originX: leftX, originY: sectionY, width: columnWidth)
+            sectionY -= 184 + sectionGap
+            placeHistorySection(originX: leftX, originY: sectionY, width: columnWidth)
+            sectionY -= 64 + sectionGap
+            placeBehaviorSection(originX: leftX, originY: sectionY, width: columnWidth)
+            sectionY -= 100 + sectionGap
+            placePrivacySection(originX: leftX, originY: sectionY, width: columnWidth)
+            sectionY -= 72 + sectionGap
+            placeLabsSection(originX: leftX, originY: sectionY, width: columnWidth)
+        }
     }
 
     fileprivate func reloadHistoryItems(_ items: [BoardManHistoryItem]) {
