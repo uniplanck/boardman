@@ -869,6 +869,46 @@ fileprivate enum BoardManInlineSettingsCategory: Int {
     case view, behavior, history, privacy
 }
 
+fileprivate enum BoardManThemePreset: String, CaseIterable {
+    case defaultPreset = "Default"
+    case graphite = "Graphite"
+    case ocean = "Ocean"
+    case amber = "Amber"
+    case rose = "Rose"
+
+    var title: String {
+        return rawValue
+    }
+
+    var accentColor: NSColor {
+        switch self {
+        case .defaultPreset: return .controlAccentColor
+        case .graphite: return .tertiaryLabelColor
+        case .ocean: return .systemTeal
+        case .amber: return .systemOrange
+        case .rose: return .systemPink
+        }
+    }
+
+    var tintColor: NSColor {
+        switch self {
+        case .defaultPreset: return .controlBackgroundColor
+        case .graphite: return NSColor.labelColor.withAlphaComponent(0.055)
+        case .ocean: return NSColor.systemTeal.withAlphaComponent(0.055)
+        case .amber: return NSColor.systemOrange.withAlphaComponent(0.050)
+        case .rose: return NSColor.systemPink.withAlphaComponent(0.050)
+        }
+    }
+
+    static func allowed(_ value: String?) -> BoardManThemePreset {
+        guard let value,
+              let preset = BoardManThemePreset.allCases.first(where: { $0.rawValue == value }) else {
+            return .defaultPreset
+        }
+        return preset
+    }
+}
+
 fileprivate enum BoardManPanelItemSource {
     case clip
     case snippet
@@ -883,9 +923,18 @@ fileprivate enum BoardManHideRuleMode: String, Codable, CaseIterable {
 
     var title: String {
         switch self {
+        case .contains: return "Contains text"
+        case .startsWith: return "Starts with"
+        case .endsWith: return "Ends with"
+        case .exact: return "Exact match"
+        }
+    }
+
+    var summaryTitle: String {
+        switch self {
         case .contains: return "contains"
-        case .startsWith: return "starts with"
-        case .endsWith: return "ends with"
+        case .startsWith: return "starts"
+        case .endsWith: return "ends"
         case .exact: return "exact"
         }
     }
@@ -1008,14 +1057,15 @@ private final class BoardManHistoryRowView: NSTableRowView {
         let row = (superview as? NSTableView)?.row(for: self) ?? -1
         let rowRect = bounds.insetBy(dx: 6, dy: 4)
         let useLiquidGlass = previewOwner?.isLiquidGlassEnabled == true
+        let accentColor = previewOwner?.themeAccentColor ?? .controlAccentColor
         let path = NSBezierPath(roundedRect: rowRect, xRadius: useLiquidGlass ? 11 : 8, yRadius: useLiquidGlass ? 11 : 8)
         if previewOwner?.isSelectedRow(row) == true {
             (useLiquidGlass
-                ? NSColor.controlAccentColor.withAlphaComponent(0.30)
+                ? accentColor.withAlphaComponent(0.30)
                 : NSColor.selectedContentBackgroundColor.withAlphaComponent(0.82)).setFill()
             path.fill()
         } else if previewOwner?.isHoveredRow(row) == true {
-            NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.14 : 0.16).setFill()
+            accentColor.withAlphaComponent(useLiquidGlass ? 0.14 : 0.16).setFill()
             path.fill()
         } else if let appearance = previewOwner?.usedItemAppearance(for: row) {
             appearance.background.setFill()
@@ -1090,7 +1140,8 @@ private final class BoardManHistoryCellView: NSTableCellView {
     func configure(item: BoardManHistoryItem,
                    isSelected: Bool,
                    usageStyle: String,
-                   useLiquidGlass: Bool) {
+                   useLiquidGlass: Bool,
+                   accentColor: NSColor) {
         primaryLabel.stringValue = item.primaryTitle
         metadataLabel.stringValue = item.metadataText
         let badgePrefix = usageStyle == "compact" ? "used " : "x"
@@ -1106,7 +1157,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
             primaryLabel.textColor = .labelColor
             metadataLabel.textColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.92) : .secondaryLabelColor
             countBadge.textColor = .labelColor
-            countBadge.layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(useLiquidGlass ? 0.18 : 0.18).cgColor
+            countBadge.layer?.backgroundColor = accentColor.withAlphaComponent(useLiquidGlass ? 0.18 : 0.18).cgColor
         }
         countBadge.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.30 : 0).cgColor
         countBadge.layer?.borderWidth = useLiquidGlass ? 1 : 0
@@ -1150,6 +1201,8 @@ class BoardManPanel: NSPanel {
     private var usageStylePopup: NSPopUpButton?
     private var usedItemStyleLabel: NSTextField?
     private var usedItemStylePopup: NSPopUpButton?
+    private var themePresetLabel: NSTextField?
+    private var themePresetPopup: NSPopUpButton?
     private var densityLabel: NSTextField?
     private var densityPopup: NSPopUpButton?
     private var clickActionLabel: NSTextField?
@@ -1169,6 +1222,8 @@ class BoardManPanel: NSPanel {
     private var removeLastHideRuleButton: NSButton?
     private var clearHideRulesButton: NSButton?
     private var hideRulesSummaryLabel: NSTextField?
+    private var hideRulesExamplesLabel: NSTextField?
+    private var hideRulesNoteLabel: NSTextField?
     private var viewSectionLabel: NSTextField?
     private var behaviorSectionLabel: NSTextField?
     private var historySectionLabel: NSTextField?
@@ -1196,6 +1251,14 @@ class BoardManPanel: NSPanel {
     }
     fileprivate var isLiquidGlassEnabled: Bool {
         return AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
+    }
+
+    fileprivate var themePreset: BoardManThemePreset {
+        return BoardManThemePreset.allowed(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManThemePreset))
+    }
+
+    fileprivate var themeAccentColor: NSColor {
+        return themePreset.accentColor
     }
 
     static func preferredPanelHeight() -> CGFloat {
@@ -1264,6 +1327,10 @@ class BoardManPanel: NSPanel {
         let allowed = ["Default", "Subtle Red", "Amber", "Blue", "Monochrome"]
         guard let value, allowed.contains(value) else { return "Default" }
         return value
+    }
+
+    private static func allowedThemePresetTitle(_ value: String?) -> String {
+        return BoardManThemePreset.allowed(value).title
     }
 
     private static func makeSectionLabel(_ title: String) -> NSTextField {
@@ -1464,6 +1531,22 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(usedItemStyle)
         usedItemStylePopup = usedItemStyle
 
+        let themeText = NSTextField(labelWithString: "Theme")
+        themeText.font = NSFont.systemFont(ofSize: 11)
+        themeText.textColor = .labelColor
+        contentView.addSubview(themeText)
+        themePresetLabel = themeText
+
+        let themePresetControl = NSPopUpButton(frame: .zero, pullsDown: false)
+        themePresetControl.addItems(withTitles: BoardManThemePreset.allCases.map { $0.title })
+        themePresetControl.selectItem(withTitle: BoardManPanel.allowedThemePresetTitle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManThemePreset)))
+        themePresetControl.font = NSFont.systemFont(ofSize: 11)
+        themePresetControl.target = self
+        themePresetControl.action = #selector(themePresetChanged(_:))
+        themePresetControl.toolTip = "Changes Board-Man panel accents only."
+        contentView.addSubview(themePresetControl)
+        themePresetPopup = themePresetControl
+
         let densityText = NSTextField(labelWithString: "Density")
         densityText.font = NSFont.systemFont(ofSize: 11)
         densityText.textColor = .labelColor
@@ -1612,10 +1695,24 @@ class BoardManPanel: NSPanel {
 
         let ruleSummary = NSTextField(labelWithString: "")
         ruleSummary.font = NSFont.systemFont(ofSize: 11)
-        ruleSummary.textColor = .secondaryLabelColor
+        ruleSummary.textColor = .labelColor
         ruleSummary.lineBreakMode = .byTruncatingTail
         contentView.addSubview(ruleSummary)
         hideRulesSummaryLabel = ruleSummary
+
+        let ruleExamples = NSTextField(labelWithString: "")
+        ruleExamples.font = NSFont.systemFont(ofSize: 11)
+        ruleExamples.textColor = .secondaryLabelColor
+        ruleExamples.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(ruleExamples)
+        hideRulesExamplesLabel = ruleExamples
+
+        let ruleNote = NSTextField(labelWithString: "Hidden only in Board-Man, data is not deleted.")
+        ruleNote.font = NSFont.systemFont(ofSize: 11)
+        ruleNote.textColor = .secondaryLabelColor
+        ruleNote.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(ruleNote)
+        hideRulesNoteLabel = ruleNote
         refreshHideRulesSummary()
 
         let labsTitle = BoardManPanel.makeSectionLabel("Labs")
@@ -1740,6 +1837,8 @@ class BoardManPanel: NSPanel {
 
     private func applyLiquidGlassStyle() {
         let useGlass = isLiquidGlassEnabled
+        let accentColor = themeAccentColor
+        let tintColor = themePreset.tintColor
         backgroundColor = useGlass ? .clear : .windowBackgroundColor
         isOpaque = !useGlass
         glassBackgroundView?.isHidden = !useGlass
@@ -1747,7 +1846,7 @@ class BoardManPanel: NSPanel {
         glassBackgroundView?.layer?.backgroundColor = NSColor.black.withAlphaComponent(useGlass ? 0.10 : 0).cgColor
         contentView?.layer?.backgroundColor = (useGlass
             ? NSColor.clear
-            : NSColor.controlBackgroundColor).cgColor
+            : tintColor).cgColor
         contentView?.layer?.isOpaque = !useGlass
         [searchGlassView, tabsGlassView, settingsGlassView, listGlassView].forEach { glass in
             glass?.isHidden = !useGlass
@@ -1769,19 +1868,20 @@ class BoardManPanel: NSPanel {
             : NSColor.clear).cgColor
         settingsBackgroundView?.layer?.backgroundColor = (useGlass
             ? NSColor.textBackgroundColor.withAlphaComponent(0.08)
-            : NSColor.controlBackgroundColor).cgColor
+            : tintColor).cgColor
         settingsBackgroundView?.layer?.cornerRadius = useGlass ? 12 : 6
-        settingsBackgroundView?.layer?.borderColor = (useGlass ? NSColor.white : NSColor.separatorColor).withAlphaComponent(useGlass ? 0.18 : 0).cgColor
-        settingsBackgroundView?.layer?.borderWidth = useGlass ? 1 : 0
+        settingsBackgroundView?.layer?.borderColor = (useGlass ? NSColor.white : accentColor).withAlphaComponent(useGlass ? 0.18 : 0.20).cgColor
+        settingsBackgroundView?.layer?.borderWidth = useGlass ? 1 : (themePreset == .defaultPreset ? 0 : 1)
         scrollView?.layer?.backgroundColor = (useGlass
             ? NSColor.clear
-            : NSColor.controlBackgroundColor).cgColor
+            : tintColor).cgColor
         scrollView?.layer?.cornerRadius = useGlass ? 11 : 8
-        scrollView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useGlass ? 0.18 : 0.55).cgColor
+        scrollView?.layer?.borderColor = (themePreset == .defaultPreset ? NSColor.separatorColor : accentColor).withAlphaComponent(useGlass ? 0.18 : 0.42).cgColor
         scrollView?.drawsBackground = !useGlass
         placeholderList?.backgroundColor = .clear
         footerNote?.textColor = NSColor.secondaryLabelColor.withAlphaComponent(useGlass ? 0.98 : 0.95)
         previewBubblePanel?.contentView?.layer?.cornerRadius = useGlass ? 11 : 8
+        previewBubblePanel?.contentView?.layer?.borderColor = accentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
         placeholderList?.reloadData()
     }
 
@@ -1805,7 +1905,7 @@ class BoardManPanel: NSPanel {
         bubble.contentView = bubbleContent
         bubble.contentView?.wantsLayer = true
         bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.18).cgColor
-        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(0.42).cgColor
+        bubble.contentView?.layer?.borderColor = themeAccentColor.withAlphaComponent(0.42).cgColor
         bubble.contentView?.layer?.borderWidth = 1
         bubble.contentView?.layer?.cornerRadius = 8
         bubble.contentView?.addSubview(label)
@@ -1835,7 +1935,6 @@ class BoardManPanel: NSPanel {
         segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         updateTabWidths(totalWidth: width)
 
-        settingsCategoryControl?.isHidden = true
         let contentTop = top - 56
         settingsGlassView?.isHidden = !isSettings || !isLiquidGlassEnabled
         settingsBackgroundView?.isHidden = !isSettings
@@ -1866,19 +1965,19 @@ class BoardManPanel: NSPanel {
 
     private func layoutInlineSettingsControls(margin: CGFloat, width: CGFloat, topY: CGFloat, isVisible: Bool) {
         let allControls: [NSView?] = [
-            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, densityLabel, densityPopup,
+            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, densityLabel, densityPopup,
             behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton,
             historySectionLabel, dedupeButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, pauseRecordingButton, excludedAppsButton,
-            filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel,
+            filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
             labsSectionLabel, labsNoteLabel,
             heightControlLabel, heightLabel, heightStepper
         ]
-        allControls.forEach { $0?.isHidden = !isVisible }
+        allControls.forEach { $0?.isHidden = true }
+        settingsCategoryControl?.isHidden = true
         guard isVisible else { return }
 
         let rowH: CGFloat = 24
-        let sectionGap: CGFloat = 22
         let rowGap: CGFloat = 32
         let fieldLabelWidth: CGFloat = 58
         let contentX = margin + 18
@@ -1888,7 +1987,16 @@ class BoardManPanel: NSPanel {
         let columnWidth = useTwoColumns ? floor((contentWidth - columnGap) / 2) : contentWidth
         let leftX = contentX
         let rightX = contentX + columnWidth + columnGap
-        let firstY = topY - 34
+        let firstY = topY - (useTwoColumns ? 34 : 74)
+
+        let viewControls: [NSView?] = [viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, densityLabel, densityPopup, heightControlLabel, heightLabel, heightStepper, labsSectionLabel, labsNoteLabel]
+        let behaviorControls: [NSView?] = [behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton]
+        let historyControls: [NSView?] = [historySectionLabel, dedupeButton, reuseTopButton, clearHistoryButton]
+        let privacyControls: [NSView?] = [privacySectionLabel, pauseRecordingButton, excludedAppsButton, filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel]
+
+        func show(_ controls: [NSView?]) {
+            controls.forEach { $0?.isHidden = false }
+        }
 
         [densityLabel, clickActionLabel, enterActionLabel].forEach {
             $0?.textColor = .secondaryLabelColor
@@ -1914,10 +2022,11 @@ class BoardManPanel: NSPanel {
             usageCountButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 2, width: 82, height: 18)
             placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX + 104, originY: originY - (rowGap * 3) - 6, width: max(150, width - 104), labelWidth: 38)
             placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: originX, originY: originY - (rowGap * 4) - 8, width: width)
-            placeLabeledRow(label: densityLabel, control: densityPopup, originX: originX, originY: originY - (rowGap * 5) - 10, width: width)
-            heightControlLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 6) - 5, width: fieldLabelWidth, height: 14)
-            heightStepper?.frame = NSRect(x: originX + fieldLabelWidth + 12, y: originY - (rowGap * 6) - 10, width: 72, height: rowH)
-            heightLabel?.frame = NSRect(x: originX + fieldLabelWidth + 92, y: originY - (rowGap * 6) - 5, width: 42, height: 14)
+            placeLabeledRow(label: themePresetLabel, control: themePresetPopup, originX: originX, originY: originY - (rowGap * 5) - 10, width: width)
+            placeLabeledRow(label: densityLabel, control: densityPopup, originX: originX, originY: originY - (rowGap * 6) - 12, width: width)
+            heightControlLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 7) - 7, width: fieldLabelWidth, height: 14)
+            heightStepper?.frame = NSRect(x: originX + fieldLabelWidth + 12, y: originY - (rowGap * 7) - 12, width: 72, height: rowH)
+            heightLabel?.frame = NSRect(x: originX + fieldLabelWidth + 92, y: originY - (rowGap * 7) - 7, width: 42, height: 14)
         }
 
         func placeHistorySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -1951,6 +2060,8 @@ class BoardManPanel: NSPanel {
             removeLastHideRuleButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 8, width: 100, height: rowH)
             clearHideRulesButton?.frame = NSRect(x: originX + 108, y: originY - (rowGap * 2) - 8, width: 64, height: rowH)
             hideRulesSummaryLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 2, width: width, height: 18)
+            hideRulesExamplesLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 22, width: width, height: 18)
+            hideRulesNoteLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 42, width: width, height: 18)
         }
 
         func placeLabsSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -1959,25 +2070,33 @@ class BoardManPanel: NSPanel {
         }
 
         if useTwoColumns {
+            show(allControls)
             placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
-            placeHistorySection(originX: leftX, originY: firstY - 232, width: columnWidth)
-            placeLabsSection(originX: leftX, originY: firstY - 346, width: columnWidth)
+            placeHistorySection(originX: leftX, originY: firstY - 268, width: columnWidth)
+            placeLabsSection(originX: leftX, originY: firstY - 382, width: columnWidth)
             placeBehaviorSection(originX: rightX, originY: firstY, width: columnWidth)
             placePrivacySection(originX: rightX, originY: firstY - 146, width: columnWidth)
             placeFiltersSection(originX: rightX, originY: firstY - 252, width: columnWidth)
         } else {
-            var sectionY = firstY
-            placeViewSection(originX: leftX, originY: sectionY, width: columnWidth)
-            sectionY -= 216 + sectionGap
-            placeHistorySection(originX: leftX, originY: sectionY, width: columnWidth)
-            sectionY -= 64 + sectionGap
-            placeBehaviorSection(originX: leftX, originY: sectionY, width: columnWidth)
-            sectionY -= 100 + sectionGap
-            placePrivacySection(originX: leftX, originY: sectionY, width: columnWidth)
-            sectionY -= 72 + sectionGap
-            placeFiltersSection(originX: leftX, originY: sectionY, width: columnWidth)
-            sectionY -= 104 + sectionGap
-            placeLabsSection(originX: leftX, originY: sectionY, width: columnWidth)
+            settingsCategoryControl?.isHidden = false
+            settingsCategoryControl?.selectedSegment = activeSettingsCategory.rawValue
+            settingsCategoryControl?.frame = NSRect(x: leftX, y: topY - 34, width: columnWidth, height: 26)
+            switch activeSettingsCategory {
+            case .view:
+                show(viewControls)
+                placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
+                placeLabsSection(originX: leftX, originY: firstY - 296, width: columnWidth)
+            case .behavior:
+                show(behaviorControls)
+                placeBehaviorSection(originX: leftX, originY: firstY, width: columnWidth)
+            case .history:
+                show(historyControls)
+                placeHistorySection(originX: leftX, originY: firstY, width: columnWidth)
+            case .privacy:
+                show(privacyControls)
+                placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
+                placeFiltersSection(originX: leftX, originY: firstY - 112, width: columnWidth)
+            }
         }
     }
 
@@ -2031,6 +2150,14 @@ class BoardManPanel: NSPanel {
     @objc private func usedItemStyleChanged(_ sender: NSPopUpButton) {
         AppEnvironment.current.defaults.set(BoardManPanel.allowedUsedItemStyle(sender.titleOfSelectedItem),
                                             forKey: Constants.UserDefaults.boardManUsedItemStyle)
+        placeholderList?.reloadData()
+    }
+
+    @objc private func themePresetChanged(_ sender: NSPopUpButton) {
+        let title = sender.titleOfSelectedItem ?? BoardManThemePreset.defaultPreset.title
+        let preset = BoardManThemePreset.allCases.first { $0.title == title } ?? .defaultPreset
+        AppEnvironment.current.defaults.set(preset.title, forKey: Constants.UserDefaults.boardManThemePreset)
+        applyLiquidGlassStyle()
         placeholderList?.reloadData()
     }
 
@@ -2117,13 +2244,19 @@ class BoardManPanel: NSPanel {
     private func refreshHideRulesSummary() {
         let rules = BoardManHideRuleStore.shared.rules
         guard !rules.isEmpty else {
-            hideRulesSummaryLabel?.stringValue = "No hide rules"
+            hideRulesSummaryLabel?.stringValue = "0 hide rules"
+            hideRulesExamplesLabel?.stringValue = "Examples: contains invoice, exact draft"
             removeLastHideRuleButton?.isEnabled = false
             clearHideRulesButton?.isEnabled = false
             return
         }
-        let sample = rules.prefix(2).map { "\($0.mode.title) \($0.value)" }.joined(separator: ", ")
-        hideRulesSummaryLabel?.stringValue = "\(rules.count) active: \(sample)"
+        let sample = rules.prefix(2).map { rule -> String in
+            let value = rule.value.replacingOccurrences(of: "\n", with: " ")
+            let clipped = value.count > 28 ? String(value.prefix(25)) + "..." : value
+            return "\(rule.mode.summaryTitle) \"\(clipped)\""
+        }.joined(separator: ", ")
+        hideRulesSummaryLabel?.stringValue = "\(rules.count) hide \(rules.count == 1 ? "rule" : "rules") active"
+        hideRulesExamplesLabel?.stringValue = "Examples: \(sample)"
         removeLastHideRuleButton?.isEnabled = true
         clearHideRulesButton?.isEnabled = true
     }
@@ -2359,6 +2492,29 @@ class BoardManPanel: NSPanel {
         return row >= 0 && row == hoveredRow
     }
 
+    private func previewBubbleOrigin(width bubbleWidth: CGFloat, height bubbleHeight: CGFloat, preferOppositeSide: Bool) -> NSPoint {
+        let panelFrame = frame
+        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? panelFrame.insetBy(dx: -bubbleWidth, dy: -bubbleHeight)
+        let gap: CGFloat = 12
+        let panelIsLeftOfCenter = panelFrame.midX <= visibleFrame.midX
+        let preferredRight = preferOppositeSide ? panelIsLeftOfCenter : true
+        let rightX = panelFrame.maxX + gap
+        let leftX = panelFrame.minX - bubbleWidth - gap
+        let preferredX = preferredRight ? rightX : leftX
+        let fallbackX = preferredRight ? leftX : rightX
+        let bubbleX: CGFloat
+        if preferredX >= visibleFrame.minX + gap && preferredX + bubbleWidth <= visibleFrame.maxX - gap {
+            bubbleX = preferredX
+        } else if fallbackX >= visibleFrame.minX + gap && fallbackX + bubbleWidth <= visibleFrame.maxX - gap {
+            bubbleX = fallbackX
+        } else {
+            bubbleX = min(max(visibleFrame.minX + gap, preferredX), visibleFrame.maxX - bubbleWidth - gap)
+        }
+        let desiredY = panelFrame.maxY - bubbleHeight - 54
+        let bubbleY = min(max(visibleFrame.minY + gap, desiredY), visibleFrame.maxY - bubbleHeight - gap)
+        return NSPoint(x: bubbleX, y: bubbleY)
+    }
+
     fileprivate func usedItemAppearance(for row: Int) -> (background: NSColor, border: NSColor, borderWidth: CGFloat)? {
         guard row >= 0, let item = historyItems[safe: row], item.pasteCount >= 1 else { return nil }
         let style = BoardManPanel.allowedUsedItemStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsedItemStyle))
@@ -2417,15 +2573,16 @@ class BoardManPanel: NSPanel {
         label.isHidden = false
         label.stringValue = item.previewTitle
         let maxWidth: CGFloat = 340
-        let maxLabelSize = NSSize(width: maxWidth - 20, height: 150)
+        let padding: CGFloat = 12
+        let maxLabelSize = NSSize(width: maxWidth - (padding * 2), height: 150)
         let textSize = (item.previewTitle as NSString).boundingRect(
             with: maxLabelSize,
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: label.font ?? NSFont.systemFont(ofSize: 12)]
         ).size
-        let bubbleWidth = min(maxWidth, max(180, ceil(textSize.width) + 20))
-        let bubbleHeight = min(166, max(44, ceil(textSize.height) + 18))
-        label.frame = NSRect(x: 10, y: 9, width: bubbleWidth - 20, height: bubbleHeight - 18)
+        let bubbleWidth = min(maxWidth, max(180, ceil(textSize.width) + (padding * 2)))
+        let bubbleHeight = min(174, max(48, ceil(textSize.height) + (padding * 2)))
+        label.frame = NSRect(x: padding, y: padding, width: bubbleWidth - (padding * 2), height: bubbleHeight - (padding * 2))
         bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
         let useGlass = isLiquidGlassEnabled
         if let effectView = bubble.contentView as? NSVisualEffectView {
@@ -2433,25 +2590,12 @@ class BoardManPanel: NSPanel {
             effectView.blendingMode = useGlass ? .behindWindow : .withinWindow
         }
         bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.16 : 0.98).cgColor
-        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+        bubble.contentView?.layer?.borderColor = themeAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+        bubble.contentView?.layer?.borderWidth = 1
         label.textColor = useGlass ? .labelColor : .labelColor
 
-        let panelFrame = frame
-        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? panelFrame.insetBy(dx: -bubbleWidth, dy: -bubbleHeight)
-        let gap: CGFloat = 10
-        let rightX = panelFrame.maxX + gap
-        let leftX = panelFrame.minX - bubbleWidth - gap
-        let bubbleX: CGFloat
-        if rightX + bubbleWidth <= visibleFrame.maxX {
-            bubbleX = rightX
-        } else if leftX >= visibleFrame.minX {
-            bubbleX = leftX
-        } else {
-            bubbleX = min(max(visibleFrame.minX + gap, rightX), visibleFrame.maxX - bubbleWidth - gap)
-        }
-        let desiredY = panelFrame.maxY - bubbleHeight - 54
-        let bubbleY = min(max(visibleFrame.minY + gap, desiredY), visibleFrame.maxY - bubbleHeight - gap)
-        bubble.setFrame(NSRect(x: bubbleX, y: bubbleY, width: bubbleWidth, height: bubbleHeight), display: true)
+        let origin = previewBubbleOrigin(width: bubbleWidth, height: bubbleHeight, preferOppositeSide: true)
+        bubble.setFrame(NSRect(x: origin.x, y: origin.y, width: bubbleWidth, height: bubbleHeight), display: true)
         bubble.orderFront(nil)
     }
 
@@ -2474,7 +2618,10 @@ class BoardManPanel: NSPanel {
         imageView.isHidden = false
         imageView.image = image
 
-        let maxImageSize = NSSize(width: 360, height: 260)
+        let panelFrame = frame
+        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? panelFrame.insetBy(dx: -420, dy: -320)
+        let maxImageSize = NSSize(width: min(420, max(260, visibleFrame.width * 0.46)),
+                                  height: min(320, max(200, visibleFrame.height * 0.50)))
         let imageSize = image.size
         let scale: CGFloat
         if imageSize.width <= 0 || imageSize.height <= 0 {
@@ -2484,9 +2631,10 @@ class BoardManPanel: NSPanel {
         }
         let displayWidth = max(180, min(maxImageSize.width, ceil(imageSize.width * scale)))
         let displayHeight = max(120, min(maxImageSize.height, ceil(imageSize.height * scale)))
-        let bubbleWidth = displayWidth + 20
-        let bubbleHeight = displayHeight + 20
-        imageView.frame = NSRect(x: 10, y: 10, width: displayWidth, height: displayHeight)
+        let padding: CGFloat = 14
+        let bubbleWidth = displayWidth + (padding * 2)
+        let bubbleHeight = displayHeight + (padding * 2)
+        imageView.frame = NSRect(x: padding, y: padding, width: displayWidth, height: displayHeight)
         bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
 
         let useGlass = isLiquidGlassEnabled
@@ -2495,29 +2643,11 @@ class BoardManPanel: NSPanel {
             effectView.blendingMode = useGlass ? .behindWindow : .withinWindow
         }
         bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.16 : 0.98).cgColor
-        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+        bubble.contentView?.layer?.borderColor = themeAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+        bubble.contentView?.layer?.borderWidth = 1
 
-        let panelFrame = frame
-        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? panelFrame.insetBy(dx: -bubbleWidth, dy: -bubbleHeight)
-        let gap: CGFloat = 10
-        let centerX = panelFrame.midX
-        let screenCenterX = visibleFrame.midX
-        let preferredRight = centerX <= screenCenterX
-        let rightX = panelFrame.maxX + gap
-        let leftX = panelFrame.minX - bubbleWidth - gap
-        let preferredX = preferredRight ? rightX : leftX
-        let fallbackX = preferredRight ? leftX : rightX
-        let bubbleX: CGFloat
-        if preferredX >= visibleFrame.minX && preferredX + bubbleWidth <= visibleFrame.maxX {
-            bubbleX = preferredX
-        } else if fallbackX >= visibleFrame.minX && fallbackX + bubbleWidth <= visibleFrame.maxX {
-            bubbleX = fallbackX
-        } else {
-            bubbleX = min(max(visibleFrame.minX + gap, preferredX), visibleFrame.maxX - bubbleWidth - gap)
-        }
-        let desiredY = panelFrame.maxY - bubbleHeight - 54
-        let bubbleY = min(max(visibleFrame.minY + gap, desiredY), visibleFrame.maxY - bubbleHeight - gap)
-        bubble.setFrame(NSRect(x: bubbleX, y: bubbleY, width: bubbleWidth, height: bubbleHeight), display: true)
+        let origin = previewBubbleOrigin(width: bubbleWidth, height: bubbleHeight, preferOppositeSide: true)
+        bubble.setFrame(NSRect(x: origin.x, y: origin.y, width: bubbleWidth, height: bubbleHeight), display: true)
         bubble.orderFront(nil)
     }
 
@@ -2587,7 +2717,8 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
         cell.configure(item: item,
                        isSelected: selectedIndex == row,
                        usageStyle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)),
-                       useLiquidGlass: isLiquidGlassEnabled)
+                       useLiquidGlass: isLiquidGlassEnabled,
+                       accentColor: themeAccentColor)
         return cell
     }
 
