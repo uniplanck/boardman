@@ -2214,7 +2214,7 @@ class BoardManPanel: NSPanel {
         guard let input = promptForSnippet(title: "Add Snippet", initialTitle: "", initialContent: "") else { return }
         let content = input.content
         guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            NSSound.beep()
+            showSnippetValidationAlert(message: "Snippet content is required.")
             return
         }
 
@@ -2259,7 +2259,8 @@ class BoardManPanel: NSPanel {
 
         let alert = NSAlert()
         alert.messageText = "Delete Snippet"
-        alert.informativeText = "Delete \"\(item.primaryTitle)\"?"
+        alert.informativeText = "Delete \"\(item.primaryTitle)\" from snippets? Clipboard history is not changed."
+        alert.alertStyle = .warning
         alert.addButton(withTitle: "Delete")
         alert.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
@@ -2330,6 +2331,16 @@ class BoardManPanel: NSPanel {
     private func normalizedSnippetTitle(_ title: String) -> String {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedTitle.isEmpty ? "untitled snippet" : trimmedTitle
+    }
+
+    private func showSnippetValidationAlert(message: String) {
+        let alert = NSAlert()
+        alert.messageText = "Snippet Not Saved"
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     private func snippetTargetFolder(in realm: Realm) -> CPYFolder {
