@@ -266,6 +266,7 @@ extension MenuManager {
                                        countText: countText,
                                        previewTitle: title,
                                        dataHash: clip.dataHash,
+                                       imageDataPath: clip.dataPath,
                                        pasteCount: pasteCount,
                                        isPinned: isPinned,
                                        source: .clip)
@@ -298,6 +299,7 @@ extension MenuManager {
                                                    countText: "",
                                                    previewTitle: snippet.content,
                                                    dataHash: snippet.identifier,
+                                                   imageDataPath: "",
                                                    pasteCount: 0,
                                                    isPinned: isPinned,
                                                    source: .snippet)
@@ -873,6 +875,91 @@ fileprivate enum BoardManPanelItemSource {
     case favorite
 }
 
+fileprivate enum BoardManHideRuleMode: String, Codable, CaseIterable {
+    case contains
+    case startsWith
+    case endsWith
+    case exact
+
+    var title: String {
+        switch self {
+        case .contains: return "contains"
+        case .startsWith: return "starts with"
+        case .endsWith: return "ends with"
+        case .exact: return "exact"
+        }
+    }
+}
+
+fileprivate struct BoardManHideRule: Codable {
+    let mode: BoardManHideRuleMode
+    let value: String
+
+    var normalizedValue: String {
+        return value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    func matches(_ text: String) -> Bool {
+        let ruleValue = normalizedValue
+        guard !ruleValue.isEmpty else { return false }
+        let normalizedText = text.lowercased()
+        switch mode {
+        case .contains:
+            return normalizedText.contains(ruleValue)
+        case .startsWith:
+            return normalizedText.hasPrefix(ruleValue)
+        case .endsWith:
+            return normalizedText.hasSuffix(ruleValue)
+        case .exact:
+            return normalizedText == ruleValue
+        }
+    }
+}
+
+fileprivate final class BoardManHideRuleStore {
+    static let shared = BoardManHideRuleStore()
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = AppEnvironment.current.defaults) {
+        self.defaults = defaults
+    }
+
+    var rules: [BoardManHideRule] {
+        guard let json = defaults.string(forKey: Constants.UserDefaults.boardManHideRulesJSON),
+              let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([BoardManHideRule].self, from: data) else {
+            return []
+        }
+        return decoded.filter { !$0.normalizedValue.isEmpty }
+    }
+
+    func add(mode: BoardManHideRuleMode, value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var next = rules
+        next.append(BoardManHideRule(mode: mode, value: trimmed))
+        save(next)
+    }
+
+    func removeLast() {
+        var next = rules
+        guard !next.isEmpty else { return }
+        next.removeLast()
+        save(next)
+    }
+
+    func clear() {
+        save([])
+    }
+
+    private func save(_ rules: [BoardManHideRule]) {
+        guard let data = try? JSONEncoder().encode(rules),
+              let json = String(data: data, encoding: .utf8) else { return }
+        defaults.set(json, forKey: Constants.UserDefaults.boardManHideRulesJSON)
+        defaults.synchronize()
+    }
+}
+
 fileprivate struct BoardManHistoryItem {
     let title: String
     let primaryTitle: String
@@ -880,6 +967,7 @@ fileprivate struct BoardManHistoryItem {
     let countText: String
     let previewTitle: String
     let dataHash: String
+    let imageDataPath: String
     let pasteCount: Int
     let isPinned: Bool
     let source: BoardManPanelItemSource
@@ -1074,6 +1162,13 @@ class BoardManPanel: NSPanel {
     private var clearHistoryButton: NSButton?
     private var pauseRecordingButton: NSButton?
     private var excludedAppsButton: NSButton?
+    private var filterSectionLabel: NSTextField?
+    private var hideRuleTextField: NSTextField?
+    private var hideRuleModePopup: NSPopUpButton?
+    private var addHideRuleButton: NSButton?
+    private var removeLastHideRuleButton: NSButton?
+    private var clearHideRulesButton: NSButton?
+    private var hideRulesSummaryLabel: NSTextField?
     private var viewSectionLabel: NSTextField?
     private var behaviorSectionLabel: NSTextField?
     private var historySectionLabel: NSTextField?
@@ -1087,6 +1182,7 @@ class BoardManPanel: NSPanel {
     private var snippetEditorButton: NSButton?
     private var previewBubblePanel: NSPanel?
     private var previewBubbleLabel: NSTextField?
+    private var previewBubbleImageView: NSImageView?
     private var allItems: [BoardManHistoryItem] = []
     private var historyItems: [BoardManHistoryItem] = []
     private var selectedIndex: Int = -1
@@ -1477,6 +1573,51 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(exclude)
         excludedAppsButton = exclude
 
+        let filtersTitle = BoardManPanel.makeSectionLabel("Hide Rules")
+        contentView.addSubview(filtersTitle)
+        filterSectionLabel = filtersTitle
+
+        let hideText = NSTextField(frame: .zero)
+        hideText.placeholderString = "word or phrase"
+        hideText.font = NSFont.systemFont(ofSize: 11)
+        hideText.target = self
+        hideText.action = #selector(addHideRuleRequested(_:))
+        contentView.addSubview(hideText)
+        hideRuleTextField = hideText
+
+        let hideMode = NSPopUpButton(frame: .zero, pullsDown: false)
+        hideMode.addItems(withTitles: BoardManHideRuleMode.allCases.map { $0.title })
+        hideMode.selectItem(withTitle: BoardManHideRuleMode.contains.title)
+        hideMode.font = NSFont.systemFont(ofSize: 11)
+        contentView.addSubview(hideMode)
+        hideRuleModePopup = hideMode
+
+        let addRule = NSButton(title: "Add", target: self, action: #selector(addHideRuleRequested(_:)))
+        addRule.font = NSFont.systemFont(ofSize: 11)
+        addRule.bezelStyle = .rounded
+        contentView.addSubview(addRule)
+        addHideRuleButton = addRule
+
+        let removeRule = NSButton(title: "Remove Last", target: self, action: #selector(removeLastHideRuleRequested(_:)))
+        removeRule.font = NSFont.systemFont(ofSize: 11)
+        removeRule.bezelStyle = .rounded
+        contentView.addSubview(removeRule)
+        removeLastHideRuleButton = removeRule
+
+        let clearRules = NSButton(title: "Clear", target: self, action: #selector(clearHideRulesRequested(_:)))
+        clearRules.font = NSFont.systemFont(ofSize: 11)
+        clearRules.bezelStyle = .rounded
+        contentView.addSubview(clearRules)
+        clearHideRulesButton = clearRules
+
+        let ruleSummary = NSTextField(labelWithString: "")
+        ruleSummary.font = NSFont.systemFont(ofSize: 11)
+        ruleSummary.textColor = .secondaryLabelColor
+        ruleSummary.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(ruleSummary)
+        hideRulesSummaryLabel = ruleSummary
+        refreshHideRulesSummary()
+
         let labsTitle = BoardManPanel.makeSectionLabel("Labs")
         contentView.addSubview(labsTitle)
         labsSectionLabel = labsTitle
@@ -1586,6 +1727,12 @@ class BoardManPanel: NSPanel {
         }
         previewBubbleLabel = bubbleLabel
 
+        let bubbleImage = NSImageView(frame: .zero)
+        bubbleImage.imageScaling = .scaleProportionallyUpOrDown
+        bubbleImage.imageAlignment = .alignCenter
+        bubbleImage.isHidden = true
+        previewBubbleImageView = bubbleImage
+
         // Load initial data
         layoutPanelSubviews()
         table.reloadData()
@@ -1662,6 +1809,9 @@ class BoardManPanel: NSPanel {
         bubble.contentView?.layer?.borderWidth = 1
         bubble.contentView?.layer?.cornerRadius = 8
         bubble.contentView?.addSubview(label)
+        if let imageView = previewBubbleImageView {
+            bubble.contentView?.addSubview(imageView)
+        }
         previewBubblePanel = bubble
     }
 
@@ -1720,6 +1870,7 @@ class BoardManPanel: NSPanel {
             behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton,
             historySectionLabel, dedupeButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, pauseRecordingButton, excludedAppsButton,
+            filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel,
             labsSectionLabel, labsNoteLabel,
             heightControlLabel, heightLabel, heightStepper
         ]
@@ -1789,6 +1940,19 @@ class BoardManPanel: NSPanel {
             excludedAppsButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 6, width: 92, height: rowH)
         }
 
+        func placeFiltersSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(filterSectionLabel, originX: originX, originY: originY, width: width)
+            let addWidth: CGFloat = 52
+            let modeWidth = min(112, max(92, floor(width * 0.34)))
+            let textWidth = max(96, width - modeWidth - addWidth - 16)
+            hideRuleModePopup?.frame = NSRect(x: originX, y: originY - rowGap - 6, width: modeWidth, height: rowH)
+            hideRuleTextField?.frame = NSRect(x: originX + modeWidth + 8, y: originY - rowGap - 4, width: textWidth, height: rowH)
+            addHideRuleButton?.frame = NSRect(x: originX + modeWidth + textWidth + 16, y: originY - rowGap - 6, width: addWidth, height: rowH)
+            removeLastHideRuleButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 8, width: 100, height: rowH)
+            clearHideRulesButton?.frame = NSRect(x: originX + 108, y: originY - (rowGap * 2) - 8, width: 64, height: rowH)
+            hideRulesSummaryLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 2, width: width, height: 18)
+        }
+
         func placeLabsSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(labsSectionLabel, originX: originX, originY: originY, width: width)
             labsNoteLabel?.frame = NSRect(x: originX, y: originY - 30, width: width, height: 18)
@@ -1800,6 +1964,7 @@ class BoardManPanel: NSPanel {
             placeLabsSection(originX: leftX, originY: firstY - 346, width: columnWidth)
             placeBehaviorSection(originX: rightX, originY: firstY, width: columnWidth)
             placePrivacySection(originX: rightX, originY: firstY - 146, width: columnWidth)
+            placeFiltersSection(originX: rightX, originY: firstY - 252, width: columnWidth)
         } else {
             var sectionY = firstY
             placeViewSection(originX: leftX, originY: sectionY, width: columnWidth)
@@ -1810,6 +1975,8 @@ class BoardManPanel: NSPanel {
             sectionY -= 100 + sectionGap
             placePrivacySection(originX: leftX, originY: sectionY, width: columnWidth)
             sectionY -= 72 + sectionGap
+            placeFiltersSection(originX: leftX, originY: sectionY, width: columnWidth)
+            sectionY -= 104 + sectionGap
             placeLabsSection(originX: leftX, originY: sectionY, width: columnWidth)
         }
     }
@@ -1926,6 +2093,41 @@ class BoardManPanel: NSPanel {
         (NSApp.delegate as? AppDelegate)?.showPreferenceWindow()
     }
 
+    @objc private func addHideRuleRequested(_ sender: Any?) {
+        let title = hideRuleModePopup?.titleOfSelectedItem ?? BoardManHideRuleMode.contains.title
+        let mode = BoardManHideRuleMode.allCases.first { $0.title == title } ?? .contains
+        BoardManHideRuleStore.shared.add(mode: mode, value: hideRuleTextField?.stringValue ?? "")
+        hideRuleTextField?.stringValue = ""
+        refreshHideRulesSummary()
+        applyCurrentFilter()
+    }
+
+    @objc private func removeLastHideRuleRequested(_ sender: NSButton) {
+        BoardManHideRuleStore.shared.removeLast()
+        refreshHideRulesSummary()
+        applyCurrentFilter()
+    }
+
+    @objc private func clearHideRulesRequested(_ sender: NSButton) {
+        BoardManHideRuleStore.shared.clear()
+        refreshHideRulesSummary()
+        applyCurrentFilter()
+    }
+
+    private func refreshHideRulesSummary() {
+        let rules = BoardManHideRuleStore.shared.rules
+        guard !rules.isEmpty else {
+            hideRulesSummaryLabel?.stringValue = "No hide rules"
+            removeLastHideRuleButton?.isEnabled = false
+            clearHideRulesButton?.isEnabled = false
+            return
+        }
+        let sample = rules.prefix(2).map { "\($0.mode.title) \($0.value)" }.joined(separator: ", ")
+        hideRulesSummaryLabel?.stringValue = "\(rules.count) active: \(sample)"
+        removeLastHideRuleButton?.isEnabled = true
+        clearHideRulesButton?.isEnabled = true
+    }
+
     @objc private func searchTextChanged(_ sender: NSSearchField) {
         selectedIndex = -1
         hoveredRow = -1
@@ -1947,7 +2149,13 @@ class BoardManPanel: NSPanel {
             tabbedItems = []
         }
 
-        historyItems = query.isEmpty ? tabbedItems : tabbedItems.filter {
+        let hideRules = BoardManHideRuleStore.shared.rules
+        let visibleItems = hideRules.isEmpty ? tabbedItems : tabbedItems.filter { item in
+            let searchableText = [item.primaryTitle, item.title, item.previewTitle]
+                .joined(separator: "\n")
+            return !hideRules.contains { $0.matches(searchableText) }
+        }
+        historyItems = query.isEmpty ? visibleItems : visibleItems.filter {
             $0.title.lowercased().contains(query) || $0.previewTitle.lowercased().contains(query)
         }
         selectedIndex = historyItems.isEmpty ? -1 : min(max(selectedIndex, 0), historyItems.count - 1)
@@ -2195,10 +2403,18 @@ class BoardManPanel: NSPanel {
         guard row >= 0,
               let item = historyItems[safe: row],
               let bubble = previewBubblePanel,
-              let label = previewBubbleLabel else {
+              let label = previewBubbleLabel,
+              let imageView = previewBubbleImageView else {
             hidePreviewBubble()
             return
         }
+        if let image = previewImage(for: item) {
+            showImagePreview(image, in: bubble, imageView: imageView, label: label)
+            return
+        }
+        imageView.isHidden = true
+        imageView.image = nil
+        label.isHidden = false
         label.stringValue = item.previewTitle
         let maxWidth: CGFloat = 340
         let maxLabelSize = NSSize(width: maxWidth - 20, height: 150)
@@ -2239,7 +2455,76 @@ class BoardManPanel: NSPanel {
         bubble.orderFront(nil)
     }
 
+    private func previewImage(for item: BoardManHistoryItem) -> NSImage? {
+        guard item.source == .clip, !item.imageDataPath.isEmpty,
+              let data = NSKeyedUnarchiver.unarchiveObject(withFile: item.imageDataPath) as? CPYClipData else {
+            return nil
+        }
+        if let image = data.image {
+            return image
+        }
+        if let fileName = data.fileNames.first {
+            return NSImage(contentsOfFile: fileName)
+        }
+        return nil
+    }
+
+    private func showImagePreview(_ image: NSImage, in bubble: NSPanel, imageView: NSImageView, label: NSTextField) {
+        label.isHidden = true
+        imageView.isHidden = false
+        imageView.image = image
+
+        let maxImageSize = NSSize(width: 360, height: 260)
+        let imageSize = image.size
+        let scale: CGFloat
+        if imageSize.width <= 0 || imageSize.height <= 0 {
+            scale = 1
+        } else {
+            scale = min(maxImageSize.width / imageSize.width, maxImageSize.height / imageSize.height, 1)
+        }
+        let displayWidth = max(180, min(maxImageSize.width, ceil(imageSize.width * scale)))
+        let displayHeight = max(120, min(maxImageSize.height, ceil(imageSize.height * scale)))
+        let bubbleWidth = displayWidth + 20
+        let bubbleHeight = displayHeight + 20
+        imageView.frame = NSRect(x: 10, y: 10, width: displayWidth, height: displayHeight)
+        bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
+
+        let useGlass = isLiquidGlassEnabled
+        if let effectView = bubble.contentView as? NSVisualEffectView {
+            effectView.material = useGlass ? .hudWindow : .popover
+            effectView.blendingMode = useGlass ? .behindWindow : .withinWindow
+        }
+        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.16 : 0.98).cgColor
+        bubble.contentView?.layer?.borderColor = NSColor.controlAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+
+        let panelFrame = frame
+        let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? panelFrame.insetBy(dx: -bubbleWidth, dy: -bubbleHeight)
+        let gap: CGFloat = 10
+        let centerX = panelFrame.midX
+        let screenCenterX = visibleFrame.midX
+        let preferredRight = centerX <= screenCenterX
+        let rightX = panelFrame.maxX + gap
+        let leftX = panelFrame.minX - bubbleWidth - gap
+        let preferredX = preferredRight ? rightX : leftX
+        let fallbackX = preferredRight ? leftX : rightX
+        let bubbleX: CGFloat
+        if preferredX >= visibleFrame.minX && preferredX + bubbleWidth <= visibleFrame.maxX {
+            bubbleX = preferredX
+        } else if fallbackX >= visibleFrame.minX && fallbackX + bubbleWidth <= visibleFrame.maxX {
+            bubbleX = fallbackX
+        } else {
+            bubbleX = min(max(visibleFrame.minX + gap, preferredX), visibleFrame.maxX - bubbleWidth - gap)
+        }
+        let desiredY = panelFrame.maxY - bubbleHeight - 54
+        let bubbleY = min(max(visibleFrame.minY + gap, desiredY), visibleFrame.maxY - bubbleHeight - gap)
+        bubble.setFrame(NSRect(x: bubbleX, y: bubbleY, width: bubbleWidth, height: bubbleHeight), display: true)
+        bubble.orderFront(nil)
+    }
+
     fileprivate func hidePreviewBubble() {
+        previewBubbleImageView?.image = nil
+        previewBubbleImageView?.isHidden = true
+        previewBubbleLabel?.isHidden = false
         previewBubblePanel?.orderOut(nil)
     }
 

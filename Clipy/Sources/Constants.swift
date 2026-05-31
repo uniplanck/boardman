@@ -78,6 +78,7 @@ struct Constants {
         static let boardManUsageCountStyle = "BoardManUsageCountStyle"
         static let boardManUsedItemStyle = "BoardManUsedItemStyle"
         static let boardManLiquidGlass = "BoardManLiquidGlass"
+        static let boardManHideRulesJSON = "BoardManHideRulesJSON"
     }
 
     struct Beta {
