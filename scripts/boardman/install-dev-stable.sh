@@ -261,6 +261,19 @@ if [ "$DRY_RUN" = false ]; then
     find "${TMPDIR:-/tmp}" -path "*BoardManMergedBuild/Build/Products/Debug/$APP_NAME.app" -type d -prune 2>/dev/null | while IFS= read -r stale_path; do
       "$LSREGISTER" -u "$stale_path" >/dev/null 2>&1 || true
     done
+    "$LSREGISTER" -dump 2>/dev/null \
+      | awk -F'path:[[:space:]]*' '/path: .*Board-Man\.app/ { print $2 }' \
+      | sed 's#\(Board-Man\.app\).*#\1#' \
+      | sort -u \
+      | while IFS= read -r stale_path; do
+        case "$stale_path" in
+          "$INSTALLED_PATH")
+            ;;
+          /private/tmp/*Board-Man.app|/private/var/*/T/*Board-Man.app)
+            "$LSREGISTER" -u "$stale_path" >/dev/null 2>&1 || true
+            ;;
+        esac
+      done
     "$LSREGISTER" -f "$INSTALLED_PATH" >/dev/null 2>&1 || true
     echo "LaunchServices registered: $INSTALLED_PATH"
   else
