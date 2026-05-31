@@ -154,7 +154,16 @@ fi
 # Quit app safely
 echo "Quitting $APP_NAME safely..."
 if [ "$DRY_RUN" = false ]; then
-  osascript -e "if application id \"$BUNDLE_ID\" is running then tell application id \"$BUNDLE_ID\" to quit" 2>/dev/null || true
+  osascript -e "if application id \"$BUNDLE_ID\" is running then tell application id \"$BUNDLE_ID\" to quit" 2>/dev/null &
+  QUIT_PID=$!
+  for _ in 1 2 3 4 5; do
+    kill -0 "$QUIT_PID" 2>/dev/null || break
+    sleep 1
+  done
+  if kill -0 "$QUIT_PID" 2>/dev/null; then
+    kill "$QUIT_PID" 2>/dev/null || true
+  fi
+  wait "$QUIT_PID" 2>/dev/null || true
   pkill -x "$APP_NAME" 2>/dev/null || true
   sleep 3
   echo "App quit confirmed."
