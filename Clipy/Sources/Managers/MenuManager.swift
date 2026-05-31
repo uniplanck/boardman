@@ -822,6 +822,7 @@ fileprivate enum BoardManPanelTab: Int {
     case pinned
     case snippets
     case favorites
+    case settings
 
     var title: String {
         switch self {
@@ -829,6 +830,7 @@ fileprivate enum BoardManPanelTab: Int {
         case .pinned: return "Pinned"
         case .snippets: return "Snippets"
         case .favorites: return "Favorites"
+        case .settings: return "Settings"
         }
     }
 
@@ -838,6 +840,7 @@ fileprivate enum BoardManPanelTab: Int {
         case .pinned: return "No pinned items yet - pin rows from the context menu"
         case .snippets: return "No snippets yet - add reusable text in Snippets"
         case .favorites: return "No favorites yet - saved favorites will appear here"
+        case .settings: return ""
         }
     }
 }
@@ -1031,7 +1034,10 @@ class BoardManPanel: NSPanel {
     private var timestampLabel: NSTextField?
     private var timestampPopup: NSPopUpButton?
     private var usageCountButton: NSButton?
+    private var usageStyleLabel: NSTextField?
     private var usageStylePopup: NSPopUpButton?
+    private var densityLabel: NSTextField?
+    private var densityPopup: NSPopUpButton?
     private var clickActionLabel: NSTextField?
     private var clickActionPopup: NSPopUpButton?
     private var enterActionLabel: NSTextField?
@@ -1042,6 +1048,12 @@ class BoardManPanel: NSPanel {
     private var clearHistoryButton: NSButton?
     private var pauseRecordingButton: NSButton?
     private var excludedAppsButton: NSButton?
+    private var viewSectionLabel: NSTextField?
+    private var behaviorSectionLabel: NSTextField?
+    private var historySectionLabel: NSTextField?
+    private var privacySectionLabel: NSTextField?
+    private var labsSectionLabel: NSTextField?
+    private var labsNoteLabel: NSTextField?
     private var heightControlLabel: NSTextField?
     private var heightStepper: NSStepper?
     private var heightLabel: NSTextField?
@@ -1119,6 +1131,13 @@ class BoardManPanel: NSPanel {
 
     private static func allowedUsageCountStyle(_ value: String?) -> String {
         return value == "compact" ? "compact" : "badge"
+    }
+
+    private static func makeSectionLabel(_ title: String) -> NSTextField {
+        let label = NSTextField(labelWithString: title)
+        label.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        label.textColor = .labelColor
+        return label
     }
 
     convenience init() {
@@ -1204,11 +1223,12 @@ class BoardManPanel: NSPanel {
 
         // Tabs: rounded style avoids harsh black blocks; History tab default and visible
         let tabs = NSSegmentedControl(frame: .zero)
-        tabs.segmentCount = 4
+        tabs.segmentCount = 5
         tabs.setLabel("History", forSegment: 0)
         tabs.setLabel("Pinned", forSegment: 1)
         tabs.setLabel("Snippets", forSegment: 2)
         tabs.setLabel("Favorites", forSegment: 3)
+        tabs.setLabel("Settings", forSegment: 4)
         tabs.selectedSegment = 0
         tabs.target = self
         tabs.action = #selector(tabChanged(_:))
@@ -1245,6 +1265,10 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(categoryControl)
         settingsCategoryControl = categoryControl
 
+        let viewTitle = BoardManPanel.makeSectionLabel("View")
+        contentView.addSubview(viewTitle)
+        viewSectionLabel = viewTitle
+
         let numbers = NSButton(checkboxWithTitle: "Rows", target: self, action: #selector(rowNumbersChanged(_:)))
         numbers.state = (AppEnvironment.current.defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true) ? .on : .off
         numbers.font = NSFont.systemFont(ofSize: 11)
@@ -1278,6 +1302,12 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(usage)
         usageCountButton = usage
 
+        let styleText = NSTextField(labelWithString: "Style")
+        styleText.font = NSFont.systemFont(ofSize: 11)
+        styleText.textColor = .labelColor
+        contentView.addSubview(styleText)
+        usageStyleLabel = styleText
+
         let usageStyle = NSPopUpButton(frame: .zero, pullsDown: false)
         usageStyle.addItems(withTitles: ["badge", "compact"])
         usageStyle.selectItem(withTitle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)))
@@ -1286,6 +1316,25 @@ class BoardManPanel: NSPanel {
         usageStyle.action = #selector(usageStyleChanged(_:))
         contentView.addSubview(usageStyle)
         usageStylePopup = usageStyle
+
+        let densityText = NSTextField(labelWithString: "Density")
+        densityText.font = NSFont.systemFont(ofSize: 11)
+        densityText.textColor = .labelColor
+        contentView.addSubview(densityText)
+        densityLabel = densityText
+
+        let densityPopupControl = NSPopUpButton(frame: .zero, pullsDown: false)
+        densityPopupControl.addItems(withTitles: ["Comfortable", "Compact"])
+        densityPopupControl.selectItem(withTitle: "Comfortable")
+        densityPopupControl.font = NSFont.systemFont(ofSize: 11)
+        densityPopupControl.isEnabled = false
+        densityPopupControl.toolTip = "Planned: row density is kept comfortable for paste safety."
+        contentView.addSubview(densityPopupControl)
+        densityPopup = densityPopupControl
+
+        let behaviorTitle = BoardManPanel.makeSectionLabel("Behavior")
+        contentView.addSubview(behaviorTitle)
+        behaviorSectionLabel = behaviorTitle
 
         let clickText = NSTextField(labelWithString: "Click")
         clickText.font = NSFont.systemFont(ofSize: 11)
@@ -1328,6 +1377,10 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(autoClose)
         autoCloseButton = autoClose
 
+        let historyTitle = BoardManPanel.makeSectionLabel("History")
+        contentView.addSubview(historyTitle)
+        historySectionLabel = historyTitle
+
         let dedupe = NSButton(checkboxWithTitle: "Dedupe", target: self, action: #selector(dedupeChanged(_:)))
         dedupe.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.copySameHistory) ? .off : .on
         dedupe.font = NSFont.systemFont(ofSize: 11)
@@ -1352,6 +1405,10 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(clear)
         clearHistoryButton = clear
 
+        let privacyTitle = BoardManPanel.makeSectionLabel("Privacy")
+        contentView.addSubview(privacyTitle)
+        privacySectionLabel = privacyTitle
+
         let pause = NSButton(checkboxWithTitle: "Pause", target: nil, action: nil)
         pause.state = .off
         pause.font = NSFont.systemFont(ofSize: 11)
@@ -1368,6 +1425,16 @@ class BoardManPanel: NSPanel {
         exclude.bezelStyle = .rounded
         contentView.addSubview(exclude)
         excludedAppsButton = exclude
+
+        let labsTitle = BoardManPanel.makeSectionLabel("Labs")
+        contentView.addSubview(labsTitle)
+        labsSectionLabel = labsTitle
+
+        let labsNote = NSTextField(labelWithString: "Glass options stay in Preferences.")
+        labsNote.font = NSFont.systemFont(ofSize: 11)
+        labsNote.textColor = .secondaryLabelColor
+        contentView.addSubview(labsNote)
+        labsNoteLabel = labsNote
 
         let heightTitle = NSTextField(labelWithString: "Height")
         heightTitle.font = NSFont.systemFont(ofSize: 11)
@@ -1545,63 +1612,90 @@ class BoardManPanel: NSPanel {
         let margin: CGFloat = 18
         let width = bounds.width - (margin * 2)
         let top = bounds.height - 52
+        let isSettings = activeTab == .settings
+        searchGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
+        searchField?.isHidden = isSettings
         searchGlassView?.frame = NSRect(x: margin, y: top, width: width, height: 32)
         searchField?.frame = NSRect(x: margin, y: top, width: width, height: 32)
         tabsGlassView?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
-        let settingsY = top - 82
-        let settingsHeight: CGFloat = 78
-        settingsGlassView?.frame = NSRect(x: margin, y: settingsY - 46, width: width, height: settingsHeight)
-        settingsBackgroundView?.isHidden = false
-        settingsBackgroundView?.frame = NSRect(x: margin, y: settingsY - 46, width: width, height: settingsHeight)
-        settingsCategoryControl?.frame = NSRect(x: margin + 12, y: settingsY + 6, width: width - 24, height: 24)
-        let controlsY = settingsY - 28
-        layoutInlineSettingsControls(margin: margin, width: width, controlY: controlsY)
-        heightControlLabel?.isHidden = true
-        heightLabel?.isHidden = true
-        heightStepper?.isHidden = true
+        updateTabWidths(totalWidth: width)
+
+        settingsCategoryControl?.isHidden = true
+        let contentTop = top - 56
+        settingsGlassView?.isHidden = !isSettings || !isLiquidGlassEnabled
+        settingsBackgroundView?.isHidden = !isSettings
+        settingsGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
+        settingsBackgroundView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
+        layoutInlineSettingsControls(margin: margin, width: width, topY: contentTop, isVisible: isSettings)
         footerNote?.frame = NSRect(x: margin, y: 8, width: width, height: 16)
-        let scrollTop = settingsY - 56
-        listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
-        scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, scrollTop - 30))
-        placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, scrollTop - 30))
+        footerNote?.isHidden = isSettings
+        listGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
+        scrollView?.isHidden = isSettings
+        listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
+        scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
+        placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, contentTop - 30))
         placeholderList?.tableColumns.first?.width = width
         hidePreviewBubble()
     }
 
-    private func layoutInlineSettingsControls(margin: CGFloat, width: CGFloat, controlY: CGFloat) {
-        let category = activeSettingsCategory
-        let viewControls: [NSView?] = [rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStylePopup]
-        let behaviorControls: [NSView?] = [clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton]
-        let historyControls: [NSView?] = [dedupeButton, reuseTopButton, clearHistoryButton]
-        let privacyControls: [NSView?] = [pauseRecordingButton, excludedAppsButton]
-        [viewControls, behaviorControls, historyControls, privacyControls].flatMap { $0 }.forEach { $0?.isHidden = true }
-
-        switch category {
-        case .view:
-            viewControls.forEach { $0?.isHidden = false }
-            rowNumbersButton?.frame = NSRect(x: margin + 12, y: controlY + 1, width: 62, height: 18)
-            timestampLabel?.frame = NSRect(x: margin + 80, y: controlY + 3, width: 32, height: 14)
-            timestampPopup?.frame = NSRect(x: margin + 116, y: controlY - 2, width: 132, height: 24)
-            usageCountButton?.frame = NSRect(x: margin + 260, y: controlY + 1, width: 66, height: 18)
-            usageStylePopup?.frame = NSRect(x: margin + 332, y: controlY - 2, width: 86, height: 24)
-        case .behavior:
-            behaviorControls.forEach { $0?.isHidden = false }
-            clickActionLabel?.frame = NSRect(x: margin + 12, y: controlY + 3, width: 34, height: 14)
-            clickActionPopup?.frame = NSRect(x: margin + 50, y: controlY - 2, width: 92, height: 24)
-            enterActionLabel?.frame = NSRect(x: margin + 154, y: controlY + 3, width: 38, height: 14)
-            enterActionPopup?.frame = NSRect(x: margin + 198, y: controlY - 2, width: 92, height: 24)
-            autoCloseButton?.frame = NSRect(x: margin + 304, y: controlY + 1, width: 100, height: 18)
-        case .history:
-            historyControls.forEach { $0?.isHidden = false }
-            dedupeButton?.frame = NSRect(x: margin + 12, y: controlY + 1, width: 82, height: 18)
-            reuseTopButton?.frame = NSRect(x: margin + 112, y: controlY + 1, width: 96, height: 18)
-            clearHistoryButton?.frame = NSRect(x: margin + width - 84, y: controlY - 2, width: 72, height: 24)
-        case .privacy:
-            privacyControls.forEach { $0?.isHidden = false }
-            pauseRecordingButton?.frame = NSRect(x: margin + 12, y: controlY + 1, width: 82, height: 18)
-            excludedAppsButton?.frame = NSRect(x: margin + 112, y: controlY - 2, width: 84, height: 24)
+    private func updateTabWidths(totalWidth: CGFloat) {
+        guard let segmentedControl else { return }
+        let settingsWidth: CGFloat = 66
+        let contentWidth = max(68, floor((totalWidth - settingsWidth) / 4))
+        for segment in 0...3 {
+            segmentedControl.setWidth(contentWidth, forSegment: segment)
         }
+        segmentedControl.setWidth(settingsWidth, forSegment: 4)
+    }
+
+    private func layoutInlineSettingsControls(margin: CGFloat, width: CGFloat, topY: CGFloat, isVisible: Bool) {
+        let allControls: [NSView?] = [
+            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, densityLabel, densityPopup,
+            behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton,
+            historySectionLabel, dedupeButton, reuseTopButton, clearHistoryButton,
+            privacySectionLabel, pauseRecordingButton, excludedAppsButton,
+            labsSectionLabel, labsNoteLabel,
+            heightControlLabel, heightLabel, heightStepper
+        ]
+        allControls.forEach { $0?.isHidden = !isVisible }
+        guard isVisible else { return }
+
+        let left = margin + 16
+        let right = margin + max(220, width / 2 + 10)
+        let rowH: CGFloat = 24
+        var currentY = topY - 34
+
+        viewSectionLabel?.frame = NSRect(x: left, y: currentY, width: 120, height: 18)
+        rowNumbersButton?.frame = NSRect(x: left, y: currentY - 30, width: 72, height: 18)
+        timestampLabel?.frame = NSRect(x: left + 96, y: currentY - 27, width: 34, height: 14)
+        timestampPopup?.frame = NSRect(x: left + 134, y: currentY - 32, width: 146, height: rowH)
+        usageCountButton?.frame = NSRect(x: left, y: currentY - 62, width: 74, height: 18)
+        usageStyleLabel?.frame = NSRect(x: left + 96, y: currentY - 59, width: 34, height: 14)
+        usageStylePopup?.frame = NSRect(x: left + 134, y: currentY - 64, width: 104, height: rowH)
+        densityLabel?.frame = NSRect(x: left, y: currentY - 91, width: 54, height: 14)
+        densityPopup?.frame = NSRect(x: left + 72, y: currentY - 96, width: 132, height: rowH)
+
+        behaviorSectionLabel?.frame = NSRect(x: right, y: currentY, width: 120, height: 18)
+        clickActionLabel?.frame = NSRect(x: right, y: currentY - 27, width: 38, height: 14)
+        clickActionPopup?.frame = NSRect(x: right + 52, y: currentY - 32, width: 110, height: rowH)
+        enterActionLabel?.frame = NSRect(x: right, y: currentY - 59, width: 40, height: 14)
+        enterActionPopup?.frame = NSRect(x: right + 52, y: currentY - 64, width: 110, height: rowH)
+        autoCloseButton?.frame = NSRect(x: right, y: currentY - 92, width: 110, height: 18)
+
+        currentY -= 134
+        historySectionLabel?.frame = NSRect(x: left, y: currentY, width: 120, height: 18)
+        dedupeButton?.frame = NSRect(x: left, y: currentY - 30, width: 88, height: 18)
+        reuseTopButton?.frame = NSRect(x: left + 102, y: currentY - 30, width: 100, height: 18)
+        clearHistoryButton?.frame = NSRect(x: left, y: currentY - 66, width: 76, height: rowH)
+
+        privacySectionLabel?.frame = NSRect(x: right, y: currentY, width: 120, height: 18)
+        pauseRecordingButton?.frame = NSRect(x: right, y: currentY - 30, width: 82, height: 18)
+        excludedAppsButton?.frame = NSRect(x: right, y: currentY - 66, width: 82, height: rowH)
+
+        currentY -= 104
+        labsSectionLabel?.frame = NSRect(x: left, y: currentY, width: 120, height: 18)
+        labsNoteLabel?.frame = NSRect(x: left, y: currentY - 28, width: width - 32, height: 18)
     }
 
     fileprivate func reloadHistoryItems(_ items: [BoardManHistoryItem]) {
@@ -1613,6 +1707,10 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate func focusTableForKeyboard() {
+        guard activeTab != .settings else {
+            makeFirstResponder(self)
+            return
+        }
         guard let table = placeholderList else { return }
         if !historyItems.isEmpty, selectedIndex < 0 {
             selectedIndex = 0
@@ -1665,6 +1763,11 @@ class BoardManPanel: NSPanel {
         hoveredRow = -1
         hidePreviewBubble()
         applyCurrentFilter()
+        if activeTab == .settings {
+            makeFirstResponder(self)
+        } else {
+            focusTableForKeyboard()
+        }
     }
 
     @objc private func settingsCategoryChanged(_ sender: NSSegmentedControl) {
@@ -1716,6 +1819,8 @@ class BoardManPanel: NSPanel {
             tabbedItems = allItems.filter { $0.source == .snippet }
         case .favorites:
             tabbedItems = allItems.filter { $0.source == .favorite }
+        case .settings:
+            tabbedItems = []
         }
 
         historyItems = query.isEmpty ? tabbedItems : tabbedItems.filter {
@@ -1825,12 +1930,15 @@ class BoardManPanel: NSPanel {
             orderOut(nil)
             return true
         case 125:
+            guard activeTab != .settings else { return false }
             moveSelection(delta: 1)
             return true
         case 126:
+            guard activeTab != .settings else { return false }
             moveSelection(delta: -1)
             return true
         case 36, 76:
+            guard activeTab != .settings else { return false }
             pasteSelectedRow()
             return true
         default:
