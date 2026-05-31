@@ -269,7 +269,9 @@ extension MenuManager {
                                        imageDataPath: clip.dataPath,
                                        pasteCount: pasteCount,
                                        isPinned: isPinned,
-                                       source: .clip)
+                                       source: .clip,
+                                       categoryIdentifier: nil,
+                                       categoryTitle: nil)
         }
         let sortedItems = items.filter { $0.isPinned } + items.filter { !$0.isPinned }
         let pinnedCount = sortedItems.filter { $0.isPinned }.count
@@ -280,7 +282,7 @@ extension MenuManager {
     fileprivate func boardManSnippetItems() -> [BoardManHistoryItem] {
         let pinStore = PinnedSnippetStore.shared
         let folderResults = realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true)
-        return folderResults
+        let folderItems = Array(folderResults
             .filter { $0.enable }
             .flatMap { folder -> [BoardManHistoryItem] in
                 folder.snippets
@@ -302,9 +304,38 @@ extension MenuManager {
                                                    imageDataPath: "",
                                                    pasteCount: 0,
                                                    isPinned: isPinned,
-                                                   source: .snippet)
+                                                   source: .snippet,
+                                                   categoryIdentifier: folder.identifier,
+                                                   categoryTitle: prefix)
                     }
+            })
+        var folderSnippetIdentifiers = Set<String>()
+        folderResults.forEach { folder in
+            folder.snippets.forEach { snippet in
+                folderSnippetIdentifiers.insert(snippet.identifier)
             }
+        }
+        let uncategorizedItems = Array(realm.objects(CPYSnippet.self)
+            .filter { $0.enable && !folderSnippetIdentifiers.contains($0.identifier) }
+            .map { snippet -> BoardManHistoryItem in
+                let rawTitle = snippet.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                let title = rawTitle.isEmpty ? "(untitled snippet)" : rawTitle
+                let isPinned = pinStore.isPinned(snippet.identifier)
+                let pin = isPinned ? "[PIN] " : ""
+                return BoardManHistoryItem(title: "\(pin)Uncategorized / \(title)",
+                                           primaryTitle: title,
+                                           metadataText: "\(pin)Uncategorized",
+                                           countText: "",
+                                           previewTitle: snippet.content,
+                                           dataHash: snippet.identifier,
+                                           imageDataPath: "",
+                                           pasteCount: 0,
+                                           isPinned: isPinned,
+                                           source: .snippet,
+                                           categoryIdentifier: BoardManPanel.uncategorizedCategoryIdentifier,
+                                           categoryTitle: "Uncategorized")
+            })
+        return (folderItems + uncategorizedItems)
             .sorted { lhs, rhs in
                 if lhs.isPinned != rhs.isPinned { return lhs.isPinned && !rhs.isPinned }
                 return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
@@ -893,10 +924,10 @@ fileprivate enum BoardManThemePreset: String, CaseIterable {
     var tintColor: NSColor {
         switch self {
         case .defaultPreset: return .controlBackgroundColor
-        case .graphite: return NSColor.labelColor.withAlphaComponent(0.055)
-        case .ocean: return NSColor.systemTeal.withAlphaComponent(0.055)
-        case .amber: return NSColor.systemOrange.withAlphaComponent(0.050)
-        case .rose: return NSColor.systemPink.withAlphaComponent(0.050)
+        case .graphite: return NSColor.labelColor.withAlphaComponent(0.10)
+        case .ocean: return NSColor.systemTeal.withAlphaComponent(0.12)
+        case .amber: return NSColor.systemOrange.withAlphaComponent(0.11)
+        case .rose: return NSColor.systemPink.withAlphaComponent(0.11)
         }
     }
 
@@ -1020,6 +1051,8 @@ fileprivate struct BoardManHistoryItem {
     let pasteCount: Int
     let isPinned: Bool
     let source: BoardManPanelItemSource
+    let categoryIdentifier: String?
+    let categoryTitle: String?
 }
 
 private final class BoardManHistoryTableView: NSTableView {
@@ -1060,10 +1093,11 @@ private final class BoardManHistoryRowView: NSTableRowView {
         let accentColor = previewOwner?.themeAccentColor ?? .controlAccentColor
         let path = NSBezierPath(roundedRect: rowRect, xRadius: useLiquidGlass ? 11 : 8, yRadius: useLiquidGlass ? 11 : 8)
         if previewOwner?.isSelectedRow(row) == true {
-            (useLiquidGlass
-                ? accentColor.withAlphaComponent(0.30)
-                : NSColor.selectedContentBackgroundColor.withAlphaComponent(0.82)).setFill()
+            accentColor.withAlphaComponent(useLiquidGlass ? 0.30 : 0.26).setFill()
             path.fill()
+            accentColor.withAlphaComponent(useLiquidGlass ? 0.50 : 0.46).setStroke()
+            path.lineWidth = 1
+            path.stroke()
         } else if previewOwner?.isHoveredRow(row) == true {
             accentColor.withAlphaComponent(useLiquidGlass ? 0.14 : 0.16).setFill()
             path.fill()
@@ -1183,6 +1217,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
 class BoardManPanel: NSPanel {
 
     private var glassBackgroundView: NSVisualEffectView?
+    private var themeAccentStripeView: NSView?
     private var searchGlassView: NSVisualEffectView?
     private var tabsGlassView: NSVisualEffectView?
     private var settingsGlassView: NSVisualEffectView?
@@ -1234,6 +1269,11 @@ class BoardManPanel: NSPanel {
     private var heightStepper: NSStepper?
     private var heightLabel: NSTextField?
     private var footerNote: NSTextField?
+    private var snippetCategoryLabel: NSTextField?
+    private var snippetCategoryPopup: NSPopUpButton?
+    private var snippetCategoryAddButton: NSButton?
+    private var snippetCategoryRenameButton: NSButton?
+    private var snippetCategoryDeleteButton: NSButton?
     private var snippetAddButton: NSButton?
     private var snippetEditButton: NSButton?
     private var snippetDeleteButton: NSButton?
@@ -1246,6 +1286,7 @@ class BoardManPanel: NSPanel {
     private var hoveredRow: Int = -1
     private var activeTab: BoardManPanelTab = .history
     private var activeSettingsCategory: BoardManInlineSettingsCategory = .view
+    private var activeSnippetCategoryIdentifier: String = BoardManPanel.allCategoriesIdentifier
     fileprivate var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
@@ -1266,6 +1307,9 @@ class BoardManPanel: NSPanel {
     static func preferredPanelHeight() -> CGFloat {
         return CGFloat(clampedPanelHeight(AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManPanelHeight)))
     }
+
+    static let allCategoriesIdentifier = "__boardman_all_categories__"
+    static let uncategorizedCategoryIdentifier = "__boardman_uncategorized__"
 
     static func preferredPanelWidth() -> CGFloat {
         return 560
@@ -1403,6 +1447,12 @@ class BoardManPanel: NSPanel {
     private func setupUI() {
         guard let contentView = contentView else { return }
         setupGlassBackgroundIfNeeded()
+
+        let accentStripe = NSView(frame: .zero)
+        accentStripe.wantsLayer = true
+        accentStripe.layer?.cornerRadius = 2
+        contentView.addSubview(accentStripe)
+        themeAccentStripeView = accentStripe
 
         let searchGlass = makeGlassSurface(blendingMode: .withinWindow)
         searchGlass.isHidden = true
@@ -1806,6 +1856,22 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(note)
         footerNote = note
 
+        let categoryLabel = NSTextField(labelWithString: "Category")
+        categoryLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        categoryLabel.textColor = .labelColor
+        categoryLabel.isHidden = true
+        contentView.addSubview(categoryLabel)
+        snippetCategoryLabel = categoryLabel
+
+        let categoryPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        categoryPopup.font = NSFont.systemFont(ofSize: 11)
+        categoryPopup.target = self
+        categoryPopup.action = #selector(snippetCategoryFilterChanged(_:))
+        categoryPopup.isHidden = true
+        categoryPopup.toolTip = "Filter snippets by category."
+        contentView.addSubview(categoryPopup)
+        snippetCategoryPopup = categoryPopup
+
         let addSnippet = NSButton(title: "Add", target: self, action: #selector(addSnippetFromPanel(_:)))
         addSnippet.font = NSFont.systemFont(ofSize: 11)
         addSnippet.bezelStyle = .rounded
@@ -1829,6 +1895,27 @@ class BoardManPanel: NSPanel {
         deleteSnippet.toolTip = "Delete the selected snippet."
         contentView.addSubview(deleteSnippet)
         snippetDeleteButton = deleteSnippet
+
+        let addCategory = NSButton(title: "Add Category", target: self, action: #selector(addSnippetCategoryFromPanel(_:)))
+        addCategory.font = NSFont.systemFont(ofSize: 11)
+        addCategory.bezelStyle = .rounded
+        addCategory.isHidden = true
+        contentView.addSubview(addCategory)
+        snippetCategoryAddButton = addCategory
+
+        let renameCategory = NSButton(title: "Rename", target: self, action: #selector(renameSnippetCategoryFromPanel(_:)))
+        renameCategory.font = NSFont.systemFont(ofSize: 11)
+        renameCategory.bezelStyle = .rounded
+        renameCategory.isHidden = true
+        contentView.addSubview(renameCategory)
+        snippetCategoryRenameButton = renameCategory
+
+        let deleteCategory = NSButton(title: "Delete", target: self, action: #selector(deleteSnippetCategoryFromPanel(_:)))
+        deleteCategory.font = NSFont.systemFont(ofSize: 11)
+        deleteCategory.bezelStyle = .rounded
+        deleteCategory.isHidden = true
+        contentView.addSubview(deleteCategory)
+        snippetCategoryDeleteButton = deleteCategory
 
         let bubbleLabel = NSTextField(labelWithString: "")
         bubbleLabel.font = NSFont.systemFont(ofSize: 12)
@@ -1866,6 +1953,7 @@ class BoardManPanel: NSPanel {
             ? NSColor.clear
             : tintColor).cgColor
         contentView?.layer?.isOpaque = !useGlass
+        themeAccentStripeView?.layer?.backgroundColor = accentColor.withAlphaComponent(useGlass ? 0.72 : 0.82).cgColor
         [searchGlassView, tabsGlassView, settingsGlassView, listGlassView].forEach { glass in
             glass?.isHidden = !useGlass
             glass?.material = .hudWindow
@@ -1897,6 +1985,11 @@ class BoardManPanel: NSPanel {
         scrollView?.layer?.borderColor = (themePreset == .defaultPreset ? NSColor.separatorColor : accentColor).withAlphaComponent(useGlass ? 0.18 : 0.42).cgColor
         scrollView?.drawsBackground = !useGlass
         placeholderList?.backgroundColor = .clear
+        [snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton, snippetAddButton, snippetEditButton, snippetDeleteButton].forEach { button in
+            if #available(macOS 10.14, *) {
+                button?.contentTintColor = themePreset == .defaultPreset ? .labelColor : accentColor
+            }
+        }
         footerNote?.textColor = NSColor.secondaryLabelColor.withAlphaComponent(useGlass ? 0.98 : 0.95)
         previewBubblePanel?.contentView?.layer?.cornerRadius = useGlass ? 11 : 8
         previewBubblePanel?.contentView?.layer?.borderColor = accentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
@@ -1940,6 +2033,7 @@ class BoardManPanel: NSPanel {
         let width = bounds.width - (margin * 2)
         let top = bounds.height - 52
         let isSettings = activeTab == .settings
+        themeAccentStripeView?.frame = NSRect(x: margin, y: bounds.height - 10, width: width, height: 4)
         searchGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
         searchField?.isHidden = isSettings
         let showsSnippetButtons = activeTab == .snippets && !isSettings
@@ -1976,9 +2070,28 @@ class BoardManPanel: NSPanel {
         footerNote?.isHidden = isSettings
         listGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
         scrollView?.isHidden = isSettings
-        listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
-        scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
-        placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: max(220, contentTop - 30))
+        let showsSnippetCategories = activeTab == .snippets && !isSettings
+        let categoryRowY = contentTop - 34
+        let listTop = showsSnippetCategories ? categoryRowY - 12 : contentTop
+        let listHeight = max(190, listTop - 30)
+        [snippetCategoryLabel, snippetCategoryPopup, snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton].forEach {
+            $0?.isHidden = !showsSnippetCategories
+        }
+        if showsSnippetCategories {
+            snippetCategoryLabel?.frame = NSRect(x: margin, y: categoryRowY + 5, width: 58, height: 16)
+            let actionWidth: CGFloat = 220
+            let popupWidth = max(160, width - 58 - 10 - actionWidth - 10)
+            snippetCategoryPopup?.frame = NSRect(x: margin + 68, y: categoryRowY, width: popupWidth, height: 24)
+            var categoryButtonX = margin + 68 + popupWidth + 10
+            snippetCategoryAddButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: 92, height: 24)
+            categoryButtonX += 98
+            snippetCategoryRenameButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: 62, height: 24)
+            categoryButtonX += 68
+            snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: 58, height: 24)
+        }
+        listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: listHeight)
+        scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: listHeight)
+        placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: listHeight)
         placeholderList?.tableColumns.first?.width = width
         hidePreviewBubble()
     }
@@ -2133,6 +2246,7 @@ class BoardManPanel: NSPanel {
 
     fileprivate func reloadHistoryItems(_ items: [BoardManHistoryItem]) {
         allItems = items
+        reloadSnippetCategoryPopup()
         applyCurrentFilter()
         if let table = placeholderList {
             makeFirstResponder(table)
@@ -2189,7 +2303,9 @@ class BoardManPanel: NSPanel {
         let preset = BoardManThemePreset.allCases.first { $0.title == title } ?? .defaultPreset
         AppEnvironment.current.defaults.set(preset.title, forKey: Constants.UserDefaults.boardManThemePreset)
         applyLiquidGlassStyle()
+        layoutPanelSubviews()
         placeholderList?.reloadData()
+        contentView?.needsDisplay = true
     }
 
     private var selectedSnippetItem: BoardManHistoryItem? {
@@ -2208,10 +2324,136 @@ class BoardManPanel: NSPanel {
         snippetAddButton?.isEnabled = isSnippetsTab
         snippetEditButton?.isEnabled = isSnippetsTab && hasSelection
         snippetDeleteButton?.isEnabled = isSnippetsTab && hasSelection
+        let canManageSelectedCategory = isSnippetsTab && selectedCategoryFolder() != nil
+        snippetCategoryRenameButton?.isEnabled = canManageSelectedCategory
+        snippetCategoryDeleteButton?.isEnabled = canManageSelectedCategory
+    }
+
+    private func reloadSnippetCategoryPopup() {
+        guard let popup = snippetCategoryPopup else { return }
+        let selectedIdentifier = activeSnippetCategoryIdentifier
+        popup.removeAllItems()
+        addCategoryMenuItem(to: popup, title: "All", identifier: BoardManPanel.allCategoriesIdentifier)
+
+        let realm = try! Realm()
+        let folders = realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true)
+        folders.forEach { folder in
+            let title = folder.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "untitled folder" : folder.title
+            addCategoryMenuItem(to: popup, title: title, identifier: folder.identifier)
+        }
+
+        if allItems.contains(where: { $0.categoryIdentifier == BoardManPanel.uncategorizedCategoryIdentifier }) {
+            addCategoryMenuItem(to: popup, title: "Uncategorized", identifier: BoardManPanel.uncategorizedCategoryIdentifier)
+        }
+
+        let identifiers = popup.itemArray.compactMap { $0.representedObject as? String }
+        activeSnippetCategoryIdentifier = identifiers.contains(selectedIdentifier) ? selectedIdentifier : BoardManPanel.allCategoriesIdentifier
+        if let item = popup.itemArray.first(where: { ($0.representedObject as? String) == activeSnippetCategoryIdentifier }) {
+            popup.select(item)
+        }
+        updateSnippetActionButtons()
+    }
+
+    private func addCategoryMenuItem(to popup: NSPopUpButton, title: String, identifier: String) {
+        popup.addItem(withTitle: title)
+        popup.lastItem?.representedObject = identifier
+    }
+
+    private func selectedCategoryFolder() -> CPYFolder? {
+        guard activeSnippetCategoryIdentifier != BoardManPanel.allCategoriesIdentifier,
+              activeSnippetCategoryIdentifier != BoardManPanel.uncategorizedCategoryIdentifier else {
+            return nil
+        }
+        let realm = try! Realm()
+        return realm.object(ofType: CPYFolder.self, forPrimaryKey: activeSnippetCategoryIdentifier)
+    }
+
+    @objc private func snippetCategoryFilterChanged(_ sender: NSPopUpButton) {
+        activeSnippetCategoryIdentifier = (sender.selectedItem?.representedObject as? String) ?? BoardManPanel.allCategoriesIdentifier
+        selectedIndex = -1
+        hoveredRow = -1
+        hidePreviewBubble()
+        applyCurrentFilter()
+    }
+
+    @objc private func addSnippetCategoryFromPanel(_ sender: Any?) {
+        guard let title = promptForCategoryTitle(title: "Add Category", initialTitle: "") else { return }
+        let realm = try! Realm()
+        let folder = CPYFolder()
+        folder.title = title
+        folder.enable = true
+        folder.index = (realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true).last?.index ?? -1) + 1
+        realm.transaction {
+            realm.add(folder)
+        }
+        activeSnippetCategoryIdentifier = folder.identifier
+        onRefreshRequested?()
+    }
+
+    @objc private func renameSnippetCategoryFromPanel(_ sender: Any?) {
+        guard let folder = selectedCategoryFolder(),
+              let title = promptForCategoryTitle(title: "Rename Category", initialTitle: folder.title) else { return }
+        let realm = try! Realm()
+        guard let savedFolder = realm.object(ofType: CPYFolder.self, forPrimaryKey: folder.identifier) else { return }
+        realm.transaction {
+            savedFolder.title = title
+        }
+        onRefreshRequested?()
+    }
+
+    @objc private func deleteSnippetCategoryFromPanel(_ sender: Any?) {
+        guard let folder = selectedCategoryFolder() else {
+            NSSound.beep()
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Delete Category"
+        alert.informativeText = "Delete \"\(folder.title)\"? Snippets in this category will be moved to Uncategorized."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Delete Category")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let realm = try! Realm()
+        guard let savedFolder = realm.object(ofType: CPYFolder.self, forPrimaryKey: folder.identifier) else { return }
+        let fallbackFolder = uncategorizedFolder(in: realm, excluding: savedFolder.identifier)
+        realm.transaction {
+            let movedSnippets = Array(savedFolder.snippets)
+            savedFolder.snippets.removeAll()
+            movedSnippets.forEach { snippet in
+                snippet.index = fallbackFolder.snippets.count
+                fallbackFolder.snippets.append(snippet)
+            }
+            realm.delete(savedFolder)
+        }
+        activeSnippetCategoryIdentifier = fallbackFolder.identifier
+        onRefreshRequested?()
+    }
+
+    private func promptForCategoryTitle(title: String, initialTitle: String) -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = "Enter a category name."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        field.stringValue = initialTitle
+        alert.accessoryView = field
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            showSnippetValidationAlert(message: "Category name is required.")
+            return nil
+        }
+        return trimmed
     }
 
     @objc private func addSnippetFromPanel(_ sender: Any?) {
-        guard let input = promptForSnippet(title: "Add Snippet", initialTitle: "", initialContent: "") else { return }
+        guard let input = promptForSnippet(title: "Add Snippet", initialTitle: "", initialContent: "", initialCategoryIdentifier: activeSnippetCategoryIdentifier) else { return }
         let content = input.content
         guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             showSnippetValidationAlert(message: "Snippet content is required.")
@@ -2219,7 +2461,7 @@ class BoardManPanel: NSPanel {
         }
 
         let realm = try! Realm()
-        let folder = snippetTargetFolder(in: realm)
+        let folder = snippetTargetFolder(in: realm, preferredIdentifier: input.categoryIdentifier)
         let snippet = CPYSnippet()
         snippet.title = normalizedSnippetTitle(input.title)
         snippet.content = content
@@ -2227,6 +2469,7 @@ class BoardManPanel: NSPanel {
         realm.transaction {
             folder.snippets.append(snippet)
         }
+        activeSnippetCategoryIdentifier = folder.identifier
         onRefreshRequested?()
     }
 
@@ -2243,11 +2486,14 @@ class BoardManPanel: NSPanel {
             return
         }
 
-        guard let input = promptForSnippet(title: "Edit Snippet", initialTitle: snippet.title, initialContent: snippet.content) else { return }
+        let initialCategoryIdentifier = snippet.folder?.identifier ?? BoardManPanel.uncategorizedCategoryIdentifier
+        guard let input = promptForSnippet(title: "Edit Snippet", initialTitle: snippet.title, initialContent: snippet.content, initialCategoryIdentifier: initialCategoryIdentifier) else { return }
         realm.transaction {
             snippet.title = normalizedSnippetTitle(input.title)
             snippet.content = input.content
         }
+        moveSnippet(snippet, toCategoryIdentifier: input.categoryIdentifier, in: realm)
+        activeSnippetCategoryIdentifier = input.categoryIdentifier
         onRefreshRequested?()
     }
 
@@ -2286,33 +2532,43 @@ class BoardManPanel: NSPanel {
         onRefreshRequested?()
     }
 
-    private func promptForSnippet(title: String, initialTitle: String, initialContent: String) -> (title: String, content: String)? {
+    private func promptForSnippet(title: String, initialTitle: String, initialContent: String, initialCategoryIdentifier: String) -> (title: String, content: String, categoryIdentifier: String)? {
         let alert = NSAlert()
         alert.messageText = title
-        alert.informativeText = "Enter a title and content."
+        alert.informativeText = "Enter a title, category, and content."
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
 
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 190))
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 224))
         let titleLabel = NSTextField(labelWithString: "Title")
-        titleLabel.frame = NSRect(x: 0, y: 168, width: 360, height: 16)
+        titleLabel.frame = NSRect(x: 0, y: 202, width: 360, height: 16)
         titleLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         accessory.addSubview(titleLabel)
 
-        let titleField = NSTextField(frame: NSRect(x: 0, y: 140, width: 360, height: 24))
+        let titleField = NSTextField(frame: NSRect(x: 0, y: 174, width: 360, height: 24))
         titleField.stringValue = initialTitle
         titleField.font = NSFont.systemFont(ofSize: 12)
         accessory.addSubview(titleField)
 
+        let categoryLabel = NSTextField(labelWithString: "Category")
+        categoryLabel.frame = NSRect(x: 0, y: 150, width: 360, height: 16)
+        categoryLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        accessory.addSubview(categoryLabel)
+
+        let categoryPopup = NSPopUpButton(frame: NSRect(x: 0, y: 122, width: 360, height: 24), pullsDown: false)
+        populateCategoryPopup(categoryPopup, selectedIdentifier: initialCategoryIdentifier)
+        categoryPopup.font = NSFont.systemFont(ofSize: 12)
+        accessory.addSubview(categoryPopup)
+
         let contentLabel = NSTextField(labelWithString: "Content")
-        contentLabel.frame = NSRect(x: 0, y: 116, width: 360, height: 16)
+        contentLabel.frame = NSRect(x: 0, y: 98, width: 360, height: 16)
         contentLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         accessory.addSubview(contentLabel)
 
-        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 360, height: 112))
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 360, height: 94))
         scroll.hasVerticalScroller = true
         scroll.borderType = .bezelBorder
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 348, height: 112))
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 348, height: 94))
         textView.string = initialContent
         textView.font = NSFont.systemFont(ofSize: 12)
         textView.isRichText = false
@@ -2325,7 +2581,8 @@ class BoardManPanel: NSPanel {
         NSApp.activate(ignoringOtherApps: true)
         alert.window.initialFirstResponder = initialTitle.isEmpty ? titleField : textView
         guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-        return (titleField.stringValue, textView.string)
+        let categoryIdentifier = (categoryPopup.selectedItem?.representedObject as? String) ?? BoardManPanel.allCategoriesIdentifier
+        return (titleField.stringValue, textView.string, categoryIdentifier)
     }
 
     private func normalizedSnippetTitle(_ title: String) -> String {
@@ -2343,7 +2600,33 @@ class BoardManPanel: NSPanel {
         alert.runModal()
     }
 
-    private func snippetTargetFolder(in realm: Realm) -> CPYFolder {
+    private func populateCategoryPopup(_ popup: NSPopUpButton, selectedIdentifier: String) {
+        popup.removeAllItems()
+        let realm = try! Realm()
+        let folders = realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true)
+        folders.forEach { folder in
+            let title = folder.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "untitled folder" : folder.title
+            addCategoryMenuItem(to: popup, title: title, identifier: folder.identifier)
+        }
+        addCategoryMenuItem(to: popup, title: "Uncategorized", identifier: BoardManPanel.uncategorizedCategoryIdentifier)
+        let effectiveIdentifier = selectedIdentifier == BoardManPanel.allCategoriesIdentifier ? (folders.first?.identifier ?? BoardManPanel.uncategorizedCategoryIdentifier) : selectedIdentifier
+        if let item = popup.itemArray.first(where: { ($0.representedObject as? String) == effectiveIdentifier }) {
+            popup.select(item)
+        }
+    }
+
+    private func snippetTargetFolder(in realm: Realm, preferredIdentifier: String) -> CPYFolder {
+        if preferredIdentifier == BoardManPanel.uncategorizedCategoryIdentifier {
+            return uncategorizedFolder(in: realm)
+        }
+        if preferredIdentifier != BoardManPanel.allCategoriesIdentifier,
+           let folder = realm.object(ofType: CPYFolder.self, forPrimaryKey: preferredIdentifier) {
+            return folder
+        }
+        return defaultSnippetFolder(in: realm)
+    }
+
+    private func defaultSnippetFolder(in realm: Realm) -> CPYFolder {
         let folders = realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true)
         if let enabledFolder = folders.first(where: { $0.enable }) {
             return enabledFolder
@@ -2360,6 +2643,40 @@ class BoardManPanel: NSPanel {
             realm.add(folder)
         }
         return folder
+    }
+
+    private func uncategorizedFolder(in realm: Realm, excluding excludedIdentifier: String? = nil) -> CPYFolder {
+        let folders = realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true)
+        if let folder = folders.first(where: { $0.identifier != excludedIdentifier && $0.title == "Uncategorized" }) {
+            return folder
+        }
+        let folder = CPYFolder()
+        folder.title = "Uncategorized"
+        folder.enable = true
+        folder.index = (folders.last?.index ?? -1) + 1
+        if realm.isInWriteTransaction {
+            realm.add(folder)
+        } else {
+            realm.transaction {
+                realm.add(folder)
+            }
+        }
+        return folder
+    }
+
+    private func moveSnippet(_ snippet: CPYSnippet, toCategoryIdentifier categoryIdentifier: String, in realm: Realm) {
+        let targetFolder = snippetTargetFolder(in: realm, preferredIdentifier: categoryIdentifier)
+        if snippet.folder?.identifier == targetFolder.identifier { return }
+        realm.transaction {
+            if let currentFolder = snippet.folder, let index = currentFolder.snippets.index(of: snippet) {
+                currentFolder.snippets.remove(at: index)
+                for (snippetIndex, folderSnippet) in currentFolder.snippets.enumerated() {
+                    folderSnippet.index = snippetIndex
+                }
+            }
+            snippet.index = targetFolder.snippets.count
+            targetFolder.snippets.append(snippet)
+        }
     }
 
     @objc private func panelHeightChanged(_ sender: NSStepper) {
@@ -2379,6 +2696,7 @@ class BoardManPanel: NSPanel {
         selectedIndex = -1
         hoveredRow = -1
         hidePreviewBubble()
+        reloadSnippetCategoryPopup()
         applyCurrentFilter()
         if activeTab == .settings {
             makeFirstResponder(self)
@@ -2474,7 +2792,12 @@ class BoardManPanel: NSPanel {
             let regularHistory = allItems.filter { $0.source == .clip && !$0.isPinned }
             tabbedItems = pinnedItems + regularHistory
         case .snippets:
-            tabbedItems = allItems.filter { $0.source == .snippet }
+            let snippetItems = allItems.filter { $0.source == .snippet }
+            if activeSnippetCategoryIdentifier == BoardManPanel.allCategoriesIdentifier {
+                tabbedItems = snippetItems
+            } else {
+                tabbedItems = snippetItems.filter { $0.categoryIdentifier == activeSnippetCategoryIdentifier }
+            }
         case .settings:
             tabbedItems = []
         }
