@@ -859,7 +859,7 @@ fileprivate enum BoardManPanelTab: Int, CaseIterable {
     var emptyMessage: String {
         switch self {
         case .history: return "No clipboard history yet"
-        case .snippets: return "No snippets yet - use Add/Edit to open the snippet editor"
+        case .snippets: return "No snippets yet"
         case .settings: return ""
         }
     }
@@ -1234,7 +1234,9 @@ class BoardManPanel: NSPanel {
     private var heightStepper: NSStepper?
     private var heightLabel: NSTextField?
     private var footerNote: NSTextField?
-    private var snippetEditorButton: NSButton?
+    private var snippetAddButton: NSButton?
+    private var snippetEditButton: NSButton?
+    private var snippetDeleteButton: NSButton?
     private var previewBubblePanel: NSPanel?
     private var previewBubbleLabel: NSTextField?
     private var previewBubbleImageView: NSImageView?
@@ -1804,13 +1806,29 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(note)
         footerNote = note
 
-        let snippetsButton = NSButton(title: "Add/Edit", target: self, action: #selector(openSnippetEditor(_:)))
-        snippetsButton.font = NSFont.systemFont(ofSize: 11)
-        snippetsButton.bezelStyle = .rounded
-        snippetsButton.isHidden = true
-        snippetsButton.toolTip = "Open the existing snippet editor."
-        contentView.addSubview(snippetsButton)
-        snippetEditorButton = snippetsButton
+        let addSnippet = NSButton(title: "Add", target: self, action: #selector(addSnippetFromPanel(_:)))
+        addSnippet.font = NSFont.systemFont(ofSize: 11)
+        addSnippet.bezelStyle = .rounded
+        addSnippet.isHidden = true
+        addSnippet.toolTip = "Add a snippet."
+        contentView.addSubview(addSnippet)
+        snippetAddButton = addSnippet
+
+        let editSnippet = NSButton(title: "Edit", target: self, action: #selector(editSelectedSnippetFromPanel(_:)))
+        editSnippet.font = NSFont.systemFont(ofSize: 11)
+        editSnippet.bezelStyle = .rounded
+        editSnippet.isHidden = true
+        editSnippet.toolTip = "Edit the selected snippet."
+        contentView.addSubview(editSnippet)
+        snippetEditButton = editSnippet
+
+        let deleteSnippet = NSButton(title: "Delete", target: self, action: #selector(deleteSelectedSnippetFromPanel(_:)))
+        deleteSnippet.font = NSFont.systemFont(ofSize: 11)
+        deleteSnippet.bezelStyle = .rounded
+        deleteSnippet.isHidden = true
+        deleteSnippet.toolTip = "Delete the selected snippet."
+        contentView.addSubview(deleteSnippet)
+        snippetDeleteButton = deleteSnippet
 
         let bubbleLabel = NSTextField(labelWithString: "")
         bubbleLabel.font = NSFont.systemFont(ofSize: 12)
@@ -1924,13 +1942,26 @@ class BoardManPanel: NSPanel {
         let isSettings = activeTab == .settings
         searchGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
         searchField?.isHidden = isSettings
-        let showsSnippetEditorButton = activeTab == .snippets && !isSettings
-        let snippetButtonWidth: CGFloat = showsSnippetEditorButton ? 82 : 0
-        let searchWidth = width - snippetButtonWidth - (showsSnippetEditorButton ? 10 : 0)
+        let showsSnippetButtons = activeTab == .snippets && !isSettings
+        let snippetButtonGap: CGFloat = 6
+        let snippetButtonWidths: [CGFloat] = [44, 44, 58]
+        let snippetButtonsWidth = showsSnippetButtons ? snippetButtonWidths.reduce(0, +) + (snippetButtonGap * 2) : 0
+        let searchWidth = width - snippetButtonsWidth - (showsSnippetButtons ? 10 : 0)
         searchGlassView?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 32)
         searchField?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 32)
-        snippetEditorButton?.isHidden = !showsSnippetEditorButton
-        snippetEditorButton?.frame = NSRect(x: margin + searchWidth + 10, y: top + 3, width: snippetButtonWidth, height: 26)
+        snippetAddButton?.isHidden = !showsSnippetButtons
+        snippetEditButton?.isHidden = !showsSnippetButtons
+        snippetDeleteButton?.isHidden = !showsSnippetButtons
+        if showsSnippetButtons {
+            let buttonY = top + 3
+            var buttonX = margin + searchWidth + 10
+            snippetAddButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[0], height: 26)
+            buttonX += snippetButtonWidths[0] + snippetButtonGap
+            snippetEditButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[1], height: 26)
+            buttonX += snippetButtonWidths[1] + snippetButtonGap
+            snippetDeleteButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[2], height: 26)
+        }
+        updateSnippetActionButtons()
         tabsGlassView?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
         updateTabWidths(totalWidth: width)
@@ -2161,8 +2192,163 @@ class BoardManPanel: NSPanel {
         placeholderList?.reloadData()
     }
 
-    @objc private func openSnippetEditor(_ sender: Any?) {
-        (NSApp.delegate as? AppDelegate)?.showSnippetEditorWindow()
+    private var selectedSnippetItem: BoardManHistoryItem? {
+        guard activeTab == .snippets,
+              selectedIndex >= 0,
+              let item = historyItems[safe: selectedIndex],
+              item.source == .snippet else {
+            return nil
+        }
+        return item
+    }
+
+    private func updateSnippetActionButtons() {
+        let isSnippetsTab = activeTab == .snippets
+        let hasSelection = selectedSnippetItem != nil
+        snippetAddButton?.isEnabled = isSnippetsTab
+        snippetEditButton?.isEnabled = isSnippetsTab && hasSelection
+        snippetDeleteButton?.isEnabled = isSnippetsTab && hasSelection
+    }
+
+    @objc private func addSnippetFromPanel(_ sender: Any?) {
+        guard let input = promptForSnippet(title: "Add Snippet", initialTitle: "", initialContent: "") else { return }
+        let content = input.content
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            NSSound.beep()
+            return
+        }
+
+        let realm = try! Realm()
+        let folder = snippetTargetFolder(in: realm)
+        let snippet = CPYSnippet()
+        snippet.title = normalizedSnippetTitle(input.title)
+        snippet.content = content
+        snippet.index = folder.snippets.count
+        realm.transaction {
+            folder.snippets.append(snippet)
+        }
+        onRefreshRequested?()
+    }
+
+    @objc private func editSelectedSnippetFromPanel(_ sender: Any?) {
+        guard let item = selectedSnippetItem else {
+            NSSound.beep()
+            return
+        }
+
+        let realm = try! Realm()
+        guard let snippet = realm.object(ofType: CPYSnippet.self, forPrimaryKey: item.dataHash) else {
+            NSSound.beep()
+            onRefreshRequested?()
+            return
+        }
+
+        guard let input = promptForSnippet(title: "Edit Snippet", initialTitle: snippet.title, initialContent: snippet.content) else { return }
+        realm.transaction {
+            snippet.title = normalizedSnippetTitle(input.title)
+            snippet.content = input.content
+        }
+        onRefreshRequested?()
+    }
+
+    @objc private func deleteSelectedSnippetFromPanel(_ sender: Any?) {
+        guard let item = selectedSnippetItem else {
+            NSSound.beep()
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Delete Snippet"
+        alert.informativeText = "Delete \"\(item.primaryTitle)\"?"
+        alert.addButton(withTitle: "Delete")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let realm = try! Realm()
+        guard let snippet = realm.object(ofType: CPYSnippet.self, forPrimaryKey: item.dataHash) else {
+            onRefreshRequested?()
+            return
+        }
+
+        let identifier = snippet.identifier
+        realm.transaction {
+            if let folder = snippet.folder, let index = folder.snippets.index(of: snippet) {
+                folder.snippets.remove(at: index)
+                for (snippetIndex, folderSnippet) in folder.snippets.enumerated() {
+                    folderSnippet.index = snippetIndex
+                }
+            }
+            realm.delete(snippet)
+        }
+        PinnedSnippetStore.shared.remove(identifier)
+        onRefreshRequested?()
+    }
+
+    private func promptForSnippet(title: String, initialTitle: String, initialContent: String) -> (title: String, content: String)? {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = "Enter a title and content."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 190))
+        let titleLabel = NSTextField(labelWithString: "Title")
+        titleLabel.frame = NSRect(x: 0, y: 168, width: 360, height: 16)
+        titleLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        accessory.addSubview(titleLabel)
+
+        let titleField = NSTextField(frame: NSRect(x: 0, y: 140, width: 360, height: 24))
+        titleField.stringValue = initialTitle
+        titleField.font = NSFont.systemFont(ofSize: 12)
+        accessory.addSubview(titleField)
+
+        let contentLabel = NSTextField(labelWithString: "Content")
+        contentLabel.frame = NSRect(x: 0, y: 116, width: 360, height: 16)
+        contentLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        accessory.addSubview(contentLabel)
+
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 360, height: 112))
+        scroll.hasVerticalScroller = true
+        scroll.borderType = .bezelBorder
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 348, height: 112))
+        textView.string = initialContent
+        textView.font = NSFont.systemFont(ofSize: 12)
+        textView.isRichText = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.enabledTextCheckingTypes = 0
+        scroll.documentView = textView
+        accessory.addSubview(scroll)
+
+        alert.accessoryView = accessory
+        NSApp.activate(ignoringOtherApps: true)
+        alert.window.initialFirstResponder = initialTitle.isEmpty ? titleField : textView
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        return (titleField.stringValue, textView.string)
+    }
+
+    private func normalizedSnippetTitle(_ title: String) -> String {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedTitle.isEmpty ? "untitled snippet" : trimmedTitle
+    }
+
+    private func snippetTargetFolder(in realm: Realm) -> CPYFolder {
+        let folders = realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true)
+        if let enabledFolder = folders.first(where: { $0.enable }) {
+            return enabledFolder
+        }
+        if let firstFolder = folders.first {
+            return firstFolder
+        }
+
+        let folder = CPYFolder()
+        folder.title = "Board-Man Snippets"
+        folder.enable = true
+        folder.index = (folders.last?.index ?? -1) + 1
+        realm.transaction {
+            realm.add(folder)
+        }
+        return folder
     }
 
     @objc private func panelHeightChanged(_ sender: NSStepper) {
@@ -2295,6 +2481,7 @@ class BoardManPanel: NSPanel {
         layoutPanelSubviews()
         placeholderList?.reloadData()
         syncNativeSelection()
+        updateSnippetActionButtons()
     }
 
     // Single-click paste handler (left click on row pastes immediately; spec #1, #4). Uses safe bounds, selects row for feedback, triggers handlePanelPaste via callback (orderOut first, no close(), strong retain via MenuManager var, no terminate).
@@ -2336,9 +2523,13 @@ class BoardManPanel: NSPanel {
             menu.addItem(pinItem)
 
             if item.source == .snippet {
-                let editSnippetItem = NSMenuItem(title: "Edit Snippet", action: #selector(openSnippetEditor(_:)), keyEquivalent: "")
+                let editSnippetItem = NSMenuItem(title: "Edit Snippet", action: #selector(editSelectedSnippetFromPanel(_:)), keyEquivalent: "")
                 editSnippetItem.target = self
                 menu.addItem(editSnippetItem)
+
+                let deleteSnippetItem = NSMenuItem(title: "Delete Snippet", action: #selector(deleteSelectedSnippetFromPanel(_:)), keyEquivalent: "")
+                deleteSnippetItem.target = self
+                menu.addItem(deleteSnippetItem)
             }
         } else {
             let disabledPin = NSMenuItem(title: "Pin / Unpin", action: nil, keyEquivalent: "")
@@ -2349,7 +2540,7 @@ class BoardManPanel: NSPanel {
         menu.addItem(NSMenuItem.separator())
 
         if activeTab == .snippets {
-            let addSnippetItem = NSMenuItem(title: "Add Snippet", action: #selector(openSnippetEditor(_:)), keyEquivalent: "")
+            let addSnippetItem = NSMenuItem(title: "Add Snippet", action: #selector(addSnippetFromPanel(_:)), keyEquivalent: "")
             addSnippetItem.target = self
             menu.addItem(addSnippetItem)
         }
@@ -2357,10 +2548,6 @@ class BoardManPanel: NSPanel {
         let copyItem = NSMenuItem(title: "Copy Title", action: nil, keyEquivalent: "")
         copyItem.isEnabled = false  // per spec: if safe otherwise skip; placeholder
         menu.addItem(copyItem)
-
-        let moreItem = NSMenuItem(title: "More actions (delete etc.) coming soon", action: nil, keyEquivalent: "")
-        moreItem.isEnabled = false
-        menu.addItem(moreItem)
 
         return menu
     }
@@ -2537,6 +2724,7 @@ class BoardManPanel: NSPanel {
         guard row >= 0, row < historyItems.count else { return }
         let oldIndex = selectedIndex
         selectedIndex = row
+        updateSnippetActionButtons()
         syncNativeSelection()
         var rows = IndexSet(integer: row)
         if oldIndex >= 0 {
@@ -2727,6 +2915,10 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
+        if let row = placeholderList?.selectedRow, row >= 0, row < historyItems.count {
+            selectedIndex = row
+        }
+        updateSnippetActionButtons()
         // Refresh views after selection change so selected row uses readable .selectedTextColor
         placeholderList?.reloadData()
     }
