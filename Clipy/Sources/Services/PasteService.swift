@@ -137,6 +137,15 @@ extension PasteService {
             case .deprecatedTIFF:
                 guard let image = data.image, let imageData = image.tiffRepresentation else { return }
                 pasteboard.setData(imageData, forType: .deprecatedTIFF)
+            case .tiff:
+                guard let image = data.image, let imageData = image.tiffRepresentation else { return }
+                pasteboard.setData(imageData, forType: .tiff)
+            case .png:
+                guard let image = data.image,
+                      let tiffData = image.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: tiffData),
+                      let imageData = bitmap.representation(using: .png, properties: [:]) else { return }
+                pasteboard.setData(imageData, forType: .png)
             default: break
             }
         }

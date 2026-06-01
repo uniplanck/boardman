@@ -56,6 +56,19 @@ final class CPYClipData: NSObject {
     var primaryType: NSPasteboard.PasteboardType? {
         return types.first
     }
+    var isImageOnly: Bool {
+        return image != nil && stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && fileNames.isEmpty && URLs.isEmpty && PDF == nil
+    }
+    var imageDisplayTitle: String? {
+        guard isImageOnly else { return nil }
+        if types.contains(.png) {
+            return "PNG image"
+        }
+        if types.contains(.tiff) || types.contains(.deprecatedTIFF) {
+            return "TIFF image"
+        }
+        return "Image"
+    }
     var isOnlyStringType: Bool {
         return types == [.deprecatedString] || types == [.string]
     }
@@ -133,6 +146,10 @@ final class CPYClipData: NSObject {
                 URLs = urls
             case .deprecatedTIFF:
                 image = pasteboard.readObjects(forClasses: [NSImage.self], options: nil)?.first as? NSImage
+            case .png, .tiff:
+                if image == nil {
+                    image = pasteboard.readObjects(forClasses: [NSImage.self], options: nil)?.first as? NSImage
+                }
             default: break
             }
         }
