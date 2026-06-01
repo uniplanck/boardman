@@ -271,6 +271,7 @@ extension MenuManager {
                                        previewTitle: title,
                                        dataHash: clip.dataHash,
                                        imageDataPath: clip.dataPath,
+                                       inlineThumbnail: isImageClip ? PINCache.shared.object(forKey: clip.thumbnailPath) as? NSImage : nil,
                                        pasteCount: pasteCount,
                                        isPinned: isPinned,
                                        source: .clip,
@@ -306,6 +307,7 @@ extension MenuManager {
                                                    previewTitle: snippet.content,
                                                    dataHash: snippet.identifier,
                                                    imageDataPath: "",
+                                                   inlineThumbnail: nil,
                                                    pasteCount: 0,
                                                    isPinned: isPinned,
                                                    source: .snippet,
@@ -333,6 +335,7 @@ extension MenuManager {
                                            previewTitle: snippet.content,
                                            dataHash: snippet.identifier,
                                            imageDataPath: "",
+                                           inlineThumbnail: nil,
                                            pasteCount: 0,
                                            isPinned: isPinned,
                                            source: .snippet,
@@ -1052,6 +1055,7 @@ fileprivate struct BoardManHistoryItem {
     let previewTitle: String
     let dataHash: String
     let imageDataPath: String
+    let inlineThumbnail: NSImage?
     let pasteCount: Int
     let isPinned: Bool
     let source: BoardManPanelItemSource
@@ -1060,8 +1064,17 @@ fileprivate struct BoardManHistoryItem {
 }
 
 private final class BoardManHistoryTableView: NSTableView {
+    weak var panelKeyOwner: BoardManPanel?
+
     override var acceptsFirstResponder: Bool {
         return true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if panelKeyOwner?.handlePanelKey(event) == true {
+            return
+        }
+        super.keyDown(with: event)
     }
 }
 
@@ -1135,6 +1148,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
     private let primaryLabel = NSTextField(labelWithString: "")
     private let metadataLabel = NSTextField(labelWithString: "")
     private let countBadge = NSTextField(labelWithString: "")
+    private let inlineImageView = NSImageView(frame: .zero)
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -1170,8 +1184,16 @@ private final class BoardManHistoryCellView: NSTableCellView {
         countBadge.layer?.masksToBounds = true
         countBadge.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
 
+        inlineImageView.imageScaling = .scaleProportionallyUpOrDown
+        inlineImageView.imageAlignment = .alignCenter
+        inlineImageView.wantsLayer = true
+        inlineImageView.layer?.cornerRadius = 5
+        inlineImageView.layer?.masksToBounds = true
+        inlineImageView.layer?.borderWidth = 1
+
         addSubview(primaryLabel)
         addSubview(metadataLabel)
+        addSubview(inlineImageView)
         addSubview(countBadge)
     }
 
@@ -1185,17 +1207,23 @@ private final class BoardManHistoryCellView: NSTableCellView {
         let badgePrefix = usageStyle == "compact" ? "used " : "x"
         countBadge.stringValue = item.countText.isEmpty ? "" : "\(badgePrefix)\(item.countText)"
         countBadge.isHidden = item.countText.isEmpty
+        inlineImageView.image = item.inlineThumbnail
+        inlineImageView.isHidden = item.inlineThumbnail == nil
 
         if isSelected {
             primaryLabel.textColor = .selectedMenuItemTextColor
             metadataLabel.textColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.86)
             countBadge.textColor = .selectedMenuItemTextColor
             countBadge.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(useLiquidGlass ? 0.20 : 0.18).cgColor
+            inlineImageView.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.10).cgColor
+            inlineImageView.layer?.borderColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.24).cgColor
         } else {
             primaryLabel.textColor = .labelColor
             metadataLabel.textColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.92) : .secondaryLabelColor
             countBadge.textColor = .labelColor
             countBadge.layer?.backgroundColor = accentColor.withAlphaComponent(useLiquidGlass ? 0.18 : 0.18).cgColor
+            inlineImageView.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(useLiquidGlass ? 0.12 : 0.68).cgColor
+            inlineImageView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.35 : 0.50).cgColor
         }
         countBadge.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.30 : 0).cgColor
         countBadge.layer?.borderWidth = useLiquidGlass ? 1 : 0
@@ -1208,9 +1236,15 @@ private final class BoardManHistoryCellView: NSTableCellView {
         let topPadding: CGFloat = 8
         let badgeWidth: CGFloat = countBadge.isHidden ? 0 : min(72, max(34, countBadge.intrinsicContentSize.width + 16))
         let badgeX = bounds.width - insetX - badgeWidth
-        let textWidth = max(80, bounds.width - (insetX * 2) - badgeWidth - (badgeWidth > 0 ? 10 : 0))
+        let imageSize: CGFloat = inlineImageView.isHidden ? 0 : 32
+        let imageX = floor((bounds.width - imageSize) / 2)
+        let textRightLimit = inlineImageView.isHidden ? badgeX : min(badgeX, imageX - 10)
+        let textWidth = max(80, textRightLimit - insetX - (badgeWidth > 0 ? 10 : 0))
         primaryLabel.frame = NSRect(x: insetX, y: bounds.height - topPadding - 18, width: textWidth, height: 18)
         metadataLabel.frame = NSRect(x: insetX, y: 8, width: textWidth, height: 15)
+        if !inlineImageView.isHidden {
+            inlineImageView.frame = NSRect(x: imageX, y: floor((bounds.height - imageSize) / 2), width: imageSize, height: imageSize)
+        }
         if !countBadge.isHidden {
             countBadge.frame = NSRect(x: badgeX, y: (bounds.height - 20) / 2, width: badgeWidth, height: 20)
         }
@@ -1851,6 +1885,7 @@ class BoardManPanel: NSPanel {
         table.allowsEmptySelection = false
         table.allowsMultipleSelection = false
         table.refusesFirstResponder = false
+        table.panelKeyOwner = self
         table.dataSource = self
         table.delegate = self
         table.target = self
@@ -2332,8 +2367,7 @@ class BoardManPanel: NSPanel {
     }
 
     private var selectedSnippetItem: BoardManHistoryItem? {
-        guard activeTab == .snippets,
-              selectedIndex >= 0,
+        guard selectedIndex >= 0,
               let item = historyItems[safe: selectedIndex],
               item.source == .snippet else {
             return nil
@@ -2880,12 +2914,14 @@ class BoardManPanel: NSPanel {
             menu.addItem(pinItem)
 
             if item.source == .snippet {
-                let editSnippetItem = NSMenuItem(title: "Edit Snippet", action: #selector(editSelectedSnippetFromPanel(_:)), keyEquivalent: "")
+                let editSnippetItem = NSMenuItem(title: "Edit Snippet", action: #selector(editSnippetFromMenu(_:)), keyEquivalent: "")
                 editSnippetItem.target = self
+                editSnippetItem.representedObject = item.dataHash
                 menu.addItem(editSnippetItem)
 
-                let deleteSnippetItem = NSMenuItem(title: "Delete Snippet", action: #selector(deleteSelectedSnippetFromPanel(_:)), keyEquivalent: "")
+                let deleteSnippetItem = NSMenuItem(title: "Delete Snippet", action: #selector(deleteSnippetFromMenu(_:)), keyEquivalent: "")
                 deleteSnippetItem.target = self
+                deleteSnippetItem.representedObject = item.dataHash
                 menu.addItem(deleteSnippetItem)
             }
         } else {
@@ -2921,6 +2957,26 @@ class BoardManPanel: NSPanel {
         onRefreshRequested?()
     }
 
+    @objc private func editSnippetFromMenu(_ sender: NSMenuItem) {
+        guard let identifier = sender.representedObject as? String,
+              let row = historyItems.firstIndex(where: { $0.dataHash == identifier && $0.source == .snippet }) else {
+            NSSound.beep()
+            return
+        }
+        setSelectedIndex(row)
+        editSelectedSnippetFromPanel(sender)
+    }
+
+    @objc private func deleteSnippetFromMenu(_ sender: NSMenuItem) {
+        guard let identifier = sender.representedObject as? String,
+              let row = historyItems.firstIndex(where: { $0.dataHash == identifier && $0.source == .snippet }) else {
+            NSSound.beep()
+            return
+        }
+        setSelectedIndex(row)
+        deleteSelectedSnippetFromPanel(sender)
+    }
+
     override func cancelOperation(_ sender: Any?) {
         hidePreviewBubble()
         self.orderOut(nil)  // Esc: hide/orderOut only (avoids V4B-6 crash, no terminate)
@@ -2937,13 +2993,24 @@ class BoardManPanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyDown, handlePanelKey(event) {
+        if event.type == .keyDown, shouldHandlePanelKey(event), handlePanelKey(event) {
             return
         }
         super.sendEvent(event)
     }
 
-    private func handlePanelKey(_ event: NSEvent) -> Bool {
+    private func shouldHandlePanelKey(_ event: NSEvent) -> Bool {
+        guard event.type == .keyDown else { return false }
+        if event.keyCode == 53 { return true }
+        guard activeTab != .settings else { return false }
+        guard let textView = firstResponder as? NSTextView else { return true }
+        if searchField?.currentEditor() === textView {
+            return event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 125 || event.keyCode == 126
+        }
+        return false
+    }
+
+    fileprivate func handlePanelKey(_ event: NSEvent) -> Bool {
         switch event.keyCode {
         case 53:
             hidePreviewBubble()
