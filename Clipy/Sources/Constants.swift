@@ -80,6 +80,7 @@ struct Constants {
         static let boardManLiquidGlass = "BoardManLiquidGlass"
         static let boardManHideRulesJSON = "BoardManHideRulesJSON"
         static let boardManThemePreset = "BoardManThemePreset"
+        static let boardManThemeLighten = "BoardManThemeLighten"
     }
 
     struct Beta {
