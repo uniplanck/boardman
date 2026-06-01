@@ -921,7 +921,7 @@ fileprivate enum BoardManThemePreset: String, CaseIterable {
     var accentColor: NSColor {
         switch self {
         case .defaultPreset: return .controlAccentColor
-        case .graphite: return .tertiaryLabelColor
+        case .graphite: return NSColor(calibratedWhite: 0.52, alpha: 1)
         case .ocean: return .systemTeal
         case .amber: return .systemOrange
         case .rose: return .systemPink
@@ -930,11 +930,62 @@ fileprivate enum BoardManThemePreset: String, CaseIterable {
 
     var tintColor: NSColor {
         switch self {
-        case .defaultPreset: return .controlBackgroundColor
-        case .graphite: return NSColor.labelColor.withAlphaComponent(0.10)
-        case .ocean: return NSColor.systemTeal.withAlphaComponent(0.12)
-        case .amber: return NSColor.systemOrange.withAlphaComponent(0.11)
-        case .rose: return NSColor.systemPink.withAlphaComponent(0.11)
+        case .defaultPreset: return NSColor.controlAccentColor.withAlphaComponent(0.09)
+        case .graphite: return NSColor.labelColor.withAlphaComponent(0.13)
+        case .ocean: return NSColor.systemTeal.withAlphaComponent(0.16)
+        case .amber: return NSColor.systemOrange.withAlphaComponent(0.15)
+        case .rose: return NSColor.systemPink.withAlphaComponent(0.15)
+        }
+    }
+
+    var glassMaterial: NSVisualEffectView.Material {
+        switch self {
+        case .graphite:
+            return .hudWindow
+        default:
+            return .popover
+        }
+    }
+
+    func panelTintColor(useLiquidGlass: Bool) -> NSColor {
+        if useLiquidGlass {
+            switch self {
+            case .defaultPreset: return NSColor.controlBackgroundColor.withAlphaComponent(0.16)
+            case .graphite: return NSColor.labelColor.withAlphaComponent(0.15)
+            case .ocean: return NSColor.systemTeal.withAlphaComponent(0.15)
+            case .amber: return NSColor.systemOrange.withAlphaComponent(0.14)
+            case .rose: return NSColor.systemPink.withAlphaComponent(0.14)
+            }
+        }
+        return tintColor
+    }
+
+    func surfaceTintColor(useLiquidGlass: Bool) -> NSColor {
+        return tintColor.withAlphaComponent(useLiquidGlass ? 0.52 : 0.18)
+    }
+
+    func rowFillColor(useLiquidGlass: Bool) -> NSColor {
+        return tintColor.withAlphaComponent(useLiquidGlass ? 0.32 : 0.42)
+    }
+
+    func rowHoverColor(useLiquidGlass: Bool) -> NSColor {
+        return accentColor.withAlphaComponent(useLiquidGlass ? 0.18 : 0.16)
+    }
+
+    func rowSelectedColor(useLiquidGlass: Bool) -> NSColor {
+        return accentColor.withAlphaComponent(useLiquidGlass ? 0.34 : 0.28)
+    }
+
+    func edgeColor(useLiquidGlass: Bool) -> NSColor {
+        return NSColor.white.withAlphaComponent(useLiquidGlass ? 0.28 : 0.10)
+    }
+
+    func shadowColor(useLiquidGlass: Bool) -> NSColor {
+        switch self {
+        case .graphite:
+            return NSColor.black.withAlphaComponent(useLiquidGlass ? 0.36 : 0.16)
+        default:
+            return accentColor.withAlphaComponent(useLiquidGlass ? 0.24 : 0.14)
         }
     }
 
@@ -944,6 +995,45 @@ fileprivate enum BoardManThemePreset: String, CaseIterable {
             return .defaultPreset
         }
         return preset
+    }
+}
+
+private final class BoardManGlassSheenView: NSView {
+    var tintColor: NSColor = .clear {
+        didSet { needsDisplay = true }
+    }
+    var accentColor: NSColor = .controlAccentColor {
+        didSet { needsDisplay = true }
+    }
+
+    override var isOpaque: Bool {
+        return false
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        return nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        NSGradient(colors: [
+            NSColor.white.withAlphaComponent(0.20),
+            tintColor.withAlphaComponent(0.20),
+            NSColor.clear
+        ])?.draw(in: bounds, angle: -90)
+
+        let reflection = NSBezierPath()
+        reflection.move(to: NSPoint(x: bounds.minX, y: bounds.maxY - 32))
+        reflection.line(to: NSPoint(x: bounds.maxX, y: bounds.maxY - 92))
+        reflection.line(to: NSPoint(x: bounds.maxX, y: bounds.maxY - 126))
+        reflection.line(to: NSPoint(x: bounds.minX, y: bounds.maxY - 58))
+        reflection.close()
+        NSColor.white.withAlphaComponent(0.075).setFill()
+        reflection.fill()
+
+        let lowerGlow = NSBezierPath(roundedRect: bounds.insetBy(dx: 18, dy: 18), xRadius: 18, yRadius: 18)
+        accentColor.withAlphaComponent(0.045).setFill()
+        lowerGlow.fill()
     }
 }
 
@@ -1107,17 +1197,21 @@ private final class BoardManHistoryRowView: NSTableRowView {
         let row = (superview as? NSTableView)?.row(for: self) ?? -1
         let rowRect = bounds.insetBy(dx: 6, dy: 4)
         let useLiquidGlass = previewOwner?.isLiquidGlassEnabled == true
-        let accentColor = previewOwner?.themeAccentColor ?? .controlAccentColor
+        let preset = previewOwner?.themePreset ?? .defaultPreset
+        let accentColor = preset.accentColor
         let path = NSBezierPath(roundedRect: rowRect, xRadius: useLiquidGlass ? 11 : 8, yRadius: useLiquidGlass ? 11 : 8)
         if previewOwner?.isSelectedRow(row) == true {
-            accentColor.withAlphaComponent(useLiquidGlass ? 0.30 : 0.26).setFill()
+            preset.rowSelectedColor(useLiquidGlass: useLiquidGlass).setFill()
             path.fill()
-            accentColor.withAlphaComponent(useLiquidGlass ? 0.50 : 0.46).setStroke()
+            accentColor.withAlphaComponent(useLiquidGlass ? 0.54 : 0.46).setStroke()
             path.lineWidth = 1
             path.stroke()
         } else if previewOwner?.isHoveredRow(row) == true {
-            accentColor.withAlphaComponent(useLiquidGlass ? 0.14 : 0.16).setFill()
+            preset.rowHoverColor(useLiquidGlass: useLiquidGlass).setFill()
             path.fill()
+            preset.edgeColor(useLiquidGlass: useLiquidGlass).setStroke()
+            path.lineWidth = 1
+            path.stroke()
         } else if let appearance = previewOwner?.usedItemAppearance(for: row) {
             appearance.background.setFill()
             path.fill()
@@ -1126,16 +1220,22 @@ private final class BoardManHistoryRowView: NSTableRowView {
             path.stroke()
         } else if row >= 0 {
             (useLiquidGlass
-                ? NSColor.textBackgroundColor.withAlphaComponent(0.12)
-                : NSColor.textBackgroundColor.withAlphaComponent(0.36)).setFill()
+                ? preset.rowFillColor(useLiquidGlass: true)
+                : preset.rowFillColor(useLiquidGlass: false)).setFill()
             path.fill()
             if useLiquidGlass {
-                NSColor.white.withAlphaComponent(0.12).setStroke()
+                preset.edgeColor(useLiquidGlass: true).setStroke()
                 path.lineWidth = 1
                 path.stroke()
             }
         } else {
             super.drawBackground(in: dirtyRect)
+        }
+        if useLiquidGlass, row >= 0 {
+            let highlightRect = NSRect(x: rowRect.minX + 1, y: rowRect.maxY - 10, width: rowRect.width - 2, height: 8)
+            let highlight = NSBezierPath(roundedRect: highlightRect, xRadius: 8, yRadius: 8)
+            NSColor.white.withAlphaComponent(0.10).setFill()
+            highlight.fill()
         }
     }
 
@@ -1201,7 +1301,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
                    isSelected: Bool,
                    usageStyle: String,
                    useLiquidGlass: Bool,
-                   accentColor: NSColor) {
+                   themePreset: BoardManThemePreset) {
         primaryLabel.stringValue = item.primaryTitle
         metadataLabel.stringValue = item.metadataText
         let badgePrefix = usageStyle == "compact" ? "used " : "x"
@@ -1218,14 +1318,15 @@ private final class BoardManHistoryCellView: NSTableCellView {
             inlineImageView.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.10).cgColor
             inlineImageView.layer?.borderColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.24).cgColor
         } else {
+            let accentColor = themePreset.accentColor
             primaryLabel.textColor = .labelColor
             metadataLabel.textColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.92) : .secondaryLabelColor
             countBadge.textColor = .labelColor
-            countBadge.layer?.backgroundColor = accentColor.withAlphaComponent(useLiquidGlass ? 0.18 : 0.18).cgColor
-            inlineImageView.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(useLiquidGlass ? 0.12 : 0.68).cgColor
-            inlineImageView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.35 : 0.50).cgColor
+            countBadge.layer?.backgroundColor = accentColor.withAlphaComponent(useLiquidGlass ? 0.22 : 0.18).cgColor
+            inlineImageView.layer?.backgroundColor = themePreset.surfaceTintColor(useLiquidGlass: useLiquidGlass).cgColor
+            inlineImageView.layer?.borderColor = accentColor.withAlphaComponent(useLiquidGlass ? 0.34 : 0.28).cgColor
         }
-        countBadge.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.30 : 0).cgColor
+        countBadge.layer?.borderColor = themePreset.edgeColor(useLiquidGlass: useLiquidGlass).cgColor
         countBadge.layer?.borderWidth = useLiquidGlass ? 1 : 0
         needsLayout = true
     }
@@ -1255,6 +1356,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
 class BoardManPanel: NSPanel {
 
     private var glassBackgroundView: NSVisualEffectView?
+    private var glassSheenView: BoardManGlassSheenView?
     private var themeAccentStripeView: NSView?
     private var searchGlassView: NSVisualEffectView?
     private var tabsGlassView: NSVisualEffectView?
@@ -1467,10 +1569,11 @@ class BoardManPanel: NSPanel {
         if let contentView = contentView {
             contentView.wantsLayer = true
             if #available(macOS 10.15, *) {
-                contentView.layer?.cornerRadius = 12  // softer, less aggressive look
+                contentView.layer?.cornerRadius = 14
                 contentView.layer?.masksToBounds = true
             }
             contentView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            contentView.layer?.borderWidth = 1
         }
     }
 
@@ -1495,10 +1598,16 @@ class BoardManPanel: NSPanel {
         glass.material = .hudWindow
         glass.state = .active
         glass.wantsLayer = true
-        glass.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.10).cgColor
+        glass.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.08).cgColor
         glass.isHidden = true
         contentView.addSubview(glass, positioned: .below, relativeTo: nil)
         glassBackgroundView = glass
+
+        let sheen = BoardManGlassSheenView(frame: contentView.bounds)
+        sheen.autoresizingMask = [.width, .height]
+        sheen.isHidden = true
+        contentView.addSubview(sheen, positioned: .above, relativeTo: glass)
+        glassSheenView = sheen
     }
 
     private func setupUI() {
@@ -2000,57 +2109,99 @@ class BoardManPanel: NSPanel {
 
     private func applyLiquidGlassStyle() {
         let useGlass = isLiquidGlassEnabled
-        let accentColor = themeAccentColor
-        let tintColor = themePreset.tintColor
+        let preset = themePreset
+        let accentColor = preset.accentColor
+        let tintColor = preset.panelTintColor(useLiquidGlass: useGlass)
+        let surfaceTint = preset.surfaceTintColor(useLiquidGlass: useGlass)
         backgroundColor = useGlass ? .clear : .windowBackgroundColor
         isOpaque = !useGlass
+        hasShadow = true
         glassBackgroundView?.isHidden = !useGlass
-        glassBackgroundView?.material = .hudWindow
-        glassBackgroundView?.layer?.backgroundColor = NSColor.black.withAlphaComponent(useGlass ? 0.10 : 0).cgColor
+        glassBackgroundView?.material = preset.glassMaterial
+        glassBackgroundView?.layer?.backgroundColor = tintColor.cgColor
+        glassBackgroundView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass).cgColor
+        glassBackgroundView?.layer?.borderWidth = useGlass ? 1 : 0
+        glassSheenView?.isHidden = !useGlass
+        glassSheenView?.tintColor = preset.tintColor
+        glassSheenView?.accentColor = accentColor
         contentView?.layer?.backgroundColor = (useGlass
-            ? NSColor.clear
+            ? tintColor
             : tintColor).cgColor
+        contentView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass).cgColor
         contentView?.layer?.isOpaque = !useGlass
-        themeAccentStripeView?.layer?.backgroundColor = accentColor.withAlphaComponent(useGlass ? 0.72 : 0.82).cgColor
+        themeAccentStripeView?.layer?.backgroundColor = accentColor.withAlphaComponent(useGlass ? 0.84 : 0.82).cgColor
+        themeAccentStripeView?.layer?.shadowColor = accentColor.cgColor
+        themeAccentStripeView?.layer?.shadowOpacity = Float(useGlass ? 0.28 : 0.10)
+        themeAccentStripeView?.layer?.shadowRadius = useGlass ? 8 : 3
+        themeAccentStripeView?.layer?.shadowOffset = .zero
         [searchGlassView, tabsGlassView, settingsGlassView, listGlassView].forEach { glass in
             glass?.isHidden = !useGlass
-            glass?.material = .hudWindow
+            glass?.material = preset.glassMaterial
             glass?.state = .active
-            glass?.layer?.backgroundColor = NSColor.textBackgroundColor.withAlphaComponent(0.10).cgColor
-            glass?.layer?.borderColor = NSColor.white.withAlphaComponent(0.18).cgColor
+            glass?.layer?.backgroundColor = surfaceTint.cgColor
+            glass?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass).cgColor
             glass?.layer?.borderWidth = useGlass ? 1 : 0
         }
         searchField?.wantsLayer = true
         searchField?.layer?.cornerRadius = useGlass ? 10 : 6
         searchField?.layer?.backgroundColor = (useGlass
-            ? NSColor.clear
+            ? surfaceTint.withAlphaComponent(0.34)
             : NSColor.clear).cgColor
         segmentedControl?.wantsLayer = true
         segmentedControl?.layer?.cornerRadius = useGlass ? 10 : 6
         segmentedControl?.layer?.backgroundColor = (useGlass
-            ? NSColor.clear
+            ? surfaceTint.withAlphaComponent(0.28)
+            : NSColor.clear).cgColor
+        settingsCategoryControl?.wantsLayer = true
+        settingsCategoryControl?.layer?.cornerRadius = useGlass ? 10 : 6
+        settingsCategoryControl?.layer?.backgroundColor = (useGlass
+            ? surfaceTint.withAlphaComponent(0.28)
             : NSColor.clear).cgColor
         settingsBackgroundView?.layer?.backgroundColor = (useGlass
-            ? NSColor.textBackgroundColor.withAlphaComponent(0.08)
+            ? surfaceTint.withAlphaComponent(0.42)
             : tintColor).cgColor
         settingsBackgroundView?.layer?.cornerRadius = useGlass ? 12 : 6
-        settingsBackgroundView?.layer?.borderColor = (useGlass ? NSColor.white : accentColor).withAlphaComponent(useGlass ? 0.18 : 0.20).cgColor
+        settingsBackgroundView?.layer?.borderColor = (useGlass ? preset.edgeColor(useLiquidGlass: true) : accentColor.withAlphaComponent(0.20)).cgColor
         settingsBackgroundView?.layer?.borderWidth = useGlass ? 1 : (themePreset == .defaultPreset ? 0 : 1)
+        settingsBackgroundView?.layer?.shadowColor = preset.shadowColor(useLiquidGlass: useGlass).cgColor
+        settingsBackgroundView?.layer?.shadowOpacity = Float(useGlass ? 0.20 : 0.08)
+        settingsBackgroundView?.layer?.shadowRadius = useGlass ? 14 : 5
+        settingsBackgroundView?.layer?.shadowOffset = NSSize(width: 0, height: -4)
         scrollView?.layer?.backgroundColor = (useGlass
-            ? NSColor.clear
+            ? surfaceTint.withAlphaComponent(0.30)
             : tintColor).cgColor
         scrollView?.layer?.cornerRadius = useGlass ? 11 : 8
-        scrollView?.layer?.borderColor = (themePreset == .defaultPreset ? NSColor.separatorColor : accentColor).withAlphaComponent(useGlass ? 0.18 : 0.42).cgColor
+        scrollView?.layer?.borderColor = (useGlass ? preset.edgeColor(useLiquidGlass: true) : accentColor.withAlphaComponent(0.42)).cgColor
+        scrollView?.layer?.borderWidth = themePreset == .defaultPreset && !useGlass ? 1 : 1
+        scrollView?.layer?.shadowColor = preset.shadowColor(useLiquidGlass: useGlass).cgColor
+        scrollView?.layer?.shadowOpacity = Float(useGlass ? 0.18 : 0.06)
+        scrollView?.layer?.shadowRadius = useGlass ? 12 : 4
+        scrollView?.layer?.shadowOffset = NSSize(width: 0, height: -3)
         scrollView?.drawsBackground = !useGlass
         placeholderList?.backgroundColor = .clear
-        [snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton, snippetAddButton, snippetEditButton, snippetDeleteButton].forEach { button in
+        [rowNumbersButton, usageCountButton, autoCloseButton, dedupeButton, reuseTopButton, pauseRecordingButton].forEach { button in
+            if #available(macOS 10.14, *) {
+                button?.contentTintColor = accentColor
+            }
+        }
+        [snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton, snippetAddButton, snippetEditButton, snippetDeleteButton, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, clearHistoryButton, excludedAppsButton].forEach { button in
             if #available(macOS 10.14, *) {
                 button?.contentTintColor = themePreset == .defaultPreset ? .labelColor : accentColor
             }
         }
+        [viewSectionLabel, behaviorSectionLabel, historySectionLabel, privacySectionLabel, filterSectionLabel, labsSectionLabel, snippetCategoryLabel].forEach { label in
+            label?.textColor = themePreset == .defaultPreset ? .labelColor : accentColor
+        }
+        [themePresetLabel, timestampLabel, usageStyleLabel, usedItemStyleLabel, clickActionLabel, enterActionLabel, heightControlLabel].forEach { label in
+            label?.textColor = NSColor.labelColor.withAlphaComponent(useGlass ? 0.96 : 1)
+        }
+        snippetCategoryPopup?.wantsLayer = true
+        snippetCategoryPopup?.layer?.cornerRadius = useGlass ? 9 : 6
+        snippetCategoryPopup?.layer?.backgroundColor = useGlass ? surfaceTint.withAlphaComponent(0.30).cgColor : NSColor.clear.cgColor
         footerNote?.textColor = NSColor.secondaryLabelColor.withAlphaComponent(useGlass ? 0.98 : 0.95)
         previewBubblePanel?.contentView?.layer?.cornerRadius = useGlass ? 11 : 8
-        previewBubblePanel?.contentView?.layer?.borderColor = accentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+        previewBubblePanel?.contentView?.layer?.backgroundColor = surfaceTint.withAlphaComponent(useGlass ? 0.42 : 0.95).cgColor
+        previewBubblePanel?.contentView?.layer?.borderColor = accentColor.withAlphaComponent(useGlass ? 0.46 : 0.42).cgColor
         placeholderList?.reloadData()
     }
 
@@ -2077,6 +2228,10 @@ class BoardManPanel: NSPanel {
         bubble.contentView?.layer?.borderColor = themeAccentColor.withAlphaComponent(0.42).cgColor
         bubble.contentView?.layer?.borderWidth = 1
         bubble.contentView?.layer?.cornerRadius = 8
+        bubble.contentView?.layer?.shadowColor = themeAccentColor.cgColor
+        bubble.contentView?.layer?.shadowOpacity = 0.16
+        bubble.contentView?.layer?.shadowRadius = 12
+        bubble.contentView?.layer?.shadowOffset = NSSize(width: 0, height: -3)
         bubble.contentView?.addSubview(label)
         if let imageView = previewBubbleImageView {
             bubble.contentView?.addSubview(imageView)
@@ -2091,6 +2246,7 @@ class BoardManPanel: NSPanel {
         let width = bounds.width - (margin * 2)
         let top = bounds.height - 52
         let isSettings = activeTab == .settings
+        glassSheenView?.frame = bounds
         themeAccentStripeView?.frame = NSRect(x: margin, y: bounds.height - 10, width: width, height: 4)
         searchGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
         searchField?.isHidden = isSettings
@@ -3198,12 +3354,14 @@ class BoardManPanel: NSPanel {
         bubble.contentView?.frame = NSRect(x: 0, y: 0, width: bubbleWidth, height: bubbleHeight)
         let useGlass = isLiquidGlassEnabled
         if let effectView = bubble.contentView as? NSVisualEffectView {
-            effectView.material = useGlass ? .hudWindow : .popover
+            effectView.material = useGlass ? themePreset.glassMaterial : .popover
             effectView.blendingMode = useGlass ? .behindWindow : .withinWindow
         }
-        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.16 : 0.98).cgColor
-        bubble.contentView?.layer?.borderColor = themeAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+        bubble.contentView?.layer?.backgroundColor = themePreset.surfaceTintColor(useLiquidGlass: useGlass).withAlphaComponent(useGlass ? 0.48 : 0.96).cgColor
+        bubble.contentView?.layer?.borderColor = themeAccentColor.withAlphaComponent(useGlass ? 0.46 : 0.42).cgColor
         bubble.contentView?.layer?.borderWidth = 1
+        bubble.contentView?.layer?.shadowColor = themePreset.shadowColor(useLiquidGlass: useGlass).cgColor
+        bubble.contentView?.layer?.shadowOpacity = Float(useGlass ? 0.22 : 0.10)
         label.textColor = useGlass ? .labelColor : .labelColor
 
         let origin = previewBubbleOrigin(width: bubbleWidth, height: bubbleHeight, preferOppositeSide: true)
@@ -3251,12 +3409,14 @@ class BoardManPanel: NSPanel {
 
         let useGlass = isLiquidGlassEnabled
         if let effectView = bubble.contentView as? NSVisualEffectView {
-            effectView.material = useGlass ? .hudWindow : .popover
+            effectView.material = useGlass ? themePreset.glassMaterial : .popover
             effectView.blendingMode = useGlass ? .behindWindow : .withinWindow
         }
-        bubble.contentView?.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(useGlass ? 0.16 : 0.98).cgColor
-        bubble.contentView?.layer?.borderColor = themeAccentColor.withAlphaComponent(useGlass ? 0.38 : 0.42).cgColor
+        bubble.contentView?.layer?.backgroundColor = themePreset.surfaceTintColor(useLiquidGlass: useGlass).withAlphaComponent(useGlass ? 0.48 : 0.96).cgColor
+        bubble.contentView?.layer?.borderColor = themeAccentColor.withAlphaComponent(useGlass ? 0.46 : 0.42).cgColor
         bubble.contentView?.layer?.borderWidth = 1
+        bubble.contentView?.layer?.shadowColor = themePreset.shadowColor(useLiquidGlass: useGlass).cgColor
+        bubble.contentView?.layer?.shadowOpacity = Float(useGlass ? 0.22 : 0.10)
 
         let origin = previewBubbleOrigin(width: bubbleWidth, height: bubbleHeight, preferOppositeSide: true)
         bubble.setFrame(NSRect(x: origin.x, y: origin.y, width: bubbleWidth, height: bubbleHeight), display: true)
@@ -3330,7 +3490,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
                        isSelected: selectedIndex == row,
                        usageStyle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)),
                        useLiquidGlass: isLiquidGlassEnabled,
-                       accentColor: themeAccentColor)
+                       themePreset: themePreset)
         return cell
     }
 
