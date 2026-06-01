@@ -1172,6 +1172,65 @@ fileprivate struct BoardManHistoryItem {
     let categoryTitle: String?
 }
 
+private enum BoardManPanelKeyCommand {
+    case escape
+    case previousTab
+    case nextTab
+    case nextRow
+    case previousRow
+    case paste
+}
+
+private extension NSEvent {
+    var boardManPanelKeyCommand: BoardManPanelKeyCommand? {
+        switch keyCode {
+        case 53:
+            return .escape
+        case 123:
+            return .previousTab
+        case 124:
+            return .nextTab
+        case 125:
+            return .nextRow
+        case 126:
+            return .previousRow
+        case 36, 76:
+            return .paste
+        default:
+            break
+        }
+
+        guard let scalar = charactersIgnoringModifiers?.unicodeScalars.first?.value else { return nil }
+        switch scalar {
+        case UInt32(NSUpArrowFunctionKey):
+            return .previousRow
+        case UInt32(NSDownArrowFunctionKey):
+            return .nextRow
+        case UInt32(NSLeftArrowFunctionKey):
+            return .previousTab
+        case UInt32(NSRightArrowFunctionKey):
+            return .nextTab
+        case UInt32(NSCarriageReturnCharacter), UInt32(NSEnterCharacter):
+            return .paste
+        case 0x1B:
+            return .escape
+        default:
+            return nil
+        }
+    }
+}
+
+private final class BoardManSearchField: NSSearchField {
+    weak var panelKeyOwner: BoardManPanel?
+
+    override func keyDown(with event: NSEvent) {
+        if panelKeyOwner?.handlePanelKey(event) == true {
+            return
+        }
+        super.keyDown(with: event)
+    }
+}
+
 private final class BoardManHistoryTableView: NSTableView {
     weak var panelKeyOwner: BoardManPanel?
 
@@ -1191,6 +1250,13 @@ private final class BoardManHistoryTableView: NSTableView {
             return
         }
         super.keyDown(with: event)
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if panelKeyOwner?.handlePanelKey(event) == true {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
     }
 }
 
@@ -1375,7 +1441,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
 }
 
 // MARK: - BoardManPanel MVP Shell (embedded in MenuManager.swift per constraints)
-class BoardManPanel: NSPanel {
+class BoardManPanel: NSPanel, NSSearchFieldDelegate {
 
     private var glassBackgroundView: NSVisualEffectView?
     private var glassSheenView: BoardManGlassSheenView?
@@ -1653,10 +1719,12 @@ class BoardManPanel: NSPanel {
         searchGlassView = searchGlass
 
         // Search field at top - clean margins
-        let search = NSSearchField(frame: .zero)
+        let search = BoardManSearchField(frame: .zero)
         search.placeholderString = "Search history and snippets"
         search.target = self
         search.action = #selector(searchTextChanged(_:))
+        search.delegate = self
+        search.panelKeyOwner = self
         search.sendsSearchStringImmediately = true
         search.focusRingType = .none
         contentView.addSubview(search)
@@ -3096,6 +3164,23 @@ class BoardManPanel: NSPanel {
         applyCurrentFilter()
     }
 
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        guard control === searchField else { return false }
+        switch commandSelector {
+        case #selector(NSResponder.moveUp(_:)):
+            moveSelection(delta: -1)
+            return true
+        case #selector(NSResponder.moveDown(_:)):
+            moveSelection(delta: 1)
+            return true
+        case #selector(NSResponder.insertNewline(_:)), #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
+            pasteSelectedRow()
+            return true
+        default:
+            return false
+        }
+    }
+
     private func applyCurrentFilter() {
         let query = (searchField?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let tabbedItems: [BoardManHistoryItem]
@@ -3260,43 +3345,55 @@ class BoardManPanel: NSPanel {
         super.sendEvent(event)
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.type == .keyDown, shouldHandlePanelKey(event), handlePanelKey(event) {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     private func shouldHandlePanelKey(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
-        if event.keyCode == 53 { return true }
+        guard let command = event.boardManPanelKeyCommand else { return false }
+        if command == .escape { return true }
         guard activeTab != .settings else { return false }
         guard let textView = firstResponder as? NSTextView else { return true }
         if searchField?.currentEditor() === textView {
-            return event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 125 || event.keyCode == 126
+            switch command {
+            case .nextRow, .previousRow, .paste:
+                return true
+            default:
+                return false
+            }
         }
         return false
     }
 
     fileprivate func handlePanelKey(_ event: NSEvent) -> Bool {
-        switch event.keyCode {
-        case 53:
+        guard let command = event.boardManPanelKeyCommand else { return false }
+        switch command {
+        case .escape:
             hidePreviewBubble()
             orderOut(nil)
             return true
-        case 123:
+        case .previousTab:
             moveTab(delta: -1)
             return true
-        case 124:
+        case .nextTab:
             moveTab(delta: 1)
             return true
-        case 125:
+        case .nextRow:
             guard activeTab != .settings else { return false }
             moveSelection(delta: 1)
             return true
-        case 126:
+        case .previousRow:
             guard activeTab != .settings else { return false }
             moveSelection(delta: -1)
             return true
-        case 36, 76:
+        case .paste:
             guard activeTab != .settings else { return false }
             pasteSelectedRow()
             return true
-        default:
-            return false
         }
     }
 
