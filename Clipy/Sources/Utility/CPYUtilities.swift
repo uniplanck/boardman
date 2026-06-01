@@ -63,6 +63,7 @@ final class CPYUtilities {
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.boardManShowUsageCount)
         defaultValues.updateValue("badge", forKey: Constants.UserDefaults.boardManUsageCountStyle)
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManLiquidGlass)
+        defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManThemeLighten)
 
         /* Updates */
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.Update.enableAutomaticCheck)
