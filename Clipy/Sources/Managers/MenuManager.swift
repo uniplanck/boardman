@@ -1183,6 +1183,7 @@ private final class BoardManHistoryTableView: NSTableView {
         super.viewDidMoveToSuperview()
         enclosingScrollView?.hasHorizontalScroller = false
         enclosingScrollView?.horizontalScrollElasticity = .none
+        gridStyleMask = []
     }
 
     override func keyDown(with event: NSEvent) {
@@ -1220,7 +1221,7 @@ private final class BoardManHistoryRowView: NSTableRowView {
 
     override func drawBackground(in dirtyRect: NSRect) {
         let row = (superview as? NSTableView)?.row(for: self) ?? -1
-        let rowRect = bounds.insetBy(dx: 6, dy: 4)
+        let rowRect = bounds.insetBy(dx: 0, dy: 4)
         let useLiquidGlass = previewOwner?.isLiquidGlassEnabled == true
         let lightenTheme = previewOwner?.isThemeLightenEnabled == true
         let preset = previewOwner?.themePreset ?? .defaultPreset
@@ -1256,12 +1257,6 @@ private final class BoardManHistoryRowView: NSTableRowView {
             }
         } else {
             super.drawBackground(in: dirtyRect)
-        }
-        if useLiquidGlass, row >= 0 {
-            let highlightRect = NSRect(x: rowRect.minX + 1, y: rowRect.maxY - 10, width: rowRect.width - 2, height: 8)
-            let highlight = NSBezierPath(roundedRect: highlightRect, xRadius: 8, yRadius: 8)
-            NSColor.white.withAlphaComponent(0.10).setFill()
-            highlight.fill()
         }
     }
 
@@ -2020,7 +2015,9 @@ class BoardManPanel: NSPanel {
         scroll.borderType = .noBorder
         scroll.autohidesScrollers = true
         scroll.horizontalScrollElasticity = .none
+        scroll.automaticallyAdjustsContentInsets = false
         scroll.contentView.autoresizesSubviews = true
+        scroll.contentView.drawsBackground = false
         scroll.wantsLayer = true
         scroll.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         scroll.layer?.cornerRadius = 8
@@ -2038,9 +2035,12 @@ class BoardManPanel: NSPanel {
         table.headerView = nil  // no oversized header
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.rowHeight = 50
+        table.intercellSpacing = NSSize(width: 0, height: 0)
+        table.gridStyleMask = []
         table.usesAlternatingRowBackgroundColors = false
+        table.selectionHighlightStyle = .none
         table.backgroundColor = .clear
-        table.autoresizingMask = [.width]
+        table.autoresizingMask = [.width, .height]
         table.allowsEmptySelection = false
         table.allowsMultipleSelection = false
         table.refusesFirstResponder = false
@@ -2155,6 +2155,7 @@ class BoardManPanel: NSPanel {
         // Load initial data
         layoutPanelSubviews()
         table.reloadData()
+        synchronizeListGeometry()
     }
 
     private func applyLiquidGlassStyle() {
@@ -2254,6 +2255,7 @@ class BoardManPanel: NSPanel {
         previewBubblePanel?.contentView?.layer?.backgroundColor = surfaceTint.withAlphaComponent(useGlass ? 0.42 : 0.95).cgColor
         previewBubblePanel?.contentView?.layer?.borderColor = accentColor.withAlphaComponent(lightenTheme ? 0.18 : (useGlass ? 0.46 : 0.42)).cgColor
         placeholderList?.reloadData()
+        synchronizeListGeometry()
     }
 
     private func setupPreviewBubble() {
@@ -2358,24 +2360,41 @@ class BoardManPanel: NSPanel {
         }
         listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: listHeight)
         scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: listHeight)
-        updateListGeometry(frameWidth: width, height: listHeight)
+        synchronizeListGeometry(frameWidth: width, height: listHeight)
         hidePreviewBubble()
     }
 
-    private func updateListGeometry(frameWidth: CGFloat, height: CGFloat) {
+    private func synchronizeListGeometry(frameWidth: CGFloat? = nil, height: CGFloat? = nil) {
         guard let scrollView, let table = placeholderList else { return }
         scrollView.hasHorizontalScroller = false
         scrollView.horizontalScrollElasticity = .none
         scrollView.contentView.bounds.origin.x = 0
 
-        let visibleWidth = max(120, scrollView.contentView.bounds.width > 0 ? scrollView.contentView.bounds.width : frameWidth)
+        let fallbackWidth = frameWidth ?? scrollView.frame.width
+        let fallbackHeight = height ?? scrollView.frame.height
+        let contentSize = scrollView.contentSize
+        let visibleWidth = floor(max(120, contentSize.width > 0 ? contentSize.width : fallbackWidth))
+        let visibleHeight = max(120, contentSize.height > 0 ? contentSize.height : fallbackHeight)
         let rowCount = max(table.numberOfRows, 1)
-        let documentHeight = max(height, CGFloat(rowCount) * table.rowHeight)
+        let documentHeight = max(visibleHeight, CGFloat(rowCount) * table.rowHeight)
         table.frame = NSRect(x: 0, y: 0, width: visibleWidth, height: documentHeight)
+        table.bounds.origin.x = 0
         if let column = table.tableColumns.first {
             column.minWidth = visibleWidth
             column.width = visibleWidth
             column.maxWidth = visibleWidth
+        }
+        table.enclosingScrollView?.hasHorizontalScroller = false
+        table.noteNumberOfRowsChanged()
+        table.needsLayout = true
+        table.needsDisplay = true
+        table.enumerateAvailableRowViews { rowView, _ in
+            rowView.setFrameSize(NSSize(width: visibleWidth, height: rowView.frame.height))
+            rowView.needsDisplay = true
+            if let cellView = rowView.view(atColumn: 0) as? NSView {
+                cellView.frame = NSRect(x: 0, y: cellView.frame.origin.y, width: visibleWidth, height: cellView.frame.height)
+                cellView.needsLayout = true
+            }
         }
     }
 
@@ -2580,6 +2599,7 @@ class BoardManPanel: NSPanel {
         AppEnvironment.current.defaults.set(BoardManPanel.allowedUsedItemStyle(sender.titleOfSelectedItem),
                                             forKey: Constants.UserDefaults.boardManUsedItemStyle)
         placeholderList?.reloadData()
+        synchronizeListGeometry()
     }
 
     @objc private func themePresetChanged(_ sender: NSPopUpButton) {
@@ -2589,6 +2609,7 @@ class BoardManPanel: NSPanel {
         applyLiquidGlassStyle()
         layoutPanelSubviews()
         placeholderList?.reloadData()
+        synchronizeListGeometry()
         contentView?.needsDisplay = true
     }
 
@@ -2597,6 +2618,7 @@ class BoardManPanel: NSPanel {
         applyLiquidGlassStyle()
         layoutPanelSubviews()
         placeholderList?.reloadData()
+        synchronizeListGeometry()
         contentView?.needsDisplay = true
     }
 
@@ -3109,6 +3131,7 @@ class BoardManPanel: NSPanel {
         }
         layoutPanelSubviews()
         placeholderList?.reloadData()
+        synchronizeListGeometry()
         syncNativeSelection()
         updateSnippetActionButtons()
     }
@@ -3595,5 +3618,6 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
         updateSnippetActionButtons()
         // Refresh views after selection change so selected row uses readable .selectedTextColor
         placeholderList?.reloadData()
+        synchronizeListGeometry()
     }
 }
