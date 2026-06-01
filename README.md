@@ -14,7 +14,7 @@ It extends the clipboard manager concept with workflow-oriented features such as
 
 ## Screenshot
 
-![Board-Man clipboard history](docs/images/boardman-history.png)
+![Board-Man screenshot](assets/readme/board-man-screenshot.png)
 
 ## Download
 
