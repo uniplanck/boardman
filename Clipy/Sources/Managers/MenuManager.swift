@@ -1179,6 +1179,12 @@ private final class BoardManHistoryTableView: NSTableView {
         return true
     }
 
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        enclosingScrollView?.hasHorizontalScroller = false
+        enclosingScrollView?.horizontalScrollElasticity = .none
+    }
+
     override func keyDown(with event: NSEvent) {
         if panelKeyOwner?.handlePanelKey(event) == true {
             return
@@ -2010,8 +2016,11 @@ class BoardManPanel: NSPanel {
 
         let scroll = NSScrollView(frame: .zero)
         scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
         scroll.borderType = .noBorder
         scroll.autohidesScrollers = true
+        scroll.horizontalScrollElasticity = .none
+        scroll.contentView.autoresizesSubviews = true
         scroll.wantsLayer = true
         scroll.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
         scroll.layer?.cornerRadius = 8
@@ -2022,11 +2031,16 @@ class BoardManPanel: NSPanel {
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(rawValue: "main"))
         column.title = "Items"
         column.width = 360
+        column.minWidth = 120
+        column.maxWidth = CGFloat.greatestFiniteMagnitude
+        column.resizingMask = .autoresizingMask
         table.addTableColumn(column)
         table.headerView = nil  // no oversized header
+        table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.rowHeight = 50
         table.usesAlternatingRowBackgroundColors = false
         table.backgroundColor = .clear
+        table.autoresizingMask = [.width]
         table.allowsEmptySelection = false
         table.allowsMultipleSelection = false
         table.refusesFirstResponder = false
@@ -2330,21 +2344,39 @@ class BoardManPanel: NSPanel {
         }
         if showsSnippetCategories {
             snippetCategoryLabel?.frame = NSRect(x: margin, y: categoryRowY + 5, width: 58, height: 16)
-            let actionWidth: CGFloat = 220
-            let popupWidth = max(160, width - 58 - 10 - actionWidth - 10)
+            let categoryButtonGap: CGFloat = 6
+            let categoryButtonWidths: [CGFloat] = width < 500 ? [84, 56, 52] : [92, 62, 58]
+            let actionWidth = categoryButtonWidths.reduce(0, +) + (categoryButtonGap * 2)
+            let popupWidth = max(120, width - 58 - 10 - actionWidth - 10)
             snippetCategoryPopup?.frame = NSRect(x: margin + 68, y: categoryRowY, width: popupWidth, height: 24)
             var categoryButtonX = margin + 68 + popupWidth + 10
-            snippetCategoryAddButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: 92, height: 24)
-            categoryButtonX += 98
-            snippetCategoryRenameButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: 62, height: 24)
-            categoryButtonX += 68
-            snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: 58, height: 24)
+            snippetCategoryAddButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[0], height: 24)
+            categoryButtonX += categoryButtonWidths[0] + categoryButtonGap
+            snippetCategoryRenameButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[1], height: 24)
+            categoryButtonX += categoryButtonWidths[1] + categoryButtonGap
+            snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[2], height: 24)
         }
         listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: listHeight)
         scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: listHeight)
-        placeholderList?.frame = NSRect(x: 0, y: 0, width: width, height: listHeight)
-        placeholderList?.tableColumns.first?.width = width
+        updateListGeometry(frameWidth: width, height: listHeight)
         hidePreviewBubble()
+    }
+
+    private func updateListGeometry(frameWidth: CGFloat, height: CGFloat) {
+        guard let scrollView, let table = placeholderList else { return }
+        scrollView.hasHorizontalScroller = false
+        scrollView.horizontalScrollElasticity = .none
+        scrollView.contentView.bounds.origin.x = 0
+
+        let visibleWidth = max(120, scrollView.contentView.bounds.width > 0 ? scrollView.contentView.bounds.width : frameWidth)
+        let rowCount = max(table.numberOfRows, 1)
+        let documentHeight = max(height, CGFloat(rowCount) * table.rowHeight)
+        table.frame = NSRect(x: 0, y: 0, width: visibleWidth, height: documentHeight)
+        if let column = table.tableColumns.first {
+            column.minWidth = visibleWidth
+            column.width = visibleWidth
+            column.maxWidth = visibleWidth
+        }
     }
 
     private func updateTabWidths(totalWidth: CGFloat) {
@@ -3070,7 +3102,11 @@ class BoardManPanel: NSPanel {
         historyItems = query.isEmpty ? visibleItems : visibleItems.filter {
             $0.title.lowercased().contains(query) || $0.previewTitle.lowercased().contains(query)
         }
-        selectedIndex = historyItems.isEmpty ? -1 : min(max(selectedIndex, 0), historyItems.count - 1)
+        if historyItems.isEmpty {
+            selectedIndex = -1
+        } else if selectedIndex >= historyItems.count {
+            selectedIndex = historyItems.count - 1
+        }
         layoutPanelSubviews()
         placeholderList?.reloadData()
         syncNativeSelection()
@@ -3261,8 +3297,12 @@ class BoardManPanel: NSPanel {
 
     private func moveSelection(delta: Int) {
         guard let table = placeholderList, !historyItems.isEmpty else { return }
-        let current = selectedIndex >= 0 ? selectedIndex : 0
-        let next = min(historyItems.count - 1, max(0, current + delta))
+        let next: Int
+        if selectedIndex < 0 {
+            next = delta < 0 ? historyItems.count - 1 : 0
+        } else {
+            next = min(historyItems.count - 1, max(0, selectedIndex + delta))
+        }
         setSelectedIndex(next)
         table.scrollRowToVisible(next)
     }
