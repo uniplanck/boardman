@@ -7,7 +7,7 @@ Board-Man은 Clipy에서 파생된 오픈소스 macOS 클립보드 생산성 도
 
 단순히 클립보드 기록을 저장하는 것을 넘어서, 복사, 붙여넣기, 편집, 텍스트 이동이 많은 작업 흐름을 더 잘 보이게 만드는 것을 목표로 합니다.
 
-![Board-Man clipboard history](../images/boardman-history.png)
+![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
 
 ## 무엇을 하나요
 

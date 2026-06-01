@@ -7,7 +7,7 @@ Board-Man é uma ferramenta open-source de produtividade para a área de transfe
 
 Ela não serve apenas para salvar o histórico da área de transferência. A ideia é tornar mais visível o trabalho baseado em copiar, colar, editar e mover texto entre aplicativos.
 
-![Board-Man clipboard history](../images/boardman-history.png)
+![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
 
 ## O que ele faz
 
