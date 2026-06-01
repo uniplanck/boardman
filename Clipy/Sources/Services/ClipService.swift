@@ -151,7 +151,8 @@ extension ClipService {
         // Create Realm object
         let clip = CPYClip()
         clip.dataPath = savedPath
-        clip.title = data.stringValue[0...10000]
+        let title = data.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? (data.imageDisplayTitle ?? data.stringValue) : data.stringValue
+        clip.title = title[0...10000]
         clip.dataHash = "\(savedHash)"
         clip.updateTime = unixTime
         clip.primaryType = data.primaryType?.rawValue ?? ""
@@ -187,6 +188,9 @@ extension ClipService {
     private func storableType(for type: NSPasteboard.PasteboardType, pasteboard: NSPasteboard) -> NSPasteboard.PasteboardType? {
         if type == .string && pasteboard.string(forType: .string) != nil {
             return canSave(with: .deprecatedString) ? .deprecatedString : nil
+        }
+        if type == .png || type == .tiff {
+            return canSave(with: .deprecatedTIFF) ? type : nil
         }
         return canSave(with: type) ? type : nil
     }

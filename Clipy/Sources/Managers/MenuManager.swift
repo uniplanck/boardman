@@ -242,7 +242,8 @@ extension MenuManager {
         let panelHistoryLimit = min(maxHistory, 120)  // V4B-13: keep panel launch fast; full history remains in Realm/legacy menu.
         let items = Array(clipResults.prefix(panelHistoryLimit)).enumerated().map { index, clip in
             let rawTitle = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let title = rawTitle.isEmpty ? "(empty clipboard item)" : rawTitle
+            let isImageClip = BoardManPanel.isImageClip(clip)
+            let title = rawTitle.isEmpty ? (isImageClip ? BoardManPanel.imageClipTitle(for: clip) : "(empty clipboard item)") : rawTitle
             let firstLine = title.components(separatedBy: .newlines).first ?? title
             let clipped = firstLine.count > 120 ? String(firstLine.prefix(117)) + "..." : firstLine
             let pasteCount = PasteCountStore.shared.count(for: clip)
@@ -257,6 +258,9 @@ extension MenuManager {
             }
             if isPinned {
                 parts.append("[PIN]")
+            }
+            if isImageClip {
+                parts.append("Image")
             }
             let countText = showUsageCount ? "\(pasteCount)" : ""
             let displayTitle = (parts + [clipped]).joined(separator: " ")
@@ -1339,6 +1343,25 @@ class BoardManPanel: NSPanel {
         formatter.locale = Locale.current
         formatter.dateFormat = format
         return formatter.string(from: date)
+    }
+
+    static func isImageClip(_ clip: CPYClip) -> Bool {
+        if !clip.thumbnailPath.isEmpty && !clip.isColorCode {
+            return true
+        }
+        let type = NSPasteboard.PasteboardType(rawValue: clip.primaryType)
+        return type == .png || type == .tiff || type == .deprecatedTIFF
+    }
+
+    static func imageClipTitle(for clip: CPYClip) -> String {
+        let type = NSPasteboard.PasteboardType(rawValue: clip.primaryType)
+        if type == .png {
+            return "PNG image"
+        }
+        if type == .tiff || type == .deprecatedTIFF {
+            return "TIFF image"
+        }
+        return "Image"
     }
 
     private static func timestampMenuTitle(for value: String?) -> String {
