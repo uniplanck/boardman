@@ -7,7 +7,7 @@ Board-Man 是一款基于 Clipy 派生的开源 macOS 剪贴板效率工具。
 
 它不只是保存剪贴板历史，而是希望让高频复制、粘贴、编辑和移动文本的工作流更容易被观察和改进。
 
-![Board-Man clipboard history](../images/boardman-history.png)
+![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
 
 ## 它能做什么
 

@@ -7,7 +7,7 @@ Board-Man est un outil open-source de productivité pour le presse-papiers sur m
 
 Il ne sert pas seulement à conserver l’historique du presse-papiers. Son objectif est de rendre plus visibles les flux de travail basés sur la copie, le collage, l’édition et le déplacement de texte entre applications.
 
-![Board-Man clipboard history](../images/boardman-history.png)
+![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
 
 ## Ce que fait Board-Man
 

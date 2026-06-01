@@ -7,7 +7,7 @@ Board-Man es una utilidad de productividad para el portapapeles en macOS, de có
 
 No se centra solo en guardar el historial del portapapeles. Su objetivo es hacer más visible el trabajo basado en copiar, pegar, editar y mover texto entre aplicaciones.
 
-![Board-Man clipboard history](../images/boardman-history.png)
+![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
 
 ## Qué hace
 
