@@ -1457,7 +1457,6 @@ class BoardManPanel: NSPanel {
     private var hoveredRow: Int = -1
     private var localKeyMonitor: Any?
     private var activeTab: BoardManPanelTab = .history
-    private var keyboardSelectionPreviewLockUntil: CFAbsoluteTime = 0
     private var activeSettingsCategory: BoardManInlineSettingsCategory = .view
     private var activeSnippetCategoryIdentifier: String = BoardManPanel.allCategoriesIdentifier
     fileprivate var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
@@ -1489,7 +1488,7 @@ class BoardManPanel: NSPanel {
     static let uncategorizedCategoryIdentifier = "__boardman_uncategorized__"
 
     static func preferredPanelWidth() -> CGFloat {
-        return 620
+        return 580
     }
 
     static func clampedPanelHeight(_ value: Int) -> Int {
@@ -2045,7 +2044,7 @@ class BoardManPanel: NSPanel {
         table.addTableColumn(column)
         table.headerView = nil  // no oversized header
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.rowHeight = 62
+        table.rowHeight = 58
         table.intercellSpacing = NSSize(width: 0, height: 0)
         table.gridStyleMask = []
         table.usesAlternatingRowBackgroundColors = false
@@ -2292,9 +2291,9 @@ class BoardManPanel: NSPanel {
     private func layoutPanelSubviews() {
         guard let contentView = contentView else { return }
         let bounds = contentView.bounds
-        let margin: CGFloat = bounds.width < 540 ? 24 : 32
+        let margin: CGFloat = bounds.width < 540 ? 20 : 28
         let width = bounds.width - (margin * 2)
-        let top = bounds.height - 104
+        let top = bounds.height - 88
         let isSettings = activeTab == .settings
         glassSheenView?.frame = bounds
         searchGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
@@ -2304,8 +2303,8 @@ class BoardManPanel: NSPanel {
         let snippetButtonWidths: [CGFloat] = [44, 44, 58]
         let snippetButtonsWidth = showsSnippetButtons ? snippetButtonWidths.reduce(0, +) + (snippetButtonGap * 2) : 0
         let searchWidth = max(160, width - snippetButtonsWidth - (showsSnippetButtons ? 12 : 0))
-        searchGlassView?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 38)
-        searchField?.frame = NSRect(x: margin, y: top + 2, width: searchWidth, height: 34)
+        searchGlassView?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 32)
+        searchField?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 32)
         snippetAddButton?.isHidden = !showsSnippetButtons
         snippetEditButton?.isHidden = !showsSnippetButtons
         snippetDeleteButton?.isHidden = !showsSnippetButtons
@@ -2353,9 +2352,9 @@ class BoardManPanel: NSPanel {
             categoryButtonX += categoryButtonWidths[1] + categoryButtonGap
             snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[2], height: 24)
         }
-        let listFrameHeight = listHeight + 2
-        listGlassView?.frame = NSRect(x: margin, y: 22, width: width, height: listFrameHeight)
-        scrollView?.frame = NSRect(x: margin, y: 22, width: width, height: listFrameHeight)
+        let listFrameHeight = listHeight + 10
+        listGlassView?.frame = NSRect(x: margin, y: 18, width: width, height: listFrameHeight)
+        scrollView?.frame = NSRect(x: margin, y: 18, width: width, height: listFrameHeight)
         synchronizeListGeometry(frameWidth: width, height: listFrameHeight)
         hidePreviewBubble()
     }
@@ -2367,14 +2366,11 @@ class BoardManPanel: NSPanel {
         scrollView.autohidesScrollers = true
         scrollView.horizontalScrollElasticity = .none
         scrollView.automaticallyAdjustsContentInsets = false
-        scrollView.contentView.autoresizesSubviews = false
-        scrollView.contentView.bounds.origin.x = 0
+        scrollView.contentView.autoresizesSubviews = true
 
         let clipView = scrollView.contentView
-        let rawWidth = frameWidth ?? scrollView.contentSize.width
-        let visibleWidth = max(1, floor(rawWidth) - 2)
-        let rawHeight = height ?? scrollView.contentSize.height
-        let visibleHeight = max(1, floor(rawHeight))
+        let visibleWidth = max(1, floor(frameWidth ?? clipView.bounds.width))
+        let visibleHeight = max(1, floor(height ?? clipView.bounds.height))
         let rowHeight = max(table.rowHeight, 1)
         let rowsHeight = CGFloat(max(table.numberOfRows, 1)) * rowHeight
         let documentHeight = max(visibleHeight, rowsHeight)
@@ -2393,22 +2389,9 @@ class BoardManPanel: NSPanel {
 
         clipView.documentView = table
         table.enclosingScrollView?.hasHorizontalScroller = false
-        table.noteNumberOfRowsChanged()
         table.needsLayout = true
         table.needsDisplay = true
-
-        table.enumerateAvailableRowViews { rowView, _ in
-            rowView.setFrameSize(NSSize(width: visibleWidth, height: rowView.frame.height))
-            rowView.needsDisplay = true
-            if let cellView = rowView.view(atColumn: 0) as? NSView {
-                cellView.frame = NSRect(x: 0, y: cellView.frame.origin.y, width: visibleWidth, height: cellView.frame.height)
-                cellView.needsLayout = true
-                cellView.needsDisplay = true
-            }
-        }
     }
-
-
 
 
     private func updateTabWidths(totalWidth: CGFloat) {
@@ -3401,12 +3384,10 @@ class BoardManPanel: NSPanel {
         makeFirstResponder(table)
 
         hoveredRow = -1
-        keyboardSelectionPreviewLockUntil = CFAbsoluteTimeGetCurrent() + 0.45
         selectedIndex = next
         let nextIndexSet = IndexSet(integer: next)
         table.selectRowIndexes(nextIndexSet, byExtendingSelection: false)
         table.scrollRowToVisible(next)
-        showPreviewBubble(for: next)
         table.reloadData(forRowIndexes: IndexSet(integer: next), columnIndexes: IndexSet(integer: 0))
 
         if previous >= 0 && previous < rowCount && previous != next {
@@ -3760,7 +3741,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        return 62
+        return 58
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
