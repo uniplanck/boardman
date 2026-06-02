@@ -3382,6 +3382,7 @@ class BoardManPanel: NSPanel {
         }
         makeFirstResponder(table)
 
+        hoveredRow = -1
         selectedIndex = next
         let nextIndexSet = IndexSet(integer: next)
         table.selectRowIndexes(nextIndexSet, byExtendingSelection: false)
