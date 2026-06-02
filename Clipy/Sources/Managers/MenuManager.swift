@@ -1488,7 +1488,7 @@ class BoardManPanel: NSPanel {
     static let uncategorizedCategoryIdentifier = "__boardman_uncategorized__"
 
     static func preferredPanelWidth() -> CGFloat {
-        return 580
+        return 640
     }
 
     static func clampedPanelHeight(_ value: Int) -> Int {
@@ -2365,33 +2365,40 @@ class BoardManPanel: NSPanel {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.horizontalScrollElasticity = .none
-        scrollView.automaticallyAdjustsContentInsets = false
-        scrollView.contentView.autoresizesSubviews = true
+        scrollView.contentView.bounds.origin.x = 0
 
-        let clipView = scrollView.contentView
-        let visibleWidth = max(1, floor(frameWidth ?? clipView.bounds.width))
-        let visibleHeight = max(1, floor(height ?? clipView.bounds.height))
+        let safeWidth = max(1, floor((frameWidth ?? scrollView.bounds.width) - 10))
+        let safeHeight = max(1, floor(height ?? scrollView.bounds.height))
         let rowHeight = max(table.rowHeight, 1)
-        let rowsHeight = CGFloat(max(table.numberOfRows, 1)) * rowHeight
-        let documentHeight = max(visibleHeight, rowsHeight)
+        let rowCount = max(table.numberOfRows, 1)
+        let documentHeight = max(safeHeight, CGFloat(rowCount) * rowHeight)
 
-        let documentFrame = NSRect(x: 0, y: 0, width: visibleWidth, height: documentHeight)
-        table.frame = documentFrame
-        table.bounds = NSRect(x: 0, y: 0, width: visibleWidth, height: documentHeight)
-        table.autoresizingMask = [.width, .height]
-        table.autoresizesSubviews = true
+        table.frame = NSRect(x: 0, y: 0, width: safeWidth, height: documentHeight)
+        table.bounds = NSRect(x: 0, y: 0, width: safeWidth, height: documentHeight)
 
         for column in table.tableColumns {
-            column.minWidth = visibleWidth
-            column.width = visibleWidth
-            column.maxWidth = visibleWidth
+            column.minWidth = safeWidth
+            column.width = safeWidth
+            column.maxWidth = safeWidth
         }
 
-        clipView.documentView = table
         table.enclosingScrollView?.hasHorizontalScroller = false
         table.needsLayout = true
         table.needsDisplay = true
+
+        table.enumerateAvailableRowViews { rowView, _ in
+            rowView.setFrameSize(NSSize(width: safeWidth, height: rowView.frame.height))
+            rowView.needsLayout = true
+            rowView.needsDisplay = true
+
+            if let cellView = rowView.view(atColumn: 0) as? NSView {
+                cellView.frame = NSRect(x: 0, y: cellView.frame.origin.y, width: safeWidth, height: cellView.frame.height)
+                cellView.needsLayout = true
+                cellView.needsDisplay = true
+            }
+        }
     }
+
 
 
     private func updateTabWidths(totalWidth: CGFloat) {
