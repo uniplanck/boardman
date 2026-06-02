@@ -262,7 +262,7 @@ extension MenuManager {
             if isImageClip {
                 parts.append("Image")
             }
-            let countText = showUsageCount ? "\(pasteCount)" : ""
+            let countText = showUsageCount && pasteCount > 0 ? "\(pasteCount)" : ""
             let displayTitle = (parts + [clipped]).joined(separator: " ")
             return BoardManHistoryItem(title: displayTitle,
                                        primaryTitle: clipped,
@@ -1333,8 +1333,9 @@ private final class BoardManHistoryCellView: NSTableCellView {
         primaryLabel.stringValue = item.primaryTitle
         metadataLabel.stringValue = item.metadataText
         let badgePrefix = usageStyle == "compact" ? "used " : "x"
-        countBadge.stringValue = item.countText.isEmpty ? "" : "\(badgePrefix)\(item.countText)"
-        countBadge.isHidden = item.countText.isEmpty
+        let shouldShowCount = item.pasteCount > 0 && !item.countText.isEmpty
+        countBadge.stringValue = shouldShowCount ? "\(badgePrefix)\(item.countText)" : ""
+        countBadge.isHidden = !shouldShowCount
         inlineImageView.image = item.inlineThumbnail
         inlineImageView.isHidden = item.inlineThumbnail == nil
 
@@ -2037,7 +2038,7 @@ class BoardManPanel: NSPanel {
         table.addTableColumn(column)
         table.headerView = nil  // no oversized header
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.rowHeight = 50
+        table.rowHeight = 54
         table.intercellSpacing = NSSize(width: 0, height: 0)
         table.gridStyleMask = []
         table.usesAlternatingRowBackgroundColors = false
@@ -2067,15 +2068,6 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(scroll)
         scrollView = scroll
         placeholderList = table
-
-        let note = NSTextField(labelWithString: "Click or press Enter to paste - right-click to pin")
-        note.alignment = .center
-        note.textColor = NSColor.secondaryLabelColor.withAlphaComponent(0.95)
-        note.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        note.backgroundColor = .clear
-        note.drawsBackground = false
-        contentView.addSubview(note)
-        footerNote = note
 
         let categoryLabel = NSTextField(labelWithString: "Category")
         categoryLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
@@ -2249,7 +2241,6 @@ class BoardManPanel: NSPanel {
         snippetCategoryPopup?.wantsLayer = true
         snippetCategoryPopup?.layer?.cornerRadius = useGlass ? 9 : 6
         snippetCategoryPopup?.layer?.backgroundColor = useGlass ? surfaceTint.withAlphaComponent(0.30).cgColor : NSColor.clear.cgColor
-        footerNote?.textColor = NSColor.secondaryLabelColor.withAlphaComponent(useGlass ? 0.98 : 0.95)
         previewBubblePanel?.contentView?.layer?.cornerRadius = useGlass ? 11 : 8
         previewBubblePanel?.contentView?.layer?.backgroundColor = surfaceTint.withAlphaComponent(useGlass ? 0.42 : 0.95).cgColor
         previewBubblePanel?.contentView?.layer?.borderColor = accentColor.withAlphaComponent(lightenTheme ? 0.18 : (useGlass ? 0.46 : 0.42)).cgColor
@@ -2331,8 +2322,7 @@ class BoardManPanel: NSPanel {
         settingsGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
         settingsBackgroundView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
         layoutInlineSettingsControls(margin: margin, width: width, topY: contentTop, isVisible: isSettings)
-        footerNote?.frame = NSRect(x: margin, y: 8, width: width, height: 16)
-        footerNote?.isHidden = isSettings
+        footerNote?.isHidden = true
         listGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
         scrollView?.isHidden = isSettings
         let showsSnippetCategories = activeTab == .snippets && !isSettings
@@ -2356,9 +2346,10 @@ class BoardManPanel: NSPanel {
             categoryButtonX += categoryButtonWidths[1] + categoryButtonGap
             snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[2], height: 24)
         }
-        listGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: listHeight)
-        scrollView?.frame = NSRect(x: margin, y: 30, width: width, height: listHeight)
-        synchronizeListGeometry(frameWidth: width, height: listHeight)
+        let listFrameHeight = listHeight + 16
+        listGlassView?.frame = NSRect(x: margin, y: 14, width: width, height: listFrameHeight)
+        scrollView?.frame = NSRect(x: margin, y: 14, width: width, height: listFrameHeight)
+        synchronizeListGeometry(frameWidth: width, height: listFrameHeight)
         hidePreviewBubble()
     }
 
@@ -3260,13 +3251,21 @@ class BoardManPanel: NSPanel {
         super.sendEvent(event)
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if shouldHandlePanelKey(event), handlePanelKey(event) {
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
     private func shouldHandlePanelKey(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
         if event.keyCode == 53 { return true }
         guard activeTab != .settings else { return false }
+        if isUpArrow(event) || isDownArrow(event) { return true }
         guard let textView = firstResponder as? NSTextView else { return true }
         if searchField?.currentEditor() === textView {
-            return event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 125 || event.keyCode == 126
+            return event.keyCode == 36 || event.keyCode == 76 || isUpArrow(event) || isDownArrow(event)
         }
         return false
     }
@@ -3277,6 +3276,17 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate func handlePanelKey(_ event: NSEvent) -> Bool {
+        if activeTab != .settings, isDownArrow(event) {
+            exitSearchToSelectionIfNeeded()
+            moveSelection(delta: 1)
+            return true
+        }
+        if activeTab != .settings, isUpArrow(event) {
+            exitSearchToSelectionIfNeeded()
+            moveSelection(delta: -1)
+            return true
+        }
+
         switch event.keyCode {
         case 53:
             hidePreviewBubble()
@@ -3290,16 +3300,12 @@ class BoardManPanel: NSPanel {
             return true
         case 125:
             guard activeTab != .settings else { return false }
-            if isSearchFieldEditorActive {
-                makeFirstResponder(placeholderList)
-            }
+            exitSearchToSelectionIfNeeded()
             moveSelection(delta: 1)
             return true
         case 126:
             guard activeTab != .settings else { return false }
-            if isSearchFieldEditorActive {
-                makeFirstResponder(placeholderList)
-            }
+            exitSearchToSelectionIfNeeded()
             moveSelection(delta: -1)
             return true
         case 36, 76:
@@ -3309,6 +3315,24 @@ class BoardManPanel: NSPanel {
         default:
             return false
         }
+    }
+
+    private func isUpArrow(_ event: NSEvent) -> Bool {
+        return event.keyCode == 126 || eventContainsFunctionKey(event, UInt32(NSUpArrowFunctionKey))
+    }
+
+    private func isDownArrow(_ event: NSEvent) -> Bool {
+        return event.keyCode == 125 || eventContainsFunctionKey(event, UInt32(NSDownArrowFunctionKey))
+    }
+
+    private func eventContainsFunctionKey(_ event: NSEvent, _ functionKey: UInt32) -> Bool {
+        guard let characters = event.charactersIgnoringModifiers else { return false }
+        return characters.unicodeScalars.contains { $0.value == functionKey }
+    }
+
+    private func exitSearchToSelectionIfNeeded() {
+        guard isSearchFieldEditorActive else { return }
+        makeFirstResponder(placeholderList)
     }
 
     private func moveTab(delta: Int) {
@@ -3340,6 +3364,7 @@ class BoardManPanel: NSPanel {
         }
         setSelectedIndex(next)
         table.scrollRowToVisible(next)
+        makeFirstResponder(table)
     }
 
     private func pasteSelectedRow() {
@@ -3642,7 +3667,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        return 50
+        return 54
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
