@@ -3245,6 +3245,13 @@ class BoardManPanel: NSPanel {
     }
 
     override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown,
+           activeTab != .settings,
+           (isUpArrow(event) || isDownArrow(event)) {
+            exitSearchToSelectionIfNeeded()
+            moveSelection(delta: isDownArrow(event) ? 1 : -1)
+            return
+        }
         if event.type == .keyDown, shouldHandlePanelKey(event), handlePanelKey(event) {
             return
         }
