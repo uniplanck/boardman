@@ -4,6 +4,7 @@
 //  Clipy
 //
 
+import Cocoa
 import Foundation
 import RealmSwift
 
@@ -19,6 +20,9 @@ final class PasteCountStore {
     }
 
     func key(for clip: CPYClip) -> String {
+        if isImageClip(clip) {
+            return imageKey(for: clip)
+        }
         return key(forString: clip.title, primaryType: clip.primaryType, dataHash: clip.dataHash)
     }
 
@@ -118,5 +122,29 @@ final class PasteCountStore {
             hash = hash &* 1_099_511_628_211
         }
         return String(hash, radix: 16)
+    }
+
+    private func imageKey(for clip: CPYClip) -> String {
+        let insertedAt = imageInsertedAtComponent(for: clip)
+        let pathHash = clip.dataPath.isEmpty ? "" : stableHash(clip.dataPath)
+        return "\(clip.primaryType):image:\(insertedAt):\(pathHash):\(clip.dataHash)"
+    }
+
+    private func imageInsertedAtComponent(for clip: CPYClip) -> String {
+        if !clip.thumbnailPath.isEmpty {
+            return clip.thumbnailPath
+        }
+        if clip.updateTime > 0 {
+            return "\(clip.updateTime)"
+        }
+        return "unknown"
+    }
+
+    private func isImageClip(_ clip: CPYClip) -> Bool {
+        if !clip.thumbnailPath.isEmpty && !clip.isColorCode {
+            return true
+        }
+        let type = NSPasteboard.PasteboardType(rawValue: clip.primaryType)
+        return type == .png || type == .tiff || type == .deprecatedTIFF
     }
 }
