@@ -1455,6 +1455,7 @@ class BoardManPanel: NSPanel {
     private var historyItems: [BoardManHistoryItem] = []
     private var selectedIndex: Int = -1
     private var hoveredRow: Int = -1
+    private var localKeyMonitor: Any?
     private var activeTab: BoardManPanelTab = .history
     private var activeSettingsCategory: BoardManInlineSettingsCategory = .view
     private var activeSnippetCategoryIdentifier: String = BoardManPanel.allCategoriesIdentifier
@@ -1598,6 +1599,10 @@ class BoardManPanel: NSPanel {
         setupUI()
         setupPreviewBubble()
         applyLiquidGlassStyle()
+    }
+
+    deinit {
+        removeLocalKeyMonitor()
     }
 
     private func setupModernContainer() {
@@ -3234,8 +3239,14 @@ class BoardManPanel: NSPanel {
         self.orderOut(nil)  // Esc: hide/orderOut only (avoids V4B-6 crash, no terminate)
     }
 
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        installLocalKeyMonitorIfNeeded()
+    }
+
     override func orderOut(_ sender: Any?) {
         hidePreviewBubble()
+        removeLocalKeyMonitor()
         super.orderOut(sender)
     }
 
@@ -3246,11 +3257,10 @@ class BoardManPanel: NSPanel {
 
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown,
-           activeTab != .settings,
            (isUpArrow(event) || isDownArrow(event)) {
-            exitSearchToSelectionIfNeeded()
-            moveSelection(delta: isDownArrow(event) ? 1 : -1)
-            return
+            if selectRowByKeyboard(delta: isDownArrow(event) ? 1 : -1) {
+                return
+            }
         }
         if event.type == .keyDown, shouldHandlePanelKey(event), handlePanelKey(event) {
             return
@@ -3283,15 +3293,11 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate func handlePanelKey(_ event: NSEvent) -> Bool {
-        if activeTab != .settings, isDownArrow(event) {
-            exitSearchToSelectionIfNeeded()
-            moveSelection(delta: 1)
-            return true
+        if isDownArrow(event) {
+            return selectRowByKeyboard(delta: 1)
         }
-        if activeTab != .settings, isUpArrow(event) {
-            exitSearchToSelectionIfNeeded()
-            moveSelection(delta: -1)
-            return true
+        if isUpArrow(event) {
+            return selectRowByKeyboard(delta: -1)
         }
 
         switch event.keyCode {
@@ -3306,15 +3312,9 @@ class BoardManPanel: NSPanel {
             moveTab(delta: 1)
             return true
         case 125:
-            guard activeTab != .settings else { return false }
-            exitSearchToSelectionIfNeeded()
-            moveSelection(delta: 1)
-            return true
+            return selectRowByKeyboard(delta: 1)
         case 126:
-            guard activeTab != .settings else { return false }
-            exitSearchToSelectionIfNeeded()
-            moveSelection(delta: -1)
-            return true
+            return selectRowByKeyboard(delta: -1)
         case 36, 76:
             guard activeTab != .settings else { return false }
             pasteSelectedRow()
@@ -3360,24 +3360,95 @@ class BoardManPanel: NSPanel {
         }
     }
 
-    private func moveSelection(delta: Int) {
-        guard let table = placeholderList, !historyItems.isEmpty else { return }
-        makeFirstResponder(table)
-        let next: Int
-        if selectedIndex < 0 {
-            next = delta < 0 ? historyItems.count - 1 : 0
-        } else {
-            next = min(historyItems.count - 1, max(0, selectedIndex + delta))
+    @discardableResult
+    private func selectRowByKeyboard(delta: Int) -> Bool {
+        guard activeTab != .settings,
+              let table = placeholderList,
+              !historyItems.isEmpty else {
+            return false
         }
-        setSelectedIndex(next)
-        table.scrollRowToVisible(next)
+        let rowCount = historyItems.count
+        let tableRow = table.selectedRow
+        let previous = tableRow >= 0 && tableRow < rowCount ? tableRow : selectedIndex
+        let next: Int
+        if previous < 0 || previous >= rowCount {
+            next = delta < 0 ? rowCount - 1 : 0
+        } else {
+            next = max(0, min(rowCount - 1, previous + delta))
+        }
+
+        if isSearchFieldEditorActive {
+            searchField?.abortEditing()
+        }
         makeFirstResponder(table)
+
+        selectedIndex = next
+        let nextIndexSet = IndexSet(integer: next)
+        table.selectRowIndexes(nextIndexSet, byExtendingSelection: false)
+        table.scrollRowToVisible(next)
+        table.reloadData(forRowIndexes: IndexSet(integer: next), columnIndexes: IndexSet(integer: 0))
+
+        if previous >= 0 && previous < rowCount && previous != next {
+            table.reloadData(forRowIndexes: IndexSet(integer: previous), columnIndexes: IndexSet(integer: 0))
+        }
+        table.needsDisplay = true
+        updateSnippetActionButtons()
+        showPreviewBubble(for: next)
+
+        return true
+    }
+
+    private func refreshSelectionRows(oldIndex: Int, newIndex: Int) {
+        guard let table = placeholderList else { return }
+        var rows = IndexSet()
+        [oldIndex, newIndex].forEach { row in
+            guard row >= 0, row < historyItems.count else { return }
+            rows.insert(row)
+            table.rowView(atRow: row, makeIfNecessary: false)?.needsDisplay = true
+        }
+        guard !rows.isEmpty else { return }
+        table.reloadData(forRowIndexes: rows, columnIndexes: IndexSet(integer: 0))
+    }
+
+    private func installLocalKeyMonitorIfNeeded() {
+        guard localKeyMonitor == nil else { return }
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            guard self.isVisible,
+                  self.activeTab != .settings,
+                  event.window === self || self.isKeyWindow || self.isMainWindow,
+                  self.isUpArrow(event) || self.isDownArrow(event) else {
+                return event
+            }
+            return self.selectRowByKeyboard(delta: self.isDownArrow(event) ? 1 : -1) ? nil : event
+        }
+    }
+
+    private func removeLocalKeyMonitor() {
+        guard let localKeyMonitor else { return }
+        NSEvent.removeMonitor(localKeyMonitor)
+        self.localKeyMonitor = nil
+    }
+
+    private func rowForCurrentSelection() -> Int {
+        guard !historyItems.isEmpty else { return -1 }
+        let tableRow = placeholderList?.selectedRow ?? -1
+        if tableRow >= 0 && tableRow < historyItems.count {
+            return tableRow
+        }
+        if selectedIndex >= 0 && selectedIndex < historyItems.count {
+            return selectedIndex
+        }
+        return 0
+    }
+
+    private func moveSelection(delta: Int) {
+        _ = selectRowByKeyboard(delta: delta)
     }
 
     private func pasteSelectedRow() {
         let startedAt = CFAbsoluteTimeGetCurrent()
-        guard placeholderList != nil else { return }
-        let row = selectedIndex >= 0 ? selectedIndex : 0
+        let row = rowForCurrentSelection()
         guard let item = historyItems[safe: row] else { return }
         setSelectedIndex(row)
         onPasteRequested?(item, startedAt)
@@ -3460,12 +3531,8 @@ class BoardManPanel: NSPanel {
         selectedIndex = row
         updateSnippetActionButtons()
         syncNativeSelection()
-        var rows = IndexSet(integer: row)
-        if oldIndex >= 0 {
-            rows.insert(oldIndex)
-        }
-        placeholderList?.reloadData(forRowIndexes: rows,
-                                    columnIndexes: IndexSet(integer: 0))
+        refreshSelectionRows(oldIndex: oldIndex, newIndex: row)
+        showPreviewBubble(for: row)
     }
 
     private func syncNativeSelection() {
@@ -3612,12 +3679,10 @@ extension BoardManPanel: NSSearchFieldDelegate {
         guard let search = searchField, control === search, activeTab != .settings else { return false }
         switch commandSelector {
         case #selector(NSResponder.moveDown(_:)):
-            makeFirstResponder(placeholderList)
-            moveSelection(delta: 1)
+            _ = selectRowByKeyboard(delta: 1)
             return true
         case #selector(NSResponder.moveUp(_:)):
-            makeFirstResponder(placeholderList)
-            moveSelection(delta: -1)
+            _ = selectRowByKeyboard(delta: -1)
             return true
         case #selector(NSResponder.insertNewline(_:)),
              #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
@@ -3678,12 +3743,13 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
+        let oldIndex = selectedIndex
         if let row = placeholderList?.selectedRow, row >= 0, row < historyItems.count {
             selectedIndex = row
+            refreshSelectionRows(oldIndex: oldIndex, newIndex: row)
+            showPreviewBubble(for: row)
         }
         updateSnippetActionButtons()
-        // Refresh views after selection change so selected row uses readable .selectedTextColor
-        placeholderList?.reloadData()
         synchronizeListGeometry()
     }
 }
