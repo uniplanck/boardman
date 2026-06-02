@@ -1455,6 +1455,7 @@ class BoardManPanel: NSPanel {
     private var historyItems: [BoardManHistoryItem] = []
     private var selectedIndex: Int = -1
     private var hoveredRow: Int = -1
+    private var keyboardPreviewLockUntil: CFAbsoluteTime = 0
     private var localKeyMonitor: Any?
     private var activeTab: BoardManPanelTab = .history
     private var activeSettingsCategory: BoardManInlineSettingsCategory = .view
@@ -3248,8 +3249,14 @@ class BoardManPanel: NSPanel {
     }
 
     override func makeKeyAndOrderFront(_ sender: Any?) {
+        let previousAlpha = alphaValue
+        alphaValue = 0
+        layoutPanelSubviews()
         super.makeKeyAndOrderFront(sender)
         installLocalKeyMonitorIfNeeded()
+        DispatchQueue.main.async { [weak self] in
+            self?.alphaValue = previousAlpha
+        }
     }
 
     override func orderOut(_ sender: Any?) {
@@ -3391,6 +3398,7 @@ class BoardManPanel: NSPanel {
         makeFirstResponder(table)
 
         hoveredRow = -1
+        keyboardPreviewLockUntil = CFAbsoluteTimeGetCurrent() + 0.35
         selectedIndex = next
         let nextIndexSet = IndexSet(integer: next)
         table.selectRowIndexes(nextIndexSet, byExtendingSelection: false)
@@ -3469,7 +3477,9 @@ class BoardManPanel: NSPanel {
         placeholderList?.rowView(atRow: row, makeIfNecessary: false)?.needsDisplay = true
         placeholderList?.reloadData(forRowIndexes: IndexSet(integer: row),
                                     columnIndexes: IndexSet(integer: 0))
-        showPreviewBubble(for: row)
+        if CFAbsoluteTimeGetCurrent() >= keyboardPreviewLockUntil {
+            showPreviewBubble(for: row)
+        }
     }
 
     fileprivate func clearHoveredRow(_ row: Int) {
@@ -3541,7 +3551,9 @@ class BoardManPanel: NSPanel {
         updateSnippetActionButtons()
         syncNativeSelection()
         refreshSelectionRows(oldIndex: oldIndex, newIndex: row)
-        showPreviewBubble(for: row)
+        if CFAbsoluteTimeGetCurrent() >= keyboardPreviewLockUntil {
+            showPreviewBubble(for: row)
+        }
     }
 
     private func syncNativeSelection() {
