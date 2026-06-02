@@ -1312,6 +1312,12 @@ private final class BoardManHistoryCellView: NSTableCellView {
         inlineImageView.layer?.masksToBounds = true
         inlineImageView.layer?.borderWidth = 1
 
+        [primaryLabel, metadataLabel, countBadge].forEach {
+            $0.cell?.truncatesLastVisibleLine = true
+            $0.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        }
+        inlineImageView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
         addSubview(primaryLabel)
         addSubview(metadataLabel)
         addSubview(inlineImageView)
@@ -1357,12 +1363,13 @@ private final class BoardManHistoryCellView: NSTableCellView {
         super.layout()
         let insetX: CGFloat = 18
         let topPadding: CGFloat = 8
-        let badgeWidth: CGFloat = countBadge.isHidden ? 0 : min(72, max(34, countBadge.intrinsicContentSize.width + 16))
-        let badgeX = bounds.width - insetX - badgeWidth
+        let maxContentWidth = max(0, bounds.width - (insetX * 2))
+        let badgeWidth: CGFloat = countBadge.isHidden ? 0 : min(maxContentWidth, min(72, max(34, countBadge.intrinsicContentSize.width + 16)))
+        let badgeX = max(insetX, bounds.width - insetX - badgeWidth)
         let imageSize: CGFloat = inlineImageView.isHidden ? 0 : 32
-        let imageX = floor((bounds.width - imageSize) / 2)
-        let textRightLimit = inlineImageView.isHidden ? badgeX : min(badgeX, imageX - 10)
-        let textWidth = max(80, textRightLimit - insetX - (badgeWidth > 0 ? 10 : 0))
+        let imageX = imageSize > 0 ? max(insetX, badgeX - imageSize - 10) : 0
+        let textRightLimit = imageSize > 0 ? imageX : (badgeWidth > 0 ? badgeX : bounds.width - insetX)
+        let textWidth = max(0, textRightLimit - insetX - 10)
         primaryLabel.frame = NSRect(x: insetX, y: bounds.height - topPadding - 18, width: textWidth, height: 18)
         metadataLabel.frame = NSRect(x: insetX, y: 8, width: textWidth, height: 15)
         if !inlineImageView.isHidden {
@@ -1641,12 +1648,6 @@ class BoardManPanel: NSPanel {
         guard let contentView = contentView else { return }
         setupGlassBackgroundIfNeeded()
 
-        let accentStripe = NSView(frame: .zero)
-        accentStripe.wantsLayer = true
-        accentStripe.layer?.cornerRadius = 2
-        contentView.addSubview(accentStripe)
-        themeAccentStripeView = accentStripe
-
         let searchGlass = makeGlassSurface(blendingMode: .withinWindow)
         searchGlass.isHidden = true
         contentView.addSubview(searchGlass)
@@ -1658,6 +1659,7 @@ class BoardManPanel: NSPanel {
         search.target = self
         search.action = #selector(searchTextChanged(_:))
         search.sendsSearchStringImmediately = true
+        search.delegate = self
         search.focusRingType = .none
         contentView.addSubview(search)
         searchField = search
@@ -2015,6 +2017,7 @@ class BoardManPanel: NSPanel {
         scroll.borderType = .noBorder
         scroll.autohidesScrollers = true
         scroll.horizontalScrollElasticity = .none
+        scroll.scrollerStyle = .overlay
         scroll.automaticallyAdjustsContentInsets = false
         scroll.contentView.autoresizesSubviews = true
         scroll.contentView.drawsBackground = false
@@ -2041,6 +2044,7 @@ class BoardManPanel: NSPanel {
         table.selectionHighlightStyle = .none
         table.backgroundColor = .clear
         table.autoresizingMask = [.width, .height]
+        table.autoresizesSubviews = true
         table.allowsEmptySelection = false
         table.allowsMultipleSelection = false
         table.refusesFirstResponder = false
@@ -2181,11 +2185,6 @@ class BoardManPanel: NSPanel {
             : tintColor).cgColor
         contentView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         contentView?.layer?.isOpaque = !useGlass
-        themeAccentStripeView?.layer?.backgroundColor = accentColor.withAlphaComponent(lightenTheme ? 0.28 : (useGlass ? 0.84 : 0.82)).cgColor
-        themeAccentStripeView?.layer?.shadowColor = accentColor.cgColor
-        themeAccentStripeView?.layer?.shadowOpacity = Float(lightenTheme ? 0.04 : (useGlass ? 0.28 : 0.10))
-        themeAccentStripeView?.layer?.shadowRadius = useGlass ? 8 : 3
-        themeAccentStripeView?.layer?.shadowOffset = .zero
         [searchGlassView, tabsGlassView, settingsGlassView, listGlassView].forEach { glass in
             glass?.isHidden = !useGlass
             glass?.material = preset.glassMaterial
@@ -2297,10 +2296,9 @@ class BoardManPanel: NSPanel {
         let bounds = contentView.bounds
         let margin: CGFloat = bounds.width < 540 ? 16 : 24
         let width = bounds.width - (margin * 2)
-        let top = bounds.height - 62
+        let top = bounds.height - 76
         let isSettings = activeTab == .settings
         glassSheenView?.frame = bounds
-        themeAccentStripeView?.frame = NSRect(x: margin, y: bounds.height - 14, width: width, height: 3)
         searchGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
         searchField?.isHidden = isSettings
         let showsSnippetButtons = activeTab == .snippets && !isSettings
@@ -2364,7 +2362,7 @@ class BoardManPanel: NSPanel {
         hidePreviewBubble()
     }
 
-    private func synchronizeListGeometry(frameWidth: CGFloat? = nil, height: CGFloat? = nil) {
+    fileprivate func synchronizeListGeometry(frameWidth: CGFloat? = nil, height: CGFloat? = nil) {
         guard let scrollView, let table = placeholderList else { return }
         scrollView.hasHorizontalScroller = false
         scrollView.horizontalScrollElasticity = .none
@@ -2384,6 +2382,7 @@ class BoardManPanel: NSPanel {
             column.width = visibleWidth
             column.maxWidth = visibleWidth
         }
+        table.sizeLastColumnToFit()
         table.enclosingScrollView?.hasHorizontalScroller = false
         table.noteNumberOfRowsChanged()
         table.needsLayout = true
@@ -2562,6 +2561,7 @@ class BoardManPanel: NSPanel {
             return
         }
         guard let table = placeholderList else { return }
+        makeFirstResponder(table)
         if !historyItems.isEmpty, selectedIndex < 0 {
             selectedIndex = 0
         }
@@ -3271,6 +3271,11 @@ class BoardManPanel: NSPanel {
         return false
     }
 
+    private var isSearchFieldEditorActive: Bool {
+        guard let textView = firstResponder as? NSTextView else { return false }
+        return searchField?.currentEditor() === textView
+    }
+
     fileprivate func handlePanelKey(_ event: NSEvent) -> Bool {
         switch event.keyCode {
         case 53:
@@ -3285,10 +3290,16 @@ class BoardManPanel: NSPanel {
             return true
         case 125:
             guard activeTab != .settings else { return false }
+            if isSearchFieldEditorActive {
+                makeFirstResponder(placeholderList)
+            }
             moveSelection(delta: 1)
             return true
         case 126:
             guard activeTab != .settings else { return false }
+            if isSearchFieldEditorActive {
+                makeFirstResponder(placeholderList)
+            }
             moveSelection(delta: -1)
             return true
         case 36, 76:
@@ -3320,6 +3331,7 @@ class BoardManPanel: NSPanel {
 
     private func moveSelection(delta: Int) {
         guard let table = placeholderList, !historyItems.isEmpty else { return }
+        makeFirstResponder(table)
         let next: Int
         if selectedIndex < 0 {
             next = delta < 0 ? historyItems.count - 1 : 0
@@ -3560,6 +3572,28 @@ class BoardManPanel: NSPanel {
 
     override var canBecomeMain: Bool {
         return true
+    }
+}
+
+extension BoardManPanel: NSSearchFieldDelegate {
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        guard let search = searchField, control === search, activeTab != .settings else { return false }
+        switch commandSelector {
+        case #selector(NSResponder.moveDown(_:)):
+            makeFirstResponder(placeholderList)
+            moveSelection(delta: 1)
+            return true
+        case #selector(NSResponder.moveUp(_:)):
+            makeFirstResponder(placeholderList)
+            moveSelection(delta: -1)
+            return true
+        case #selector(NSResponder.insertNewline(_:)),
+             #selector(NSResponder.insertNewlineIgnoringFieldEditor(_:)):
+            pasteSelectedRow()
+            return true
+        default:
+            return false
+        }
     }
 }
 
