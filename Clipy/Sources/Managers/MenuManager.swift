@@ -3403,10 +3403,10 @@ class BoardManPanel: NSPanel {
         let nextIndexSet = IndexSet(integer: next)
         table.selectRowIndexes(nextIndexSet, byExtendingSelection: false)
         table.scrollRowToVisible(next)
-        table.reloadData(forRowIndexes: IndexSet(integer: next), columnIndexes: IndexSet(integer: 0))
 
+        table.rowView(atRow: next, makeIfNecessary: false)?.needsDisplay = true
         if previous >= 0 && previous < rowCount && previous != next {
-            table.reloadData(forRowIndexes: IndexSet(integer: previous), columnIndexes: IndexSet(integer: 0))
+            table.rowView(atRow: previous, makeIfNecessary: false)?.needsDisplay = true
         }
         table.needsDisplay = true
         updateSnippetActionButtons()
