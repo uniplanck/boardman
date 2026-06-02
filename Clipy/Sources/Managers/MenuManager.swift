@@ -2410,6 +2410,7 @@ class BoardManPanel: NSPanel {
 
 
 
+
     private func updateTabWidths(totalWidth: CGFloat) {
         guard let segmentedControl else { return }
         let settingsWidth: CGFloat = 54
