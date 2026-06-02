@@ -2023,6 +2023,7 @@ class BoardManPanel: NSPanel {
         scroll.borderType = .noBorder
         scroll.autohidesScrollers = true
         scroll.horizontalScrollElasticity = .none
+        scroll.hasHorizontalScroller = false
         scroll.scrollerStyle = .overlay
         scroll.automaticallyAdjustsContentInsets = false
         scroll.contentView.autoresizesSubviews = true
@@ -2043,7 +2044,7 @@ class BoardManPanel: NSPanel {
         table.addTableColumn(column)
         table.headerView = nil  // no oversized header
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.rowHeight = 54
+        table.rowHeight = 58
         table.intercellSpacing = NSSize(width: 0, height: 0)
         table.gridStyleMask = []
         table.usesAlternatingRowBackgroundColors = false
@@ -2290,9 +2291,9 @@ class BoardManPanel: NSPanel {
     private func layoutPanelSubviews() {
         guard let contentView = contentView else { return }
         let bounds = contentView.bounds
-        let margin: CGFloat = bounds.width < 540 ? 16 : 24
+        let margin: CGFloat = bounds.width < 540 ? 20 : 28
         let width = bounds.width - (margin * 2)
-        let top = bounds.height - 76
+        let top = bounds.height - 88
         let isSettings = activeTab == .settings
         glassSheenView?.frame = bounds
         searchGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
@@ -2351,47 +2352,47 @@ class BoardManPanel: NSPanel {
             categoryButtonX += categoryButtonWidths[1] + categoryButtonGap
             snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[2], height: 24)
         }
-        let listFrameHeight = listHeight + 16
-        listGlassView?.frame = NSRect(x: margin, y: 14, width: width, height: listFrameHeight)
-        scrollView?.frame = NSRect(x: margin, y: 14, width: width, height: listFrameHeight)
+        let listFrameHeight = listHeight + 10
+        listGlassView?.frame = NSRect(x: margin, y: 18, width: width, height: listFrameHeight)
+        scrollView?.frame = NSRect(x: margin, y: 18, width: width, height: listFrameHeight)
         synchronizeListGeometry(frameWidth: width, height: listFrameHeight)
         hidePreviewBubble()
     }
 
     fileprivate func synchronizeListGeometry(frameWidth: CGFloat? = nil, height: CGFloat? = nil) {
         guard let scrollView, let table = placeholderList else { return }
-        scrollView.hasHorizontalScroller = false
-        scrollView.horizontalScrollElasticity = .none
-        scrollView.contentView.bounds.origin.x = 0
 
-        let fallbackWidth = frameWidth ?? scrollView.frame.width
-        let fallbackHeight = height ?? scrollView.frame.height
-        let contentSize = scrollView.contentSize
-        let visibleWidth = floor(max(120, contentSize.width > 0 ? contentSize.width : fallbackWidth))
-        let visibleHeight = max(120, contentSize.height > 0 ? contentSize.height : fallbackHeight)
-        let rowCount = max(table.numberOfRows, 1)
-        let documentHeight = max(visibleHeight, CGFloat(rowCount) * table.rowHeight)
-        table.frame = NSRect(x: 0, y: 0, width: visibleWidth, height: documentHeight)
-        table.bounds.origin.x = 0
-        if let column = table.tableColumns.first {
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.horizontalScrollElasticity = .none
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.contentView.autoresizesSubviews = true
+
+        let clipView = scrollView.contentView
+        let visibleWidth = max(1, floor(frameWidth ?? clipView.bounds.width))
+        let visibleHeight = max(1, floor(height ?? clipView.bounds.height))
+        let rowHeight = max(table.rowHeight, 1)
+        let rowsHeight = CGFloat(max(table.numberOfRows, 1)) * rowHeight
+        let documentHeight = max(visibleHeight, rowsHeight)
+
+        let documentFrame = NSRect(x: 0, y: 0, width: visibleWidth, height: documentHeight)
+        table.frame = documentFrame
+        table.bounds = NSRect(x: 0, y: 0, width: visibleWidth, height: documentHeight)
+        table.autoresizingMask = [.width, .height]
+        table.autoresizesSubviews = true
+
+        for column in table.tableColumns {
             column.minWidth = visibleWidth
             column.width = visibleWidth
             column.maxWidth = visibleWidth
         }
-        table.sizeLastColumnToFit()
+
+        clipView.documentView = table
         table.enclosingScrollView?.hasHorizontalScroller = false
-        table.noteNumberOfRowsChanged()
         table.needsLayout = true
         table.needsDisplay = true
-        table.enumerateAvailableRowViews { rowView, _ in
-            rowView.setFrameSize(NSSize(width: visibleWidth, height: rowView.frame.height))
-            rowView.needsDisplay = true
-            if let cellView = rowView.view(atColumn: 0) as? NSView {
-                cellView.frame = NSRect(x: 0, y: cellView.frame.origin.y, width: visibleWidth, height: cellView.frame.height)
-                cellView.needsLayout = true
-            }
-        }
     }
+
 
     private func updateTabWidths(totalWidth: CGFloat) {
         guard let segmentedControl else { return }
@@ -3740,7 +3741,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        return 54
+        return 58
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
