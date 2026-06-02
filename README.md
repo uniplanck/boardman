@@ -18,8 +18,8 @@ It extends the clipboard manager concept with workflow-oriented features such as
 
 ## Download
 
-- [Download Board-Man v1.2.2](https://github.com/uniplanck/boardman/releases/tag/v1.2.2)
-- macOS app archive: `Board-Man-v1.2.2.zip`
+- [Download Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
+- macOS app archive: `Board-Man-v1.2.3.zip`
 
 > Note: Board-Man is an early public release. macOS may require opening it manually from System Settings if Gatekeeper blocks the first launch.
 
