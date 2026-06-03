@@ -7,7 +7,7 @@ Board-Man は、Clipy から派生したオープンソースの macOS 向けク
 
 単にクリップボード履歴を保存するだけではなく、貼り付け作業やコピペ中心のワークフローを見える化することを目的にしています。
 
-![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
+![Board-Man clipboard history](../assets/board-man-main-screenshot.png)
 
 ## 何ができるか
 

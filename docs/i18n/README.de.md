@@ -7,7 +7,7 @@ Board-Man ist ein Open-Source-Produktivitätstool für die macOS-Zwischenablage 
 
 Es geht nicht nur darum, den Verlauf der Zwischenablage zu speichern. Ziel ist es, Arbeitsabläufe mit häufigem Kopieren, Einfügen, Bearbeiten und Verschieben von Text sichtbarer zu machen.
 
-![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
+![Board-Man clipboard history](../assets/board-man-main-screenshot.png)
 
 ## Was es macht
 

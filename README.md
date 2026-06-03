@@ -14,72 +14,65 @@ It extends the clipboard manager concept with workflow-oriented features such as
 
 ## Screenshot
 
-![Board-Man screenshot](assets/readme/board-man-screenshot.png)
+![Board-Man main screenshot](docs/assets/board-man-main-screenshot.png)
+
+## What Board-Man can do
+
+Board-Man is a macOS clipboard productivity app derived from Clipy. It keeps clipboard history available from the menu bar and adds workflow-oriented visibility for people who repeatedly copy, paste, edit, and move text or images across apps.
+
+Main features:
+
+- Clipboard history from the menu bar
+- Reusable snippets for phrases, templates, URLs, and repeated text
+- Paste count badges for frequently used items
+- Image clipboard support, including screenshot-like image-only entries
+- Search and keyboard navigation
+- Pinning and menu-friendly workflow controls
+- Settings for shortcuts, history limits, menu behavior, and visual theme options
+- Local macOS operation without sending clipboard contents to an external service
 
 ## Download
 
 - [Download Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
 - macOS app archive: `Board-Man-v1.2.3.zip`
 
-> Note: Board-Man is an early public release. macOS may require opening it manually from System Settings if Gatekeeper blocks the first launch.
+## Install and first launch
 
+1. Download `Board-Man-v1.2.3.zip` from the release page.
+2. Unzip the archive.
+3. Move `Board-Man.app` to `/Applications`.
+4. Open Board-Man.
 
-## Why Board-Man exists
+If macOS Gatekeeper blocks the first launch, open **System Settings > Privacy & Security** and allow Board-Man, or Control-click the app and choose **Open**.
 
-Many clipboard managers help users store snippets, but they do not clearly show how often clipboard actions are used during real work.
+## Basic usage
 
-Board-Man focuses on clipboard activity as an operational signal:
+1. Copy text, a URL, or an image as usual.
+2. Open Board-Man from the menu bar.
+3. Search or move through the clipboard history.
+4. Select an item to paste it into the active app.
+5. Use snippets for text you paste repeatedly.
 
-- writers can understand repetitive text workflows
-- developers can track repeated paste-heavy operations
-- marketers and operators can reduce manual copy/paste friction
-- power users can connect clipboard actions with local automation tools
+## Clipboard history
 
-## Current direction
+Board-Man stores recent clipboard items so you can return to text, URLs, and image clipboard entries without copying them again. History settings let you control how much is kept and how the menu behaves.
 
-The public edition is planned to focus on:
+## Snippets
 
-- paste count tracking
-- clipboard workflow visibility
-- menu bar status feedback
-- safe local-only operation
-- clear build instructions for macOS
-- documentation for contributors and fork maintainers
+Snippets are reusable text entries for phrases, templates, URLs, and other content you paste often. They are useful for repeated replies, commands, boilerplate text, and short templates.
 
-## Attribution
+## Paste count badges
 
-Board-Man is a heavily modified derivative work based on Clipy.
+Paste count badges show how many times an item has been pasted. This makes repeated paste activity visible and helps identify the text, commands, or assets you use most often.
 
-This repository preserves upstream attribution and license notices.
+## Image clipboard support
 
-See:
+Board-Man supports image clipboard entries and can show image-only clipboard content in the history list. This is useful when copying screenshots, graphics, or other visual clipboard content between apps.
 
-- `ATTRIBUTION.md`
-- `LICENSE`
-- `LICENSE_CLIPMENU`
+## Search and keyboard navigation
 
-## Public release policy
+Use search to filter clipboard history. The panel is designed for keyboard-driven use so you can search, move through results, and paste without leaving the current workflow.
 
-This public repository should not contain:
-
-- private logs
-- personal absolute paths
-- signing certificates
-- provisioning profiles
-- API keys or tokens
-- local automation secrets
-- production-only scripts
-- private build artifacts
-- user-specific configuration
-
-## Planned v0.1 scope
-
-- Buildable sanitized source tree
-- Preserved upstream license and attribution
-- Basic README
-- Screenshot or short demo
-- Minimal release notes
-- Known limitations section
 
 ## License
 
