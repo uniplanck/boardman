@@ -13,6 +13,7 @@
 // swiftlint:disable file_length function_body_length type_body_length
 
 import Cocoa
+import KeyHolder
 import Magnet
 import PINCache
 import RealmSwift
@@ -927,6 +928,42 @@ fileprivate enum BoardManInlineSettingsCategory: Int {
     case general, view, history, snippets, privacy
 }
 
+private final class BoardManSnippetShortcutRow {
+    let folderIdentifier: String
+    let titleLabel: NSTextField
+    let detailLabel: NSTextField
+    let recordView: RecordView
+    let clearButton: NSButton
+
+    init(folder: CPYFolder, keyCombo: KeyCombo?) {
+        folderIdentifier = folder.identifier
+
+        let title = folder.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        titleLabel = NSTextField(labelWithString: title.isEmpty ? "untitled folder" : title)
+        titleLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        titleLabel.textColor = .labelColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+
+        let enabledText = folder.enable ? "Enabled" : "Disabled"
+        detailLabel = NSTextField(labelWithString: "\(enabledText) / \(folder.snippets.count) snippets")
+        detailLabel.font = NSFont.systemFont(ofSize: 10)
+        detailLabel.textColor = .secondaryLabelColor
+        detailLabel.lineBreakMode = .byTruncatingTail
+
+        recordView = RecordView(frame: .zero)
+        recordView.keyCombo = keyCombo
+
+        clearButton = NSButton(title: "Clear", target: nil, action: nil)
+        clearButton.font = NSFont.systemFont(ofSize: 10)
+        clearButton.bezelStyle = .rounded
+        clearButton.identifier = NSUserInterfaceItemIdentifier(folder.identifier)
+    }
+
+    var views: [NSView] {
+        return [titleLabel, detailLabel, recordView, clearButton]
+    }
+}
+
 fileprivate enum BoardManThemePreset: String, CaseIterable {
     case defaultPreset = "Default"
     case graphite = "Graphite"
@@ -1444,6 +1481,9 @@ class BoardManPanel: NSPanel {
     private var snippetSummaryLabel: NSTextField?
     private var snippetFoldersLabel: NSTextField?
     private var snippetShortcutsLabel: NSTextField?
+    private var snippetShortcutScrollView: NSScrollView?
+    private var snippetShortcutDocumentView: NSView?
+    private var snippetShortcutRows: [BoardManSnippetShortcutRow] = []
     private var manageSnippetsButton: NSButton?
     private var densityLabel: NSTextField?
     private var densityPopup: NSPopUpButton?
@@ -1689,6 +1729,21 @@ class BoardManPanel: NSPanel {
         snippetSummaryLabel?.stringValue = "\(snippetCount) snippets, \(folders.count) folders (\(enabledSnippetCount) snippets enabled, \(enabledFolderCount) folders enabled)"
         snippetFoldersLabel?.stringValue = "Folders: \(folderPreview)"
         snippetShortcutsLabel?.stringValue = "Modern Snippets tab is default. Folder shortcuts preserved: \(shortcutCount)"
+        reloadSnippetShortcutRows(with: folders)
+    }
+
+    private func reloadSnippetShortcutRows(with folders: [CPYFolder]) {
+        guard let documentView = snippetShortcutDocumentView else { return }
+        snippetShortcutRows.flatMap { $0.views }.forEach { $0.removeFromSuperview() }
+        snippetShortcutRows = folders.map { folder in
+            let keyCombo = AppEnvironment.current.hotKeyService.keyComboForSnippetFolder(identifier: folder.identifier)
+            let row = BoardManSnippetShortcutRow(folder: folder, keyCombo: keyCombo)
+            row.recordView.delegate = self
+            row.clearButton.target = self
+            row.clearButton.action = #selector(clearSnippetFolderShortcut(_:))
+            row.views.forEach { documentView.addSubview($0) }
+            return row
+        }
     }
 
     private static func makeSectionLabel(_ title: String) -> NSTextField {
@@ -1942,6 +1997,17 @@ class BoardManPanel: NSPanel {
         snippetShortcuts.lineBreakMode = .byTruncatingTail
         contentView.addSubview(snippetShortcuts)
         snippetShortcutsLabel = snippetShortcuts
+
+        let shortcutDocument = NSView(frame: .zero)
+        let shortcutScrollView = NSScrollView(frame: .zero)
+        shortcutScrollView.documentView = shortcutDocument
+        shortcutScrollView.hasVerticalScroller = true
+        shortcutScrollView.hasHorizontalScroller = false
+        shortcutScrollView.drawsBackground = false
+        shortcutScrollView.borderType = .noBorder
+        contentView.addSubview(shortcutScrollView)
+        snippetShortcutDocumentView = shortcutDocument
+        snippetShortcutScrollView = shortcutScrollView
 
         let manageSnippets = NSButton(title: "Manage Snippets", target: self, action: #selector(openSnippetManager(_:)))
         manageSnippets.font = NSFont.systemFont(ofSize: 11)
@@ -2672,7 +2738,7 @@ class BoardManPanel: NSPanel {
     private func layoutInlineSettingsControls(margin: CGFloat, width: CGFloat, topY: CGFloat, isVisible: Bool) {
         let allControls: [NSView?] = [
             generalSectionLabel, launchOnLoginButton, inputPasteCommandButton, maxHistorySizeLabel, maxHistorySizeStepper, maxHistorySizeValueLabel, statusItemLabel, statusItemPopup, shortcutSectionLabel, mainShortcutLabel, mainShortcutValueLabel,
-            snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetShortcutsLabel, manageSnippetsButton,
+            snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton,
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, themeLightenButton, densityLabel, densityPopup,
             historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
@@ -2713,7 +2779,7 @@ class BoardManPanel: NSPanel {
             labsSectionLabel, labsNoteLabel
         ]
         let historyControls: [NSView?] = [historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton]
-        let snippetControls: [NSView?] = [snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetShortcutsLabel, manageSnippetsButton]
+        let snippetControls: [NSView?] = [snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton]
         let privacyControls: [NSView?] = [
             privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel,
             storedTypesSectionLabel, filterSectionLabel, hideRuleTextField,
@@ -2782,12 +2848,31 @@ class BoardManPanel: NSPanel {
             clearHistoryButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 6, width: 86, height: rowH)
         }
 
-        func placeSnippetSettingsSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+        func layoutSnippetShortcutRows(width: CGFloat) {
+            let rowHeight: CGFloat = 34
+            let documentHeight = max(CGFloat(snippetShortcutRows.count) * rowHeight, snippetShortcutScrollView?.bounds.height ?? 0)
+            snippetShortcutDocumentView?.frame = NSRect(x: 0, y: 0, width: width, height: documentHeight)
+
+            for (index, row) in snippetShortcutRows.enumerated() {
+                let rowOriginY = documentHeight - CGFloat(index + 1) * rowHeight
+                let clearWidth: CGFloat = 52
+                let recordWidth: CGFloat = min(150, max(112, width * 0.32))
+                let textWidth = max(80, width - recordWidth - clearWidth - 20)
+                row.titleLabel.frame = NSRect(x: 0, y: rowOriginY + 17, width: textWidth, height: 14)
+                row.detailLabel.frame = NSRect(x: 0, y: rowOriginY + 3, width: textWidth, height: 13)
+                row.recordView.frame = NSRect(x: textWidth + 8, y: rowOriginY + 5, width: recordWidth, height: 24)
+                row.clearButton.frame = NSRect(x: textWidth + recordWidth + 16, y: rowOriginY + 5, width: clearWidth, height: 24)
+            }
+        }
+
+        func placeSnippetSettingsSection(originX: CGFloat, originY: CGFloat, width: CGFloat, scrollHeight: CGFloat) {
             placeHeader(snippetSettingsSectionLabel, originX: originX, originY: originY, width: width)
             snippetSummaryLabel?.frame = NSRect(x: originX, y: originY - rowGap + 4, width: width, height: 18)
             snippetFoldersLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 2) + 2, width: width, height: 18)
             snippetShortcutsLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3), width: width, height: 18)
-            manageSnippetsButton?.frame = NSRect(x: originX, y: originY - (rowGap * 4) - 8, width: min(136, width), height: rowH)
+            snippetShortcutScrollView?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - scrollHeight - 6, width: width, height: scrollHeight)
+            layoutSnippetShortcutRows(width: width)
+            manageSnippetsButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - scrollHeight - 38, width: min(136, width), height: rowH)
         }
 
         func placePrivacySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -2836,10 +2921,10 @@ class BoardManPanel: NSPanel {
             placeShortcutSection(originX: leftX, originY: firstY - 150, width: columnWidth)
             placeViewSection(originX: leftX, originY: firstY - 242, width: columnWidth)
             placeHistorySection(originX: rightX, originY: firstY, width: columnWidth)
-            placeSnippetSettingsSection(originX: rightX, originY: firstY - 116, width: columnWidth)
-            placePrivacySection(originX: rightX, originY: firstY - 284, width: columnWidth)
-            placeStoredTypesSection(originX: rightX, originY: firstY - 386, width: columnWidth)
-            placeFiltersSection(originX: rightX, originY: firstY - 540, width: columnWidth)
+            placeSnippetSettingsSection(originX: rightX, originY: firstY - 116, width: columnWidth, scrollHeight: 128)
+            placePrivacySection(originX: rightX, originY: firstY - 350, width: columnWidth)
+            placeStoredTypesSection(originX: rightX, originY: firstY - 452, width: columnWidth)
+            placeFiltersSection(originX: rightX, originY: firstY - 606, width: columnWidth)
         } else {
             settingsCategoryControl?.isHidden = false
             settingsCategoryControl?.selectedSegment = activeSettingsCategory.rawValue
@@ -2858,7 +2943,7 @@ class BoardManPanel: NSPanel {
                 placeHistorySection(originX: leftX, originY: firstY, width: columnWidth)
             case .snippets:
                 show(snippetControls)
-                placeSnippetSettingsSection(originX: leftX, originY: firstY, width: columnWidth)
+                placeSnippetSettingsSection(originX: leftX, originY: firstY, width: columnWidth, scrollHeight: max(180, topY - 250))
             case .privacy:
                 show(privacyControls)
                 storedTypeButtons.forEach { $0.isHidden = false }
@@ -3402,6 +3487,14 @@ class BoardManPanel: NSPanel {
 
     @objc private func openSnippetManager(_ sender: NSButton) {
         openSnippetsManagerMode()
+    }
+
+    @objc private func clearSnippetFolderShortcut(_ sender: NSButton) {
+        guard let identifier = sender.identifier?.rawValue else { return }
+        AppEnvironment.current.hotKeyService.clearSnippetKeyCombo(forFolder: identifier)
+        snippetShortcutRows.first { $0.folderIdentifier == identifier }?.recordView.keyCombo = nil
+        refreshSnippetSettingsSummary()
+        layoutPanelSubviews()
     }
 
     @objc private func storedTypeChanged(_ sender: NSButton) {
@@ -4083,6 +4176,25 @@ extension BoardManPanel: NSSearchFieldDelegate {
             return false
         }
     }
+}
+
+extension BoardManPanel: RecordViewDelegate {
+    func recordViewShouldBeginRecording(_ recordView: RecordView) -> Bool {
+        return snippetShortcutRows.contains { $0.recordView === recordView }
+    }
+
+    func recordView(_ recordView: RecordView, canRecordKeyCombo keyCombo: KeyCombo) -> Bool {
+        return snippetShortcutRows.contains { $0.recordView === recordView }
+    }
+
+    func recordView(_ recordView: RecordView, didChangeKeyCombo keyCombo: KeyCombo?) {
+        guard let row = snippetShortcutRows.first(where: { $0.recordView === recordView }) else { return }
+        AppEnvironment.current.hotKeyService.setSnippetKeyCombo(keyCombo, forFolder: row.folderIdentifier)
+        refreshSnippetSettingsSummary()
+        layoutPanelSubviews()
+    }
+
+    func recordViewDidEndRecording(_ recordView: RecordView) {}
 }
 
 // Basic data source for placeholder list (embedded to avoid extra files)

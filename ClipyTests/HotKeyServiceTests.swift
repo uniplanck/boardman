@@ -14,6 +14,7 @@ final class HotKeyServiceTests {
         defaults.removeObject(forKey: Constants.HotKey.historyKeyCombo)
         defaults.removeObject(forKey: Constants.HotKey.snippetKeyCombo)
         defaults.removeObject(forKey: Constants.HotKey.clearHistoryKeyCombo)
+        defaults.removeObject(forKey: Constants.HotKey.folderKeyCombos)
         defaults.synchronize()
     }
 
@@ -25,6 +26,7 @@ final class HotKeyServiceTests {
         defaults.removeObject(forKey: Constants.HotKey.historyKeyCombo)
         defaults.removeObject(forKey: Constants.HotKey.snippetKeyCombo)
         defaults.removeObject(forKey: Constants.HotKey.clearHistoryKeyCombo)
+        defaults.removeObject(forKey: Constants.HotKey.folderKeyCombos)
         defaults.synchronize()
     }
 
@@ -222,5 +224,25 @@ final class HotKeyServiceTests {
 
         service.changeClearHistoryKeyCombo(nil)
         #expect(service.clearHistoryKeyCombo == nil)
+    }
+
+    @Test
+    func setAndClearSnippetFolderHotkey() throws {
+        let service = HotKeyService()
+        let keyCombo = try #require(KeyCombo(QWERTYKeyCode: 1, carbonModifiers: cmdKey))
+        let folderIdentifier = "folder-1"
+
+        #expect(service.keyComboForSnippetFolder(identifier: folderIdentifier) == nil)
+
+        service.setSnippetKeyCombo(keyCombo, forFolder: folderIdentifier)
+        #expect(service.keyComboForSnippetFolder(identifier: folderIdentifier) == keyCombo)
+
+        let defaults = UserDefaults.standard
+        let savedData = try #require(defaults.object(forKey: Constants.HotKey.folderKeyCombos) as? Data)
+        let savedCombos = try #require(NSKeyedUnarchiver.unarchiveObject(with: savedData) as? [String: KeyCombo])
+        #expect(savedCombos[folderIdentifier] == keyCombo)
+
+        service.clearSnippetKeyCombo(forFolder: folderIdentifier)
+        #expect(service.keyComboForSnippetFolder(identifier: folderIdentifier) == nil)
     }
 }
