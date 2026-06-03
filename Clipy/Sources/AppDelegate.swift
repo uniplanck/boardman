@@ -51,7 +51,19 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     }
 
     // MARK: - Menu Actions
+    @objc func openBoardManSettings() {
+        if AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) {
+            AppEnvironment.current.menuManager.showBoardManSettingsPanel()
+            return
+        }
+        showPreferenceWindow()
+    }
+
     @objc func showPreferenceWindow() {
+        if AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) {
+            AppEnvironment.current.menuManager.showBoardManSettingsPanel()
+            return
+        }
         AppEnvironment.current.menuManager.hideBoardManPanelForPreferences()
         NSApp.activate(ignoringOtherApps: true)
         CPYPreferencesWindowController.sharedController.showWindow(self)
