@@ -7,7 +7,7 @@ Board-Man est un outil open-source de productivité pour le presse-papiers sur m
 
 Il ne sert pas seulement à conserver l’historique du presse-papiers. Son objectif est de rendre plus visibles les flux de travail basés sur la copie, le collage, l’édition et le déplacement de texte entre applications.
 
-![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
+![Board-Man clipboard history](../assets/board-man-main-screenshot.png)
 
 ## Ce que fait Board-Man
 
@@ -16,9 +16,14 @@ Board-Man vise les flux de travail où les actions de copier-coller se répèten
 Axes principaux:
 
 - consulter l’historique du presse-papiers
+- enregistrer et coller des snippets réutilisables
+- afficher des badges de compteur de collage pour les éléments fréquents
+- prendre en charge les images dans le presse-papiers
+- rechercher dans l’historique et naviguer au clavier
 - rendre l’activité de collage plus visible
 - améliorer les flux de travail centrés sur le copier-coller
-- afficher l’état dans la barre de menus
+- afficher l’état et les réglages dans la barre de menus
+- ajuster les options de thème et de mode plus clair
 - fonctionner comme un utilitaire local pour macOS
 
 ## Pour qui
@@ -34,7 +39,10 @@ Axes principaux:
 
 Pour l’instant, le projet est un candidat public initial. Les versions disponibles sont listées ici:
 
-- [Board-Man v0.1.1](https://github.com/uniplanck/boardman/releases/tag/v0.1.1)
+- [Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
+- macOS app archive: `Board-Man-v1.2.3.zip`
+
+Après l’avoir décompressé, déplacez `Board-Man.app` vers `/Applications` et ouvrez l’app. Si macOS Gatekeeper bloque le premier lancement, autorisez Board-Man dans **System Settings > Privacy & Security** ou ouvrez l’app avec Control-clic puis **Open**.
 
 ## Licence et attribution
 

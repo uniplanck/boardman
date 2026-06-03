@@ -7,7 +7,7 @@ Board-Man ist ein Open-Source-Produktivitätstool für die macOS-Zwischenablage 
 
 Es geht nicht nur darum, den Verlauf der Zwischenablage zu speichern. Ziel ist es, Arbeitsabläufe mit häufigem Kopieren, Einfügen, Bearbeiten und Verschieben von Text sichtbarer zu machen.
 
-![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
+![Board-Man clipboard history](../assets/board-man-main-screenshot.png)
 
 ## Was es macht
 
@@ -16,9 +16,14 @@ Board-Man ist für Arbeitsabläufe gedacht, in denen Kopieren und Einfügen imme
 Schwerpunkte:
 
 - Verlauf der Zwischenablage prüfen
+- wiederverwendbare Snippets speichern und einfügen
+- Paste-Count-Badges für häufig genutzte Einträge anzeigen
+- Bildinhalte aus der Zwischenablage unterstützen
+- Verlauf durchsuchen und per Tastatur navigieren
 - Einfügeaktivität sichtbar machen
 - kopier- und einfügelastige Arbeitsabläufe verbessern
-- Status in der Menüleiste anzeigen
+- Status und Einstellungen in der Menüleiste anzeigen
+- Theme- und hellere Darstellungsoptionen anpassen
 - als lokale macOS-Utility laufen
 
 ## Für wen es gedacht ist
@@ -34,7 +39,10 @@ Schwerpunkte:
 
 Derzeit ist dies ein früher öffentlicher Kandidat. Verfügbare Releases finden Sie hier:
 
-- [Board-Man v0.1.1](https://github.com/uniplanck/boardman/releases/tag/v0.1.1)
+- [Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
+- macOS app archive: `Board-Man-v1.2.3.zip`
+
+Nach dem Entpacken verschieben Sie `Board-Man.app` nach `/Applications` und öffnen die App. Wenn macOS Gatekeeper den ersten Start blockiert, erlauben Sie Board-Man in **System Settings > Privacy & Security** oder öffnen Sie die App per Control-Klick und **Open**.
 
 ## Lizenz und Attribution
 

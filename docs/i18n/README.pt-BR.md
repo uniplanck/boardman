@@ -7,7 +7,7 @@ Board-Man é uma ferramenta open-source de produtividade para a área de transfe
 
 Ela não serve apenas para salvar o histórico da área de transferência. A ideia é tornar mais visível o trabalho baseado em copiar, colar, editar e mover texto entre aplicativos.
 
-![Board-Man clipboard history](../../assets/readme/board-man-screenshot.png)
+![Board-Man clipboard history](../assets/board-man-main-screenshot.png)
 
 ## O que ele faz
 
@@ -16,9 +16,14 @@ Board-Man foi criado para fluxos de trabalho em que copiar e colar acontece muit
 Principais direções:
 
 - consultar o histórico da área de transferência
+- salvar e colar snippets reutilizáveis
+- mostrar badges de contagem de colagem para itens usados com frequência
+- aceitar conteúdo de imagem na área de transferência
+- pesquisar no histórico e navegar pelo teclado
 - tornar a atividade de colagem mais visível
 - melhorar fluxos de trabalho centrados em copiar e colar
-- mostrar status na barra de menus
+- mostrar status e ajustes na barra de menus
+- ajustar opções de tema e modo mais claro
 - funcionar como uma utilidade local para macOS
 
 ## Para quem é
@@ -34,7 +39,10 @@ Principais direções:
 
 No momento, este projeto é um candidato público inicial. As versões disponíveis podem ser vistas aqui:
 
-- [Board-Man v0.1.1](https://github.com/uniplanck/boardman/releases/tag/v0.1.1)
+- [Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
+- macOS app archive: `Board-Man-v1.2.3.zip`
+
+Depois de descompactar, mova `Board-Man.app` para `/Applications` e abra o app. Se o macOS Gatekeeper bloquear a primeira inicialização, permita o Board-Man em **System Settings > Privacy & Security** ou abra o app com Control-clique e **Open**.
 
 ## Licença e atribuição
 
