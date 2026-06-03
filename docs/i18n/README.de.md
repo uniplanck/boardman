@@ -2,117 +2,117 @@
 
 [English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
 
-Board-Man is a macOS clipboard productivity app derived from Clipy.
+Board-Man ist eine macOS-Produktivitätsapp für die Zwischenablage, abgeleitet von Clipy.
 
-It keeps clipboard history available from the menu bar and adds workflow-oriented visibility for people who repeatedly copy, paste, edit, and move text, URLs, commands, and images across apps.
+Sie hält den Verlauf der Zwischenablage über die Menüleiste verfügbar und bietet arbeitsablauforientierte Übersicht für Menschen, die häufig Text, URLs, Befehle und Bilder zwischen Apps kopieren, einfügen, bearbeiten und verschieben.
 
-> Status: public candidate. This repository is a sanitized open-source edition prepared from an actively developed private build.
+> Status: öffentlicher Kandidat. Dieses Repository ist eine bereinigte Open-Source-Edition, die aus einem aktiv entwickelten privaten Build vorbereitet wurde.
 
 ## Screenshot
 
 ![Board-Man main screenshot](../assets/board-man-main-screenshot.png)
 
-## What Board-Man can do
+## Was Board-Man kann
 
-- Keep recent clipboard history available from the menu bar.
-- Save and paste reusable snippets.
-- Show paste count badges for frequently used items.
-- Handle image clipboard entries, including screenshot-like image-only clipboard content.
-- Search clipboard history.
-- Navigate the panel from the keyboard.
-- Pin important items.
-- Adjust shortcuts, history limits, menu behavior, and visual theme options.
-- Run locally on macOS without sending clipboard contents to an external service.
+- Den aktuellen Verlauf der Zwischenablage über die Menüleiste verfügbar halten.
+- Wiederverwendbare Snippets speichern und einfügen.
+- Einfügezähler-Badges für häufig verwendete Elemente anzeigen.
+- Bildeinträge der Zwischenablage verarbeiten, einschließlich bildreiner Inhalte wie Screenshots.
+- Den Verlauf der Zwischenablage durchsuchen.
+- Das Panel per Tastatur bedienen.
+- Wichtige Elemente anheften.
+- Kurzbefehle, Verlaufslimits, Menüverhalten und visuelle Designoptionen anpassen.
+- Lokal auf macOS laufen, ohne Inhalte der Zwischenablage an einen externen Dienst zu senden.
 
 ## Download
 
-- [Download Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
-- macOS app archive: `Board-Man-v1.2.3.zip`
+- [Board-Man v1.2.3 herunterladen](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
+- macOS-App-Archiv: `Board-Man-v1.2.3.zip`
 
-## Install and first launch
+## Installation und erster Start
 
-1. Download `Board-Man-v1.2.3.zip` from the release page.
-2. Unzip the archive.
-3. Move `Board-Man.app` to `/Applications`.
-4. Open Board-Man.
+1. Lade `Board-Man-v1.2.3.zip` von der Release-Seite herunter.
+2. Entpacke das Archiv.
+3. Verschiebe `Board-Man.app` nach `/Applications`.
+4. Öffne Board-Man.
 
-If macOS Gatekeeper blocks the first launch, open **System Settings > Privacy & Security** and allow Board-Man, or Control-click the app and choose **Open**.
+Wenn macOS Gatekeeper den ersten Start blockiert, öffne **System Settings > Privacy & Security** und erlaube Board-Man, oder führe Control-click auf die App aus und wähle **Open**.
 
-## Basic usage
+## Grundlegende Nutzung
 
-1. Copy text, a URL, a command, or an image as usual.
-2. Open Board-Man from the menu bar.
-3. Search or move through the clipboard history.
-4. Select an item to paste it into the active app.
-5. Use snippets for text you paste repeatedly.
+1. Kopiere wie gewohnt Text, eine URL, einen Befehl oder ein Bild.
+2. Öffne Board-Man über die Menüleiste.
+3. Suche oder bewege dich durch den Verlauf der Zwischenablage.
+4. Wähle ein Element aus, um es in die aktive App einzufügen.
+5. Verwende Snippets für Text, den du wiederholt einfügst.
 
-## Clipboard history
+## Verlauf der Zwischenablage
 
-Board-Man stores recent clipboard items so you can return to text, URLs, commands, and image clipboard entries without copying them again.
+Board-Man speichert aktuelle Elemente der Zwischenablage, sodass du zu Texten, URLs, Befehlen und Bildeinträgen zurückkehren kannst, ohne sie erneut zu kopieren.
 
-Use this when you want to:
+Nutze dies, wenn du:
 
-- reuse something copied earlier
-- avoid switching between documents only to copy the same text again
-- keep recent commands or URLs close at hand
-- review the flow of copy/paste-heavy work
+- etwas zuvor Kopiertes wiederverwenden möchtest
+- nicht nur zum erneuten Kopieren desselben Textes zwischen Dokumenten wechseln möchtest
+- aktuelle Befehle oder URLs griffbereit halten möchtest
+- den Ablauf kopier- und einfügeintensiver Arbeit nachvollziehen möchtest
 
 ## Snippets
 
-Snippets are reusable text entries for phrases, templates, URLs, commands, and other content you paste often.
+Snippets sind wiederverwendbare Texteinträge für Formulierungen, Vorlagen, URLs, Befehle und andere Inhalte, die du häufig einfügst.
 
-Typical uses:
+Typische Verwendungen:
 
-- repeated replies
-- command templates
-- marketing or SNS text blocks
-- support messages
-- URLs and short boilerplate
+- wiederholte Antworten
+- Befehlsvorlagen
+- Marketing- oder Social-Media-Textblöcke
+- Supportnachrichten
+- URLs und kurze Textbausteine
 
-## Paste count badges
+## Einfügezähler-Badges
 
-Paste count badges show how many times an item has been pasted.
+Einfügezähler-Badges zeigen, wie oft ein Element eingefügt wurde.
 
-This helps you notice:
+Das hilft dir zu erkennen:
 
-- text you reuse often
-- commands you repeatedly run
-- assets or snippets that are central to your workflow
-- copy/paste patterns that may be worth turning into snippets or automation
+- Text, den du häufig wiederverwendest
+- Befehle, die du wiederholt ausführst
+- Assets oder Snippets, die für deinen Workflow zentral sind
+- Kopier-/Einfügemuster, die sich als Snippets oder Automatisierung lohnen könnten
 
-## Image clipboard support
+## Unterstützung für Bilder in der Zwischenablage
 
-Board-Man supports image clipboard entries and can show image-only clipboard content in the history list.
+Board-Man unterstützt Bildeinträge der Zwischenablage und kann bildreine Inhalte im Verlauf anzeigen.
 
-This is useful when copying:
+Das ist nützlich beim Kopieren von:
 
-- screenshots
-- graphics
-- design references
-- visual clipboard content between apps
+- Screenshots
+- Grafiken
+- Designreferenzen
+- visuellen Zwischenablageinhalten zwischen Apps
 
-Image entries use a timestamp-based identity so generic names such as `TIFF image` or `PNG image` do not collide in paste counts.
+Bildeinträge verwenden eine zeitstempelbasierte Identität, damit generische Namen wie `TIFF image` oder `PNG image` bei den Einfügezählern nicht kollidieren.
 
-## Search and keyboard navigation
+## Suche und Tastaturnavigation
 
-Use search to filter clipboard history. The panel is designed for keyboard-driven use so you can search, move through results, and paste without leaving the current workflow.
+Nutze die Suche, um den Verlauf der Zwischenablage zu filtern. Das Panel ist für tastaturgesteuerte Nutzung ausgelegt, damit du suchen, durch Ergebnisse navigieren und einfügen kannst, ohne den aktuellen Workflow zu verlassen.
 
-## Settings and appearance
+## Einstellungen und Darstellung
 
-Board-Man includes settings for menu behavior, shortcuts, history limits, and visual appearance. Depending on the current build, you can use theme and lighter display options to make the panel easier to read.
+Board-Man enthält Einstellungen für Menüverhalten, Kurzbefehle, Verlaufslimits und visuelle Darstellung. Je nach aktuellem Build kannst du Design- und hellere Anzeigeoptionen verwenden, um das Panel leichter lesbar zu machen.
 
-## Privacy
+## Datenschutz
 
-Board-Man is a local macOS utility. Clipboard contents are handled locally by the app. Do not store secrets, tokens, passwords, or private customer data in clipboard history unless you understand the risk.
+Board-Man ist ein lokales macOS-Werkzeug. Inhalte der Zwischenablage werden lokal von der App verarbeitet. Speichere keine Secrets, Tokens, Passwörter oder privaten Kundendaten im Verlauf der Zwischenablage, es sei denn, du verstehst das Risiko.
 
-## License and attribution
+## Lizenz und Attribution
 
-Board-Man is a heavily modified derivative work based on Clipy.
+Board-Man ist ein stark verändertes abgeleitetes Werk auf Basis von Clipy.
 
-This repository preserves upstream attribution and license notices:
+Dieses Repository bewahrt die Attribution und Lizenzhinweise des Upstream-Projekts:
 
 - `ATTRIBUTION.md`
 - `LICENSE`
 - `LICENSE_CLIPMENU`
 
-Board-Man is distributed under the MIT license terms inherited from Clipy. It is not endorsed by the upstream Clipy or ClipMenu maintainers.
+Board-Man wird unter den von Clipy geerbten MIT-Lizenzbedingungen verteilt. Es wird nicht von den Upstream-Maintainern von Clipy oder ClipMenu unterstützt.

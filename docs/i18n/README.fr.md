@@ -2,117 +2,117 @@
 
 [English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
 
-Board-Man is a macOS clipboard productivity app derived from Clipy.
+Board-Man est une app de productivité pour le presse-papiers macOS dérivée de Clipy.
 
-It keeps clipboard history available from the menu bar and adds workflow-oriented visibility for people who repeatedly copy, paste, edit, and move text, URLs, commands, and images across apps.
+Elle garde l'historique du presse-papiers accessible depuis la barre de menus et ajoute une visibilité orientée flux de travail pour les personnes qui copient, collent, modifient et déplacent régulièrement du texte, des URL, des commandes et des images entre plusieurs apps.
 
-> Status: public candidate. This repository is a sanitized open-source edition prepared from an actively developed private build.
+> Statut : candidat public. Ce dépôt est une édition open source assainie, préparée à partir d'une build privée en développement actif.
 
-## Screenshot
+## Capture d'écran
 
 ![Board-Man main screenshot](../assets/board-man-main-screenshot.png)
 
-## What Board-Man can do
+## Ce que Board-Man peut faire
 
-- Keep recent clipboard history available from the menu bar.
-- Save and paste reusable snippets.
-- Show paste count badges for frequently used items.
-- Handle image clipboard entries, including screenshot-like image-only clipboard content.
-- Search clipboard history.
-- Navigate the panel from the keyboard.
-- Pin important items.
-- Adjust shortcuts, history limits, menu behavior, and visual theme options.
-- Run locally on macOS without sending clipboard contents to an external service.
+- Garder l'historique récent du presse-papiers accessible depuis la barre de menus.
+- Enregistrer et coller des snippets réutilisables.
+- Afficher des badges de nombre de collages pour les éléments souvent utilisés.
+- Gérer les entrées d'image du presse-papiers, y compris le contenu uniquement composé d'une image, comme une capture d'écran.
+- Rechercher dans l'historique du presse-papiers.
+- Naviguer dans le panneau au clavier.
+- Épingler les éléments importants.
+- Ajuster les raccourcis, les limites d'historique, le comportement du menu et les options de thème visuel.
+- Fonctionner localement sur macOS sans envoyer le contenu du presse-papiers à un service externe.
 
-## Download
+## Téléchargement
 
-- [Download Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
-- macOS app archive: `Board-Man-v1.2.3.zip`
+- [Télécharger Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
+- Archive de l'app macOS : `Board-Man-v1.2.3.zip`
 
-## Install and first launch
+## Installation et premier lancement
 
-1. Download `Board-Man-v1.2.3.zip` from the release page.
-2. Unzip the archive.
-3. Move `Board-Man.app` to `/Applications`.
-4. Open Board-Man.
+1. Téléchargez `Board-Man-v1.2.3.zip` depuis la page de release.
+2. Décompressez l'archive.
+3. Déplacez `Board-Man.app` vers `/Applications`.
+4. Ouvrez Board-Man.
 
-If macOS Gatekeeper blocks the first launch, open **System Settings > Privacy & Security** and allow Board-Man, or Control-click the app and choose **Open**.
+Si macOS Gatekeeper bloque le premier lancement, ouvrez **System Settings > Privacy & Security** et autorisez Board-Man, ou faites Control-click sur l'app et choisissez **Open**.
 
-## Basic usage
+## Utilisation de base
 
-1. Copy text, a URL, a command, or an image as usual.
-2. Open Board-Man from the menu bar.
-3. Search or move through the clipboard history.
-4. Select an item to paste it into the active app.
-5. Use snippets for text you paste repeatedly.
+1. Copiez du texte, une URL, une commande ou une image comme d'habitude.
+2. Ouvrez Board-Man depuis la barre de menus.
+3. Recherchez ou parcourez l'historique du presse-papiers.
+4. Sélectionnez un élément pour le coller dans l'app active.
+5. Utilisez les snippets pour le texte que vous collez souvent.
 
-## Clipboard history
+## Historique du presse-papiers
 
-Board-Man stores recent clipboard items so you can return to text, URLs, commands, and image clipboard entries without copying them again.
+Board-Man stocke les éléments récents du presse-papiers afin que vous puissiez revenir à du texte, des URL, des commandes et des entrées d'image sans les copier de nouveau.
 
-Use this when you want to:
+Utilisez-le lorsque vous voulez :
 
-- reuse something copied earlier
-- avoid switching between documents only to copy the same text again
-- keep recent commands or URLs close at hand
-- review the flow of copy/paste-heavy work
+- réutiliser quelque chose copié plus tôt
+- éviter de passer d'un document à l'autre uniquement pour recopier le même texte
+- garder des commandes ou URL récentes à portée de main
+- revoir le déroulé d'un travail intensif en copier-coller
 
 ## Snippets
 
-Snippets are reusable text entries for phrases, templates, URLs, commands, and other content you paste often.
+Les snippets sont des entrées de texte réutilisables pour les phrases, modèles, URL, commandes et autres contenus que vous collez souvent.
 
-Typical uses:
+Usages typiques :
 
-- repeated replies
-- command templates
-- marketing or SNS text blocks
-- support messages
-- URLs and short boilerplate
+- réponses répétées
+- modèles de commandes
+- blocs de texte marketing ou pour les réseaux sociaux
+- messages de support
+- URL et courts textes standard
 
-## Paste count badges
+## Badges de nombre de collages
 
-Paste count badges show how many times an item has been pasted.
+Les badges de nombre de collages indiquent combien de fois un élément a été collé.
 
-This helps you notice:
+Cela vous aide à repérer :
 
-- text you reuse often
-- commands you repeatedly run
-- assets or snippets that are central to your workflow
-- copy/paste patterns that may be worth turning into snippets or automation
+- le texte que vous réutilisez souvent
+- les commandes que vous exécutez régulièrement
+- les ressources ou snippets centraux dans votre flux de travail
+- les schémas de copier-coller qui pourraient mériter de devenir des snippets ou des automatisations
 
-## Image clipboard support
+## Prise en charge des images du presse-papiers
 
-Board-Man supports image clipboard entries and can show image-only clipboard content in the history list.
+Board-Man prend en charge les entrées d'image du presse-papiers et peut afficher le contenu uniquement composé d'une image dans la liste de l'historique.
 
-This is useful when copying:
+C'est utile lors de la copie de :
 
-- screenshots
-- graphics
-- design references
-- visual clipboard content between apps
+- captures d'écran
+- graphiques
+- références de design
+- contenu visuel du presse-papiers entre apps
 
-Image entries use a timestamp-based identity so generic names such as `TIFF image` or `PNG image` do not collide in paste counts.
+Les entrées d'image utilisent une identité basée sur l'horodatage afin que les noms génériques comme `TIFF image` ou `PNG image` n'entrent pas en collision dans les compteurs de collage.
 
-## Search and keyboard navigation
+## Recherche et navigation au clavier
 
-Use search to filter clipboard history. The panel is designed for keyboard-driven use so you can search, move through results, and paste without leaving the current workflow.
+Utilisez la recherche pour filtrer l'historique du presse-papiers. Le panneau est conçu pour une utilisation au clavier afin de rechercher, parcourir les résultats et coller sans quitter le flux de travail en cours.
 
-## Settings and appearance
+## Réglages et apparence
 
-Board-Man includes settings for menu behavior, shortcuts, history limits, and visual appearance. Depending on the current build, you can use theme and lighter display options to make the panel easier to read.
+Board-Man inclut des réglages pour le comportement du menu, les raccourcis, les limites d'historique et l'apparence visuelle. Selon la build actuelle, vous pouvez utiliser des options de thème et d'affichage plus clair pour rendre le panneau plus lisible.
 
-## Privacy
+## Confidentialité
 
-Board-Man is a local macOS utility. Clipboard contents are handled locally by the app. Do not store secrets, tokens, passwords, or private customer data in clipboard history unless you understand the risk.
+Board-Man est un utilitaire macOS local. Le contenu du presse-papiers est traité localement par l'app. Ne stockez pas de secrets, tokens, mots de passe ou données privées de clients dans l'historique du presse-papiers sauf si vous comprenez le risque.
 
-## License and attribution
+## Licence et attribution
 
-Board-Man is a heavily modified derivative work based on Clipy.
+Board-Man est une oeuvre dérivée fortement modifiée basée sur Clipy.
 
-This repository preserves upstream attribution and license notices:
+Ce dépôt conserve l'attribution et les avis de licence du projet amont :
 
 - `ATTRIBUTION.md`
 - `LICENSE`
 - `LICENSE_CLIPMENU`
 
-Board-Man is distributed under the MIT license terms inherited from Clipy. It is not endorsed by the upstream Clipy or ClipMenu maintainers.
+Board-Man est distribué sous les conditions de la licence MIT héritées de Clipy. Il n'est pas approuvé par les mainteneurs amont de Clipy ou ClipMenu.
