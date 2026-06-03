@@ -13,6 +13,7 @@
 // swiftlint:disable file_length function_body_length type_body_length
 
 import Cocoa
+import Magnet
 import PINCache
 import RealmSwift
 import RxCocoa
@@ -909,7 +910,7 @@ fileprivate enum BoardManPanelTab: Int, CaseIterable {
 }
 
 fileprivate enum BoardManInlineSettingsCategory: Int {
-    case view, behavior, history, privacy
+    case general, view, history, privacy
 }
 
 fileprivate enum BoardManThemePreset: String, CaseIterable {
@@ -1414,6 +1415,17 @@ class BoardManPanel: NSPanel {
     private var themePresetLabel: NSTextField?
     private var themePresetPopup: NSPopUpButton?
     private var themeLightenButton: NSButton?
+    private var generalSectionLabel: NSTextField?
+    private var launchOnLoginButton: NSButton?
+    private var inputPasteCommandButton: NSButton?
+    private var maxHistorySizeLabel: NSTextField?
+    private var maxHistorySizeStepper: NSStepper?
+    private var maxHistorySizeValueLabel: NSTextField?
+    private var statusItemLabel: NSTextField?
+    private var statusItemPopup: NSPopUpButton?
+    private var shortcutSectionLabel: NSTextField?
+    private var mainShortcutLabel: NSTextField?
+    private var mainShortcutValueLabel: NSTextField?
     private var densityLabel: NSTextField?
     private var densityPopup: NSPopUpButton?
     private var clickActionLabel: NSTextField?
@@ -1422,10 +1434,14 @@ class BoardManPanel: NSPanel {
     private var enterActionPopup: NSPopUpButton?
     private var autoCloseButton: NSButton?
     private var dedupeButton: NSButton?
+    private var overwriteSameHistoryButton: NSButton?
     private var reuseTopButton: NSButton?
     private var clearHistoryButton: NSButton?
     private var pauseRecordingButton: NSButton?
     private var excludedAppsButton: NSButton?
+    private var excludedAppsSummaryLabel: NSTextField?
+    private var storedTypesSectionLabel: NSTextField?
+    private var storedTypeButtons: [NSButton] = []
     private var filterSectionLabel: NSTextField?
     private var hideRuleTextField: NSTextField?
     private var hideRuleModePopup: NSPopUpButton?
@@ -1463,7 +1479,7 @@ class BoardManPanel: NSPanel {
     private var keyboardPreviewLockUntil: CFAbsoluteTime = 0
     private var localKeyMonitor: Any?
     private var activeTab: BoardManPanelTab = .history
-    private var activeSettingsCategory: BoardManInlineSettingsCategory = .view
+    private var activeSettingsCategory: BoardManInlineSettingsCategory = .general
     private var activeSnippetCategoryIdentifier: String = BoardManPanel.allCategoriesIdentifier
     fileprivate var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
     var onRefreshRequested: (() -> Void)?
@@ -1474,6 +1490,8 @@ class BoardManPanel: NSPanel {
     func selectSettingsTab() {
         activeTab = .settings
         segmentedControl?.selectedSegment = activeTab.rawValue
+        mainShortcutValueLabel?.stringValue = BoardManPanel.shortcutText(AppEnvironment.current.hotKeyService.mainKeyCombo)
+        refreshExcludedAppsSummary()
         selectedIndex = -1
         hoveredRow = -1
         hidePreviewBubble()
@@ -1589,6 +1607,29 @@ class BoardManPanel: NSPanel {
 
     private static func allowedThemePresetTitle(_ value: String?) -> String {
         return BoardManThemePreset.allowed(value).title
+    }
+
+    private static func statusItemTitle(for rawValue: Int) -> String {
+        switch MenuManager.StatusType(rawValue: rawValue) ?? .black {
+        case .black: return "Black"
+        case .white: return "White"
+        case .none: return "Hidden"
+        }
+    }
+
+    private static func statusItemValue(for title: String?) -> Int {
+        switch title {
+        case "Hidden": return MenuManager.StatusType.none.rawValue
+        case "White": return MenuManager.StatusType.white.rawValue
+        default: return MenuManager.StatusType.black.rawValue
+        }
+    }
+
+    private static func shortcutText(_ keyCombo: KeyCombo?) -> String {
+        guard let keyCombo else { return "Not set" }
+        let key = keyCombo.characters.isEmpty ? keyCombo.keyEquivalent : keyCombo.characters
+        let text = keyCombo.keyEquivalentModifierMaskString + key.uppercased()
+        return text.isEmpty ? "Set" : text
     }
 
     private static func makeSectionLabel(_ title: String) -> NSTextField {
@@ -1725,8 +1766,8 @@ class BoardManPanel: NSPanel {
 
         let categoryControl = NSSegmentedControl(frame: .zero)
         categoryControl.segmentCount = 4
-        categoryControl.setLabel("View", forSegment: 0)
-        categoryControl.setLabel("Behavior", forSegment: 1)
+        categoryControl.setLabel("General", forSegment: 0)
+        categoryControl.setLabel("View", forSegment: 1)
         categoryControl.setLabel("History", forSegment: 2)
         categoryControl.setLabel("Privacy", forSegment: 3)
         categoryControl.selectedSegment = 0
@@ -1737,6 +1778,85 @@ class BoardManPanel: NSPanel {
         }
         contentView.addSubview(categoryControl)
         settingsCategoryControl = categoryControl
+
+        let generalTitle = BoardManPanel.makeSectionLabel("General")
+        contentView.addSubview(generalTitle)
+        generalSectionLabel = generalTitle
+
+        let launchOnLogin = NSButton(checkboxWithTitle: "Launch on Login", target: self, action: #selector(launchOnLoginChanged(_:)))
+        launchOnLogin.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.loginItem) ? .on : .off
+        launchOnLogin.font = NSFont.systemFont(ofSize: 11)
+        if #available(macOS 10.14, *) {
+            launchOnLogin.contentTintColor = .labelColor
+        }
+        contentView.addSubview(launchOnLogin)
+        launchOnLoginButton = launchOnLogin
+
+        let pasteCommand = NSButton(checkboxWithTitle: "Send Command+V", target: self, action: #selector(inputPasteCommandChanged(_:)))
+        pasteCommand.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.inputPasteCommand) ? .on : .off
+        pasteCommand.font = NSFont.systemFont(ofSize: 11)
+        pasteCommand.toolTip = "Sends Command+V after selecting a clipboard item."
+        if #available(macOS 10.14, *) {
+            pasteCommand.contentTintColor = .labelColor
+        }
+        contentView.addSubview(pasteCommand)
+        inputPasteCommandButton = pasteCommand
+
+        let maxHistoryLabel = NSTextField(labelWithString: "Max")
+        maxHistoryLabel.font = NSFont.systemFont(ofSize: 11)
+        maxHistoryLabel.textColor = .labelColor
+        contentView.addSubview(maxHistoryLabel)
+        maxHistorySizeLabel = maxHistoryLabel
+
+        let maxHistoryStepper = NSStepper(frame: .zero)
+        maxHistoryStepper.minValue = 1
+        maxHistoryStepper.maxValue = 1000
+        maxHistoryStepper.increment = 10
+        maxHistoryStepper.integerValue = max(1, AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.maxHistorySize))
+        maxHistoryStepper.target = self
+        maxHistoryStepper.action = #selector(maxHistorySizeChanged(_:))
+        contentView.addSubview(maxHistoryStepper)
+        maxHistorySizeStepper = maxHistoryStepper
+
+        let maxHistoryValue = NSTextField(labelWithString: "\(maxHistoryStepper.integerValue)")
+        maxHistoryValue.alignment = .right
+        maxHistoryValue.font = NSFont.systemFont(ofSize: 11)
+        maxHistoryValue.textColor = .labelColor
+        contentView.addSubview(maxHistoryValue)
+        maxHistorySizeValueLabel = maxHistoryValue
+
+        let statusLabel = NSTextField(labelWithString: "Icon")
+        statusLabel.font = NSFont.systemFont(ofSize: 11)
+        statusLabel.textColor = .labelColor
+        contentView.addSubview(statusLabel)
+        statusItemLabel = statusLabel
+
+        let statusPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+        statusPopup.addItems(withTitles: ["Black", "White", "Hidden"])
+        statusPopup.selectItem(withTitle: BoardManPanel.statusItemTitle(for: AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.showStatusItem)))
+        statusPopup.font = NSFont.systemFont(ofSize: 11)
+        statusPopup.target = self
+        statusPopup.action = #selector(statusItemChanged(_:))
+        contentView.addSubview(statusPopup)
+        statusItemPopup = statusPopup
+
+        let shortcutTitle = BoardManPanel.makeSectionLabel("Shortcut")
+        contentView.addSubview(shortcutTitle)
+        shortcutSectionLabel = shortcutTitle
+
+        let shortcutLabel = NSTextField(labelWithString: "Open")
+        shortcutLabel.font = NSFont.systemFont(ofSize: 11)
+        shortcutLabel.textColor = .labelColor
+        contentView.addSubview(shortcutLabel)
+        mainShortcutLabel = shortcutLabel
+
+        let shortcutValue = NSTextField(labelWithString: BoardManPanel.shortcutText(AppEnvironment.current.hotKeyService.mainKeyCombo))
+        shortcutValue.font = NSFont.systemFont(ofSize: 11)
+        shortcutValue.textColor = .secondaryLabelColor
+        shortcutValue.lineBreakMode = .byTruncatingTail
+        shortcutValue.toolTip = "Read-only in this migration phase."
+        contentView.addSubview(shortcutValue)
+        mainShortcutValueLabel = shortcutValue
 
         let viewTitle = BoardManPanel.makeSectionLabel("View")
         contentView.addSubview(viewTitle)
@@ -1904,6 +2024,16 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(dedupe)
         dedupeButton = dedupe
 
+        let overwrite = NSButton(checkboxWithTitle: "Overwrite same", target: self, action: #selector(overwriteSameHistoryChanged(_:)))
+        overwrite.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.overwriteSameHistory) ? .on : .off
+        overwrite.font = NSFont.systemFont(ofSize: 11)
+        overwrite.toolTip = "Uses the same stored history item when duplicate content is allowed."
+        if #available(macOS 10.14, *) {
+            overwrite.contentTintColor = .labelColor
+        }
+        contentView.addSubview(overwrite)
+        overwriteSameHistoryButton = overwrite
+
         let reuseTop = NSButton(checkboxWithTitle: "Reuse top", target: self, action: #selector(reuseTopChanged(_:)))
         reuseTop.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting) ? .on : .off
         reuseTop.font = NSFont.systemFont(ofSize: 11)
@@ -1923,22 +2053,37 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(privacyTitle)
         privacySectionLabel = privacyTitle
 
-        let pause = NSButton(checkboxWithTitle: "Pause", target: nil, action: nil)
-        pause.state = .off
-        pause.font = NSFont.systemFont(ofSize: 11)
-        pause.isEnabled = false
-        pause.toolTip = "Planned: recording pause needs backend support."
-        if #available(macOS 10.14, *) {
-            pause.contentTintColor = .labelColor
-        }
-        contentView.addSubview(pause)
-        pauseRecordingButton = pause
+        let typesTitle = BoardManPanel.makeSectionLabel("Stored Types")
+        contentView.addSubview(typesTitle)
+        storedTypesSectionLabel = typesTitle
 
-        let exclude = NSButton(title: "Exclude", target: self, action: #selector(openExcludedAppsSettings(_:)))
+        let storedTypes = AppEnvironment.current.defaults.dictionary(forKey: Constants.UserDefaults.storeTypes) as? [String: NSNumber] ?? AppDelegate.storeTypesDictinary()
+        storedTypeButtons = CPYClipData.availableTypesString.map { typeName in
+            let button = NSButton(checkboxWithTitle: typeName, target: self, action: #selector(storedTypeChanged(_:)))
+            button.state = (storedTypes[typeName]?.boolValue ?? true) ? .on : .off
+            button.font = NSFont.systemFont(ofSize: 11)
+            button.identifier = NSUserInterfaceItemIdentifier(rawValue: typeName)
+            if #available(macOS 10.14, *) {
+                button.contentTintColor = .labelColor
+            }
+            contentView.addSubview(button)
+            return button
+        }
+
+        let exclude = NSButton(title: "Open legacy excluded apps", target: self, action: #selector(openExcludedAppsSettings(_:)))
         exclude.font = NSFont.systemFont(ofSize: 11)
         exclude.bezelStyle = .rounded
+        exclude.toolTip = "Full add/remove editing still uses the legacy excluded-apps controller."
         contentView.addSubview(exclude)
         excludedAppsButton = exclude
+
+        let excludedSummary = NSTextField(labelWithString: "")
+        excludedSummary.font = NSFont.systemFont(ofSize: 11)
+        excludedSummary.textColor = .secondaryLabelColor
+        excludedSummary.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(excludedSummary)
+        excludedAppsSummaryLabel = excludedSummary
+        refreshExcludedAppsSummary()
 
         let filtersTitle = BoardManPanel.makeSectionLabel("Hide Rules")
         contentView.addSubview(filtersTitle)
@@ -2249,7 +2394,7 @@ class BoardManPanel: NSPanel {
         scrollView?.layer?.shadowOffset = NSSize(width: 0, height: -3)
         scrollView?.drawsBackground = !useGlass
         placeholderList?.backgroundColor = .clear
-        [rowNumbersButton, usageCountButton, themeLightenButton, autoCloseButton, dedupeButton, reuseTopButton, pauseRecordingButton].forEach { button in
+        ([launchOnLoginButton, inputPasteCommandButton, rowNumbersButton, usageCountButton, themeLightenButton, autoCloseButton, dedupeButton, overwriteSameHistoryButton, reuseTopButton] + storedTypeButtons.map { Optional($0) }).forEach { button in
             if #available(macOS 10.14, *) {
                 button?.contentTintColor = accentColor
             }
@@ -2259,10 +2404,10 @@ class BoardManPanel: NSPanel {
                 button?.contentTintColor = themePreset == .defaultPreset ? .labelColor : accentColor
             }
         }
-        [viewSectionLabel, behaviorSectionLabel, historySectionLabel, privacySectionLabel, filterSectionLabel, labsSectionLabel, snippetCategoryLabel].forEach { label in
+        [generalSectionLabel, shortcutSectionLabel, viewSectionLabel, behaviorSectionLabel, historySectionLabel, privacySectionLabel, storedTypesSectionLabel, filterSectionLabel, labsSectionLabel, snippetCategoryLabel].forEach { label in
             label?.textColor = themePreset == .defaultPreset ? .labelColor : accentColor
         }
-        [themePresetLabel, timestampLabel, usageStyleLabel, usedItemStyleLabel, clickActionLabel, enterActionLabel, heightControlLabel].forEach { label in
+        [maxHistorySizeLabel, statusItemLabel, mainShortcutLabel, themePresetLabel, timestampLabel, usageStyleLabel, usedItemStyleLabel, clickActionLabel, enterActionLabel, heightControlLabel].forEach { label in
             label?.textColor = NSColor.labelColor.withAlphaComponent(useGlass ? 0.96 : 1)
         }
         snippetCategoryPopup?.wantsLayer = true
@@ -2435,15 +2580,17 @@ class BoardManPanel: NSPanel {
 
     private func layoutInlineSettingsControls(margin: CGFloat, width: CGFloat, topY: CGFloat, isVisible: Bool) {
         let allControls: [NSView?] = [
+            generalSectionLabel, launchOnLoginButton, inputPasteCommandButton, maxHistorySizeLabel, maxHistorySizeStepper, maxHistorySizeValueLabel, statusItemLabel, statusItemPopup, shortcutSectionLabel, mainShortcutLabel, mainShortcutValueLabel,
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, themeLightenButton, densityLabel, densityPopup,
-            behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton,
-            historySectionLabel, dedupeButton, reuseTopButton, clearHistoryButton,
-            privacySectionLabel, pauseRecordingButton, excludedAppsButton,
+            historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton,
+            privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
             labsSectionLabel, labsNoteLabel,
             heightControlLabel, heightLabel, heightStepper
         ]
         allControls.forEach { $0?.isHidden = true }
+        [behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton, pauseRecordingButton].forEach { $0?.isHidden = true }
+        storedTypeButtons.forEach { $0.isHidden = true }
         settingsCategoryControl?.isHidden = true
         guard isVisible else { return }
 
@@ -2459,10 +2606,21 @@ class BoardManPanel: NSPanel {
         let rightX = contentX + columnWidth + columnGap
         let firstY = topY - (useTwoColumns ? 34 : 74)
 
+        let generalControls: [NSView?] = [
+            generalSectionLabel, launchOnLoginButton, inputPasteCommandButton,
+            maxHistorySizeLabel, maxHistorySizeStepper, maxHistorySizeValueLabel,
+            statusItemLabel, statusItemPopup, shortcutSectionLabel,
+            mainShortcutLabel, mainShortcutValueLabel
+        ]
         let viewControls: [NSView?] = [viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, themeLightenButton, densityLabel, densityPopup, heightControlLabel, heightLabel, heightStepper, labsSectionLabel, labsNoteLabel]
-        let behaviorControls: [NSView?] = [behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton]
-        let historyControls: [NSView?] = [historySectionLabel, dedupeButton, reuseTopButton, clearHistoryButton]
-        let privacyControls: [NSView?] = [privacySectionLabel, pauseRecordingButton, excludedAppsButton, filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel]
+        let historyControls: [NSView?] = [historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton]
+        let privacyControls: [NSView?] = [
+            privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel,
+            storedTypesSectionLabel, filterSectionLabel, hideRuleTextField,
+            hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton,
+            clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel,
+            hideRulesNoteLabel
+        ] + storedTypeButtons.map { $0 as NSView }
 
         func show(_ controls: [NSView?]) {
             controls.forEach { $0?.isHidden = false }
@@ -2485,6 +2643,22 @@ class BoardManPanel: NSPanel {
             control?.frame = NSRect(x: originX + labelWidth + 12, y: originY, width: popupWidth(in: width, labelWidth: labelWidth), height: rowH)
         }
 
+        func placeGeneralSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(generalSectionLabel, originX: originX, originY: originY, width: width)
+            launchOnLoginButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 150, height: 18)
+            inputPasteCommandButton?.frame = NSRect(x: originX + 162, y: originY - rowGap, width: 150, height: 18)
+            maxHistorySizeLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 5, width: fieldLabelWidth, height: 14)
+            maxHistorySizeStepper?.frame = NSRect(x: originX + fieldLabelWidth + 12, y: originY - (rowGap * 2) - 10, width: 72, height: rowH)
+            maxHistorySizeValueLabel?.frame = NSRect(x: originX + fieldLabelWidth + 92, y: originY - (rowGap * 2) - 5, width: 52, height: 14)
+            placeLabeledRow(label: statusItemLabel, control: statusItemPopup, originX: originX, originY: originY - (rowGap * 3) - 12, width: width, labelWidth: 42)
+        }
+
+        func placeShortcutSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(shortcutSectionLabel, originX: originX, originY: originY, width: width)
+            mainShortcutLabel?.frame = NSRect(x: originX, y: originY - rowGap + 5, width: 42, height: 14)
+            mainShortcutValueLabel?.frame = NSRect(x: originX + 54, y: originY - rowGap + 5, width: width - 54, height: 14)
+        }
+
         func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(viewSectionLabel, originX: originX, originY: originY, width: width)
             rowNumbersButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 86, height: 18)
@@ -2504,20 +2678,27 @@ class BoardManPanel: NSPanel {
             placeHeader(historySectionLabel, originX: originX, originY: originY, width: width)
             dedupeButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 92, height: 18)
             reuseTopButton?.frame = NSRect(x: originX + 106, y: originY - rowGap, width: 118, height: 18)
-            clearHistoryButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 6, width: 86, height: rowH)
-        }
-
-        func placeBehaviorSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(behaviorSectionLabel, originX: originX, originY: originY, width: width)
-            placeLabeledRow(label: clickActionLabel, control: clickActionPopup, originX: originX, originY: originY - rowGap - 6, width: width)
-            placeLabeledRow(label: enterActionLabel, control: enterActionPopup, originX: originX, originY: originY - (rowGap * 2) - 8, width: width)
-            autoCloseButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 4, width: 120, height: 18)
+            overwriteSameHistoryButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 2, width: 136, height: 18)
+            clearHistoryButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 6, width: 86, height: rowH)
         }
 
         func placePrivacySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(privacySectionLabel, originX: originX, originY: originY, width: width)
-            pauseRecordingButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 92, height: 18)
-            excludedAppsButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 6, width: 92, height: rowH)
+            excludedAppsSummaryLabel?.frame = NSRect(x: originX, y: originY - rowGap + 3, width: width, height: 18)
+            excludedAppsButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 6, width: min(178, width), height: rowH)
+        }
+
+        func placeStoredTypesSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(storedTypesSectionLabel, originX: originX, originY: originY, width: width)
+            let buttonWidth = max(72, floor((width - 8) / 2))
+            for (index, button) in storedTypeButtons.enumerated() {
+                let column = index % 2
+                let row = index / 2
+                button.frame = NSRect(x: originX + CGFloat(column) * (buttonWidth + 8),
+                                      y: originY - rowGap - CGFloat(row * 24),
+                                      width: buttonWidth,
+                                      height: 18)
+            }
         }
 
         func placeFiltersSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -2542,31 +2723,36 @@ class BoardManPanel: NSPanel {
 
         if useTwoColumns {
             show(allControls)
-            placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
-            placeHistorySection(originX: leftX, originY: firstY - 268, width: columnWidth)
-            placeLabsSection(originX: leftX, originY: firstY - 382, width: columnWidth)
-            placeBehaviorSection(originX: rightX, originY: firstY, width: columnWidth)
-            placePrivacySection(originX: rightX, originY: firstY - 146, width: columnWidth)
-            placeFiltersSection(originX: rightX, originY: firstY - 252, width: columnWidth)
+            storedTypeButtons.forEach { $0.isHidden = false }
+            placeGeneralSection(originX: leftX, originY: firstY, width: columnWidth)
+            placeShortcutSection(originX: leftX, originY: firstY - 150, width: columnWidth)
+            placeViewSection(originX: leftX, originY: firstY - 242, width: columnWidth)
+            placeHistorySection(originX: rightX, originY: firstY, width: columnWidth)
+            placePrivacySection(originX: rightX, originY: firstY - 116, width: columnWidth)
+            placeStoredTypesSection(originX: rightX, originY: firstY - 218, width: columnWidth)
+            placeFiltersSection(originX: rightX, originY: firstY - 372, width: columnWidth)
         } else {
             settingsCategoryControl?.isHidden = false
             settingsCategoryControl?.selectedSegment = activeSettingsCategory.rawValue
             settingsCategoryControl?.frame = NSRect(x: leftX, y: topY - 34, width: columnWidth, height: 26)
             switch activeSettingsCategory {
+            case .general:
+                show(generalControls)
+                placeGeneralSection(originX: leftX, originY: firstY, width: columnWidth)
+                placeShortcutSection(originX: leftX, originY: firstY - 150, width: columnWidth)
             case .view:
                 show(viewControls)
                 placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
                 placeLabsSection(originX: leftX, originY: firstY - 296, width: columnWidth)
-            case .behavior:
-                show(behaviorControls)
-                placeBehaviorSection(originX: leftX, originY: firstY, width: columnWidth)
             case .history:
                 show(historyControls)
                 placeHistorySection(originX: leftX, originY: firstY, width: columnWidth)
             case .privacy:
                 show(privacyControls)
+                storedTypeButtons.forEach { $0.isHidden = false }
                 placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
-                placeFiltersSection(originX: leftX, originY: firstY - 112, width: columnWidth)
+                placeStoredTypesSection(originX: leftX, originY: firstY - 112, width: columnWidth)
+                placeFiltersSection(originX: leftX, originY: firstY - 268, width: columnWidth)
             }
         }
     }
@@ -3048,8 +3234,34 @@ class BoardManPanel: NSPanel {
         layoutPanelSubviews()
     }
 
+    @objc private func launchOnLoginChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.loginItem)
+        AppEnvironment.current.defaults.synchronize()
+    }
+
+    @objc private func inputPasteCommandChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.inputPasteCommand)
+    }
+
+    @objc private func maxHistorySizeChanged(_ sender: NSStepper) {
+        let value = max(1, sender.integerValue)
+        sender.integerValue = value
+        maxHistorySizeValueLabel?.stringValue = "\(value)"
+        AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.maxHistorySize)
+        onRefreshRequested?()
+    }
+
+    @objc private func statusItemChanged(_ sender: NSPopUpButton) {
+        AppEnvironment.current.defaults.set(BoardManPanel.statusItemValue(for: sender.titleOfSelectedItem),
+                                            forKey: Constants.UserDefaults.showStatusItem)
+    }
+
     @objc private func dedupeChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .off, forKey: Constants.UserDefaults.copySameHistory)
+    }
+
+    @objc private func overwriteSameHistoryChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.overwriteSameHistory)
     }
 
     @objc private func reuseTopChanged(_ sender: NSButton) {
@@ -3070,7 +3282,17 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func openExcludedAppsSettings(_ sender: NSButton) {
-        (NSApp.delegate as? AppDelegate)?.showPreferenceWindow()
+        AppEnvironment.current.menuManager.hideBoardManPanelForPreferences()
+        NSApp.activate(ignoringOtherApps: true)
+        CPYPreferencesWindowController.sharedController.showWindow(self)
+    }
+
+    @objc private func storedTypeChanged(_ sender: NSButton) {
+        guard let typeName = sender.identifier?.rawValue else { return }
+        var storeTypes = AppEnvironment.current.defaults.dictionary(forKey: Constants.UserDefaults.storeTypes) as? [String: NSNumber] ?? AppDelegate.storeTypesDictinary()
+        storeTypes[typeName] = NSNumber(value: sender.state == .on)
+        AppEnvironment.current.defaults.set(storeTypes, forKey: Constants.UserDefaults.storeTypes)
+        AppEnvironment.current.defaults.synchronize()
     }
 
     @objc private func addHideRuleRequested(_ sender: Any?) {
@@ -3112,6 +3334,17 @@ class BoardManPanel: NSPanel {
         hideRulesExamplesLabel?.stringValue = "Examples: \(sample)"
         removeLastHideRuleButton?.isEnabled = true
         clearHideRulesButton?.isEnabled = true
+    }
+
+    private func refreshExcludedAppsSummary() {
+        let apps = AppEnvironment.current.excludeAppService.applications
+        guard !apps.isEmpty else {
+            excludedAppsSummaryLabel?.stringValue = "0 excluded apps"
+            return
+        }
+        let names = apps.prefix(3).map { $0.name }.joined(separator: ", ")
+        let suffix = apps.count > 3 ? " +\(apps.count - 3)" : ""
+        excludedAppsSummaryLabel?.stringValue = "\(apps.count) excluded: \(names)\(suffix)"
     }
 
     @objc private func searchTextChanged(_ sender: NSSearchField) {
