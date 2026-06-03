@@ -159,6 +159,14 @@ extension MenuManager {
         boardManPanel?.selectSettingsTab()
     }
 
+    func showBoardManSnippetsPanel() {
+        showBoardManPanel()
+        guard let panel = boardManPanel else { return }
+        panel.openSnippetsManagerMode()
+        panel.reloadHistoryItems(boardManPanelItems())
+        panel.focusTableForKeyboard()
+    }
+
     fileprivate func handlePanelPaste(dataHash: String, clickStartedAt: CFAbsoluteTime?) {
         guard let panel = boardManPanel else { return }
 
@@ -449,7 +457,7 @@ private extension MenuManager {
         // Keeping the status menu lightweight avoids slow rebuilds after Realm/paste-count changes.
         let menu = NSMenu(title: Constants.Application.name)
         menu.addItem(NSMenuItem(title: String(localized: "Open Board-Man Settings"), action: #selector(AppDelegate.openBoardManSettings)))
-        menu.addItem(NSMenuItem(title: String(localized: "Manage Snippets"), action: #selector(AppDelegate.showSnippetEditorWindow)))
+        menu.addItem(NSMenuItem(title: String(localized: "Manage Snippets"), action: #selector(AppDelegate.openBoardManSnippetsManager)))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: String(localized: "Quit Board-Man"), action: #selector(AppDelegate.terminate)))
 
@@ -1506,6 +1514,18 @@ class BoardManPanel: NSPanel {
         makeFirstResponder(self)
     }
 
+    func openSnippetsManagerMode() {
+        activeTab = .snippets
+        segmentedControl?.selectedSegment = activeTab.rawValue
+        selectedIndex = -1
+        hoveredRow = -1
+        hidePreviewBubble()
+        reloadSnippetCategoryPopup()
+        applyCurrentFilter()
+        layoutPanelSubviews()
+        focusTableForKeyboard()
+    }
+
     fileprivate var isLiquidGlassEnabled: Bool {
         return AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
     }
@@ -1660,7 +1680,7 @@ class BoardManPanel: NSPanel {
 
         snippetSummaryLabel?.stringValue = "\(snippetCount) snippets, \(folders.count) folders (\(enabledSnippetCount) snippets enabled, \(enabledFolderCount) folders enabled)"
         snippetFoldersLabel?.stringValue = "Folders: \(folderPreview)"
-        snippetShortcutsLabel?.stringValue = "Snippet folder shortcuts preserved: \(shortcutCount)"
+        snippetShortcutsLabel?.stringValue = "Modern Snippets tab is default. Folder shortcuts preserved: \(shortcutCount)"
     }
 
     private static func makeSectionLabel(_ title: String) -> NSTextField {
@@ -1918,7 +1938,7 @@ class BoardManPanel: NSPanel {
         let manageSnippets = NSButton(title: "Manage Snippets", target: self, action: #selector(openSnippetManager(_:)))
         manageSnippets.font = NSFont.systemFont(ofSize: 11)
         manageSnippets.bezelStyle = .rounded
-        manageSnippets.toolTip = "Opens the existing snippet manager. Existing snippet shortcuts are preserved."
+        manageSnippets.toolTip = "Opens the Board-Man Snippets tab. Existing snippet shortcuts are preserved."
         contentView.addSubview(manageSnippets)
         manageSnippetsButton = manageSnippets
         refreshSnippetSettingsSummary()
@@ -3373,9 +3393,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func openSnippetManager(_ sender: NSButton) {
-        AppEnvironment.current.menuManager.hideBoardManPanelForPreferences()
-        NSApp.activate(ignoringOtherApps: true)
-        CPYSnippetsEditorWindowController.sharedController.showWindow(self)
+        openSnippetsManagerMode()
     }
 
     @objc private func storedTypeChanged(_ sender: NSButton) {

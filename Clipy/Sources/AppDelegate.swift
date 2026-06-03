@@ -59,6 +59,10 @@ class AppDelegate: NSObject, NSMenuItemValidation {
         showPreferenceWindow()
     }
 
+    @objc func openBoardManSnippetsManager() {
+        AppEnvironment.current.menuManager.showBoardManSnippetsPanel()
+    }
+
     @objc func showPreferenceWindow() {
         if AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) {
             AppEnvironment.current.menuManager.showBoardManSettingsPanel()
