@@ -89,6 +89,11 @@ extension MenuManager {
     }
 
     func popUpSnippetFolder(_ folder: CPYFolder) {
+        if AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) {
+            showBoardManSnippetsPanel(folderIdentifier: folder.identifier)
+            return
+        }
+
         let folderMenu = NSMenu(title: folder.title)
         // Folder title
         let labelItem = NSMenuItem(title: folder.title, action: nil)
@@ -159,10 +164,10 @@ extension MenuManager {
         boardManPanel?.selectSettingsTab()
     }
 
-    func showBoardManSnippetsPanel() {
+    func showBoardManSnippetsPanel(folderIdentifier: String? = nil) {
         showBoardManPanel()
         guard let panel = boardManPanel else { return }
-        panel.openSnippetsManagerMode()
+        panel.openSnippetsManagerMode(categoryIdentifier: folderIdentifier)
         panel.reloadHistoryItems(boardManPanelItems())
         panel.focusTableForKeyboard()
     }
@@ -1514,9 +1519,12 @@ class BoardManPanel: NSPanel {
         makeFirstResponder(self)
     }
 
-    func openSnippetsManagerMode() {
+    func openSnippetsManagerMode(categoryIdentifier: String? = nil) {
         activeTab = .snippets
         segmentedControl?.selectedSegment = activeTab.rawValue
+        if let categoryIdentifier {
+            activeSnippetCategoryIdentifier = categoryIdentifier
+        }
         selectedIndex = -1
         hoveredRow = -1
         hidePreviewBubble()
