@@ -34,6 +34,21 @@ Open System Settings > Privacy & Security > Accessibility.
 Confirm `Board-Man` is present and enabled. If there are duplicate entries,
 disable the stale entry and keep only the `/Applications/Board-Man.app` copy.
 
+## Mojibake Check
+
+If Japanese text is visibly broken in the permission alert, first inspect
+`Clipy/Sources/Services/AccessibilityService.swift`. The System Settings button
+must use the intended Japanese label, not a mojibake literal:
+
+```swift
+String(localized: "システム設定を開く")
+```
+
+For copied text, the current pasteboard path reads and writes strings through
+`NSPasteboard.string(forType:)` and `NSPasteboard.setString(_:forType:)`, so it
+should preserve Unicode text. If mojibake appears only in UI labels, treat the
+source or localization string as the first suspect.
+
 ## Input Monitoring
 
 Open System Settings > Privacy & Security > Input Monitoring.
