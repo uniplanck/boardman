@@ -18,7 +18,7 @@
                 <menuItem title="Board-Man" id="Zat-vi-KS9">
                     <menu key="submenu" title="Board-Man" systemMenu="apple" id="VBj-p9-ODY">
                         <items>
-                            <menuItem title="About ClipMenu" id="Pr1-7V-tJO">
+                            <menuItem title="About Board-Man" id="Pr1-7V-tJO">
                                 <modifierMask key="keyEquivalentModifierMask"/>
                             </menuItem>
                             <menuItem isSeparatorItem="YES" id="I6z-OO-O1g">
@@ -34,7 +34,7 @@
                             <menuItem isSeparatorItem="YES" id="0Kd-Pq-IHx">
                                 <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                             </menuItem>
-                            <menuItem title="Hide ClipMenu" keyEquivalent="h" id="LO5-8K-Kr9"/>
+                            <menuItem title="Hide Board-Man" keyEquivalent="h" id="LO5-8K-Kr9"/>
                             <menuItem title="Hide Others" keyEquivalent="h" id="hPA-9S-0Fr">
                                 <modifierMask key="keyEquivalentModifierMask" option="YES" command="YES"/>
                             </menuItem>
@@ -42,7 +42,7 @@
                             <menuItem isSeparatorItem="YES" id="kh7-TQ-Gy7">
                                 <modifierMask key="keyEquivalentModifierMask" command="YES"/>
                             </menuItem>
-                            <menuItem title="Quit ClipMenu" id="imj-9R-rzK"/>
+                            <menuItem title="Quit Board-Man" id="imj-9R-rzK"/>
                         </items>
                     </menu>
                 </menuItem>
@@ -138,7 +138,7 @@
                 <menuItem title="Help" id="0x6-nt-Xpj">
                     <menu key="submenu" title="Help" id="Z2c-gh-pHm">
                         <items>
-                            <menuItem title="ClipMenu Help" keyEquivalent="?" id="Juh-pg-E6E">
+                            <menuItem title="Board-Man Help" keyEquivalent="?" id="Juh-pg-E6E">
                                 <connections>
                                     <action selector="showHelp:" target="-1" id="Wh5-de-Hzq"/>
                                 </connections>
