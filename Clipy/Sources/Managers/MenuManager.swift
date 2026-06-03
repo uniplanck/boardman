@@ -153,6 +153,11 @@ extension MenuManager {
         }
     }
 
+    func showBoardManSettingsPanel() {
+        showBoardManPanel()
+        boardManPanel?.selectSettingsTab()
+    }
+
     fileprivate func handlePanelPaste(dataHash: String, clickStartedAt: CFAbsoluteTime?) {
         guard let panel = boardManPanel else { return }
 
@@ -442,7 +447,7 @@ private extension MenuManager {
         // V4B-14: Panel UI mode does not need legacy history/snippet menu rebuilds.
         // Keeping the status menu lightweight avoids slow rebuilds after Realm/paste-count changes.
         let menu = NSMenu(title: Constants.Application.name)
-        menu.addItem(NSMenuItem(title: String(localized: "Open Board-Man Settings"), action: #selector(AppDelegate.showPreferenceWindow)))
+        menu.addItem(NSMenuItem(title: String(localized: "Open Board-Man Settings"), action: #selector(AppDelegate.openBoardManSettings)))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: String(localized: "Quit Board-Man"), action: #selector(AppDelegate.terminate)))
 
@@ -1465,6 +1470,17 @@ class BoardManPanel: NSPanel {
     var itemCount: Int {
         return historyItems.count
     }
+
+    func selectSettingsTab() {
+        activeTab = .settings
+        segmentedControl?.selectedSegment = activeTab.rawValue
+        selectedIndex = -1
+        hoveredRow = -1
+        hidePreviewBubble()
+        applyCurrentFilter()
+        makeFirstResponder(self)
+    }
+
     fileprivate var isLiquidGlassEnabled: Bool {
         return AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManLiquidGlass)
     }
@@ -1681,7 +1697,11 @@ class BoardManPanel: NSPanel {
         tabs.segmentCount = 3
         tabs.setLabel("History", forSegment: 0)
         tabs.setLabel("Snippets", forSegment: 1)
-        tabs.setLabel("Set", forSegment: 2)
+        tabs.setLabel("Settings", forSegment: 2)
+        if #available(macOS 11.0, *), let settingsImage = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings") {
+            tabs.setImage(settingsImage, forSegment: 2)
+            tabs.setLabel("", forSegment: 2)
+        }
         tabs.selectedSegment = 0
         tabs.target = self
         tabs.action = #selector(tabChanged(_:))
@@ -1983,7 +2003,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(labsTitle)
         labsSectionLabel = labsTitle
 
-        let labsNote = NSTextField(labelWithString: "Glass options stay in Preferences.")
+        let labsNote = NSTextField(labelWithString: "Glass options are available here.")
         labsNote.font = NSFont.systemFont(ofSize: 11)
         labsNote.textColor = .secondaryLabelColor
         contentView.addSubview(labsNote)
