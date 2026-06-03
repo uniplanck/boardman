@@ -1609,19 +1609,25 @@ class BoardManPanel: NSPanel {
         return BoardManThemePreset.allowed(value).title
     }
 
+    private enum StatusItemValue {
+        static let hidden = 0
+        static let black = 1
+        static let white = 2
+    }
+
     private static func statusItemTitle(for rawValue: Int) -> String {
-        switch MenuManager.StatusType(rawValue: rawValue) ?? .black {
-        case .black: return "Black"
-        case .white: return "White"
-        case .none: return "Hidden"
+        switch rawValue {
+        case StatusItemValue.hidden: return "Hidden"
+        case StatusItemValue.white: return "White"
+        default: return "Black"
         }
     }
 
     private static func statusItemValue(for title: String?) -> Int {
         switch title {
-        case "Hidden": return MenuManager.StatusType.none.rawValue
-        case "White": return MenuManager.StatusType.white.rawValue
-        default: return MenuManager.StatusType.black.rawValue
+        case "Hidden": return StatusItemValue.hidden
+        case "White": return StatusItemValue.white
+        default: return StatusItemValue.black
         }
     }
 
