@@ -2,53 +2,117 @@
 
 [English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
 
+Board-Man is a macOS clipboard productivity app derived from Clipy.
 
-Board-Man 是一款基于 Clipy 派生的开源 macOS 剪贴板效率工具。
+It keeps clipboard history available from the menu bar and adds workflow-oriented visibility for people who repeatedly copy, paste, edit, and move text, URLs, commands, and images across apps.
 
-它不只是保存剪贴板历史，而是希望让高频复制、粘贴、编辑和移动文本的工作流更容易被观察和改进。
+> Status: public candidate. This repository is a sanitized open-source edition prepared from an actively developed private build.
 
-![Board-Man clipboard history](../assets/board-man-main-screenshot.png)
+## Screenshot
 
-## 它能做什么
+![Board-Man main screenshot](../assets/board-man-main-screenshot.png)
 
-Board-Man 面向日常工作中反复发生的复制、粘贴、编辑和文本移动场景。
+## What Board-Man can do
 
-主要方向:
+- Keep recent clipboard history available from the menu bar.
+- Save and paste reusable snippets.
+- Show paste count badges for frequently used items.
+- Handle image clipboard entries, including screenshot-like image-only clipboard content.
+- Search clipboard history.
+- Navigate the panel from the keyboard.
+- Pin important items.
+- Adjust shortcuts, history limits, menu behavior, and visual theme options.
+- Run locally on macOS without sending clipboard contents to an external service.
 
-- 查看剪贴板历史
-- 让粘贴活动更可见
-- 改善以复制粘贴为中心的工作流
-- 在菜单栏中查看状态
-- 在本地运行的 macOS 工具
+## Download
 
-## 适合谁
+- [Download Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
+- macOS app archive: `Board-Man-v1.2.3.zip`
 
-- 写作者
-- 开发者
-- 视频、社交媒体和市场运营者
-- 经常处理模板文本和 URL 的用户
-- 复制粘贴工作很多的 Mac 用户
-- 关注本地自动化和工作可视化的人
+## Install and first launch
 
-## 安装
+1. Download `Board-Man-v1.2.3.zip` from the release page.
+2. Unzip the archive.
+3. Move `Board-Man.app` to `/Applications`.
+4. Open Board-Man.
 
-当前版本仍是早期公开候选版本。可用发布版本如下:
+If macOS Gatekeeper blocks the first launch, open **System Settings > Privacy & Security** and allow Board-Man, or Control-click the app and choose **Open**.
 
-- [Board-Man v0.1.1](https://github.com/uniplanck/boardman/releases/tag/v0.1.1)
+## Basic usage
 
-## 许可证与归属
+1. Copy text, a URL, a command, or an image as usual.
+2. Open Board-Man from the menu bar.
+3. Search or move through the clipboard history.
+4. Select an item to paste it into the active app.
+5. Use snippets for text you paste repeatedly.
 
-Board-Man 是基于 Clipy 的修改派生版本。
+## Clipboard history
 
-原项目的 MIT 许可证声明和版权声明保留在以下文件中:
+Board-Man stores recent clipboard items so you can return to text, URLs, commands, and image clipboard entries without copying them again.
 
+Use this when you want to:
+
+- reuse something copied earlier
+- avoid switching between documents only to copy the same text again
+- keep recent commands or URLs close at hand
+- review the flow of copy/paste-heavy work
+
+## Snippets
+
+Snippets are reusable text entries for phrases, templates, URLs, commands, and other content you paste often.
+
+Typical uses:
+
+- repeated replies
+- command templates
+- marketing or SNS text blocks
+- support messages
+- URLs and short boilerplate
+
+## Paste count badges
+
+Paste count badges show how many times an item has been pasted.
+
+This helps you notice:
+
+- text you reuse often
+- commands you repeatedly run
+- assets or snippets that are central to your workflow
+- copy/paste patterns that may be worth turning into snippets or automation
+
+## Image clipboard support
+
+Board-Man supports image clipboard entries and can show image-only clipboard content in the history list.
+
+This is useful when copying:
+
+- screenshots
+- graphics
+- design references
+- visual clipboard content between apps
+
+Image entries use a timestamp-based identity so generic names such as `TIFF image` or `PNG image` do not collide in paste counts.
+
+## Search and keyboard navigation
+
+Use search to filter clipboard history. The panel is designed for keyboard-driven use so you can search, move through results, and paste without leaving the current workflow.
+
+## Settings and appearance
+
+Board-Man includes settings for menu behavior, shortcuts, history limits, and visual appearance. Depending on the current build, you can use theme and lighter display options to make the panel easier to read.
+
+## Privacy
+
+Board-Man is a local macOS utility. Clipboard contents are handled locally by the app. Do not store secrets, tokens, passwords, or private customer data in clipboard history unless you understand the risk.
+
+## License and attribution
+
+Board-Man is a heavily modified derivative work based on Clipy.
+
+This repository preserves upstream attribution and license notices:
+
+- `ATTRIBUTION.md`
 - `LICENSE`
 - `LICENSE_CLIPMENU`
-- `ATTRIBUTION.md`
 
-Board-Man 不是 Clipy / ClipMenu 的官方项目，也不是其认可版本。
-
-## 链接
-
-- GitHub: https://github.com/uniplanck/boardman
-- Website: https://uniplanck.com
+Board-Man is distributed under the MIT license terms inherited from Clipy. It is not endorsed by the upstream Clipy or ClipMenu maintainers.
