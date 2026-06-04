@@ -182,6 +182,22 @@ extension HotKeyService {
         return folderKeyCombos?[identifier]
     }
 
+    func keyComboForSnippetFolder(identifier: String) -> KeyCombo? {
+        return snippetKeyCombo(forIdentifier: identifier)
+    }
+
+    func setSnippetKeyCombo(_ keyCombo: KeyCombo?, forFolder identifier: String) {
+        guard let keyCombo = keyCombo else {
+            clearSnippetKeyCombo(forFolder: identifier)
+            return
+        }
+        registerSnippetHotKey(with: identifier, keyCombo: keyCombo)
+    }
+
+    func clearSnippetKeyCombo(forFolder identifier: String) {
+        unregisterSnippetHotKey(with: identifier)
+    }
+
     func registerSnippetHotKey(with identifier: String, keyCombo: KeyCombo) {
         // Reset hotkey
         unregisterSnippetHotKey(with: identifier)
