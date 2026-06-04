@@ -19,6 +19,8 @@ final class PasteCountInputService {
     private var lastDetectedAt = Date.distantPast
     private let debounceInterval: TimeInterval = 0.45
     private let duplicateDetectionInterval: TimeInterval = 0.12
+    private let boardManPasteSuppressionInterval: TimeInterval = 0.35
+    private let pasteboardMatchDelay: TimeInterval = 0.15
     private let maxLogSize: UInt64 = 128 * 1024
     private let logURL: URL
 
@@ -32,16 +34,18 @@ final class PasteCountInputService {
     func startMonitoring() {
         guard globalMonitor == nil, localMonitor == nil, eventTap == nil else { return }
 
-        log("monitor started accessibilityTrusted=\(AXIsProcessTrusted())")
+        log("monitor started accessibilityTrusted=\(AXIsProcessTrusted()) listenEventTrusted=\(CGPreflightListenEventAccess())")
 
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleNSEventKeyDown(event, source: "global")
         }
+        log(globalMonitor == nil ? "nsevent global monitor unavailable" : "nsevent global monitor active")
 
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleNSEventKeyDown(event, source: "local")
             return event
         }
+        log(localMonitor == nil ? "nsevent local monitor unavailable" : "nsevent local monitor active")
 
         startCGEventTap()
     }
@@ -66,7 +70,7 @@ final class PasteCountInputService {
     }
 
     func suppressNextGlobalPaste() {
-        suppressUntil = Date().addingTimeInterval(0.8)
+        suppressUntil = Date().addingTimeInterval(boardManPasteSuppressionInterval)
         log("suppress next global paste")
     }
 
@@ -108,6 +112,11 @@ final class PasteCountInputService {
     }
 
     private func startCGEventTap() {
+        if !CGPreflightListenEventAccess() {
+            let granted = CGRequestListenEventAccess()
+            log("listen event access requested granted=\(granted)")
+        }
+
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
 
         eventTap = CGEvent.tapCreate(
@@ -120,7 +129,7 @@ final class PasteCountInputService {
         )
 
         guard let eventTap else {
-            log("cg event tap failed; Input Monitoring may be missing")
+            log("cg event tap failed listenEventTrusted=\(CGPreflightListenEventAccess())")
             return
         }
 
@@ -128,7 +137,11 @@ final class PasteCountInputService {
         if let eventTapSource {
             CFRunLoopAddSource(CFRunLoopGetMain(), eventTapSource, .commonModes)
             CGEvent.tapEnable(tap: eventTap, enable: true)
-            log("cg event tap started")
+            log("cg event tap started enabled=\(CGEvent.tapIsEnabled(tap: eventTap))")
+        } else {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            self.eventTap = nil
+            log("cg event tap source failed")
         }
     }
 
@@ -142,7 +155,12 @@ final class PasteCountInputService {
             .takeUnretainedValue()
 
         if type == .tapDisabledByTimeout {
-            service.reenableEventTap(reason: "timeout")
+            service.reenableEventTap(reason: "tapDisabledByTimeout")
+            return Unmanaged.passUnretained(event)
+        }
+
+        if type == .tapDisabledByUserInput {
+            service.reenableEventTap(reason: "tapDisabledByUserInput")
             return Unmanaged.passUnretained(event)
         }
 
@@ -190,9 +208,9 @@ final class PasteCountInputService {
         }
         lastDetectedAt = now
 
-        log("detected cmd+v source=\(source)")
+        log("detected cmd+v source=\(source) scheduling_match_delay=\(pasteboardMatchDelay)")
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + pasteboardMatchDelay) { [weak self] in
             self?.countCurrentClipboardIfNeeded(source: source)
         }
     }
@@ -230,7 +248,7 @@ final class PasteCountInputService {
         lastCountedText = pastedText
         lastCountedAt = now
 
-        log("count increment success source=\(source)")
+        log("count increment success source=\(source) key=\(key)")
     }
 
     private func rotateLogIfNeeded() {
