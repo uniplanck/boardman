@@ -23,6 +23,7 @@
 		C5F1B7331FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F1B7321FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift */; };
 		FA08EDF81D1FED7D000D1D13 /* HotKeyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */; };
 		FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CE71DDCC61600AC9052 /* ClipService.swift */; };
+		FA0D5CEE1DDCC61600AC9052 /* Entitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */; };
 		FA0D5CEA1DDCC61600AC9052 /* PasteCountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CE91DDCC61600AC9052 /* PasteCountStore.swift */; };
 		FA0D5CEC1DDCC61600AC9052 /* PasteCountInputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CEB1DDCC61600AC9052 /* PasteCountInputService.swift */; };
 		FA1189331E4CD58C00244F12 /* ExcludeAppService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1189321E4CD58C00244F12 /* ExcludeAppService.swift */; };
@@ -150,6 +151,7 @@
 		C5F1B7321FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPasteboard+Deprecated.swift"; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
+		FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Entitlement.swift; sourceTree = "<group>"; };
 		FA0D5CE91DDCC61600AC9052 /* PasteCountStore.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PasteCountStore.swift; sourceTree = "<group>"; };
 		FA0D5CEB1DDCC61600AC9052 /* PasteCountInputService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PasteCountInputService.swift; sourceTree = "<group>"; };
 		FA1189321E4CD58C00244F12 /* ExcludeAppService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExcludeAppService.swift; sourceTree = "<group>"; };
@@ -285,6 +287,7 @@
 			isa = PBXGroup;
 			children = (
 				FA0D5CE71DDCC61600AC9052 /* ClipService.swift */,
+				FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */,
 				FA0D5CE91DDCC61600AC9052 /* PasteCountStore.swift */,
 				FA0D5CEB1DDCC61600AC9052 /* PasteCountInputService.swift */,
 				FAE911B81DE045E2008A4BEC /* HotKeyService.swift */,
@@ -691,6 +694,7 @@
 				FA1DB4BC1DDCB452007F95C8 /* Realm+NoCatch.swift in Sources */,
 				FA1DB4B91DDCB452007F95C8 /* NSMenuItem+Initialize.swift in Sources */,
 				FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */,
+				FA0D5CEE1DDCC61600AC9052 /* Entitlement.swift in Sources */,
 				FA0D5CEA1DDCC61600AC9052 /* PasteCountStore.swift in Sources */,
 				FA0D5CEC1DDCC61600AC9052 /* PasteCountInputService.swift in Sources */,
 				FA1DB4C91DDCB460007F95C8 /* MenuManager.swift in Sources */,
