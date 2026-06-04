@@ -3302,8 +3302,7 @@ class BoardManPanel: NSPanel {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Delete Group")
         alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard runSnippetPanelAlert(alert) == .alertFirstButtonReturn else { return }
 
         let realm = try! Realm()
         guard let savedFolder = realm.object(ofType: CPYFolder.self, forPrimaryKey: folder.identifier) else { return }
@@ -3332,9 +3331,7 @@ class BoardManPanel: NSPanel {
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
         field.stringValue = initialTitle
         alert.accessoryView = field
-        NSApp.activate(ignoringOtherApps: true)
-        alert.window.initialFirstResponder = field
-        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        guard runSnippetPanelAlert(alert, initialFirstResponder: field) == .alertFirstButtonReturn else { return nil }
         let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             showSnippetValidationAlert(message: "Group name is required.")
@@ -3437,8 +3434,7 @@ class BoardManPanel: NSPanel {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Delete")
         alert.addButton(withTitle: "Cancel")
-        NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        guard runSnippetPanelAlert(alert) == .alertFirstButtonReturn else { return }
 
         let realm = try! Realm()
         guard let snippet = realm.object(ofType: CPYSnippet.self, forPrimaryKey: item.dataHash) else {
@@ -3515,9 +3511,7 @@ class BoardManPanel: NSPanel {
         accessory.addSubview(scroll)
 
         alert.accessoryView = accessory
-        NSApp.activate(ignoringOtherApps: true)
-        alert.window.initialFirstResponder = initialTitle.isEmpty ? titleField : textView
-        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        guard runSnippetPanelAlert(alert, initialFirstResponder: initialTitle.isEmpty ? titleField : textView) == .alertFirstButtonReturn else { return nil }
         let categoryIdentifier = (categoryPopup.selectedItem?.representedObject as? String) ?? BoardManPanel.allCategoriesIdentifier
         return (titleField.stringValue, textView.string, categoryIdentifier)
     }
@@ -3533,8 +3527,34 @@ class BoardManPanel: NSPanel {
         alert.informativeText = message
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
+        runSnippetPanelAlert(alert)
+    }
+
+    @discardableResult
+    private func runSnippetPanelAlert(_ alert: NSAlert, initialFirstResponder: NSView? = nil) -> NSApplication.ModalResponse {
         NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
+        if isVisible {
+            makeKey()
+            orderFrontRegardless()
+        } else {
+            makeKeyAndOrderFront(nil)
+        }
+        alert.window.initialFirstResponder = initialFirstResponder
+        alert.window.level = .modalPanel
+
+        guard isVisible else {
+            alert.window.center()
+            alert.window.orderFrontRegardless()
+            return alert.runModal()
+        }
+
+        var response = NSApplication.ModalResponse.abort
+        alert.beginSheetModal(for: self) { result in
+            response = result
+            NSApp.stopModal()
+        }
+        NSApp.runModal(for: alert.window)
+        return response
     }
 
     private func populateCategoryPopup(_ popup: NSPopUpButton, selectedIdentifier: String) {
