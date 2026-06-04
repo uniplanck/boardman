@@ -28,13 +28,19 @@ final class PasteCountInputService {
         let logDirectory = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs/Board-Man", isDirectory: true)
         try? FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
-        self.logURL = logDirectory.appendingPathComponent("paste-count.log")
+        self.logURL = logDirectory.appendingPathComponent("paste-count-input.log")
+        log("service initialized logFile=\(logURL.path)")
     }
 
     func startMonitoring() {
-        guard globalMonitor == nil, localMonitor == nil, eventTap == nil else { return }
+        log("startMonitoring called")
 
-        log("monitor started accessibilityTrusted=\(AXIsProcessTrusted()) listenEventTrusted=\(CGPreflightListenEventAccess())")
+        guard globalMonitor == nil, localMonitor == nil, eventTap == nil else {
+            log("startMonitoring skipped reason=already_active")
+            return
+        }
+
+        log("permission status accessibilityTrusted=\(AXIsProcessTrusted()) listenEventTrusted=\(CGPreflightListenEventAccess())")
 
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleNSEventKeyDown(event, source: "global")
