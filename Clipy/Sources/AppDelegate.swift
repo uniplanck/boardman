@@ -126,7 +126,6 @@ class AppDelegate: NSObject, NSMenuItemValidation {
         if didPaste {
             PasteCountStore.shared.markUsed(clip: clip, in: realm)
             if isInputLikeTarget {
-                PasteCountInputService.shared.suppressNextGlobalPaste()
                 PasteCountStore.shared.increment(forKey: pasteCountKey)
             }
         }

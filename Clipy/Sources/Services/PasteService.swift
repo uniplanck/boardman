@@ -168,6 +168,7 @@ extension PasteService {
         }
 
         let vKeyCode = Sauce.shared.keyCode(for: .v, cocoaModifiers: .command)
+        PasteCountInputService.shared.suppressNextGlobalPaste()
         DispatchQueue.main.async {
             let source = CGEventSource(stateID: .combinedSessionState)
             // Disable local keyboard events while pasting

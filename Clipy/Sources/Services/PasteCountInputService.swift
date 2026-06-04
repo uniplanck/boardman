@@ -133,16 +133,32 @@ final class PasteCountInputService {
     }
 
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, refcon in
-        guard type == .keyDown, let refcon else {
+        guard let refcon else {
             return Unmanaged.passUnretained(event)
         }
 
         let service = Unmanaged<PasteCountInputService>
             .fromOpaque(refcon)
             .takeUnretainedValue()
+
+        if type == .tapDisabledByTimeout {
+            service.reenableEventTap(reason: "timeout")
+            return Unmanaged.passUnretained(event)
+        }
+
+        guard type == .keyDown else {
+            return Unmanaged.passUnretained(event)
+        }
+
         service.handleCGEventKeyDown(event)
 
         return Unmanaged.passUnretained(event)
+    }
+
+    private func reenableEventTap(reason: String) {
+        guard let eventTap else { return }
+        CGEvent.tapEnable(tap: eventTap, enable: true)
+        log("cg event tap reenabled reason=\(reason)")
     }
 
     private func handleNSEventKeyDown(_ event: NSEvent, source: String) {
