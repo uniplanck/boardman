@@ -346,6 +346,7 @@ private extension CPYPreferencesWindowController {
             view.addSubview(paneGlass, positioned: .below, relativeTo: nil)
         }
         stylePreferenceSubviews(in: view, depth: 0)
+        styleAppearanceSectionIfPresent(in: view, useLiquidGlass: useLiquidGlass)
     }
 
     func stylePreferenceSubviews(in view: NSView, depth: Int) {
@@ -393,6 +394,54 @@ private extension CPYPreferencesWindowController {
             }
             stylePreferenceSubviews(in: subview, depth: depth + 1)
         }
+    }
+
+    func styleAppearanceSectionIfPresent(in view: NSView, useLiquidGlass: Bool) {
+        guard let titleLabel = view.subviews.compactMap({ $0 as? NSTextField }).first(where: { $0.stringValue == "Appearance" }),
+              let statusLabel = view.subviews.compactMap({ $0 as? NSTextField }).first(where: { $0.stringValue == "Menu bar icon style:" }),
+              let statusControl = view.subviews.compactMap({ $0 as? NSPopUpButton }).first(where: { $0.frame.minY >= 10 && $0.frame.maxY <= 45 }) else {
+            return
+        }
+
+        let cardIdentifier = NSUserInterfaceItemIdentifier("BoardManAppearancePreferenceCard")
+        view.subviews
+            .filter { $0.identifier == cardIdentifier }
+            .forEach { $0.removeFromSuperview() }
+
+        let cardFrame = NSRect(
+            x: min(titleLabel.frame.minX, statusLabel.frame.minX) - 12,
+            y: min(statusLabel.frame.minY, statusControl.frame.minY) - 8,
+            width: max(statusControl.frame.maxX, statusLabel.frame.maxX) - min(titleLabel.frame.minX, statusLabel.frame.minX) + 24,
+            height: titleLabel.frame.maxY - min(statusLabel.frame.minY, statusControl.frame.minY) + 16
+        )
+        let card = NSView(frame: cardFrame)
+        card.identifier = cardIdentifier
+        card.wantsLayer = true
+        card.layer?.cornerRadius = 8
+        card.layer?.masksToBounds = true
+        card.layer?.backgroundColor = (useLiquidGlass
+            ? NSColor.black.withAlphaComponent(0.16)
+            : NSColor(calibratedWhite: 0.12, alpha: 1)).cgColor
+        card.layer?.borderColor = (useLiquidGlass
+            ? NSColor.white.withAlphaComponent(0.14)
+            : NSColor(calibratedWhite: 0.20, alpha: 1)).cgColor
+        card.layer?.borderWidth = 1
+
+        let accent = NSView(frame: NSRect(x: 0, y: 0, width: 3, height: cardFrame.height))
+        accent.wantsLayer = true
+        accent.layer?.backgroundColor = NSColor.systemRed.withAlphaComponent(useLiquidGlass ? 0.88 : 0.95).cgColor
+        card.addSubview(accent)
+
+        titleLabel.textColor = NSColor.systemRed
+        statusControl.wantsLayer = true
+        statusControl.layer?.cornerRadius = 6
+        statusControl.layer?.backgroundColor = (useLiquidGlass
+            ? NSColor.textBackgroundColor.withAlphaComponent(0.10)
+            : NSColor(calibratedWhite: 0.15, alpha: 1)).cgColor
+        statusControl.layer?.borderColor = NSColor.systemRed.withAlphaComponent(useLiquidGlass ? 0.24 : 0.18).cgColor
+        statusControl.layer?.borderWidth = 1
+
+        view.addSubview(card, positioned: .below, relativeTo: titleLabel)
     }
 }
 
