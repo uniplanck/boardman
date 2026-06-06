@@ -24,6 +24,7 @@
 		FA08EDF81D1FED7D000D1D13 /* HotKeyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */; };
 		FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CE71DDCC61600AC9052 /* ClipService.swift */; };
 		FA0D5CEE1DDCC61600AC9052 /* Entitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */; };
+		FA0D5CF61DDCC61600AC9052 /* LicenseActivationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF51DDCC61600AC9052 /* LicenseActivationClient.swift */; };
 		FA0D5CF01DDCC61600AC9052 /* LocalDeviceIdentityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CEF1DDCC61600AC9052 /* LocalDeviceIdentityService.swift */; };
 		FA0D5CF21DDCC61600AC9052 /* LicenseToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF11DDCC61600AC9052 /* LicenseToken.swift */; };
 		FA0D5CF41DDCC61600AC9052 /* LicenseTokenVerifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF31DDCC61600AC9052 /* LicenseTokenVerifier.swift */; };
@@ -155,6 +156,7 @@
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
 		FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Entitlement.swift; sourceTree = "<group>"; };
+		FA0D5CF51DDCC61600AC9052 /* LicenseActivationClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LicenseActivationClient.swift; sourceTree = "<group>"; };
 		FA0D5CEF1DDCC61600AC9052 /* LocalDeviceIdentityService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LocalDeviceIdentityService.swift; sourceTree = "<group>"; };
 		FA0D5CF11DDCC61600AC9052 /* LicenseToken.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LicenseToken.swift; sourceTree = "<group>"; };
 		FA0D5CF31DDCC61600AC9052 /* LicenseTokenVerifier.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LicenseTokenVerifier.swift; sourceTree = "<group>"; };
@@ -294,6 +296,7 @@
 			children = (
 				FA0D5CE71DDCC61600AC9052 /* ClipService.swift */,
 				FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */,
+				FA0D5CF51DDCC61600AC9052 /* LicenseActivationClient.swift */,
 				FA0D5CEF1DDCC61600AC9052 /* LocalDeviceIdentityService.swift */,
 				FA0D5CF11DDCC61600AC9052 /* LicenseToken.swift */,
 				FA0D5CF31DDCC61600AC9052 /* LicenseTokenVerifier.swift */,
@@ -704,6 +707,7 @@
 				FA1DB4B91DDCB452007F95C8 /* NSMenuItem+Initialize.swift in Sources */,
 				FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */,
 				FA0D5CEE1DDCC61600AC9052 /* Entitlement.swift in Sources */,
+				FA0D5CF61DDCC61600AC9052 /* LicenseActivationClient.swift in Sources */,
 				FA0D5CF01DDCC61600AC9052 /* LocalDeviceIdentityService.swift in Sources */,
 				FA0D5CF21DDCC61600AC9052 /* LicenseToken.swift in Sources */,
 				FA0D5CF41DDCC61600AC9052 /* LicenseTokenVerifier.swift in Sources */,

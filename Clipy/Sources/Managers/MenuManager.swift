@@ -1629,6 +1629,7 @@ class BoardManPanel: NSPanel {
     private var licenseLimitsLabel: NSTextField?
     private var licenseKeyField: NSTextField?
     private var licenseActivateButton: NSButton?
+    private var licenseActivationStatusLabel: NSTextField?
     private var licenseUpgradeButton: NSButton?
     private var licenseProLockedControlView: BoardManProLockedControlView?
     private var licenseMockNoteLabel: NSTextField?
@@ -2469,13 +2470,19 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(licenseKey)
         licenseKeyField = licenseKey
 
-        let activate = NSButton(title: "Activate", target: nil, action: nil)
+        let activate = NSButton(title: "Activate", target: self, action: #selector(activateLicenseRequested(_:)))
         activate.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         activate.bezelStyle = .rounded
-        activate.isEnabled = false
-        activate.toolTip = "Disabled: production activation is out of scope for this phase."
+        activate.toolTip = "Calls a local stub only. This phase does not activate or store licenses."
         contentView.addSubview(activate)
         licenseActivateButton = activate
+
+        let activationStatus = NSTextField(labelWithString: "Activation client stub only. No license will be stored or enabled.")
+        activationStatus.font = NSFont.systemFont(ofSize: 10)
+        activationStatus.textColor = .tertiaryLabelColor
+        activationStatus.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(activationStatus)
+        licenseActivationStatusLabel = activationStatus
 
         let upgrade = NSButton(title: "Upgrade to Pro", target: self, action: #selector(openLicensePurchasePage(_:)))
         upgrade.font = NSFont.systemFont(ofSize: 11, weight: .medium)
@@ -3052,7 +3059,7 @@ class BoardManPanel: NSPanel {
             historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
-            licenseSectionLabel, licensePlanLabel, licenseStateLabel, licenseLimitsLabel, licenseKeyField, licenseActivateButton, licenseUpgradeButton, licenseProLockedControlView, licenseMockNoteLabel, licenseStateExamplesLabel,
+            licenseSectionLabel, licensePlanLabel, licenseStateLabel, licenseLimitsLabel, licenseKeyField, licenseActivateButton, licenseActivationStatusLabel, licenseUpgradeButton, licenseProLockedControlView, licenseMockNoteLabel, licenseStateExamplesLabel,
             labsSectionLabel, labsNoteLabel,
             heightControlLabel, heightLabel, heightStepper
         ]
@@ -3100,7 +3107,7 @@ class BoardManPanel: NSPanel {
         let licenseControls: [NSView?] = [
             licenseSectionLabel, licensePlanLabel, licenseStateLabel,
             licenseLimitsLabel, licenseKeyField, licenseActivateButton,
-            licenseUpgradeButton, licenseProLockedControlView,
+            licenseActivationStatusLabel, licenseUpgradeButton, licenseProLockedControlView,
             licenseMockNoteLabel, licenseStateExamplesLabel
         ]
 
@@ -3239,10 +3246,11 @@ class BoardManPanel: NSPanel {
             let upgradeWidth: CGFloat = min(126, width)
             licenseKeyField?.frame = NSRect(x: originX, y: originY - 120, width: max(120, width - buttonWidth - 10), height: rowH)
             licenseActivateButton?.frame = NSRect(x: originX + max(120, width - buttonWidth - 10) + 10, y: originY - 122, width: buttonWidth, height: rowH)
-            licenseUpgradeButton?.frame = NSRect(x: originX, y: originY - 158, width: upgradeWidth, height: rowH)
-            licenseProLockedControlView?.frame = NSRect(x: originX, y: originY - 238, width: width, height: 68)
-            licenseMockNoteLabel?.frame = NSRect(x: originX, y: originY - 292, width: width, height: 42)
-            licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 314, width: width, height: 14)
+            licenseActivationStatusLabel?.frame = NSRect(x: originX, y: originY - 142, width: width, height: 16)
+            licenseUpgradeButton?.frame = NSRect(x: originX, y: originY - 176, width: upgradeWidth, height: rowH)
+            licenseProLockedControlView?.frame = NSRect(x: originX, y: originY - 256, width: width, height: 68)
+            licenseMockNoteLabel?.frame = NSRect(x: originX, y: originY - 310, width: width, height: 42)
+            licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 332, width: width, height: 14)
         }
 
         refreshLicenseSummary()
@@ -3949,6 +3957,16 @@ class BoardManPanel: NSPanel {
         NSWorkspace.shared.open(url)
     }
 
+    @objc private func activateLicenseRequested(_ sender: NSButton) {
+        let request = LicenseActivationRequest(
+            licenseKey: licenseKeyField?.stringValue ?? "",
+            localDeviceID: LocalDeviceIdentityService.shared.deviceID()
+        )
+        let response = StubLicenseActivationClient().activate(request)
+        licenseActivationStatusLabel?.stringValue = "\(licenseActivationStatusTitle(response.status)): \(response.message)"
+        licenseActivationStatusLabel?.textColor = response.status == .invalidInput ? .systemRed : .tertiaryLabelColor
+    }
+
     @objc private func clearSnippetFolderShortcut(_ sender: NSButton) {
         guard let identifier = sender.identifier?.rawValue else { return }
         AppEnvironment.current.hotKeyService.clearSnippetKeyCombo(forFolder: identifier)
@@ -4032,6 +4050,15 @@ class BoardManPanel: NSPanel {
         case .invalid: return "Invalid"
         case .offlineGrace: return "Offline Grace"
         case .locked: return "Locked"
+        }
+    }
+
+    private func licenseActivationStatusTitle(_ status: LicenseActivationStatus) -> String {
+        switch status {
+        case .notConfigured: return "Not configured"
+        case .invalidInput: return "Invalid input"
+        case .networkUnavailable: return "Network unavailable"
+        case .unsupported: return "Unsupported"
         }
     }
 
