@@ -932,7 +932,7 @@ fileprivate enum BoardManPanelTab: Int, CaseIterable {
 }
 
 fileprivate enum BoardManInlineSettingsCategory: Int {
-    case general, view, history, snippets, privacy
+    case general, view, history, snippets, privacy, license
 }
 
 private final class BoardManSnippetShortcutRow {
@@ -1518,6 +1518,15 @@ class BoardManPanel: NSPanel {
     private var hideRulesSummaryLabel: NSTextField?
     private var hideRulesExamplesLabel: NSTextField?
     private var hideRulesNoteLabel: NSTextField?
+    private var licenseSectionLabel: NSTextField?
+    private var licensePlanLabel: NSTextField?
+    private var licenseStateLabel: NSTextField?
+    private var licenseLimitsLabel: NSTextField?
+    private var licenseKeyField: NSTextField?
+    private var licenseActivateButton: NSButton?
+    private var licenseUpgradeButton: NSButton?
+    private var licenseMockNoteLabel: NSTextField?
+    private var licenseStateExamplesLabel: NSTextField?
     private var viewSectionLabel: NSTextField?
     private var behaviorSectionLabel: NSTextField?
     private var historySectionLabel: NSTextField?
@@ -1897,12 +1906,13 @@ class BoardManPanel: NSPanel {
         settingsBackgroundView = settingsBackground
 
         let categoryControl = NSSegmentedControl(frame: .zero)
-        categoryControl.segmentCount = 5
+        categoryControl.segmentCount = 6
         categoryControl.setLabel("General", forSegment: 0)
         categoryControl.setLabel("View", forSegment: 1)
         categoryControl.setLabel("History", forSegment: 2)
         categoryControl.setLabel("Snippets", forSegment: 3)
         categoryControl.setLabel("Privacy", forSegment: 4)
+        categoryControl.setLabel("License", forSegment: 5)
         categoryControl.selectedSegment = 0
         categoryControl.target = self
         categoryControl.action = #selector(settingsCategoryChanged(_:))
@@ -2320,6 +2330,68 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(ruleNote)
         hideRulesNoteLabel = ruleNote
         refreshHideRulesSummary()
+
+        let licenseTitle = BoardManPanel.makeSectionLabel("License")
+        contentView.addSubview(licenseTitle)
+        licenseSectionLabel = licenseTitle
+
+        let planLabel = NSTextField(labelWithString: "")
+        planLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        planLabel.textColor = .systemRed
+        planLabel.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(planLabel)
+        licensePlanLabel = planLabel
+
+        let stateLabel = NSTextField(labelWithString: "")
+        stateLabel.font = NSFont.systemFont(ofSize: 11)
+        stateLabel.textColor = .secondaryLabelColor
+        stateLabel.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(stateLabel)
+        licenseStateLabel = stateLabel
+
+        let limitsLabel = NSTextField(labelWithString: "")
+        limitsLabel.font = NSFont.systemFont(ofSize: 11)
+        limitsLabel.textColor = .secondaryLabelColor
+        limitsLabel.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(limitsLabel)
+        licenseLimitsLabel = limitsLabel
+
+        let licenseKey = NSTextField(frame: .zero)
+        licenseKey.placeholderString = "XXXX-XXXX-XXXX-XXXX"
+        licenseKey.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        licenseKey.toolTip = "Mock input only. This phase does not activate or store licenses."
+        contentView.addSubview(licenseKey)
+        licenseKeyField = licenseKey
+
+        let activate = NSButton(title: "Activate", target: nil, action: nil)
+        activate.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        activate.bezelStyle = .rounded
+        activate.isEnabled = false
+        activate.toolTip = "Disabled: production activation is out of scope for this phase."
+        contentView.addSubview(activate)
+        licenseActivateButton = activate
+
+        let upgrade = NSButton(title: "Upgrade to Pro", target: self, action: #selector(openLicensePurchasePage(_:)))
+        upgrade.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        upgrade.bezelStyle = .rounded
+        upgrade.toolTip = "Opens uniplanck.com for the future purchase flow."
+        contentView.addSubview(upgrade)
+        licenseUpgradeButton = upgrade
+
+        let licenseNote = NSTextField(labelWithString: "Local UI mock only. No API calls, payment flow, token verification, Keychain binding, or persistent license storage.")
+        licenseNote.font = NSFont.systemFont(ofSize: 11)
+        licenseNote.textColor = .secondaryLabelColor
+        licenseNote.lineBreakMode = .byWordWrapping
+        contentView.addSubview(licenseNote)
+        licenseMockNoteLabel = licenseNote
+
+        let examples = NSTextField(labelWithString: "UI states: Free / Trial / Pro Active / Expired / Invalid / Offline Grace / Locked")
+        examples.font = NSFont.systemFont(ofSize: 10)
+        examples.textColor = .tertiaryLabelColor
+        examples.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(examples)
+        licenseStateExamplesLabel = examples
+        refreshLicenseSummary()
 
         let labsTitle = BoardManPanel.makeSectionLabel("Labs")
         contentView.addSubview(labsTitle)
@@ -2859,6 +2931,7 @@ class BoardManPanel: NSPanel {
             historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
+            licenseSectionLabel, licensePlanLabel, licenseStateLabel, licenseLimitsLabel, licenseKeyField, licenseActivateButton, licenseUpgradeButton, licenseMockNoteLabel, licenseStateExamplesLabel,
             labsSectionLabel, labsNoteLabel,
             heightControlLabel, heightLabel, heightStepper
         ]
@@ -2903,6 +2976,11 @@ class BoardManPanel: NSPanel {
             clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel,
             hideRulesNoteLabel
         ] + storedTypeButtons.map { $0 as NSView }
+        let licenseControls: [NSView?] = [
+            licenseSectionLabel, licensePlanLabel, licenseStateLabel,
+            licenseLimitsLabel, licenseKeyField, licenseActivateButton,
+            licenseUpgradeButton, licenseMockNoteLabel, licenseStateExamplesLabel
+        ]
 
         func show(_ controls: [NSView?]) {
             controls.forEach { $0?.isHidden = false }
@@ -3030,6 +3108,21 @@ class BoardManPanel: NSPanel {
             labsNoteLabel?.frame = NSRect(x: originX, y: originY - 30, width: width, height: 18)
         }
 
+        func placeLicenseSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            placeHeader(licenseSectionLabel, originX: originX, originY: originY, width: width)
+            licensePlanLabel?.frame = NSRect(x: originX, y: originY - 34, width: width, height: 18)
+            licenseStateLabel?.frame = NSRect(x: originX, y: originY - 58, width: width, height: 18)
+            licenseLimitsLabel?.frame = NSRect(x: originX, y: originY - 82, width: width, height: 18)
+            let buttonWidth: CGFloat = 84
+            let upgradeWidth: CGFloat = min(126, width)
+            licenseKeyField?.frame = NSRect(x: originX, y: originY - 120, width: max(120, width - buttonWidth - 10), height: rowH)
+            licenseActivateButton?.frame = NSRect(x: originX + max(120, width - buttonWidth - 10) + 10, y: originY - 122, width: buttonWidth, height: rowH)
+            licenseUpgradeButton?.frame = NSRect(x: originX, y: originY - 158, width: upgradeWidth, height: rowH)
+            licenseMockNoteLabel?.frame = NSRect(x: originX, y: originY - 210, width: width, height: 42)
+            licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 232, width: width, height: 14)
+        }
+
+        refreshLicenseSummary()
         if useTwoColumns {
             show(allControls)
             storedTypeButtons.forEach { $0.isHidden = false }
@@ -3041,6 +3134,7 @@ class BoardManPanel: NSPanel {
             placePrivacySection(originX: rightX, originY: firstY - 350, width: columnWidth)
             placeStoredTypesSection(originX: rightX, originY: firstY - 452, width: columnWidth)
             placeFiltersSection(originX: rightX, originY: firstY - 606, width: columnWidth)
+            placeLicenseSection(originX: leftX, originY: firstY - 510, width: columnWidth)
         } else {
             settingsCategoryControl?.isHidden = false
             settingsCategoryControl?.selectedSegment = activeSettingsCategory.rawValue
@@ -3066,6 +3160,9 @@ class BoardManPanel: NSPanel {
                 placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
                 placeStoredTypesSection(originX: leftX, originY: firstY - 112, width: columnWidth)
                 placeFiltersSection(originX: leftX, originY: firstY - 268, width: columnWidth)
+            case .license:
+                show(licenseControls)
+                placeLicenseSection(originX: leftX, originY: firstY, width: columnWidth)
             }
         }
     }
@@ -3724,6 +3821,11 @@ class BoardManPanel: NSPanel {
         openSnippetsManagerMode()
     }
 
+    @objc private func openLicensePurchasePage(_ sender: NSButton) {
+        guard let url = URL(string: "https://uniplanck.com") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     @objc private func clearSnippetFolderShortcut(_ sender: NSButton) {
         guard let identifier = sender.identifier?.rawValue else { return }
         AppEnvironment.current.hotKeyService.clearSnippetKeyCombo(forFolder: identifier)
@@ -3779,6 +3881,74 @@ class BoardManPanel: NSPanel {
         hideRulesExamplesLabel?.stringValue = "Examples: \(sample)"
         removeLastHideRuleButton?.isEnabled = true
         clearHideRulesButton?.isEnabled = true
+    }
+
+    private func refreshLicenseSummary() {
+        let snapshot = EntitlementService.shared.currentSnapshot
+        licensePlanLabel?.stringValue = "\(licensePlanTitle(snapshot.plan)) Plan"
+        licenseStateLabel?.stringValue = "\(licenseStateTitle(snapshot.state)): \(licenseStateDescription(snapshot))"
+        licenseStateLabel?.textColor = licenseStateColor(snapshot.state)
+        licenseLimitsLabel?.stringValue = "History \(limitText(snapshot.limits.maxHistoryItems)), snippets \(limitText(snapshot.limits.maxSnippets)), saved searches \(limitText(snapshot.limits.maxSavedSearches))"
+    }
+
+    private func licensePlanTitle(_ plan: EntitlementPlan) -> String {
+        switch plan {
+        case .free: return "Free"
+        case .trial: return "Trial"
+        case .pro: return "Pro"
+        }
+    }
+
+    private func licenseStateTitle(_ state: LicenseState) -> String {
+        switch state {
+        case .free: return "Free"
+        case .trial: return "Trial"
+        case .proActive: return "Pro Active"
+        case .proExpired: return "Expired"
+        case .invalid: return "Invalid"
+        case .offlineGrace: return "Offline Grace"
+        case .locked: return "Locked"
+        }
+    }
+
+    private func licenseStateDescription(_ snapshot: EntitlementSnapshot) -> String {
+        switch snapshot.state {
+        case .free:
+            return "Core clipboard history and snippets are available locally."
+        case .trial:
+            return "Temporary Pro access\(dateSuffix(snapshot.expiresAt, prefix: " until "))."
+        case .proActive:
+            return "Verified Pro entitlement\(dateSuffix(snapshot.lastVerifiedAt, prefix: ", checked "))."
+        case .proExpired:
+            return "Pro entitlement is no longer active."
+        case .invalid:
+            return "License status cannot be trusted."
+        case .offlineGrace:
+            return "Pro is temporarily trusted offline\(dateSuffix(snapshot.offlineGraceExpiresAt, prefix: " until "))."
+        case .locked:
+            return "Feature access is locked by the current entitlement."
+        }
+    }
+
+    private func licenseStateColor(_ state: LicenseState) -> NSColor {
+        switch state {
+        case .proActive: return .systemGreen
+        case .trial, .offlineGrace: return .systemOrange
+        case .invalid, .proExpired, .locked: return .systemRed
+        case .free: return .secondaryLabelColor
+        }
+    }
+
+    private func dateSuffix(_ date: Date?, prefix: String) -> String {
+        guard let date else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return prefix + formatter.string(from: date)
+    }
+
+    private func limitText(_ value: Int) -> String {
+        return value == Int.max ? "unlimited" : "\(value)"
     }
 
     private func refreshExcludedAppsSummary() {
