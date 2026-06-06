@@ -1220,6 +1220,111 @@ fileprivate final class BoardManHideRuleStore {
     }
 }
 
+fileprivate final class BoardManProLockedControlView: NSView {
+
+    private let feature: EntitlementFeature
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let badgeLabel = NSTextField(labelWithString: "PRO")
+    private let explanationLabel = NSTextField(labelWithString: "")
+    private let upgradeButton: NSButton
+    private let lockedControl: NSView
+    private var lockImageView: NSImageView?
+
+    init(title: String,
+         explanation: String,
+         feature: EntitlementFeature,
+         control: NSView,
+         upgradeTarget: AnyObject?,
+         upgradeAction: Selector?) {
+        self.feature = feature
+        self.lockedControl = control
+        self.upgradeButton = NSButton(title: "Upgrade", target: upgradeTarget, action: upgradeAction)
+        super.init(frame: .zero)
+
+        wantsLayer = true
+        layer?.backgroundColor = NSColor(calibratedWhite: 0.12, alpha: 1).cgColor
+        layer?.borderColor = NSColor(calibratedWhite: 0.22, alpha: 1).cgColor
+        layer?.borderWidth = 1
+        layer?.cornerRadius = 8
+
+        if #available(macOS 11.0, *),
+           let lockImage = NSImage(systemSymbolName: "lock.fill", accessibilityDescription: "Locked") {
+            let imageView = NSImageView(image: lockImage)
+            imageView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
+            imageView.contentTintColor = .systemRed
+            addSubview(imageView)
+            lockImageView = imageView
+        }
+
+        titleLabel.stringValue = title
+        titleLabel.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        titleLabel.textColor = .labelColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+        addSubview(titleLabel)
+
+        badgeLabel.font = NSFont.systemFont(ofSize: 10, weight: .bold)
+        badgeLabel.textColor = .white
+        badgeLabel.alignment = .center
+        badgeLabel.wantsLayer = true
+        badgeLabel.layer?.backgroundColor = NSColor.systemRed.cgColor
+        badgeLabel.layer?.cornerRadius = 5
+        badgeLabel.layer?.masksToBounds = true
+        addSubview(badgeLabel)
+
+        explanationLabel.stringValue = explanation
+        explanationLabel.font = NSFont.systemFont(ofSize: 11)
+        explanationLabel.textColor = .secondaryLabelColor
+        explanationLabel.lineBreakMode = .byTruncatingTail
+        addSubview(explanationLabel)
+
+        upgradeButton.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        upgradeButton.bezelStyle = .rounded
+        upgradeButton.toolTip = "Upgrade to unlock this Pro control."
+        addSubview(upgradeButton)
+
+        addSubview(lockedControl)
+        refresh()
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override func layout() {
+        super.layout()
+        let inset: CGFloat = 10
+        let lockSize: CGFloat = 14
+        let badgeWidth: CGFloat = 34
+        let buttonWidth: CGFloat = 74
+        let controlWidth: CGFloat = min(132, max(96, floor(bounds.width * 0.34)))
+        let titleX = inset + lockSize + 6
+        lockImageView?.frame = NSRect(x: inset, y: bounds.height - 25, width: lockSize, height: lockSize)
+        badgeLabel.frame = NSRect(x: min(bounds.width - badgeWidth - inset, titleX + 142), y: bounds.height - 26, width: badgeWidth, height: 16)
+        titleLabel.frame = NSRect(x: titleX, y: bounds.height - 28, width: max(80, badgeLabel.frame.minX - titleX - 8), height: 18)
+        lockedControl.frame = NSRect(x: bounds.width - inset - controlWidth, y: bounds.height - 58, width: controlWidth, height: 24)
+        explanationLabel.frame = NSRect(x: inset, y: 10, width: max(80, bounds.width - inset * 2 - buttonWidth - 10), height: 18)
+        upgradeButton.frame = NSRect(x: bounds.width - inset - buttonWidth, y: 8, width: buttonWidth, height: 24)
+    }
+
+    func refresh() {
+        let canUse = EntitlementGate.canUse(feature)
+        setEnabled(canUse, in: lockedControl)
+        lockedControl.alphaValue = canUse ? 1 : 0.48
+        lockImageView?.isHidden = canUse
+        badgeLabel.isHidden = canUse
+        explanationLabel.textColor = canUse ? .secondaryLabelColor : .tertiaryLabelColor
+        upgradeButton.isHidden = canUse
+        toolTip = canUse ? "Available in your current plan." : "Pro feature. Upgrade to unlock this control."
+    }
+
+    private func setEnabled(_ enabled: Bool, in view: NSView) {
+        if let control = view as? NSControl {
+            control.isEnabled = enabled
+        }
+        view.subviews.forEach { setEnabled(enabled, in: $0) }
+    }
+}
+
 fileprivate struct BoardManHistoryItem {
     let title: String
     let primaryTitle: String
@@ -1525,6 +1630,7 @@ class BoardManPanel: NSPanel {
     private var licenseKeyField: NSTextField?
     private var licenseActivateButton: NSButton?
     private var licenseUpgradeButton: NSButton?
+    private var licenseProLockedControlView: BoardManProLockedControlView?
     private var licenseMockNoteLabel: NSTextField?
     private var licenseStateExamplesLabel: NSTextField?
     private var viewSectionLabel: NSTextField?
@@ -2378,6 +2484,21 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(upgrade)
         licenseUpgradeButton = upgrade
 
+        let proControl = NSPopUpButton(frame: .zero, pullsDown: false)
+        proControl.addItems(withTitles: ["Advanced Accent", "Saved Theme"])
+        proControl.font = NSFont.systemFont(ofSize: 11)
+        proControl.toolTip = "Example Pro control. This phase does not enforce feature execution."
+        let lockedProControl = BoardManProLockedControlView(
+            title: "Advanced appearance",
+            explanation: "Unlock Pro to customize advanced visual presets.",
+            feature: .appearanceAdvanced,
+            control: proControl,
+            upgradeTarget: self,
+            upgradeAction: #selector(openLicensePurchasePage(_:))
+        )
+        contentView.addSubview(lockedProControl)
+        licenseProLockedControlView = lockedProControl
+
         let licenseNote = NSTextField(labelWithString: "Local UI mock only. No API calls, payment flow, token verification, Keychain binding, or persistent license storage.")
         licenseNote.font = NSFont.systemFont(ofSize: 11)
         licenseNote.textColor = .secondaryLabelColor
@@ -2931,7 +3052,7 @@ class BoardManPanel: NSPanel {
             historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
-            licenseSectionLabel, licensePlanLabel, licenseStateLabel, licenseLimitsLabel, licenseKeyField, licenseActivateButton, licenseUpgradeButton, licenseMockNoteLabel, licenseStateExamplesLabel,
+            licenseSectionLabel, licensePlanLabel, licenseStateLabel, licenseLimitsLabel, licenseKeyField, licenseActivateButton, licenseUpgradeButton, licenseProLockedControlView, licenseMockNoteLabel, licenseStateExamplesLabel,
             labsSectionLabel, labsNoteLabel,
             heightControlLabel, heightLabel, heightStepper
         ]
@@ -2979,7 +3100,8 @@ class BoardManPanel: NSPanel {
         let licenseControls: [NSView?] = [
             licenseSectionLabel, licensePlanLabel, licenseStateLabel,
             licenseLimitsLabel, licenseKeyField, licenseActivateButton,
-            licenseUpgradeButton, licenseMockNoteLabel, licenseStateExamplesLabel
+            licenseUpgradeButton, licenseProLockedControlView,
+            licenseMockNoteLabel, licenseStateExamplesLabel
         ]
 
         func show(_ controls: [NSView?]) {
@@ -3118,8 +3240,9 @@ class BoardManPanel: NSPanel {
             licenseKeyField?.frame = NSRect(x: originX, y: originY - 120, width: max(120, width - buttonWidth - 10), height: rowH)
             licenseActivateButton?.frame = NSRect(x: originX + max(120, width - buttonWidth - 10) + 10, y: originY - 122, width: buttonWidth, height: rowH)
             licenseUpgradeButton?.frame = NSRect(x: originX, y: originY - 158, width: upgradeWidth, height: rowH)
-            licenseMockNoteLabel?.frame = NSRect(x: originX, y: originY - 210, width: width, height: 42)
-            licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 232, width: width, height: 14)
+            licenseProLockedControlView?.frame = NSRect(x: originX, y: originY - 238, width: width, height: 68)
+            licenseMockNoteLabel?.frame = NSRect(x: originX, y: originY - 292, width: width, height: 42)
+            licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 314, width: width, height: 14)
         }
 
         refreshLicenseSummary()
@@ -3889,6 +4012,7 @@ class BoardManPanel: NSPanel {
         licenseStateLabel?.stringValue = "\(licenseStateTitle(snapshot.state)): \(licenseStateDescription(snapshot))"
         licenseStateLabel?.textColor = licenseStateColor(snapshot.state)
         licenseLimitsLabel?.stringValue = "History \(limitText(snapshot.limits.maxHistoryItems)), snippets \(limitText(snapshot.limits.maxSnippets)), saved searches \(limitText(snapshot.limits.maxSavedSearches))"
+        licenseProLockedControlView?.refresh()
     }
 
     private func licensePlanTitle(_ plan: EntitlementPlan) -> String {
