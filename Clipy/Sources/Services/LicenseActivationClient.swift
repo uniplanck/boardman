@@ -44,7 +44,7 @@ final class StubLicenseActivationClient: LicenseActivationClient {
 
         return LicenseActivationResponse(
             status: .notConfigured,
-            message: "Activation client is not configured. No network request was made."
+            message: "Local stub only. No network request, license storage, or Pro unlock was performed."
         )
     }
 }
