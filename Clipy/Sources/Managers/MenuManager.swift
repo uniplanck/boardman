@@ -3958,9 +3958,9 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func activateLicenseRequested(_ sender: NSButton) {
+        // Mock activation stays local-only; production activation will provide a device ID explicitly.
         let request = LicenseActivationRequest(
-            licenseKey: licenseKeyField?.stringValue ?? "",
-            localDeviceID: LocalDeviceIdentityService.shared.deviceID()
+            licenseKey: licenseKeyField?.stringValue ?? ""
         )
         let response = StubLicenseActivationClient().activate(request)
         licenseActivationStatusLabel?.stringValue = "\(licenseActivationStatusTitle(response.status)): \(response.message)"
