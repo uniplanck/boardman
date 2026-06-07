@@ -1672,6 +1672,7 @@ class BoardManPanel: NSPanel {
     private var hoveredRow: Int = -1
     private var keyboardPreviewLockUntil: CFAbsoluteTime = 0
     private var localKeyMonitor: Any?
+    private var previewLifecycleObservers: [NSObjectProtocol] = []
     private var activeTab: BoardManPanelTab = .history
     private var activeSettingsCategory: BoardManInlineSettingsCategory = .general
     private var activeSnippetCategoryIdentifier: String = BoardManPanel.allCategoriesIdentifier
@@ -1905,11 +1906,14 @@ class BoardManPanel: NSPanel {
         setupModernContainer()
         setupUI()
         setupPreviewBubble()
+        installPreviewLifecycleObservers()
         applyLiquidGlassStyle()
     }
 
     deinit {
+        hidePreviewBubble()
         removeLocalKeyMonitor()
+        previewLifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     private func setupModernContainer() {
@@ -2872,7 +2876,7 @@ class BoardManPanel: NSPanel {
                              backing: .buffered,
                              defer: false)
         bubble.isReleasedWhenClosed = false
-        bubble.hidesOnDeactivate = false
+        bubble.hidesOnDeactivate = true
         bubble.level = .popUpMenu
         bubble.hasShadow = true
         bubble.backgroundColor = .clear
@@ -2897,6 +2901,19 @@ class BoardManPanel: NSPanel {
             bubble.contentView?.addSubview(imageView)
         }
         previewBubblePanel = bubble
+        addChildWindow(bubble, ordered: .above)
+    }
+
+    private func installPreviewLifecycleObservers() {
+        let center = NotificationCenter.default
+        previewLifecycleObservers = [
+            center.addObserver(forName: NSApplication.didResignActiveNotification, object: NSApp, queue: .main) { [weak self] _ in
+                self?.hidePreviewBubble()
+            },
+            center.addObserver(forName: NSApplication.didHideNotification, object: NSApp, queue: .main) { [weak self] _ in
+                self?.hidePreviewBubble()
+            }
+        ]
     }
 
     private func layoutPanelSubviews() {
@@ -4174,6 +4191,7 @@ class BoardManPanel: NSPanel {
             NSSound.beep()
             return
         }
+        hidePreviewBubble()
         onPasteRequested?(item, startedAt)
     }
 
@@ -4243,6 +4261,7 @@ class BoardManPanel: NSPanel {
             NSSound.beep()
             return
         }
+        hidePreviewBubble()
         onPasteRequested?(item, nil)
     }
 
@@ -4292,6 +4311,22 @@ class BoardManPanel: NSPanel {
         hidePreviewBubble()
         removeLocalKeyMonitor()
         super.orderOut(sender)
+    }
+
+    override func close() {
+        hidePreviewBubble()
+        removeLocalKeyMonitor()
+        super.close()
+    }
+
+    override func resignKey() {
+        hidePreviewBubble()
+        super.resignKey()
+    }
+
+    override func resignMain() {
+        hidePreviewBubble()
+        super.resignMain()
     }
 
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
@@ -4501,6 +4536,7 @@ class BoardManPanel: NSPanel {
             NSSound.beep()
             return
         }
+        hidePreviewBubble()
         onPasteRequested?(item, startedAt)
     }
 
@@ -4596,6 +4632,7 @@ class BoardManPanel: NSPanel {
             table.selectRowIndexes(IndexSet(integer: selectedIndex), byExtendingSelection: false)
         } else {
             table.deselectAll(nil)
+            hidePreviewBubble()
         }
     }
 
