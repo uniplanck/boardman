@@ -8,9 +8,9 @@ import Foundation
 
 struct LicenseActivationRequest: Equatable {
     let licenseKey: String
-    let localDeviceID: String
+    let localDeviceID: String?
 
-    init(licenseKey: String, localDeviceID: String) {
+    init(licenseKey: String, localDeviceID: String? = nil) {
         self.licenseKey = licenseKey.trimmingCharacters(in: .whitespacesAndNewlines)
         self.localDeviceID = localDeviceID
     }
@@ -35,8 +35,7 @@ protocol LicenseActivationClient {
 final class StubLicenseActivationClient: LicenseActivationClient {
 
     func activate(_ request: LicenseActivationRequest) -> LicenseActivationResponse {
-        guard !request.licenseKey.isEmpty,
-              !request.localDeviceID.isEmpty else {
+        guard !request.licenseKey.isEmpty else {
             return LicenseActivationResponse(
                 status: .invalidInput,
                 message: "Enter a license key to test the local activation boundary."
