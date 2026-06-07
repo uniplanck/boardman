@@ -1295,15 +1295,16 @@ fileprivate final class BoardManProLockedControlView: NSView {
         let inset: CGFloat = 10
         let lockSize: CGFloat = 14
         let badgeWidth: CGFloat = 34
-        let buttonWidth: CGFloat = 74
-        let controlWidth: CGFloat = min(132, max(96, floor(bounds.width * 0.34)))
+        let buttonWidth: CGFloat = 78
+        let controlGap: CGFloat = 10
+        let controlWidth = max(96, bounds.width - (inset * 2) - buttonWidth - controlGap)
         let titleX = inset + lockSize + 6
         lockImageView?.frame = NSRect(x: inset, y: bounds.height - 25, width: lockSize, height: lockSize)
         badgeLabel.frame = NSRect(x: min(bounds.width - badgeWidth - inset, titleX + 142), y: bounds.height - 26, width: badgeWidth, height: 16)
         titleLabel.frame = NSRect(x: titleX, y: bounds.height - 28, width: max(80, badgeLabel.frame.minX - titleX - 8), height: 18)
-        lockedControl.frame = NSRect(x: bounds.width - inset - controlWidth, y: bounds.height - 58, width: controlWidth, height: 24)
-        explanationLabel.frame = NSRect(x: inset, y: 10, width: max(80, bounds.width - inset * 2 - buttonWidth - 10), height: 18)
-        upgradeButton.frame = NSRect(x: bounds.width - inset - buttonWidth, y: 8, width: buttonWidth, height: 24)
+        explanationLabel.frame = NSRect(x: inset, y: bounds.height - 50, width: max(80, bounds.width - inset * 2), height: 18)
+        lockedControl.frame = NSRect(x: inset, y: 10, width: controlWidth, height: 24)
+        upgradeButton.frame = NSRect(x: lockedControl.frame.maxX + controlGap, y: 8, width: buttonWidth, height: 24)
     }
 
     func refresh() {
@@ -2477,10 +2478,10 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(activate)
         licenseActivateButton = activate
 
-        let activationStatus = NSTextField(labelWithString: "Activation client stub only. No license will be stored or enabled.")
-        activationStatus.font = NSFont.systemFont(ofSize: 10)
-        activationStatus.textColor = .tertiaryLabelColor
-        activationStatus.lineBreakMode = .byTruncatingTail
+        let activationStatus = NSTextField(labelWithString: "Internal beta: activation is a local stub. No license is stored or enabled.")
+        activationStatus.font = NSFont.systemFont(ofSize: 11)
+        activationStatus.textColor = .secondaryLabelColor
+        activationStatus.lineBreakMode = .byWordWrapping
         contentView.addSubview(activationStatus)
         licenseActivationStatusLabel = activationStatus
 
@@ -2506,7 +2507,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(lockedProControl)
         licenseProLockedControlView = lockedProControl
 
-        let licenseNote = NSTextField(labelWithString: "Local UI mock only. No API calls, payment flow, token verification, Keychain binding, or persistent license storage.")
+        let licenseNote = NSTextField(labelWithString: "Internal beta: activation is a local stub. No license is stored or enabled.")
         licenseNote.font = NSFont.systemFont(ofSize: 11)
         licenseNote.textColor = .secondaryLabelColor
         licenseNote.lineBreakMode = .byWordWrapping
@@ -3242,15 +3243,16 @@ class BoardManPanel: NSPanel {
             licensePlanLabel?.frame = NSRect(x: originX, y: originY - 34, width: width, height: 18)
             licenseStateLabel?.frame = NSRect(x: originX, y: originY - 58, width: width, height: 18)
             licenseLimitsLabel?.frame = NSRect(x: originX, y: originY - 82, width: width, height: 18)
-            let buttonWidth: CGFloat = 84
+            let buttonWidth: CGFloat = 106
             let upgradeWidth: CGFloat = min(126, width)
-            licenseKeyField?.frame = NSRect(x: originX, y: originY - 120, width: max(120, width - buttonWidth - 10), height: rowH)
-            licenseActivateButton?.frame = NSRect(x: originX + max(120, width - buttonWidth - 10) + 10, y: originY - 122, width: buttonWidth, height: rowH)
-            licenseActivationStatusLabel?.frame = NSRect(x: originX, y: originY - 142, width: width, height: 16)
-            licenseUpgradeButton?.frame = NSRect(x: originX, y: originY - 176, width: upgradeWidth, height: rowH)
-            licenseProLockedControlView?.frame = NSRect(x: originX, y: originY - 256, width: width, height: 68)
-            licenseMockNoteLabel?.frame = NSRect(x: originX, y: originY - 310, width: width, height: 42)
-            licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 332, width: width, height: 14)
+            let fieldWidth = max(120, width - buttonWidth - 12)
+            licenseKeyField?.frame = NSRect(x: originX, y: originY - 124, width: fieldWidth, height: rowH)
+            licenseActivateButton?.frame = NSRect(x: originX + fieldWidth + 12, y: originY - 126, width: buttonWidth, height: rowH)
+            licenseActivationStatusLabel?.frame = NSRect(x: originX, y: originY - 166, width: width, height: 34)
+            licenseUpgradeButton?.frame = NSRect(x: originX, y: originY - 208, width: upgradeWidth, height: rowH)
+            licenseProLockedControlView?.frame = NSRect(x: originX, y: originY - 306, width: width, height: 88)
+            licenseMockNoteLabel?.frame = NSRect(x: originX, y: originY - 360, width: width, height: 34)
+            licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 384, width: width, height: 14)
         }
 
         refreshLicenseSummary()
@@ -3964,7 +3966,7 @@ class BoardManPanel: NSPanel {
         )
         let response = StubLicenseActivationClient().activate(request)
         licenseActivationStatusLabel?.stringValue = "\(licenseActivationStatusTitle(response.status)): \(response.message)"
-        licenseActivationStatusLabel?.textColor = response.status == .invalidInput ? .systemRed : .tertiaryLabelColor
+        licenseActivationStatusLabel?.textColor = response.status == .invalidInput ? .systemRed : .secondaryLabelColor
     }
 
     @objc private func clearSnippetFolderShortcut(_ sender: NSButton) {
