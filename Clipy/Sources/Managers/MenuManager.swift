@@ -136,23 +136,14 @@ extension MenuManager {
         if let panel = boardManPanel {
             // V4B-13: position and show first. Heavy Realm/defaults reload happens after first paint.
             let panelSize = NSSize(width: BoardManPanel.preferredPanelWidth(), height: BoardManPanel.preferredPanelHeight())
-            let anchor = anchorPoint ?? NSEvent.mouseLocation
-            var originX = anchor.x - (panelSize.width / 2)
-            var originY = anchor.y - (panelSize.height / 2)
-            if let screen = NSScreen.main {
-                let visibleFrame = screen.visibleFrame
-                originX = max(visibleFrame.minX + 20, min(originX, visibleFrame.maxX - panelSize.width - 20))
-                originY = max(visibleFrame.minY + 20, min(originY, visibleFrame.maxY - panelSize.height - 40))
-            }
-            panel.setFrame(NSRect(x: originX, y: originY, width: panelSize.width, height: panelSize.height),
-                           display: false,
-                           animate: false)
+            let finalFrame = BoardManPanel.cursorRelativeFrame(size: panelSize, anchorPoint: anchorPoint)
+            panel.prepareForFirstVisibleOrder(frame: finalFrame)
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
             panel.focusTableForKeyboard()
             PasteCountInputService.shared.logBoardManPerformance("panel_visible_fast", startedAt: startedAt, details: "items=\(panel.itemCount)")
 
-            DispatchQueue.main.async { [weak self, weak panel] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(80)) { [weak self, weak panel] in
                 guard let self, let panel else { return }
                 panel.reloadHistoryItems(self.boardManInitialPanelItems())
                 panel.focusTableForKeyboard()
@@ -1743,6 +1734,18 @@ class BoardManPanel: NSPanel {
         return 640
     }
 
+    static func cursorRelativeFrame(size panelSize: NSSize, anchorPoint: NSPoint? = nil) -> NSRect {
+        let anchor = anchorPoint ?? NSEvent.mouseLocation
+        var originX = anchor.x - (panelSize.width / 2)
+        var originY = anchor.y - (panelSize.height / 2)
+        if let screen = NSScreen.screens.first(where: { NSMouseInRect(anchor, $0.frame, false) }) ?? NSScreen.main {
+            let visibleFrame = screen.visibleFrame
+            originX = max(visibleFrame.minX + 20, min(originX, visibleFrame.maxX - panelSize.width - 20))
+            originY = max(visibleFrame.minY + 20, min(originY, visibleFrame.maxY - panelSize.height - 40))
+        }
+        return NSRect(x: originX, y: originY, width: panelSize.width, height: panelSize.height)
+    }
+
     static func clampedPanelHeight(_ value: Int) -> Int {
         return min(1200, max(520, value == 0 ? 760 : value))
     }
@@ -1909,6 +1912,8 @@ class BoardManPanel: NSPanel {
         self.level = .popUpMenu
         self.backgroundColor = NSColor.windowBackgroundColor
         self.hasShadow = true
+        self.isRestorable = false
+        self.setFrameAutosaveName("")
         setupModernContainer()
         setupUI()
         setupPreviewBubble()
@@ -3349,6 +3354,12 @@ class BoardManPanel: NSPanel {
         }
     }
 
+    fileprivate func prepareForFirstVisibleOrder(frame finalFrame: NSRect) {
+        alphaValue = 0
+        setFrame(finalFrame, display: false, animate: false)
+        layoutPanelSubviews()
+    }
+
     @objc private func rowNumbersChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowRowNumbers)
         onRefreshRequested?()
@@ -4337,12 +4348,11 @@ class BoardManPanel: NSPanel {
 
     override func makeKeyAndOrderFront(_ sender: Any?) {
         let previousAlpha = alphaValue
-        alphaValue = 0
         layoutPanelSubviews()
         super.makeKeyAndOrderFront(sender)
         installLocalKeyMonitorIfNeeded()
         DispatchQueue.main.async { [weak self] in
-            self?.alphaValue = previousAlpha
+            self?.alphaValue = previousAlpha == 0 ? 1 : previousAlpha
         }
     }
 
