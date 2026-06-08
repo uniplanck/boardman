@@ -15,6 +15,7 @@ final class PasteCountInputService {
     private var eventTapSource: CFRunLoopSource?
     private var eventTapRunLoop: CFRunLoop?
     private var appDidBecomeActiveObserver: NSObjectProtocol?
+    private var isMonitoringStarted = false
     private var isStartingEventTap = false
     private var suppressUntil = Date.distantPast
     private var lastCountedText: String?
@@ -24,46 +25,57 @@ final class PasteCountInputService {
     private let duplicateDetectionInterval: TimeInterval = 0.12
     private let boardManPasteSuppressionInterval: TimeInterval = 0.35
     private let pasteboardMatchDelay: TimeInterval = 0.15
-    private let eventTapStartDelay: TimeInterval = 0.75
+    private let monitorInstallDelay: TimeInterval = 0.30
+    private let eventTapStartDelay: TimeInterval = 1.75
     private let maxLogSize: UInt64 = 128 * 1024
+    private let logQueue = DispatchQueue(label: "com.uniplanck.BoardMan.PasteCountInputService.log", qos: .utility)
     private let logURL: URL
 
     private init() {
         let logDirectory = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs/Board-Man", isDirectory: true)
-        try? FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
         self.logURL = logDirectory.appendingPathComponent("paste-count-input.log")
         log("service initialized logFile=\(logURL.path)")
     }
 
     func startMonitoring() {
+        guard !isMonitoringStarted else {
+            log("startMonitoring skipped reason=already_started")
+            return
+        }
+        isMonitoringStarted = true
         log("startMonitoring attempted")
 
-        logPermissionStatus(context: "startMonitoring")
-
-        installAppDidBecomeActiveRetryIfNeeded()
-
-        if globalMonitor == nil {
-            globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.handleNSEventKeyDown(event, source: "global")
-            }
-            log(globalMonitor == nil ? "nsevent global monitor unavailable" : "nsevent global monitor active")
-        } else {
-            log("nsevent global monitor already_active")
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            self?.logPermissionStatus(context: "startMonitoring")
         }
 
-        if localMonitor == nil {
-            localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                self?.handleNSEventKeyDown(event, source: "local")
-                return event
-            }
-            log(localMonitor == nil ? "nsevent local monitor unavailable" : "nsevent local monitor active")
-        } else {
-            log("nsevent local monitor already_active")
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + monitorInstallDelay) { [weak self] in
+            guard let self else { return }
+            self.installAppDidBecomeActiveRetryIfNeeded()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + eventTapStartDelay) { [weak self] in
-            self?.startCGEventTap(reason: "startMonitoringDeferred")
+            if self.globalMonitor == nil {
+                self.globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    self?.handleNSEventKeyDown(event, source: "global")
+                }
+                self.log(self.globalMonitor == nil ? "nsevent global monitor unavailable" : "nsevent global monitor active")
+            } else {
+                self.log("nsevent global monitor already_active")
+            }
+
+            if self.localMonitor == nil {
+                self.localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                    self?.handleNSEventKeyDown(event, source: "local")
+                    return event
+                }
+                self.log(self.localMonitor == nil ? "nsevent local monitor unavailable" : "nsevent local monitor active")
+            } else {
+                self.log("nsevent local monitor already_active")
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + self.eventTapStartDelay) { [weak self] in
+                self?.startCGEventTap(reason: "startMonitoringDeferred")
+            }
         }
     }
 
@@ -331,17 +343,21 @@ final class PasteCountInputService {
             return
         }
 
-        guard let key = PasteCountStore.shared.keyForLatestClip(matching: pastedText) else {
-            log("matched clip key=no source=\(source)")
-            return
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let key = PasteCountStore.shared.keyForLatestClip(matching: pastedText) else {
+                self?.log("matched clip key=no source=\(source)")
+                return
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                PasteCountStore.shared.increment(forKey: key)
+
+                self?.lastCountedText = pastedText
+                self?.lastCountedAt = now
+
+                self?.log("count increment success source=\(source) key=\(key)")
+            }
         }
-
-        PasteCountStore.shared.increment(forKey: key)
-
-        lastCountedText = pastedText
-        lastCountedAt = now
-
-        log("count increment success source=\(source) key=\(key)")
     }
 
     private func rotateLogIfNeeded() {
@@ -357,19 +373,21 @@ final class PasteCountInputService {
     }
 
     private func log(_ message: String) {
-        NSLog("Board-Man paste-count %@", message)
-        let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
-        guard let data = line.data(using: .utf8) else { return }
-        rotateLogIfNeeded()
+        logQueue.async { [logURL] in
+            try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
+            guard let data = line.data(using: .utf8) else { return }
+            self.rotateLogIfNeeded()
 
-        if FileManager.default.fileExists(atPath: logURL.path) {
-            if let handle = try? FileHandle(forWritingTo: logURL) {
-                try? handle.seekToEnd()
-                try? handle.write(contentsOf: data)
-                try? handle.close()
+            if FileManager.default.fileExists(atPath: logURL.path) {
+                if let handle = try? FileHandle(forWritingTo: logURL) {
+                    try? handle.seekToEnd()
+                    try? handle.write(contentsOf: data)
+                    try? handle.close()
+                }
+            } else {
+                try? data.write(to: logURL)
             }
-        } else {
-            try? data.write(to: logURL)
         }
     }
 }

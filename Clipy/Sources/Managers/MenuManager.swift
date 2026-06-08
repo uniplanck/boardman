@@ -154,7 +154,7 @@ extension MenuManager {
 
             DispatchQueue.main.async { [weak self, weak panel] in
                 guard let self, let panel else { return }
-                panel.reloadHistoryItems(self.boardManPanelItems())
+                panel.reloadHistoryItems(self.boardManInitialPanelItems())
                 panel.focusTableForKeyboard()
             }
         }
@@ -247,6 +247,10 @@ extension MenuManager {
 
     fileprivate func boardManPanelItems() -> [BoardManHistoryItem] {
         return boardManHistoryItems() + boardManSnippetItems()
+    }
+
+    fileprivate func boardManInitialPanelItems() -> [BoardManHistoryItem] {
+        return boardManHistoryItems()
     }
 
     fileprivate func boardManHistoryItems() -> [BoardManHistoryItem] {
@@ -2157,7 +2161,6 @@ class BoardManPanel: NSPanel {
         manageSnippets.toolTip = "Opens the Board-Man Snippets tab. Existing snippet shortcuts are preserved."
         contentView.addSubview(manageSnippets)
         manageSnippetsButton = manageSnippets
-        refreshSnippetSettingsSummary()
 
         let viewTitle = BoardManPanel.makeSectionLabel("Appearance")
         contentView.addSubview(viewTitle)
@@ -3919,6 +3922,13 @@ class BoardManPanel: NSPanel {
         selectedIndex = -1
         hoveredRow = -1
         hidePreviewBubble()
+        if activeTab == .snippets && !allItems.contains(where: { $0.source == .snippet }) {
+            onRefreshRequested?()
+            return
+        }
+        if activeTab == .settings {
+            refreshSnippetSettingsSummary()
+        }
         reloadSnippetCategoryPopup()
         applyCurrentFilter()
         if activeTab == .settings {
@@ -4460,6 +4470,13 @@ class BoardManPanel: NSPanel {
         selectedIndex = -1
         hoveredRow = -1
         hidePreviewBubble()
+        if activeTab == .snippets && !allItems.contains(where: { $0.source == .snippet }) {
+            onRefreshRequested?()
+            return
+        }
+        if activeTab == .settings {
+            refreshSnippetSettingsSummary()
+        }
         applyCurrentFilter()
         if activeTab == .settings {
             makeFirstResponder(self)
