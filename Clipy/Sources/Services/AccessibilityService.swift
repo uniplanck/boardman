@@ -14,8 +14,7 @@ import Foundation
 import Cocoa
 
 final class AccessibilityService {
-    private var lastBoardManPermissionAlertAt = Date.distantPast
-    private let boardManPermissionAlertInterval: TimeInterval = 12
+    private var hasShownBoardManPermissionAlertThisLaunch = false
 }
 
 // MARK: - Permission
@@ -35,26 +34,40 @@ extension AccessibilityService {
         return AXIsProcessTrustedWithOptions(opts)
     }
 
-    func showAccessibilityAuthenticationAlert() {
-        guard !isAccessibilityEnabled(isPrompt: false) else { return }
+    func isListenEventAccessEnabled() -> Bool {
+        return CGPreflightListenEventAccess()
+    }
 
-        let now = Date()
-        guard now.timeIntervalSince(lastBoardManPermissionAlertAt) > boardManPermissionAlertInterval else {
+    func logPermissionStatus(context: String) {
+        NSLog(
+            "Board-Man permission status context=%@ accessibilityTrusted=%@ listenEventAccess=%@",
+            context,
+            isAccessibilityEnabled(isPrompt: false).description,
+            isListenEventAccessEnabled().description
+        )
+    }
+
+    func showAccessibilityAuthenticationAlert() {
+        logPermissionStatus(context: "permission-alert-check")
+        guard !isAccessibilityEnabled(isPrompt: false) || !isListenEventAccessEnabled() else { return }
+        guard !hasShownBoardManPermissionAlertThisLaunch else {
+            NSLog("Board-Man permission alert suppressed reason=already_shown_this_launch")
             return
         }
-        lastBoardManPermissionAlertAt = now
+        hasShownBoardManPermissionAlertThisLaunch = true
 
         let alert = NSAlert()
-        alert.messageText = "Board-Manにアクセシビリティ権限が必要です"
+        alert.messageText = "Board-Manに権限が必要です"
         alert.informativeText = "/Applications/Board-Man.app をアクセシビリティと入力監視に追加してONにしてください。ONに見えても効かない場合は、一度削除してから追加し直してください。"
         alert.icon = NSApplication.shared.applicationIconImage
         alert.addButton(withTitle: String(localized: "システム設定を開く"))
         NSApp.activate(ignoringOtherApps: true)
 
         if alert.runModal() == NSApplication.ModalResponse.alertFirstButtonReturn {
-            guard !isAccessibilityEnabled(isPrompt: false) else { return }
             guard !openAccessibilitySettingWindow() else { return }
-            isAccessibilityEnabled(isPrompt: true)
+            if !isAccessibilityEnabled(isPrompt: false) {
+                isAccessibilityEnabled(isPrompt: true)
+            }
         }
     }
 

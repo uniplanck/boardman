@@ -13,6 +13,8 @@ final class PasteCountInputService {
     private var localMonitor: Any?
     private var eventTap: CFMachPort?
     private var eventTapSource: CFRunLoopSource?
+    private var appDidBecomeActiveObserver: NSObjectProtocol?
+    private var didRequestListenEventAccessThisLaunch = false
     private var suppressUntil = Date.distantPast
     private var lastCountedText: String?
     private var lastCountedAt = Date.distantPast
@@ -33,27 +35,36 @@ final class PasteCountInputService {
     }
 
     func startMonitoring() {
-        log("startMonitoring called")
+        log("startMonitoring attempted")
 
-        guard globalMonitor == nil, localMonitor == nil, eventTap == nil else {
-            log("startMonitoring skipped reason=already_active")
-            return
+        logPermissionStatus(context: "startMonitoring")
+
+        installAppDidBecomeActiveRetryIfNeeded()
+
+        if globalMonitor == nil {
+            globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.handleNSEventKeyDown(event, source: "global")
+            }
+            log(globalMonitor == nil ? "nsevent global monitor unavailable" : "nsevent global monitor active")
+        } else {
+            log("nsevent global monitor already_active")
         }
 
-        log("permission status accessibilityTrusted=\(AXIsProcessTrusted()) listenEventTrusted=\(CGPreflightListenEventAccess())")
-
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleNSEventKeyDown(event, source: "global")
+        if localMonitor == nil {
+            localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.handleNSEventKeyDown(event, source: "local")
+                return event
+            }
+            log(localMonitor == nil ? "nsevent local monitor unavailable" : "nsevent local monitor active")
+        } else {
+            log("nsevent local monitor already_active")
         }
-        log(globalMonitor == nil ? "nsevent global monitor unavailable" : "nsevent global monitor active")
 
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handleNSEventKeyDown(event, source: "local")
-            return event
+        if eventTap == nil {
+            startCGEventTap(reason: "startMonitoring")
+        } else if let eventTap {
+            log("cg event tap already_active enabled=\(CGEvent.tapIsEnabled(tap: eventTap))")
         }
-        log(localMonitor == nil ? "nsevent local monitor unavailable" : "nsevent local monitor active")
-
-        startCGEventTap()
     }
 
     func stopMonitoring() {
@@ -73,6 +84,10 @@ final class PasteCountInputService {
         localMonitor = nil
         eventTap = nil
         eventTapSource = nil
+        if let appDidBecomeActiveObserver {
+            NotificationCenter.default.removeObserver(appDidBecomeActiveObserver)
+        }
+        appDidBecomeActiveObserver = nil
     }
 
     func suppressNextGlobalPaste() {
@@ -117,10 +132,18 @@ final class PasteCountInputService {
         log(String(format: "perf %@ %.1fms%@", name, elapsedMs, suffix))
     }
 
-    private func startCGEventTap() {
+    private func startCGEventTap(reason: String) {
+        log("cg event tap start attempted reason=\(reason)")
+        logPermissionStatus(context: "eventTapStart")
+
         if !CGPreflightListenEventAccess() {
-            let granted = CGRequestListenEventAccess()
-            log("listen event access requested granted=\(granted)")
+            if didRequestListenEventAccessThisLaunch {
+                log("listen event access request skipped reason=already_requested_this_launch")
+            } else {
+                didRequestListenEventAccessThisLaunch = true
+                let granted = CGRequestListenEventAccess()
+                log("listen event access requested granted=\(granted)")
+            }
         }
 
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
@@ -135,7 +158,7 @@ final class PasteCountInputService {
         )
 
         guard let eventTap else {
-            log("cg event tap failed listenEventTrusted=\(CGPreflightListenEventAccess())")
+            log("cg event tap failed accessibilityTrusted=\(AXIsProcessTrusted()) listenEventAccess=\(CGPreflightListenEventAccess())")
             return
         }
 
@@ -149,6 +172,29 @@ final class PasteCountInputService {
             self.eventTap = nil
             log("cg event tap source failed")
         }
+    }
+
+    private func installAppDidBecomeActiveRetryIfNeeded() {
+        guard appDidBecomeActiveObserver == nil else { return }
+        appDidBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.retryEventTapIfNeeded(reason: "appDidBecomeActive")
+        }
+    }
+
+    private func retryEventTapIfNeeded(reason: String) {
+        guard eventTap == nil else {
+            log("cg event tap retry skipped reason=already_active trigger=\(reason)")
+            return
+        }
+        startCGEventTap(reason: reason)
+    }
+
+    private func logPermissionStatus(context: String) {
+        log("permission status context=\(context) accessibilityTrusted=\(AXIsProcessTrusted()) listenEventAccess=\(CGPreflightListenEventAccess())")
     }
 
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, refcon in
@@ -182,7 +228,7 @@ final class PasteCountInputService {
     private func reenableEventTap(reason: String) {
         guard let eventTap else { return }
         CGEvent.tapEnable(tap: eventTap, enable: true)
-        log("cg event tap reenabled reason=\(reason)")
+        log("cg event tap reenabled reason=\(reason) enabled=\(CGEvent.tapIsEnabled(tap: eventTap))")
     }
 
     private func handleNSEventKeyDown(_ event: NSEvent, source: String) {
@@ -270,6 +316,7 @@ final class PasteCountInputService {
     }
 
     private func log(_ message: String) {
+        NSLog("Board-Man paste-count %@", message)
         let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
         guard let data = line.data(using: .utf8) else { return }
         rotateLogIfNeeded()
