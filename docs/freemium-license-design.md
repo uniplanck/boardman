@@ -10,6 +10,8 @@ The freemium model keeps the app useful without payment while reserving advanced
 
 uniplanck.com is the source of truth for product positioning, downloads, purchase, license management, and support.
 
+Landing page handoff details live in `docs/boardman-lp-free-pro-design.md`.
+
 1. Visitor lands on the Board-Man product page on uniplanck.com.
 2. Visitor compares Free and Pro features.
 3. Visitor downloads the macOS app without requiring an account.
