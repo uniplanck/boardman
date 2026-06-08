@@ -202,8 +202,8 @@ extension AppDelegate: NSApplicationDelegate {
         CPYUtilities.registerUserDefaultKeys()
         // SDKs
         CPYUtilities.initSDKs()
-        // Check Accessibility Permission
-        AppEnvironment.current.accessibilityService.isAccessibilityEnabled(isPrompt: true)
+        // Check permissions without triggering repeated macOS prompts at launch.
+        AppEnvironment.current.accessibilityService.logPermissionStatus(context: "launch")
 
         // Show Login Item
         if !AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.loginItem) && !AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.suppressAlertForLoginItem) {
