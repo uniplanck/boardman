@@ -13,8 +13,9 @@ final class PasteCountInputService {
     private var localMonitor: Any?
     private var eventTap: CFMachPort?
     private var eventTapSource: CFRunLoopSource?
+    private var eventTapRunLoop: CFRunLoop?
     private var appDidBecomeActiveObserver: NSObjectProtocol?
-    private var didRequestListenEventAccessThisLaunch = false
+    private var isStartingEventTap = false
     private var suppressUntil = Date.distantPast
     private var lastCountedText: String?
     private var lastCountedAt = Date.distantPast
@@ -23,6 +24,7 @@ final class PasteCountInputService {
     private let duplicateDetectionInterval: TimeInterval = 0.12
     private let boardManPasteSuppressionInterval: TimeInterval = 0.35
     private let pasteboardMatchDelay: TimeInterval = 0.15
+    private let eventTapStartDelay: TimeInterval = 0.75
     private let maxLogSize: UInt64 = 128 * 1024
     private let logURL: URL
 
@@ -60,10 +62,8 @@ final class PasteCountInputService {
             log("nsevent local monitor already_active")
         }
 
-        if eventTap == nil {
-            startCGEventTap(reason: "startMonitoring")
-        } else if let eventTap {
-            log("cg event tap already_active enabled=\(CGEvent.tapIsEnabled(tap: eventTap))")
+        DispatchQueue.main.asyncAfter(deadline: .now() + eventTapStartDelay) { [weak self] in
+            self?.startCGEventTap(reason: "startMonitoringDeferred")
         }
     }
 
@@ -74,16 +74,20 @@ final class PasteCountInputService {
         if let localMonitor {
             NSEvent.removeMonitor(localMonitor)
         }
-        if let eventTapSource {
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), eventTapSource, .commonModes)
-        }
         if let eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
+        }
+        if let eventTapSource, let eventTapRunLoop {
+            CFRunLoopRemoveSource(eventTapRunLoop, eventTapSource, .commonModes)
+            CFRunLoopStop(eventTapRunLoop)
+            CFRunLoopWakeUp(eventTapRunLoop)
         }
         globalMonitor = nil
         localMonitor = nil
         eventTap = nil
         eventTapSource = nil
+        eventTapRunLoop = nil
+        isStartingEventTap = false
         if let appDidBecomeActiveObserver {
             NotificationCenter.default.removeObserver(appDidBecomeActiveObserver)
         }
@@ -133,48 +137,77 @@ final class PasteCountInputService {
     }
 
     private func startCGEventTap(reason: String) {
-        log("cg event tap start attempted reason=\(reason)")
-        logPermissionStatus(context: "eventTapStart")
-
-        // Manual paste tracking is intentionally limited to keyboard events.
-        // Generic context-menu or app Edit > Paste commands do not emit a reliable
-        // cross-app paste signal; supporting them would require invasive AX text
-        // inspection or broad polling of other apps' focused content.
-        if !CGPreflightListenEventAccess() {
-            if didRequestListenEventAccessThisLaunch {
-                log("listen event access request skipped reason=already_requested_this_launch")
-            } else {
-                didRequestListenEventAccessThisLaunch = true
-                let granted = CGRequestListenEventAccess()
-                log("listen event access requested granted=\(granted)")
-            }
-        }
-
-        let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
-
-        eventTap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .tailAppendEventTap,
-            options: .listenOnly,
-            eventsOfInterest: mask,
-            callback: Self.eventTapCallback,
-            userInfo: Unmanaged.passUnretained(self).toOpaque()
-        )
-
-        guard let eventTap else {
-            log("cg event tap failed accessibilityTrusted=\(AXIsProcessTrusted()) listenEventAccess=\(CGPreflightListenEventAccess())")
+        if let eventTap {
+            log("cg event tap already_active enabled=\(CGEvent.tapIsEnabled(tap: eventTap)) reason=\(reason)")
             return
         }
+        guard !isStartingEventTap else {
+            log("cg event tap start skipped reason=already_starting trigger=\(reason)")
+            return
+        }
+        isStartingEventTap = true
+        log("cg event tap start scheduled reason=\(reason)")
 
-        eventTapSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
-        if let eventTapSource {
-            CFRunLoopAddSource(CFRunLoopGetMain(), eventTapSource, .commonModes)
-            CGEvent.tapEnable(tap: eventTap, enable: true)
-            log("cg event tap started enabled=\(CGEvent.tapIsEnabled(tap: eventTap))")
-        } else {
-            CGEvent.tapEnable(tap: eventTap, enable: false)
-            self.eventTap = nil
-            log("cg event tap source failed")
+        Thread { [weak self] in
+            self?.createAndRunCGEventTap(reason: reason)
+        }.start()
+    }
+
+    private func createAndRunCGEventTap(reason: String) {
+        autoreleasepool {
+            // Manual paste tracking is intentionally limited to keyboard events.
+            // Generic context-menu or app Edit > Paste commands do not emit a reliable
+            // cross-app paste signal without invasive AX text inspection.
+            guard CGPreflightListenEventAccess() else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.isStartingEventTap = false
+                    self?.log("cg event tap skipped reason=listen_event_access_missing trigger=\(reason)")
+                }
+                return
+            }
+
+            let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
+
+            guard let tap = CGEvent.tapCreate(
+                tap: .cgSessionEventTap,
+                place: .tailAppendEventTap,
+                options: .listenOnly,
+                eventsOfInterest: mask,
+                callback: Self.eventTapCallback,
+                userInfo: Unmanaged.passUnretained(self).toOpaque()
+            ) else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.isStartingEventTap = false
+                    self?.log("cg event tap failed accessibilityTrusted=\(AXIsProcessTrusted()) listenEventAccess=\(CGPreflightListenEventAccess())")
+                }
+                return
+            }
+
+            guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
+                CGEvent.tapEnable(tap: tap, enable: false)
+                DispatchQueue.main.async { [weak self] in
+                    self?.isStartingEventTap = false
+                    self?.log("cg event tap source failed")
+                }
+                return
+            }
+
+            let runLoop = CFRunLoopGetCurrent()
+            CFRunLoopAddSource(runLoop, source, .commonModes)
+            CGEvent.tapEnable(tap: tap, enable: true)
+
+            DispatchQueue.main.async { [weak self] in
+                self?.eventTap = tap
+                self?.eventTapSource = source
+                self?.eventTapRunLoop = runLoop
+                self?.isStartingEventTap = false
+                self?.log("cg event tap started enabled=\(CGEvent.tapIsEnabled(tap: tap)) trigger=\(reason)")
+            }
+
+            CFRunLoopRun()
+
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
         }
     }
 
@@ -237,7 +270,9 @@ final class PasteCountInputService {
 
     private func handleNSEventKeyDown(_ event: NSEvent, source: String) {
         guard isCommandV(event) else { return }
-        handleDetectedCommandV(source: source)
+        DispatchQueue.main.async { [weak self] in
+            self?.handleDetectedCommandV(source: source)
+        }
     }
 
     private func handleCGEventKeyDown(_ event: CGEvent) {
@@ -248,7 +283,9 @@ final class PasteCountInputService {
         guard flags.contains(.maskCommand) else { return }
         guard !flags.contains(.maskControl), !flags.contains(.maskAlternate) else { return }
 
-        handleDetectedCommandV(source: "cgEventTap")
+        DispatchQueue.main.async { [weak self] in
+            self?.handleDetectedCommandV(source: "cgEventTap")
+        }
     }
 
     private func handleDetectedCommandV(source: String) {
