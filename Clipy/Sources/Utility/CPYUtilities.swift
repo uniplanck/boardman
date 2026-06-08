@@ -66,7 +66,7 @@ final class CPYUtilities {
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManThemeLighten)
 
         /* Updates */
-        defaultValues.updateValue(NSNumber(value: true), forKey: Constants.Update.enableAutomaticCheck)
+        defaultValues.updateValue(NSNumber(value: false), forKey: Constants.Update.enableAutomaticCheck)
         defaultValues.updateValue(NSNumber(value: 86400), forKey: Constants.Update.checkInterval)
 
         /* Beta */

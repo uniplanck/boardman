@@ -21,7 +21,7 @@ struct Constants {
             static let name = "Board-Man"
         #endif
 
-        static let appcastURL = URL(string: "https://uniplanck.com/board-man/appcast.xml")!
+        static let appcastURL = URL(string: "https://github.com/uniplanck/boardman/releases/latest/download/appcast.xml")!
     }
 
     struct Menu {

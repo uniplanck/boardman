@@ -33,11 +33,41 @@ class CPYUpdatesPreferenceViewController: NSViewController {
             .compactMap { $0 }
             .assign(to: \.objectValue, on: lastUpdateCheckDateTextField)
             .store(in: &cancellables)
-        versionTextField.stringValue = "v\(Bundle.main.appVersion ?? "")"
+        let version = Bundle.main.appVersion ?? "Unknown"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        versionTextField.stringValue = build.map { "Version \(version) (\($0))" } ?? "Version \(version)"
     }
 
     @IBAction private func checkForUpdates(_ sender: Any) {
-        guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
-        appDelegate.updaterController?.checkForUpdates(sender)
+        guard let updaterController else {
+            showUpdateFeedUnavailableMessage()
+            return
+        }
+        guard let feedURLString = Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String,
+              let feedURL = URL(string: feedURLString) else {
+            showUpdateFeedUnavailableMessage()
+            return
+        }
+        var request = URLRequest(url: feedURL)
+        request.httpMethod = "HEAD"
+        request.timeoutInterval = 8
+        URLSession.shared.dataTask(with: request) { _, response, _ in
+            let statusCode = (response as? HTTPURLResponse)?.statusCode
+            DispatchQueue.main.async {
+                guard let statusCode, (200..<300).contains(statusCode) else {
+                    self.showUpdateFeedUnavailableMessage()
+                    return
+                }
+                updaterController.checkForUpdates(sender)
+            }
+        }.resume()
+    }
+
+    private func showUpdateFeedUnavailableMessage() {
+        let alert = NSAlert()
+        alert.messageText = "Update feed is not published yet"
+        alert.informativeText = "Updates will be delivered through GitHub Releases once an appcast is published."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 }

@@ -39,7 +39,7 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>SUFeedURL</key>
-	<string>https://uniplanck.com/board-man/appcast.xml</string>
+	<string>https://github.com/uniplanck/boardman/releases/latest/download/appcast.xml</string>
 	<key>SUPublicDSAKeyFile</key>
 	<string>dsa_pub.pem</string>
 	<key>SUPublicEDKey</key>
