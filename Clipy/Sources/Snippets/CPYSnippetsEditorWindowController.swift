@@ -96,6 +96,10 @@ extension CPYSnippetsEditorWindowController {
             NSSound.beep()
             return
         }
+        guard canAddSnippet() else {
+            showProLockedAlert(message: "Free plan includes 5 snippets. Upgrade or activate Founder Lifetime to add more.")
+            return
+        }
         let snippet = folder.createSnippet()
         folder.snippets.append(snippet)
         folder.mergeSnippet(snippet)
@@ -158,6 +162,10 @@ extension CPYSnippetsEditorWindowController {
     }
 
     @IBAction private func importSnippetButtonTapped(_ sender: AnyObject) {
+        guard EntitlementGate.canUse(.exportImport) else {
+            showProLockedAlert(message: "Snippet import is a Pro feature.")
+            return
+        }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: NSHomeDirectory())
@@ -214,6 +222,10 @@ extension CPYSnippetsEditorWindowController {
     }
 
     @IBAction private func exportSnippetButtonTapped(_ sender: AnyObject) {
+        guard EntitlementGate.canUse(.exportImport) else {
+            showProLockedAlert(message: "Snippet export is a Pro feature.")
+            return
+        }
         let xmlDocument = AEXMLDocument()
         let rootElement = xmlDocument.addChild(name: Constants.Xml.rootElement)
 
@@ -538,7 +550,30 @@ private extension CPYSnippetsEditorWindowController {
             return
         }
 
-        PinnedSnippetStore.shared.toggle(snippet.identifier)
+        if PinnedSnippetStore.shared.isPinned(snippet.identifier) {
+            PinnedSnippetStore.shared.remove(snippet.identifier)
+        } else if !PinnedSnippetStore.shared.add(snippet.identifier) {
+            showProLockedAlert(message: "Free plan includes 3 pinned items. Upgrade or activate Founder Lifetime to pin more.")
+        }
         outlineView.reloadData()
+    }
+}
+
+private extension CPYSnippetsEditorWindowController {
+
+    func canAddSnippet() -> Bool {
+        let snapshot = EntitlementGate.currentSnapshot()
+        guard !snapshot.isProEntitled else { return true }
+        let realm = try! Realm()
+        return realm.objects(CPYSnippet.self).count < snapshot.limits.maxSnippets
+    }
+
+    func showProLockedAlert(message: String) {
+        NSSound.beep()
+        let alert = NSAlert()
+        alert.messageText = "Pro limit reached"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 }
