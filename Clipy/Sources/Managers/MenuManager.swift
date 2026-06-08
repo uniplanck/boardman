@@ -929,7 +929,7 @@ fileprivate enum BoardManPanelTab: Int, CaseIterable {
 }
 
 fileprivate enum BoardManInlineSettingsCategory: Int {
-    case general, view, history, snippets, privacy, license
+    case general, view, history, snippets, privacy, updates, license
 }
 
 private final class BoardManSnippetShortcutRow {
@@ -1632,6 +1632,8 @@ class BoardManPanel: NSPanel {
     private var licenseProLockedControlView: BoardManProLockedControlView?
     private var licenseMockNoteLabel: NSTextField?
     private var licenseStateExamplesLabel: NSTextField?
+    private let updatesPreferenceViewController = CPYUpdatesPreferenceViewController(nibName: "CPYUpdatesPreferenceViewController", bundle: nil)
+    private var updatesPreferenceView: NSView?
     private var viewSectionLabel: NSTextField?
     private var behaviorSectionLabel: NSTextField?
     private var historySectionLabel: NSTextField?
@@ -2029,13 +2031,14 @@ class BoardManPanel: NSPanel {
         settingsBackgroundView = settingsBackground
 
         let categoryControl = NSSegmentedControl(frame: .zero)
-        categoryControl.segmentCount = 6
+        categoryControl.segmentCount = 7
         categoryControl.setLabel("General", forSegment: 0)
         categoryControl.setLabel("Appearance", forSegment: 1)
         categoryControl.setLabel("History", forSegment: 2)
         categoryControl.setLabel("Snippets", forSegment: 3)
         categoryControl.setLabel("Privacy", forSegment: 4)
-        categoryControl.setLabel("License", forSegment: 5)
+        categoryControl.setLabel("Updates", forSegment: 5)
+        categoryControl.setLabel("License", forSegment: 6)
         categoryControl.selectedSegment = 0
         categoryControl.target = self
         categoryControl.action = #selector(settingsCategoryChanged(_:))
@@ -2452,6 +2455,11 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(ruleNote)
         hideRulesNoteLabel = ruleNote
         refreshHideRulesSummary()
+
+        let updatesView = updatesPreferenceViewController.view
+        updatesView.isHidden = true
+        contentView.addSubview(updatesView)
+        updatesPreferenceView = updatesView
 
         let licenseTitle = BoardManPanel.makeSectionLabel("License")
         contentView.addSubview(licenseTitle)
@@ -3092,6 +3100,7 @@ class BoardManPanel: NSPanel {
             heightControlLabel, heightLabel, heightStepper
         ]
         allControls.forEach { $0?.isHidden = true }
+        updatesPreferenceView?.isHidden = true
         [behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton, pauseRecordingButton].forEach { $0?.isHidden = true }
         storedTypeButtons.forEach { $0.isHidden = true }
         settingsCategoryControl?.isHidden = true
@@ -3138,6 +3147,7 @@ class BoardManPanel: NSPanel {
             licenseActivationStatusLabel, licenseUpgradeButton, licenseProLockedControlView,
             licenseMockNoteLabel, licenseStateExamplesLabel
         ]
+        let updatesControls: [NSView?] = [updatesPreferenceView]
 
         func show(_ controls: [NSView?]) {
             controls.forEach { $0?.isHidden = false }
@@ -3282,6 +3292,14 @@ class BoardManPanel: NSPanel {
             licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 384, width: width, height: 14)
         }
 
+        func placeUpdatesSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            let updatesWidth = min(width, updatesPreferenceView?.frame.width ?? width)
+            updatesPreferenceView?.frame = NSRect(x: originX + floor((width - updatesWidth) / 2),
+                                                  y: originY - 174,
+                                                  width: updatesWidth,
+                                                  height: 174)
+        }
+
         refreshLicenseSummary()
         if useTwoColumns {
             show(allControls)
@@ -3320,6 +3338,9 @@ class BoardManPanel: NSPanel {
                 placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
                 placeStoredTypesSection(originX: leftX, originY: firstY - 112, width: columnWidth)
                 placeFiltersSection(originX: leftX, originY: firstY - 268, width: columnWidth)
+            case .updates:
+                show(updatesControls)
+                placeUpdatesSection(originX: leftX, originY: firstY, width: columnWidth)
             case .license:
                 show(licenseControls)
                 placeLicenseSection(originX: leftX, originY: firstY, width: columnWidth)
