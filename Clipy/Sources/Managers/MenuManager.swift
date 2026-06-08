@@ -199,15 +199,12 @@ extension MenuManager {
                 return
             }
 
-            let pasteCountKey = PasteCountStore.shared.key(for: clip)
-            let isInputLikeTarget = PasteCountInputService.shared.isFocusedTargetInputLike()
             let didPaste = AppEnvironment.current.pasteService.paste(with: clip)
 
             if didPaste {
+                let pasteCountKey = PasteCountStore.shared.key(for: clip)
                 PasteCountStore.shared.markUsed(clip: clip, in: realm)
-                if isInputLikeTarget {
-                    PasteCountStore.shared.increment(forKey: pasteCountKey)
-                }
+                PasteCountStore.shared.increment(forKey: pasteCountKey)
             }
 
             self.previousFrontmostApplication = nil
@@ -2025,7 +2022,7 @@ class BoardManPanel: NSPanel {
         let categoryControl = NSSegmentedControl(frame: .zero)
         categoryControl.segmentCount = 6
         categoryControl.setLabel("General", forSegment: 0)
-        categoryControl.setLabel("View", forSegment: 1)
+        categoryControl.setLabel("Appearance", forSegment: 1)
         categoryControl.setLabel("History", forSegment: 2)
         categoryControl.setLabel("Snippets", forSegment: 3)
         categoryControl.setLabel("Privacy", forSegment: 4)
@@ -2162,7 +2159,7 @@ class BoardManPanel: NSPanel {
         manageSnippetsButton = manageSnippets
         refreshSnippetSettingsSummary()
 
-        let viewTitle = BoardManPanel.makeSectionLabel("View")
+        let viewTitle = BoardManPanel.makeSectionLabel("Appearance")
         contentView.addSubview(viewTitle)
         viewSectionLabel = viewTitle
 

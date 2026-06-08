@@ -120,14 +120,11 @@ class AppDelegate: NSObject, NSMenuItemValidation {
             return
         }
 
-        let pasteCountKey = PasteCountStore.shared.key(for: clip)
-        let isInputLikeTarget = PasteCountInputService.shared.isFocusedTargetInputLike()
         let didPaste = AppEnvironment.current.pasteService.paste(with: clip)
         if didPaste {
+            let pasteCountKey = PasteCountStore.shared.key(for: clip)
             PasteCountStore.shared.markUsed(clip: clip, in: realm)
-            if isInputLikeTarget {
-                PasteCountStore.shared.increment(forKey: pasteCountKey)
-            }
+            PasteCountStore.shared.increment(forKey: pasteCountKey)
         }
     }
 
