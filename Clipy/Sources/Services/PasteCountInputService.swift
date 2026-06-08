@@ -136,6 +136,10 @@ final class PasteCountInputService {
         log("cg event tap start attempted reason=\(reason)")
         logPermissionStatus(context: "eventTapStart")
 
+        // Manual paste tracking is intentionally limited to keyboard events.
+        // Generic context-menu or app Edit > Paste commands do not emit a reliable
+        // cross-app paste signal; supporting them would require invasive AX text
+        // inspection or broad polling of other apps' focused content.
         if !CGPreflightListenEventAccess() {
             if didRequestListenEventAccessThisLaunch {
                 log("listen event access request skipped reason=already_requested_this_launch")
