@@ -451,3 +451,116 @@ private extension NSWindow {
         center()
     }
 }
+
+enum BoardManPreferenceUI {
+    static let base = NSColor(bmHex: 0x0E0F11)
+    static let window = NSColor(bmHex: 0x151619)
+    static let panel = NSColor(bmHex: 0x1C1D20)
+    static let card = NSColor(bmHex: 0x202226)
+    static let field = NSColor(bmHex: 0x141518)
+    static let borderSubtle = NSColor(bmHex: 0x2B2D31)
+    static let borderNormal = NSColor(bmHex: 0x3A3D42)
+    static let activeBorder = NSColor(bmHex: 0xFF4B4B)
+    static let primaryText = NSColor(bmHex: 0xF2F2F3)
+    static let secondaryText = NSColor(bmHex: 0xB7B8BC)
+    static let mutedText = NSColor(bmHex: 0x777A80)
+    static let red = NSColor(bmHex: 0xFF4B4B)
+    static let redDeep = NSColor(bmHex: 0xB91F2B)
+    static let redSoft = NSColor(bmHex: 0x3A1518)
+
+    enum Radius {
+        static let window: CGFloat = 18
+        static let panel: CGFloat = 12
+        static let card: CGFloat = 10
+        static let control: CGFloat = 7
+    }
+
+    static func prepare(_ view: NSView, color: NSColor = panel, radius: CGFloat = Radius.panel, border: NSColor = borderSubtle) {
+        view.wantsLayer = true
+        view.layer?.backgroundColor = color.cgColor
+        view.layer?.cornerRadius = radius
+        view.layer?.borderWidth = 1
+        view.layer?.borderColor = border.cgColor
+    }
+
+    static func label(_ text: String, size: CGFloat = 13, weight: NSFont.Weight = .regular, color: NSColor = primaryText) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.font = NSFont.systemFont(ofSize: size, weight: weight)
+        label.textColor = color
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        return label
+    }
+
+    static func icon(_ symbolName: String, size: CGFloat = 20, color: NSColor = red) -> NSImageView {
+        let imageView = NSImageView()
+        if #available(macOS 11.0, *) {
+            imageView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+        }
+        imageView.image?.isTemplate = true
+        imageView.contentTintColor = color
+        imageView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: size, weight: .medium)
+        return imageView
+    }
+
+    static func primaryButton(_ title: String) -> NSButton {
+        let button = NSButton(title: title, target: nil, action: nil)
+        button.bezelStyle = .rounded
+        button.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        button.contentTintColor = .white
+        button.wantsLayer = true
+        button.layer?.backgroundColor = Self.red.withAlphaComponent(0.88).cgColor
+        button.layer?.cornerRadius = Radius.control
+        button.layer?.borderWidth = 1
+        button.layer?.borderColor = NSColor.white.withAlphaComponent(0.12).cgColor
+        return button
+    }
+
+    static func secondaryButton(_ title: String) -> NSButton {
+        let button = NSButton(title: title, target: nil, action: nil)
+        button.bezelStyle = .rounded
+        button.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        button.contentTintColor = primaryText
+        button.wantsLayer = true
+        button.layer?.backgroundColor = Self.card.cgColor
+        button.layer?.cornerRadius = Radius.control
+        button.layer?.borderWidth = 1
+        button.layer?.borderColor = Self.borderNormal.cgColor
+        return button
+    }
+
+    static func proBadge() -> NSTextField {
+        let badge = label("PRO", size: 10, weight: .bold, color: .white)
+        badge.alignment = .center
+        badge.wantsLayer = true
+        badge.layer?.backgroundColor = Self.red.withAlphaComponent(0.88).cgColor
+        badge.layer?.cornerRadius = 4
+        return badge
+    }
+
+    static func lockedBadge() -> NSView {
+        let wrap = NSView()
+        prepare(wrap, color: Self.field, radius: Radius.control, border: Self.borderSubtle)
+        let lock = icon("lock.fill", size: 12, color: Self.mutedText)
+        wrap.addSubview(lock)
+        lock.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            lock.centerXAnchor.constraint(equalTo: wrap.centerXAnchor),
+            lock.centerYAnchor.constraint(equalTo: wrap.centerYAnchor),
+            wrap.widthAnchor.constraint(equalToConstant: 28),
+            wrap.heightAnchor.constraint(equalToConstant: 28)
+        ])
+        return wrap
+    }
+}
+
+extension NSColor {
+    convenience init(bmHex hex: UInt32, alpha: CGFloat = 1.0) {
+        self.init(
+            calibratedRed: CGFloat((hex >> 16) & 0xff) / 255.0,
+            green: CGFloat((hex >> 8) & 0xff) / 255.0,
+            blue: CGFloat(hex & 0xff) / 255.0,
+            alpha: alpha
+        )
+    }
+}
