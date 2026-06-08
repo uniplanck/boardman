@@ -22,8 +22,9 @@ uniplanck.com is the source of truth for product positioning, downloads, purchas
 
 | Area | Free | Pro |
 | --- | --- | --- |
-| Clipboard history | Basic history limit | Expanded history limit |
-| Snippets | Basic snippet count | Expanded or unlimited snippets |
+| Clipboard history | 100 history items | Unlimited history |
+| Pins | 3 pinned items | Unlimited pinned items |
+| Snippets | 5 snippets | Unlimited snippets |
 | Search | Standard local search | Advanced workflow options where applicable |
 | Paste count | Basic visibility | Full paste analytics and sorting controls |
 | Appearance | Core theme controls | Fine-grained appearance customization |
@@ -32,6 +33,8 @@ uniplanck.com is the source of truth for product positioning, downloads, purchas
 | License support | Free local state | Activated license, recovery, deactivation |
 
 Exact limits should be defined in the entitlement table, not hardcoded across UI files.
+
+Internal founder lifetime codes are for maintainer dogfooding only. The full founder code must not be committed; the app only contains the SHA256 hash used for local verification. Production licensing still requires signed token activation through a backend.
 
 ## LicenseState
 

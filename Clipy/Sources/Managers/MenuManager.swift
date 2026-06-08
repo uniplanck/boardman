@@ -886,15 +886,20 @@ final class PinnedSnippetStore {
         if isPinned(identifier) {
             remove(identifier)
         } else {
-            add(identifier)
+            _ = add(identifier)
         }
     }
 
-    func add(_ identifier: String) {
+    func add(_ identifier: String) -> Bool {
         var values = identifiers.filter { !$0.isEmpty }
-        guard !values.contains(identifier) else { return }
+        guard !values.contains(identifier) else { return true }
+        let snapshot = EntitlementGate.currentSnapshot()
+        guard snapshot.isProEntitled || values.count < snapshot.limits.maxPinnedItems else {
+            return false
+        }
         values.append(identifier)
         save(values)
+        return true
     }
 
     func remove(_ identifier: String) {
@@ -2471,18 +2476,18 @@ class BoardManPanel: NSPanel {
         let licenseKey = NSTextField(frame: .zero)
         licenseKey.placeholderString = "XXXX-XXXX-XXXX-XXXX"
         licenseKey.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        licenseKey.toolTip = "Mock input only. This phase does not activate or store licenses."
+        licenseKey.toolTip = "Founder codes activate locally. Production licenses still require signed tokens."
         contentView.addSubview(licenseKey)
         licenseKeyField = licenseKey
 
         let activate = NSButton(title: "Activate", target: self, action: #selector(activateLicenseRequested(_:)))
         activate.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         activate.bezelStyle = .rounded
-        activate.toolTip = "Calls a local stub only. This phase does not activate or store licenses."
+        activate.toolTip = "Activates an internal founder code locally when it matches."
         contentView.addSubview(activate)
         licenseActivateButton = activate
 
-        let activationStatus = NSTextField(labelWithString: "Internal beta: activation is a local stub. No license is stored or enabled.")
+        let activationStatus = NSTextField(labelWithString: "Internal dogfood: founder codes activate locally. Unknown codes stay locked.")
         activationStatus.font = NSFont.systemFont(ofSize: 11)
         activationStatus.textColor = .secondaryLabelColor
         activationStatus.lineBreakMode = .byWordWrapping
@@ -2499,7 +2504,7 @@ class BoardManPanel: NSPanel {
         let proControl = NSPopUpButton(frame: .zero, pullsDown: false)
         proControl.addItems(withTitles: ["Advanced Accent", "Saved Theme"])
         proControl.font = NSFont.systemFont(ofSize: 11)
-        proControl.toolTip = "Example Pro control. This phase does not enforce feature execution."
+        proControl.toolTip = "Pro-only advanced appearance control."
         let lockedProControl = BoardManProLockedControlView(
             title: "Advanced appearance",
             explanation: "Unlock Pro to customize advanced visual presets.",
@@ -2511,7 +2516,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(lockedProControl)
         licenseProLockedControlView = lockedProControl
 
-        let licenseNote = NSTextField(labelWithString: "Internal beta: activation is a local stub. No license is stored or enabled.")
+        let licenseNote = NSTextField(labelWithString: "Internal dogfood only. Production licensing still requires signed token activation.")
         licenseNote.font = NSFont.systemFont(ofSize: 11)
         licenseNote.textColor = .secondaryLabelColor
         licenseNote.lineBreakMode = .byWordWrapping
@@ -3588,6 +3593,10 @@ class BoardManPanel: NSPanel {
 
     @objc private func addSnippetFromPanel(_ sender: Any?) {
         let realm = try! Realm()
+        guard canAddSnippet(in: realm) else {
+            showProLockedAlert(message: "Free plan includes 5 snippets. Upgrade or activate Founder Lifetime to add more.")
+            return
+        }
         let folder = snippetTargetFolder(in: realm, preferredIdentifier: activeSnippetCategoryIdentifier)
         let snippet = CPYSnippet()
         snippet.title = "untitled snippet"
@@ -3601,6 +3610,20 @@ class BoardManPanel: NSPanel {
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: snippet.identifier)
         snippetEditorTitleField?.selectText(nil)
+    }
+
+    private func canAddSnippet(in realm: Realm) -> Bool {
+        let snapshot = EntitlementGate.currentSnapshot()
+        return snapshot.isProEntitled || realm.objects(CPYSnippet.self).count < snapshot.limits.maxSnippets
+    }
+
+    private func showProLockedAlert(message: String) {
+        NSSound.beep()
+        let alert = NSAlert()
+        alert.messageText = "Pro limit reached"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     @objc private func editSelectedSnippetFromPanel(_ sender: Any?) {
@@ -3977,13 +4000,13 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func activateLicenseRequested(_ sender: NSButton) {
-        // Mock activation stays local-only; production activation will provide a device ID explicitly.
         let request = LicenseActivationRequest(
             licenseKey: licenseKeyField?.stringValue ?? ""
         )
         let response = StubLicenseActivationClient().activate(request)
         licenseActivationStatusLabel?.stringValue = "\(licenseActivationStatusTitle(response.status)): \(response.message)"
-        licenseActivationStatusLabel?.textColor = response.status == .invalidInput ? .systemRed : .secondaryLabelColor
+        licenseActivationStatusLabel?.textColor = response.status == .activated ? .systemGreen : (response.status == .invalidInput || response.status == .unsupported ? .systemRed : .secondaryLabelColor)
+        refreshLicenseSummary()
     }
 
     @objc private func clearSnippetFolderShortcut(_ sender: NSButton) {
@@ -4048,7 +4071,7 @@ class BoardManPanel: NSPanel {
         licensePlanLabel?.stringValue = "\(licensePlanTitle(snapshot.plan)) Plan"
         licenseStateLabel?.stringValue = "\(licenseStateTitle(snapshot.state)): \(licenseStateDescription(snapshot))"
         licenseStateLabel?.textColor = licenseStateColor(snapshot.state)
-        licenseLimitsLabel?.stringValue = "History \(limitText(snapshot.limits.maxHistoryItems)), snippets \(limitText(snapshot.limits.maxSnippets)), saved searches \(limitText(snapshot.limits.maxSavedSearches))"
+        licenseLimitsLabel?.stringValue = "History \(limitText(snapshot.limits.maxHistoryItems)), pins \(limitText(snapshot.limits.maxPinnedItems)), snippets \(limitText(snapshot.limits.maxSnippets))"
         licenseProLockedControlView?.refresh()
     }
 
@@ -4057,6 +4080,7 @@ class BoardManPanel: NSPanel {
         case .free: return "Free"
         case .trial: return "Trial"
         case .pro: return "Pro"
+        case .founder: return "Founder Lifetime"
         }
     }
 
@@ -4074,6 +4098,7 @@ class BoardManPanel: NSPanel {
 
     private func licenseActivationStatusTitle(_ status: LicenseActivationStatus) -> String {
         switch status {
+        case .activated: return "Activated"
         case .notConfigured: return "Not configured"
         case .invalidInput: return "Invalid input"
         case .networkUnavailable: return "Network unavailable"
@@ -4088,6 +4113,9 @@ class BoardManPanel: NSPanel {
         case .trial:
             return "Temporary Pro access\(dateSuffix(snapshot.expiresAt, prefix: " until "))."
         case .proActive:
+            if snapshot.plan == .founder {
+                return "Founder Lifetime active locally."
+            }
             return "Verified Pro entitlement\(dateSuffix(snapshot.lastVerifiedAt, prefix: ", checked "))."
         case .proExpired:
             return "Pro entitlement is no longer active."
@@ -4267,7 +4295,11 @@ class BoardManPanel: NSPanel {
 
     @objc private func togglePinFromMenu(_ sender: NSMenuItem) {
         guard let dataHash = sender.representedObject as? String else { return }
-        PinnedSnippetStore.shared.toggle(dataHash)
+        if PinnedSnippetStore.shared.isPinned(dataHash) {
+            PinnedSnippetStore.shared.remove(dataHash)
+        } else if !PinnedSnippetStore.shared.add(dataHash) {
+            showProLockedAlert(message: "Free plan includes 3 pinned items. Upgrade or activate Founder Lifetime to pin more.")
+        }
         onRefreshRequested?()
     }
 

@@ -101,7 +101,7 @@ struct SignedLicenseToken: Equatable {
             plan: plan,
             state: state,
             features: Set((payloadDTO.features ?? []).compactMap(EntitlementFeature.init(rawValue:))),
-            limits: payloadDTO.limits?.entitlementLimits ?? (plan == .pro ? .proDefault : .freeDefault),
+            limits: payloadDTO.limits?.entitlementLimits ?? (plan.isUnlimited ? .proDefault : .freeDefault),
             issuedAt: payloadDTO.iat.flatMap(Date.init(licenseClaimValue:)),
             expiresAt: payloadDTO.exp.flatMap(Date.init(licenseClaimValue:)),
             deviceID: payloadDTO.deviceID,
@@ -145,12 +145,14 @@ private struct PayloadDTO: Decodable {
 
 private struct LimitsDTO: Decodable {
     let maxHistoryItems: Int?
+    let maxPinnedItems: Int?
     let maxSnippets: Int?
     let maxSavedSearches: Int?
     let maxThemePresets: Int?
 
     enum CodingKeys: String, CodingKey {
         case maxHistoryItems = "max_history_items"
+        case maxPinnedItems = "max_pinned_items"
         case maxSnippets = "max_snippets"
         case maxSavedSearches = "max_saved_searches"
         case maxThemePresets = "max_theme_presets"
@@ -159,10 +161,17 @@ private struct LimitsDTO: Decodable {
     var entitlementLimits: EntitlementLimits {
         return EntitlementLimits(
             maxHistoryItems: maxHistoryItems ?? EntitlementLimits.freeDefault.maxHistoryItems,
+            maxPinnedItems: maxPinnedItems ?? EntitlementLimits.freeDefault.maxPinnedItems,
             maxSnippets: maxSnippets ?? EntitlementLimits.freeDefault.maxSnippets,
             maxSavedSearches: maxSavedSearches ?? EntitlementLimits.freeDefault.maxSavedSearches,
             maxThemePresets: maxThemePresets ?? EntitlementLimits.freeDefault.maxThemePresets
         )
+    }
+}
+
+private extension EntitlementPlan {
+    var isUnlimited: Bool {
+        return self == .pro || self == .founder
     }
 }
 

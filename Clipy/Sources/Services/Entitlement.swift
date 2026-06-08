@@ -20,6 +20,7 @@ enum EntitlementPlan: String, Equatable {
     case free
     case trial
     case pro
+    case founder
 }
 
 enum EntitlementFeature: String, CaseIterable, Hashable {
@@ -38,19 +39,22 @@ enum EntitlementFeature: String, CaseIterable, Hashable {
 
 struct EntitlementLimits: Equatable {
     let maxHistoryItems: Int
+    let maxPinnedItems: Int
     let maxSnippets: Int
     let maxSavedSearches: Int
     let maxThemePresets: Int
 
     static let freeDefault = EntitlementLimits(
-        maxHistoryItems: 30,
-        maxSnippets: 10,
+        maxHistoryItems: 100,
+        maxPinnedItems: 3,
+        maxSnippets: 5,
         maxSavedSearches: 0,
         maxThemePresets: 1
     )
 
     static let proDefault = EntitlementLimits(
-        maxHistoryItems: 1_000,
+        maxHistoryItems: Int.max,
+        maxPinnedItems: Int.max,
         maxSnippets: Int.max,
         maxSavedSearches: 50,
         maxThemePresets: 20
@@ -71,7 +75,7 @@ struct EntitlementSnapshot: Equatable {
     var isProEntitled: Bool {
         switch state {
         case .trial, .proActive, .offlineGrace:
-            return plan == .trial || plan == .pro
+            return plan == .trial || plan == .pro || plan == .founder
         case .free, .proExpired, .invalid, .locked:
             return false
         }
@@ -113,6 +117,20 @@ struct EntitlementSnapshot: Equatable {
         offlineGraceExpiresAt: nil
     )
 #endif
+
+    static func founderLifetime(activatedAt: Date = Date()) -> EntitlementSnapshot {
+        return EntitlementSnapshot(
+            state: .proActive,
+            plan: .founder,
+            features: Set(EntitlementFeature.allCases),
+            limits: .proDefault,
+            licenseID: "internal-founder-lifetime",
+            issuedAt: activatedAt,
+            expiresAt: nil,
+            lastVerifiedAt: activatedAt,
+            offlineGraceExpiresAt: nil
+        )
+    }
 }
 
 final class EntitlementService {
@@ -137,7 +155,7 @@ final class EntitlementService {
     private var _debugOverrideSnapshot: EntitlementSnapshot?
 #endif
 
-    init(snapshot: EntitlementSnapshot = .freeDefault) {
+    init(snapshot: EntitlementSnapshot = LocalFounderLicenseStore.shared.entitlementSnapshot() ?? .freeDefault) {
         self.snapshot = snapshot
     }
 
@@ -153,6 +171,11 @@ final class EntitlementService {
 
     func canUse(_ feature: EntitlementFeature) -> Bool {
         return currentSnapshot.canUse(feature)
+    }
+
+    func activateFounderLifetime(activatedAt: Date = Date()) {
+        lock.lock(); defer { lock.unlock() }
+        snapshot = .founderLifetime(activatedAt: activatedAt)
     }
 }
 
