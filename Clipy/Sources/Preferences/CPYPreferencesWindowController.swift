@@ -306,6 +306,9 @@ private extension CPYPreferencesWindowController {
 
     func switchView(_ index: Int) {
         let newView = viewController[index].view
+        if index == 0 {
+            newView.frame.size = NSSize(width: 1180, height: 650)
+        }
         // Remove current views without toolbar
         window?.contentView?.subviews.forEach { view in
             if view != toolBar && (settingsGlassBackgroundView == nil || view !== settingsGlassBackgroundView!) {
@@ -408,40 +411,227 @@ private extension CPYPreferencesWindowController {
             .filter { $0.identifier == cardIdentifier }
             .forEach { $0.removeFromSuperview() }
 
-        let cardFrame = NSRect(
-            x: min(titleLabel.frame.minX, statusLabel.frame.minX) - 12,
-            y: min(statusLabel.frame.minY, statusControl.frame.minY) - 8,
-            width: max(statusControl.frame.maxX, statusLabel.frame.maxX) - min(titleLabel.frame.minX, statusLabel.frame.minX) + 24,
-            height: titleLabel.frame.maxY - min(statusLabel.frame.minY, statusControl.frame.minY) + 16
-        )
-        let card = NSView(frame: cardFrame)
+        titleLabel.isHidden = true
+        statusLabel.isHidden = true
+        statusControl.isHidden = true
+        let card = makeAppearancePreferencesScaffold(frame: view.bounds.insetBy(dx: 26, dy: 24), useLiquidGlass: useLiquidGlass)
         card.identifier = cardIdentifier
-        card.wantsLayer = true
-        card.layer?.cornerRadius = 8
-        card.layer?.masksToBounds = true
-        card.layer?.backgroundColor = (useLiquidGlass
-            ? NSColor.black.withAlphaComponent(0.16)
-            : NSColor(calibratedWhite: 0.12, alpha: 1)).cgColor
-        card.layer?.borderColor = (useLiquidGlass
-            ? NSColor.white.withAlphaComponent(0.14)
-            : NSColor(calibratedWhite: 0.20, alpha: 1)).cgColor
-        card.layer?.borderWidth = 1
+        view.addSubview(card)
+    }
 
-        let accent = NSView(frame: NSRect(x: 0, y: 0, width: 3, height: cardFrame.height))
-        accent.wantsLayer = true
-        accent.layer?.backgroundColor = NSColor.systemRed.withAlphaComponent(useLiquidGlass ? 0.88 : 0.95).cgColor
-        card.addSubview(accent)
+    func makeAppearancePreferencesScaffold(frame: NSRect, useLiquidGlass: Bool) -> NSView {
+        let root = NSView(frame: frame)
+        BoardManPreferenceUI.prepare(root, color: BoardManPreferenceUI.base, radius: BoardManPreferenceUI.Radius.window, border: BoardManPreferenceUI.borderNormal)
 
-        titleLabel.textColor = NSColor.systemRed
-        statusControl.wantsLayer = true
-        statusControl.layer?.cornerRadius = 6
-        statusControl.layer?.backgroundColor = (useLiquidGlass
-            ? NSColor.textBackgroundColor.withAlphaComponent(0.10)
-            : NSColor(calibratedWhite: 0.15, alpha: 1)).cgColor
-        statusControl.layer?.borderColor = NSColor.systemRed.withAlphaComponent(useLiquidGlass ? 0.24 : 0.18).cgColor
-        statusControl.layer?.borderWidth = 1
+        let isPro = EntitlementGate.currentSnapshot().isProEntitled
+        let left = NSView(frame: NSRect(x: 18, y: 18, width: 560, height: frame.height - 36))
+        BoardManPreferenceUI.prepare(left, color: BoardManPreferenceUI.window, radius: BoardManPreferenceUI.Radius.panel, border: BoardManPreferenceUI.borderSubtle)
+        root.addSubview(left)
 
-        view.addSubview(card, positioned: .below, relativeTo: titleLabel)
+        let preview = NSView(frame: NSRect(x: 594, y: 18, width: frame.width - 612, height: frame.height - 36))
+        BoardManPreferenceUI.prepare(preview, color: useLiquidGlass ? BoardManPreferenceUI.panel.withAlphaComponent(0.86) : BoardManPreferenceUI.panel, radius: BoardManPreferenceUI.Radius.panel, border: BoardManPreferenceUI.borderSubtle)
+        root.addSubview(preview)
+
+        left.addSubview(BoardManPreferenceUI.label("Window Background", size: 16, weight: .semibold).bmPositioned(originX: 18, originY: left.frame.height - 42, width: 240, height: 22))
+        addBackgroundModes(to: left, originY: left.frame.height - 126, isPro: isPro)
+        addSourcePath(to: left, originY: left.frame.height - 172, isPro: isPro)
+        addAdjustmentSection(to: left, originY: left.frame.height - 376, isPro: isPro)
+        addShapeSection(to: left, originY: left.frame.height - 505, isPro: isPro)
+        addPresetSection(to: left, originY: 18, isPro: isPro)
+
+        preview.addSubview(BoardManPreferenceUI.label("Live Preview", size: 16, weight: .semibold).bmPositioned(originX: 18, originY: preview.frame.height - 42, width: 160, height: 22))
+        preview.addSubview(BoardManPreferenceUI.icon("questionmark.circle", size: 14, color: BoardManPreferenceUI.secondaryText).bmPositioned(originX: 122, originY: preview.frame.height - 39, width: 18, height: 18))
+        addPreviewScaffold(to: preview, isPro: isPro)
+        if !isPro {
+            addUpgradePanel(to: preview)
+        }
+        return root
+    }
+
+    func addBackgroundModes(to view: NSView, originY: CGFloat, isPro: Bool) {
+        let modes = [
+            ("photo", "Wallpaper", false),
+            ("square.dashed", "Transparent", false),
+            ("rectangle.fill", "Solid Color", false),
+            ("paintbrush", "Gradient", true),
+            ("sparkles", "Blur Glass", true)
+        ]
+        for (index, mode) in modes.enumerated() {
+            let originX = 18 + CGFloat(index) * 104
+            let card = appearanceTile(symbol: mode.0, title: mode.1, active: index == 1, locked: mode.2 && !isPro)
+            card.frame = NSRect(x: originX, y: originY, width: 86, height: 76)
+            view.addSubview(card)
+        }
+    }
+
+    func addSourcePath(to view: NSView, originY: CGFloat, isPro: Bool) {
+        view.addSubview(BoardManPreferenceUI.label("Source", size: 13, weight: .semibold).bmPositioned(originX: 18, originY: originY + 8, width: 70, height: 20))
+        let field = NSTextField(string: "/Users/naomac/Pictures/Board-Man Background.jpg")
+        field.font = NSFont.systemFont(ofSize: 12)
+        field.textColor = isPro ? BoardManPreferenceUI.secondaryText : BoardManPreferenceUI.mutedText
+        field.backgroundColor = BoardManPreferenceUI.field
+        field.isEnabled = isPro
+        field.frame = NSRect(x: 86, y: originY + 4, width: 360, height: 28)
+        BoardManPreferenceUI.prepare(field, color: BoardManPreferenceUI.field, radius: BoardManPreferenceUI.Radius.control, border: BoardManPreferenceUI.borderSubtle)
+        view.addSubview(field)
+        let choose = BoardManPreferenceUI.secondaryButton("Choose...")
+        choose.isEnabled = isPro
+        choose.frame = NSRect(x: 458, y: originY + 4, width: 78, height: 28)
+        view.addSubview(choose)
+    }
+
+    func addAdjustmentSection(to view: NSView, originY: CGFloat, isPro: Bool) {
+        addSectionDivider(to: view, originY: originY + 154)
+        view.addSubview(BoardManPreferenceUI.label("Appearance Adjustments", size: 16, weight: .semibold).bmPositioned(originX: 18, originY: originY + 126, width: 250, height: 22))
+        let controls = [
+            ("Opacity", "78 %", false), ("Contrast", "12 %", true),
+            ("Blur", "28 px", true), ("Noise", "6 %", true),
+            ("Tint", "#FF3B30", false), ("Vignette", "22 %", true),
+            ("Brightness", "8 %", true), ("Shadow Intensity", "35 %", true),
+            ("Saturation", "14 %", true)
+        ]
+        for (index, control) in controls.enumerated() {
+            let column = index % 2
+            let row = index / 2
+            addSliderRow(to: view, title: control.0, value: control.1, originX: 18 + CGFloat(column) * 280, originY: originY + 94 - CGFloat(row) * 34, locked: control.2 && !isPro)
+        }
+    }
+
+    func addShapeSection(to view: NSView, originY: CGFloat, isPro: Bool) {
+        addSectionDivider(to: view, originY: originY + 86)
+        view.addSubview(BoardManPreferenceUI.label("Window Shape & Layout", size: 16, weight: .semibold).bmPositioned(originX: 18, originY: originY + 58, width: 250, height: 22))
+        let controls = [
+            ("Corner Radius", "16 px", false), ("Inner Spacing", "14 px", true),
+            ("Border Thickness", "1.0 px", true), ("Panel Depth", "22 px", true),
+            ("Padding", "18 px", true)
+        ]
+        for (index, control) in controls.enumerated() {
+            let column = index % 2
+            let row = index / 2
+            addSliderRow(to: view, title: control.0, value: control.1, originX: 18 + CGFloat(column) * 280, originY: originY + 26 - CGFloat(row) * 34, locked: control.2 && !isPro)
+        }
+    }
+
+    func addPresetSection(to view: NSView, originY: CGFloat, isPro: Bool) {
+        addSectionDivider(to: view, originY: originY + 116)
+        view.addSubview(BoardManPreferenceUI.label("Quick Presets", size: 16, weight: .semibold).bmPositioned(originX: 18, originY: originY + 88, width: 180, height: 22))
+        let presets = [
+            ("Deep Dark", BoardManPreferenceUI.redSoft, false),
+            ("Carbon", NSColor(bmHex: 0x273242), true),
+            ("Aurora", NSColor(bmHex: 0x4B2BB8), true),
+            ("Sunset", NSColor(bmHex: 0xD75C3C), true),
+            ("Ocean", NSColor(bmHex: 0x0F7190), true)
+        ]
+        for (index, preset) in presets.enumerated() {
+            let tile = presetTile(title: preset.0, color: preset.1, active: index == 0, locked: preset.2 && !isPro)
+            tile.frame = NSRect(x: 18 + CGFloat(index) * 104, y: originY, width: 86, height: 76)
+            view.addSubview(tile)
+        }
+    }
+
+    func addPreviewScaffold(to view: NSView, isPro: Bool) {
+        let canvas = BoardManPreviewCanvasView(frame: NSRect(x: 18, y: 42, width: view.frame.width - 36, height: view.frame.height - 96))
+        BoardManPreferenceUI.prepare(canvas, color: BoardManPreferenceUI.card, radius: BoardManPreferenceUI.Radius.panel, border: BoardManPreferenceUI.borderSubtle)
+        view.addSubview(canvas)
+        let panel = NSView(frame: NSRect(x: 110, y: 92, width: canvas.frame.width - 220, height: canvas.frame.height - 132))
+        BoardManPreferenceUI.prepare(panel, color: BoardManPreferenceUI.base.withAlphaComponent(isPro ? 0.82 : 0.70), radius: 16, border: BoardManPreferenceUI.borderNormal)
+        canvas.addSubview(panel)
+        panel.addSubview(BoardManPreferenceUI.label("Board-Man", size: 14, weight: .bold).bmPositioned(originX: 158, originY: panel.frame.height - 38, width: 140, height: 20))
+        let search = BoardManPreferenceUI.label("  Search clipboard history or snippets...", size: 12, color: BoardManPreferenceUI.mutedText)
+        BoardManPreferenceUI.prepare(search, color: BoardManPreferenceUI.field, radius: BoardManPreferenceUI.Radius.control, border: BoardManPreferenceUI.borderSubtle)
+        panel.addSubview(search.bmPositioned(originX: 20, originY: panel.frame.height - 76, width: panel.frame.width - 40, height: 32))
+        let rows = [("Board-Man is the smart clipboard for creators.", "Text"), ("const build = () => 'Ship it!'", "Code"), ("https://board-man.app", "Link")]
+        for (index, row) in rows.enumerated() {
+            let item = NSView(frame: NSRect(x: 20, y: panel.frame.height - 128 - CGFloat(index) * 58, width: panel.frame.width - 40, height: 44))
+            BoardManPreferenceUI.prepare(item, color: BoardManPreferenceUI.card.withAlphaComponent(0.72), radius: BoardManPreferenceUI.Radius.control, border: BoardManPreferenceUI.borderSubtle)
+            item.addSubview(BoardManPreferenceUI.label(row.0, size: 12).bmPositioned(originX: 14, originY: 13, width: item.frame.width - 110, height: 18))
+            item.addSubview(BoardManPreferenceUI.label(row.1, size: 12, color: BoardManPreferenceUI.secondaryText).bmPositioned(originX: item.frame.width - 72, originY: 13, width: 48, height: 18))
+            panel.addSubview(item)
+        }
+    }
+
+    func addUpgradePanel(to view: NSView) {
+        let panel = NSView(frame: NSRect(x: 46, y: view.frame.height - 158, width: view.frame.width - 92, height: 84))
+        BoardManPreferenceUI.prepare(panel, color: BoardManPreferenceUI.redSoft.withAlphaComponent(0.66), radius: BoardManPreferenceUI.Radius.card, border: BoardManPreferenceUI.red.withAlphaComponent(0.45))
+        panel.addSubview(BoardManPreferenceUI.icon("crown", size: 24).bmPositioned(originX: 18, originY: 30, width: 30, height: 30))
+        panel.addSubview(BoardManPreferenceUI.label("Unlock advanced appearance controls with Board-Man Pro", size: 14, weight: .semibold).bmPositioned(originX: 58, originY: 42, width: 350, height: 20))
+        panel.addSubview(BoardManPreferenceUI.label("Free keeps core appearance controls. Pro enables gradient, glass, blur, layout depth, and extra presets.", size: 12, color: BoardManPreferenceUI.secondaryText).bmPositioned(originX: 58, originY: 18, width: 430, height: 18))
+        let button = BoardManPreferenceUI.primaryButton("Upgrade to Pro")
+        button.frame = NSRect(x: panel.frame.width - 128, y: 25, width: 108, height: 34)
+        panel.addSubview(button)
+        view.addSubview(panel)
+    }
+
+    func addSliderRow(to view: NSView, title: String, value: String, originX: CGFloat, originY: CGFloat, locked: Bool) {
+        view.addSubview(BoardManPreferenceUI.label(title, size: 12, color: locked ? BoardManPreferenceUI.mutedText : BoardManPreferenceUI.primaryText).bmPositioned(originX: originX, originY: originY + 4, width: 112, height: 18))
+        if title == "Tint" {
+            let swatch = NSView(frame: NSRect(x: originX + 116, y: originY + 2, width: 38, height: 22))
+            BoardManPreferenceUI.prepare(swatch, color: BoardManPreferenceUI.red, radius: 5, border: BoardManPreferenceUI.borderNormal)
+            view.addSubview(swatch)
+        } else {
+            let slider = NSSlider(value: locked ? 0.42 : 0.70, minValue: 0, maxValue: 1, target: nil, action: nil)
+            slider.isEnabled = !locked
+            slider.frame = NSRect(x: originX + 116, y: originY, width: 120, height: 24)
+            view.addSubview(slider)
+        }
+        let pill = BoardManPreferenceUI.label(value, size: 12, color: locked ? BoardManPreferenceUI.mutedText : BoardManPreferenceUI.primaryText)
+        pill.alignment = .center
+        BoardManPreferenceUI.prepare(pill, color: BoardManPreferenceUI.field, radius: BoardManPreferenceUI.Radius.control, border: BoardManPreferenceUI.borderSubtle)
+        view.addSubview(pill.bmPositioned(originX: originX + 244, originY: originY + 1, width: 44, height: 24))
+        if locked {
+            view.addSubview(BoardManPreferenceUI.proBadge().bmPositioned(originX: originX + 206, originY: originY + 3, width: 30, height: 18))
+        }
+    }
+
+    func addSectionDivider(to view: NSView, originY: CGFloat) {
+        let divider = NSView(frame: NSRect(x: 18, y: originY, width: view.frame.width - 36, height: 1))
+        divider.wantsLayer = true
+        divider.layer?.backgroundColor = BoardManPreferenceUI.borderSubtle.cgColor
+        view.addSubview(divider)
+    }
+
+    func appearanceTile(symbol: String, title: String, active: Bool, locked: Bool) -> NSView {
+        let tile = NSView()
+        BoardManPreferenceUI.prepare(tile, color: BoardManPreferenceUI.card, radius: BoardManPreferenceUI.Radius.card, border: active ? BoardManPreferenceUI.red : BoardManPreferenceUI.borderNormal)
+        tile.addSubview(BoardManPreferenceUI.icon(symbol, size: 20, color: locked ? BoardManPreferenceUI.mutedText : BoardManPreferenceUI.red).bmPositioned(originX: 28, originY: 34, width: 30, height: 28))
+        tile.addSubview(BoardManPreferenceUI.label(title, size: 11, color: locked ? BoardManPreferenceUI.mutedText : BoardManPreferenceUI.primaryText).bmPositioned(originX: 4, originY: 8, width: 78, height: 16))
+        if locked {
+            tile.addSubview(BoardManPreferenceUI.lockedBadge().bmPositioned(originX: 58, originY: 46, width: 22, height: 22))
+        }
+        return tile
+    }
+
+    func presetTile(title: String, color: NSColor, active: Bool, locked: Bool) -> NSView {
+        let tile = NSView()
+        BoardManPreferenceUI.prepare(tile, color: color.withAlphaComponent(0.78), radius: BoardManPreferenceUI.Radius.card, border: active ? BoardManPreferenceUI.red : BoardManPreferenceUI.borderNormal)
+        let mini = NSView(frame: NSRect(x: 14, y: 24, width: 58, height: 34))
+        BoardManPreferenceUI.prepare(mini, color: BoardManPreferenceUI.card.withAlphaComponent(0.78), radius: 6, border: BoardManPreferenceUI.borderSubtle)
+        tile.addSubview(mini)
+        tile.addSubview(BoardManPreferenceUI.label(title, size: 11).bmPositioned(originX: 4, originY: 6, width: 78, height: 16))
+        if active {
+            tile.addSubview(BoardManPreferenceUI.icon("checkmark.circle.fill", size: 15).bmPositioned(originX: 64, originY: 22, width: 18, height: 18))
+        } else if locked {
+            tile.addSubview(BoardManPreferenceUI.proBadge().bmPositioned(originX: 51, originY: 52, width: 30, height: 18))
+        }
+        return tile
+    }
+}
+
+private extension NSView {
+    func bmPositioned(originX: CGFloat, originY: CGFloat, width: CGFloat, height: CGFloat) -> Self {
+        frame = NSRect(x: originX, y: originY, width: width, height: height)
+        return self
+    }
+}
+
+private final class BoardManPreviewCanvasView: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        NSGradient(colors: [
+            BoardManPreferenceUI.base,
+            BoardManPreferenceUI.redSoft,
+            NSColor(bmHex: 0x26334A)
+        ])?.draw(in: bounds, angle: 25)
     }
 }
 
