@@ -111,37 +111,6 @@ final class PasteCountInputService {
         log("suppress next global paste")
     }
 
-    func isFocusedTargetInputLike() -> Bool {
-        guard AXIsProcessTrusted() else { return true }
-
-        let systemWide = AXUIElementCreateSystemWide()
-        var focusedObject: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(
-            systemWide,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedObject
-        )
-
-        guard result == .success, let focusedObject else { return true }
-
-        var roleObject: CFTypeRef?
-        AXUIElementCopyAttributeValue(
-            // swiftlint:disable:next force_cast
-            focusedObject as! AXUIElement,
-            kAXRoleAttribute as CFString,
-            &roleObject
-        )
-
-        let role = roleObject as? String ?? ""
-        return [
-            kAXTextFieldRole as String,
-            kAXTextAreaRole as String,
-            "AXComboBox",
-            "AXWebArea",
-            "AXEditableText"
-        ].contains(role)
-    }
-
     func logBoardManPerformance(_ name: String, startedAt: CFAbsoluteTime, details: String = "") {
         let elapsedMs = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
         let suffix = details.isEmpty ? "" : " \(details)"
@@ -313,6 +282,12 @@ final class PasteCountInputService {
         }
         lastDetectedAt = now
 
+        let focusedTarget = focusedPasteTargetCheck()
+        guard focusedTarget.isEditable else {
+            log("detected cmd+v source=\(source) editable_target=false reason=\(focusedTarget.reason)")
+            return
+        }
+
         log("detected cmd+v source=\(source) scheduling_match_delay=\(pasteboardMatchDelay)")
 
         DispatchQueue.main.asyncAfter(deadline: .now() + pasteboardMatchDelay) { [weak self] in
@@ -326,6 +301,69 @@ final class PasteCountInputService {
         guard !flags.contains(.option), !flags.contains(.control) else { return false }
 
         return event.keyCode == UInt16(kVK_ANSI_V)
+    }
+
+    private func focusedPasteTargetCheck() -> (isEditable: Bool, reason: String) {
+        guard AXIsProcessTrusted() else {
+            return (false, "accessibility_untrusted")
+        }
+
+        guard let frontmostApplication = NSWorkspace.shared.frontmostApplication else {
+            return (false, "frontmost_app_unavailable")
+        }
+
+        let appElement = AXUIElementCreateApplication(frontmostApplication.processIdentifier)
+        var focusedObject: CFTypeRef?
+        let focusedResult = AXUIElementCopyAttributeValue(
+            appElement,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedObject
+        )
+
+        guard focusedResult == .success, let focusedObject else {
+            return (false, "focused_element_unavailable")
+        }
+
+        let focusedElement = focusedObject as! AXUIElement // swiftlint:disable:this force_cast
+        let role = stringAttribute(kAXRoleAttribute, from: focusedElement) ?? ""
+        let subrole = stringAttribute(kAXSubroleAttribute, from: focusedElement) ?? ""
+        let isEditable = boolAttribute("AXEditable", from: focusedElement)
+
+        if isEditable == true {
+            return (true, "editable_attribute")
+        }
+
+        let editableRoles: Set<String> = [
+            kAXTextFieldRole as String,
+            kAXTextAreaRole as String,
+            kAXComboBoxRole as String,
+            "AXEditableText"
+        ]
+        if editableRoles.contains(role) {
+            return (true, "editable_role_\(role)")
+        }
+
+        if role == "AXWebArea", isEditable == true || subrole == "AXEditableWebArea" {
+            return (true, "editable_web_area")
+        }
+
+        return (false, role.isEmpty ? "role_unavailable" : "non_editable_role_\(role)")
+    }
+
+    private func stringAttribute(_ attribute: String, from element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
+            return nil
+        }
+        return value as? String
+    }
+
+    private func boolAttribute(_ attribute: String, from element: AXUIElement) -> Bool? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
+            return nil
+        }
+        return value as? Bool
     }
 
     private func countCurrentClipboardIfNeeded(source: String) {
