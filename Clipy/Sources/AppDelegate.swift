@@ -223,7 +223,9 @@ extension AppDelegate: NSApplicationDelegate {
         AppEnvironment.current.dataCleanService.startMonitoring()
         AppEnvironment.current.excludeAppService.startMonitoring()
         AppEnvironment.current.hotKeyService.setupDefaultHotKeys()
-        PasteCountInputService.shared.startMonitoring()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.60) {
+            PasteCountInputService.shared.startMonitoring()
+        }
 
         // Managers
         AppEnvironment.current.menuManager.setup()

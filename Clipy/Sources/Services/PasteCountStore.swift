@@ -48,26 +48,23 @@ final class PasteCountStore {
 
     func keyForLatestClip(matching string: String) -> String? {
         let realm = try! Realm()
-        let clips = realm.objects(CPYClip.self).sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: false)
 
-        for clip in clips {
-            if clip.isInvalidated { continue }
-            guard let data = NSKeyedUnarchiver.unarchiveObject(withFile: clip.dataPath) as? CPYClipData else { continue }
-            if data.stringValue == string {
-                let unixTime = Int(Date().timeIntervalSince1970)
-                do {
-                    try realm.write {
-                        clip.updateTime = unixTime
-                    }
-                } catch {
-                    return nil
-                }
-                NotificationCenter.default.post(name: Notification.Name(rawValue: Constants.Notification.pasteCountDidChange), object: nil)
-                return key(for: clip)
-            }
+        guard let clip = latestTextClip(in: realm, matching: string) else {
+            return nil
         }
 
-        return nil
+        let pasteCountKey = key(for: clip)
+        let unixTime = Int(Date().timeIntervalSince1970)
+        do {
+            try realm.write {
+                clip.updateTime = unixTime
+            }
+        } catch {
+            return nil
+        }
+
+        postPasteCountDidChange()
+        return pasteCountKey
     }
 
     @discardableResult
@@ -80,7 +77,7 @@ final class PasteCountStore {
                 guard !clip.isInvalidated else { return }
                 clip.updateTime = unixTime
             }
-            NotificationCenter.default.post(name: Notification.Name(rawValue: Constants.Notification.pasteCountDidChange), object: nil)
+            postPasteCountDidChange()
             return true
         } catch {
             return false
@@ -102,7 +99,7 @@ final class PasteCountStore {
         defaults.set(pasteCounts, forKey: Constants.UserDefaults.pasteCounts)
         defaults.synchronize()
 
-        NotificationCenter.default.post(name: Notification.Name(rawValue: Constants.Notification.pasteCountDidChange), object: nil)
+        postPasteCountDidChange()
         return true
     }
 
@@ -113,6 +110,38 @@ final class PasteCountStore {
 
     private func counts() -> [String: NSNumber] {
         return defaults.dictionary(forKey: Constants.UserDefaults.pasteCounts) as? [String: NSNumber] ?? [:]
+    }
+
+    private func latestTextClip(in realm: Realm, matching string: String) -> CPYClip? {
+        // Manual Cmd+V count must stay fast: use Realm metadata only.
+        // Reading every archived CPYClipData file blocks UI on large histories.
+        let storedTitle = storedTitle(forText: string)
+        let textTypes = [
+            NSPasteboard.PasteboardType.string.rawValue,
+            NSPasteboard.PasteboardType.deprecatedString.rawValue,
+            NSPasteboard.PasteboardType.deprecatedRTF.rawValue,
+            NSPasteboard.PasteboardType.deprecatedRTFD.rawValue
+        ]
+        return realm.objects(CPYClip.self)
+            .filter("title == %@ AND primaryType IN %@", storedTitle, textTypes)
+            .sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: false)
+            .first
+    }
+
+    private func storedTitle(forText string: String) -> String {
+        let title = string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? string : string
+        return title[0...10000]
+    }
+
+    private func postPasteCountDidChange() {
+        let post = {
+            NotificationCenter.default.post(name: Notification.Name(rawValue: Constants.Notification.pasteCountDidChange), object: nil)
+        }
+        if Thread.isMainThread {
+            post()
+        } else {
+            DispatchQueue.main.async(execute: post)
+        }
     }
 
     private func stableHash(_ string: String) -> String {
