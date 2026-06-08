@@ -38,6 +38,8 @@ It keeps clipboard history available from the menu bar and adds workflow-oriente
 
 If macOS Gatekeeper blocks the first launch, open **System Settings > Privacy & Security** and allow Board-Man, or Control-click the app and choose **Open**.
 
+Maintainers dogfooding local builds should use the canonical identity notes in [`docs/canonical-install.md`](docs/canonical-install.md).
+
 ## Basic usage
 
 1. Copy text, a URL, a command, or an image as usual.
