@@ -141,7 +141,9 @@ extension ClipService {
         // Don't save empty string history
         if data.isOnlyStringType && data.stringValue.isEmpty { return }
 
-        if !EntitlementGate.canAddHistoryItem(currentCount: realm.objects(CPYClip.self).count) {
+        let snapshot = EntitlementGate.currentSnapshot()
+        if !snapshot.isProEntitled,
+           realm.objects(CPYClip.self).count >= snapshot.limits.maxHistoryItems {
             return
         }
 

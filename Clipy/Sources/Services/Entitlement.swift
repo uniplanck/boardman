@@ -32,6 +32,10 @@ enum EntitlementFeature: String, CaseIterable, Hashable {
     case futureSync
 }
 
+extension EntitlementFeature {
+    static let appearanceAdvanced: EntitlementFeature = .advancedAppearance
+}
+
 typealias Feature = EntitlementFeature
 
 enum EntitlementLimit: Equatable {
@@ -188,6 +192,17 @@ struct Entitlement: Equatable {
             )
         )
     }
+
+    static func founderLifetime(activatedAt: Date = Date()) -> Entitlement {
+        let metadata = LicenseMetadata(
+            licenseKeyMasked: "internal-founder-lifetime",
+            deviceIdMasked: nil,
+            activatedAt: activatedAt,
+            lastVerifiedAt: activatedAt,
+            status: LicenseState.proActive.rawValue
+        )
+        return .proActive(metadata: metadata)
+    }
 }
 
 typealias EntitlementSnapshot = Entitlement
@@ -215,6 +230,10 @@ final class EntitlementService {
     func replaceSnapshot(_ snapshot: EntitlementSnapshot) {
         lock.lock(); defer { lock.unlock() }
         self.snapshot = snapshot
+    }
+
+    func activateFounderLifetime(activatedAt: Date = Date()) {
+        replaceSnapshot(.founderLifetime(activatedAt: activatedAt))
     }
 }
 

@@ -885,7 +885,8 @@ final class PinnedSnippetStore {
     func add(_ identifier: String) -> Bool {
         var values = identifiers.filter { !$0.isEmpty }
         guard !values.contains(identifier) else { return true }
-        guard EntitlementGate.canPinItem(currentPinnedCount: values.count) else {
+        let snapshot = EntitlementGate.currentSnapshot()
+        guard snapshot.isProEntitled || values.count < snapshot.limits.maxPinnedItems else {
             return false
         }
         values.append(identifier)
@@ -2488,18 +2489,18 @@ class BoardManPanel: NSPanel {
         let licenseKey = NSTextField(frame: .zero)
         licenseKey.placeholderString = "XXXX-XXXX-XXXX-XXXX"
         licenseKey.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        licenseKey.toolTip = "Production license activation is not implemented in this build."
+        licenseKey.toolTip = "Founder codes activate locally. Production licenses still require signed tokens."
         contentView.addSubview(licenseKey)
         licenseKeyField = licenseKey
 
         let activate = NSButton(title: "Activate", target: self, action: #selector(activateLicenseRequested(_:)))
         activate.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         activate.bezelStyle = .rounded
-        activate.toolTip = "Activation is disabled until production licensing exists."
+        activate.toolTip = "Activates an internal founder code locally when it matches."
         contentView.addSubview(activate)
         licenseActivateButton = activate
 
-        let activationStatus = NSTextField(labelWithString: "License activation is not implemented in this build.")
+        let activationStatus = NSTextField(labelWithString: "Internal dogfood: founder codes activate locally. Unknown codes stay locked.")
         activationStatus.font = NSFont.systemFont(ofSize: 11)
         activationStatus.textColor = .secondaryLabelColor
         activationStatus.lineBreakMode = .byWordWrapping
@@ -2520,7 +2521,7 @@ class BoardManPanel: NSPanel {
         let lockedProControl = BoardManProLockedControlView(
             title: "Advanced appearance",
             explanation: "Unlock Pro to customize advanced visual presets.",
-            feature: .advancedAppearance,
+            feature: .appearanceAdvanced,
             control: proControl,
             upgradeTarget: self,
             upgradeAction: #selector(openLicensePurchasePage(_:))
@@ -2528,7 +2529,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(lockedProControl)
         licenseProLockedControlView = lockedProControl
 
-        let licenseNote = NSTextField(labelWithString: "Production licensing still requires signed token activation.")
+        let licenseNote = NSTextField(labelWithString: "Internal dogfood only. Production licensing still requires signed token activation.")
         licenseNote.font = NSFont.systemFont(ofSize: 11)
         licenseNote.textColor = .secondaryLabelColor
         licenseNote.lineBreakMode = .byWordWrapping
@@ -3625,7 +3626,7 @@ class BoardManPanel: NSPanel {
     @objc private func addSnippetFromPanel(_ sender: Any?) {
         let realm = try! Realm()
         guard canAddSnippet(in: realm) else {
-        showProLockedAlert(message: "Free plan includes 5 snippets. Upgrade to Pro to add more.")
+            showProLockedAlert(message: "Free plan includes 5 snippets. Upgrade or activate Founder Lifetime to add more.")
             return
         }
         let folder = snippetTargetFolder(in: realm, preferredIdentifier: activeSnippetCategoryIdentifier)
@@ -3644,7 +3645,8 @@ class BoardManPanel: NSPanel {
     }
 
     private func canAddSnippet(in realm: Realm) -> Bool {
-        return EntitlementGate.canCreateSnippet(currentSnippetCount: realm.objects(CPYSnippet.self).count)
+        let snapshot = EntitlementGate.currentSnapshot()
+        return snapshot.isProEntitled || realm.objects(CPYSnippet.self).count < snapshot.limits.maxSnippets
     }
 
     private func showProLockedAlert(message: String) {
@@ -4108,7 +4110,7 @@ class BoardManPanel: NSPanel {
         licensePlanLabel?.stringValue = "\(licensePlanTitle(snapshot.plan)) Plan"
         licenseStateLabel?.stringValue = "\(licenseStateTitle(snapshot.state)): \(licenseStateDescription(snapshot))"
         licenseStateLabel?.textColor = licenseStateColor(snapshot.state)
-        licenseLimitsLabel?.stringValue = "History \(limitText(snapshot.limits.maxHistoryItems)), pins \(limitText(snapshot.limits.maxPinnedItems)), snippets \(limitText(snapshot.limits.maxSnippetItems))"
+        licenseLimitsLabel?.stringValue = "History \(limitText(snapshot.limits.maxHistoryItems)), pins \(limitText(snapshot.limits.maxPinnedItems)), snippets \(limitText(snapshot.limits.maxSnippets))"
         licenseProLockedControlView?.refresh()
     }
 
@@ -4330,7 +4332,7 @@ class BoardManPanel: NSPanel {
         if PinnedSnippetStore.shared.isPinned(dataHash) {
             PinnedSnippetStore.shared.remove(dataHash)
         } else if !PinnedSnippetStore.shared.add(dataHash) {
-        showProLockedAlert(message: "Free plan includes 3 pinned items. Upgrade to Pro to pin more.")
+            showProLockedAlert(message: "Free plan includes 3 pinned items. Upgrade or activate Founder Lifetime to pin more.")
         }
         onRefreshRequested?()
     }
