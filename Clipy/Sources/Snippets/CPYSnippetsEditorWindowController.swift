@@ -110,6 +110,10 @@ extension CPYSnippetsEditorWindowController {
     }
 
     @IBAction private func addFolderButtonTapped(_ sender: AnyObject) {
+        guard canAddSnippetFolder() else {
+            showProLockedAlert(message: "Free plan includes 1 snippet folder. Upgrade to Pro to add more.")
+            return
+        }
         let folder = CPYFolder.create()
         folders.append(folder)
         folder.merge()
@@ -562,10 +566,12 @@ private extension CPYSnippetsEditorWindowController {
 private extension CPYSnippetsEditorWindowController {
 
     func canAddSnippet() -> Bool {
-        let snapshot = EntitlementGate.currentSnapshot()
-        guard !snapshot.isProEntitled else { return true }
         let realm = try! Realm()
-        return realm.objects(CPYSnippet.self).count < snapshot.limits.maxSnippets
+        return EntitlementGate.canCreateSnippet(currentSnippetCount: realm.objects(CPYSnippet.self).count)
+    }
+
+    func canAddSnippetFolder() -> Bool {
+        return EntitlementGate.canCreateSnippetFolder(currentFolderCount: folders.count)
     }
 
     func showProLockedAlert(message: String) {

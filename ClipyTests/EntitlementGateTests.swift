@@ -61,6 +61,36 @@ final class EntitlementGateTests {
     }
 
     @Test
+    func freeSnippetFolderLimitIsOne() {
+        let service = EntitlementService(snapshot: .freeDefault)
+
+        #expect(EntitlementGate.canCreateSnippetFolder(currentFolderCount: 0, service: service))
+        #expect(!EntitlementGate.canCreateSnippetFolder(currentFolderCount: 1, service: service))
+    }
+
+    @Test
+    func overLimitExistingCountsAreNotMutatedByGate() {
+        let service = EntitlementService(snapshot: .freeDefault)
+        let existingPinnedCount = 10
+        let existingSnippetCount = 12
+
+        #expect(!EntitlementGate.canPinItem(currentPinnedCount: existingPinnedCount, service: service))
+        #expect(!EntitlementGate.canCreateSnippet(currentSnippetCount: existingSnippetCount, service: service))
+        #expect(existingPinnedCount == 10)
+        #expect(existingSnippetCount == 12)
+    }
+
+    @Test
+    func proAllowsRuntimeActions() {
+        let service = EntitlementService(snapshot: .proActive())
+
+        #expect(EntitlementGate.canAddHistoryItem(currentCount: 10_000, service: service))
+        #expect(EntitlementGate.canPinItem(currentPinnedCount: 10_000, service: service))
+        #expect(EntitlementGate.canCreateSnippet(currentSnippetCount: 10_000, service: service))
+        #expect(EntitlementGate.canCreateSnippetFolder(currentFolderCount: 10_000, service: service))
+    }
+
+    @Test
     func inactiveStatesDoNotBehaveAsActivePro() {
         let inactiveStates: [LicenseState] = [.locked, .invalid, .proExpired]
 
