@@ -11,6 +11,9 @@ final class CPYBetaPreferenceViewController: NSViewController {
     private let validationLabel = BoardManPreferenceUI.label("Not connected yet", size: 12, color: BoardManPreferenceUI.secondaryText)
     private let planLabel = BoardManPreferenceUI.label("Free Plan", size: 28, weight: .bold)
     private let statusPill = BoardManPreferenceUI.label("Free", size: 12, weight: .semibold)
+    private let currentPlanValue = BoardManPreferenceUI.label("Free Plan", size: 12, weight: .semibold)
+    private let statusValue = BoardManPreferenceUI.label("Free", size: 12, weight: .semibold)
+    private let lastVerifiedValue = BoardManPreferenceUI.label("Not verified / Offline", size: 12, weight: .semibold, color: BoardManPreferenceUI.red)
     private let deviceStatus = BoardManPreferenceUI.label("Not activated", size: 12, color: BoardManPreferenceUI.secondaryText)
 
     override func loadView() {
@@ -29,15 +32,16 @@ final class CPYBetaPreferenceViewController: NSViewController {
         statusPill.frame = NSRect(x: 20, y: 118, width: 70, height: 24)
         BoardManPreferenceUI.prepare(statusPill, color: BoardManPreferenceUI.card, radius: 12, border: BoardManPreferenceUI.borderSubtle)
         currentPlan.addSubview(statusPill)
-        currentPlan.addSubview(infoRow("clock", "Last verified:", "Offline", accent: true, y: 78))
-        currentPlan.addSubview(infoRow("laptopcomputer", "Device activated:", "Not activated", y: 44))
+        currentPlan.addSubview(statusRow("tag", "Current Plan:", currentPlanValue, y: 92))
+        currentPlan.addSubview(statusRow("checkmark.seal", "Status:", statusValue, y: 66))
+        currentPlan.addSubview(statusRow("clock", "Last verified:", lastVerifiedValue, y: 40))
+        currentPlan.addSubview(statusRow("laptopcomputer", "Device activated:", deviceStatus, y: 14))
         let upgrade = BoardManPreferenceUI.secondaryButton("Upgrade to Pro  ›")
         upgrade.target = self
         upgrade.action = #selector(openBuyPro)
         upgrade.frame = NSRect(x: 200, y: 150, width: 130, height: 38)
         upgrade.layer?.borderColor = BoardManPreferenceUI.red.withAlphaComponent(0.8).cgColor
         currentPlan.addSubview(upgrade)
-        currentPlan.addSubview(BoardManPreferenceUI.label("ⓘ  Pro unlocks advanced customization and unlimited usage.", size: 11, color: BoardManPreferenceUI.secondaryText).positioned(x: 20, y: 18, w: 310, h: 18))
         view.addSubview(currentPlan)
 
         let activation = card(x: 395, y: 320, w: 405, h: 250, title: "2. License Key Activation", icon: "key")
@@ -117,7 +121,12 @@ final class CPYBetaPreferenceViewController: NSViewController {
         planLabel.stringValue = active ? "Board-Man Pro" : "Free Plan"
         statusPill.stringValue = active ? "Active" : "Free"
         statusPill.layer?.backgroundColor = (active ? BoardManPreferenceUI.redSoft : BoardManPreferenceUI.card).cgColor
+        currentPlanValue.stringValue = active ? "Board-Man Pro" : "Free Plan"
+        statusValue.stringValue = active ? "Active" : "Free"
+        lastVerifiedValue.stringValue = active ? "Verified" : "Not verified / Offline"
+        lastVerifiedValue.textColor = active ? .systemGreen : BoardManPreferenceUI.red
         deviceStatus.stringValue = active ? "Activated" : "Not activated"
+        deviceStatus.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
         validationLabel.stringValue = active ? "Activated" : "Not connected yet"
         validationLabel.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
     }
@@ -139,11 +148,12 @@ final class CPYBetaPreferenceViewController: NSViewController {
         return row
     }
 
-    private func infoRow(_ symbol: String, _ left: String, _ right: String, accent: Bool = false, y: CGFloat) -> NSView {
+    private func statusRow(_ symbol: String, _ left: String, _ value: NSTextField, y: CGFloat) -> NSView {
         let row = NSView(frame: NSRect(x: 20, y: y, width: 310, height: 20))
         row.addSubview(BoardManPreferenceUI.icon(symbol, size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 0, y: 0, w: 18, h: 18))
-        row.addSubview(BoardManPreferenceUI.label(left, size: 12, color: BoardManPreferenceUI.secondaryText).positioned(x: 28, y: 0, w: 120, h: 20))
-        row.addSubview(BoardManPreferenceUI.label(right, size: 12, weight: .semibold, color: accent ? BoardManPreferenceUI.red : BoardManPreferenceUI.secondaryText).positioned(x: 155, y: 0, w: 140, h: 20))
+        row.addSubview(BoardManPreferenceUI.label(left, size: 12, color: BoardManPreferenceUI.secondaryText).positioned(x: 28, y: 0, w: 115, h: 20))
+        value.frame = NSRect(x: 145, y: 0, width: 160, height: 20)
+        row.addSubview(value)
         return row
     }
 
