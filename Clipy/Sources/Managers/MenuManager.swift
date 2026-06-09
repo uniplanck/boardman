@@ -885,8 +885,7 @@ final class PinnedSnippetStore {
     func add(_ identifier: String) -> Bool {
         var values = identifiers.filter { !$0.isEmpty }
         guard !values.contains(identifier) else { return true }
-        let snapshot = EntitlementGate.currentSnapshot()
-        guard snapshot.isProEntitled || values.count < snapshot.limits.maxPinnedItems else {
+        guard EntitlementGate.canPinItem(currentPinnedCount: values.count) else {
             return false
         }
         values.append(identifier)
@@ -3549,8 +3548,12 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func addSnippetCategoryFromPanel(_ sender: Any?) {
-        guard let title = promptForCategoryTitle(title: "Add Group", initialTitle: "") else { return }
         let realm = try! Realm()
+        guard canAddSnippetFolder(in: realm) else {
+            showProLockedAlert(message: "Free plan includes 1 snippet folder. Upgrade to Pro to add more.")
+            return
+        }
+        guard let title = promptForCategoryTitle(title: "Add Group", initialTitle: "") else { return }
         let folder = CPYFolder()
         folder.title = title
         folder.enable = true
@@ -3645,8 +3648,11 @@ class BoardManPanel: NSPanel {
     }
 
     private func canAddSnippet(in realm: Realm) -> Bool {
-        let snapshot = EntitlementGate.currentSnapshot()
-        return snapshot.isProEntitled || realm.objects(CPYSnippet.self).count < snapshot.limits.maxSnippets
+        return EntitlementGate.canCreateSnippet(currentSnippetCount: realm.objects(CPYSnippet.self).count)
+    }
+
+    private func canAddSnippetFolder(in realm: Realm) -> Bool {
+        return EntitlementGate.canCreateSnippetFolder(currentFolderCount: realm.objects(CPYFolder.self).count)
     }
 
     private func showProLockedAlert(message: String) {

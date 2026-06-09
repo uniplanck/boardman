@@ -141,12 +141,6 @@ extension ClipService {
         // Don't save empty string history
         if data.isOnlyStringType && data.stringValue.isEmpty { return }
 
-        let snapshot = EntitlementGate.currentSnapshot()
-        if !snapshot.isProEntitled,
-           realm.objects(CPYClip.self).count >= snapshot.limits.maxHistoryItems {
-            return
-        }
-
         // Overwrite same history
         let isOverwriteHistory = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.overwriteSameHistory)
         let savedHash = isOverwriteHistory ? data.hash : Int.random(in: 0..<1_000_000)
@@ -181,8 +175,29 @@ extension ClipService {
                     dispatchRealm.transaction {
                         dispatchRealm.add(clip, update: .all)
                     }
+                    self.trimHistoryIfNeeded(in: dispatchRealm)
                 }
             }
+        }
+    }
+
+    private func trimHistoryIfNeeded(in realm: Realm) {
+        guard let limit = EntitlementGate.historyRetentionLimit(),
+              limit > 0 else {
+            return
+        }
+
+        let clips = realm.objects(CPYClip.self).sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: false)
+        guard clips.count > limit else { return }
+
+        let overflowingClips = Array(clips.dropFirst(limit))
+        overflowingClips
+            .filter { !$0.isInvalidated && !$0.thumbnailPath.isEmpty }
+            .map { $0.thumbnailPath }
+            .forEach { PINCache.shared.removeObject(forKey: $0) }
+
+        realm.transaction {
+            realm.delete(overflowingClips.filter { !$0.isInvalidated })
         }
     }
 

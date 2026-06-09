@@ -259,6 +259,10 @@ enum EntitlementGate {
         return canAdd(currentCount: currentCount, limit: .historyItems, service: service)
     }
 
+    static func historyRetentionLimit(service: EntitlementService = .shared) -> Int? {
+        return limit(for: .historyItems, service: service)
+    }
+
     static func canPinItem(currentPinnedCount: Int,
                            service: EntitlementService = .shared) -> Bool {
         return canAdd(currentCount: currentPinnedCount, limit: .pinnedItems, service: service)
