@@ -42,6 +42,21 @@ final class EntitlementGateTests {
 
         #expect(EntitlementGate.canAddHistoryItem(currentCount: 99, service: service))
         #expect(!EntitlementGate.canAddHistoryItem(currentCount: 100, service: service))
+        #expect(EntitlementGate.historyRetentionLimit(service: service) == 100)
+    }
+
+    @Test
+    func freeHistoryUsesRetentionInsteadOfCreationBlocking() {
+        let service = EntitlementService(snapshot: .freeDefault)
+        var storedHistoryCount = 100
+
+        storedHistoryCount += 1
+        if let limit = EntitlementGate.historyRetentionLimit(service: service),
+           storedHistoryCount > limit {
+            storedHistoryCount = limit
+        }
+
+        #expect(storedHistoryCount == 100)
     }
 
     @Test
