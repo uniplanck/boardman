@@ -81,6 +81,7 @@
 		FA6167921D3ABEB10049FA14 /* FolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6167911D3ABEB10049FA14 /* FolderTests.swift */; };
 		FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */; };
 		FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6167951D3ACDD80049FA14 /* SnippetTests.swift */; };
+		FA0D5CF81DDCC61600AC9052 /* EntitlementGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */; };
 		FA6DD5141C7DEDB600317E73 /* BuildFile in Resources */ = {isa = PBXBuildFile; };
 		FA6DD5151C7DEDB600317E73 /* BuildFile in Resources */ = {isa = PBXBuildFile; };
 		FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */; };
@@ -205,6 +206,7 @@
 		FA6167911D3ABEB10049FA14 /* FolderTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FolderTests.swift; sourceTree = "<group>"; };
 		FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DraggedDataTests.swift; sourceTree = "<group>"; };
 		FA6167951D3ACDD80049FA14 /* SnippetTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SnippetTests.swift; sourceTree = "<group>"; };
+		FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EntitlementGateTests.swift; sourceTree = "<group>"; };
 		FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
 		FAAA885C1E6853B80088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYBetaPreferenceViewController.xib; sourceTree = "<group>"; };
 		FAAA88621E6858030088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYBetaPreferenceViewController.strings; sourceTree = "<group>"; };
@@ -529,6 +531,7 @@
 			isa = PBXGroup;
 			children = (
 				FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */,
+				FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */,
 				FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */,
 				FA6167911D3ABEB10049FA14 /* FolderTests.swift */,
 				FA6167951D3ACDD80049FA14 /* SnippetTests.swift */,
@@ -745,6 +748,7 @@
 			files = (
 				FA6167921D3ABEB10049FA14 /* FolderTests.swift in Sources */,
 				FA08EDF81D1FED7D000D1D13 /* HotKeyServiceTests.swift in Sources */,
+				FA0D5CF81DDCC61600AC9052 /* EntitlementGateTests.swift in Sources */,
 				FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */,
 				FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */,
 			);
@@ -1008,6 +1012,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.uniplanck.BoardMan;
+				PRODUCT_MODULE_NAME = Clipy;
 				PRODUCT_NAME = "Board-Man";
 				PROVISIONING_PROFILE = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "";
@@ -1037,6 +1042,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.uniplanck.BoardMan;
+				PRODUCT_MODULE_NAME = Clipy;
 				PRODUCT_NAME = "Board-Man";
 				PROVISIONING_PROFILE = "";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1067,7 +1073,7 @@
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.uniplanck.BoardMan;
-				PRODUCT_NAME = "Board-Man";
+				PRODUCT_NAME = ClipyTests;
 				SWIFT_SWIFT3_OBJC_INFERENCE = Default;
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Board-Man.app/Contents/MacOS/Board-Man";
@@ -1091,7 +1097,7 @@
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.uniplanck.BoardMan;
-				PRODUCT_NAME = "Board-Man";
+				PRODUCT_NAME = ClipyTests;
 				SWIFT_SWIFT3_OBJC_INFERENCE = Default;
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Board-Man.app/Contents/MacOS/Board-Man";

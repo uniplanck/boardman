@@ -28,17 +28,27 @@ struct SignedLicenseToken: Equatable {
 
         func entitlementSnapshot(lastVerifiedAt: Date,
                                  offlineGraceExpiresAt: Date? = nil) -> EntitlementSnapshot {
+            let metadata = LicenseMetadata(
+                licenseKeyMasked: licenseID,
+                deviceIdMasked: deviceID.map(Self.masked),
+                activatedAt: issuedAt,
+                lastVerifiedAt: lastVerifiedAt,
+                status: state.rawValue
+            )
             return EntitlementSnapshot(
-                state: state,
                 plan: plan,
+                licenseState: state,
                 features: features,
                 limits: limits,
-                licenseID: licenseID,
-                issuedAt: issuedAt,
+                licenseMetadata: metadata,
                 expiresAt: expiresAt,
-                lastVerifiedAt: lastVerifiedAt,
                 offlineGraceExpiresAt: offlineGraceExpiresAt
             )
+        }
+
+        private static func masked(_ value: String) -> String {
+            guard value.count > 4 else { return "****" }
+            return "****" + value.suffix(4)
         }
     }
 
@@ -146,32 +156,29 @@ private struct PayloadDTO: Decodable {
 private struct LimitsDTO: Decodable {
     let maxHistoryItems: Int?
     let maxPinnedItems: Int?
-    let maxSnippets: Int?
-    let maxSavedSearches: Int?
-    let maxThemePresets: Int?
+    let maxSnippetItems: Int?
+    let maxSnippetFolders: Int?
 
     enum CodingKeys: String, CodingKey {
         case maxHistoryItems = "max_history_items"
         case maxPinnedItems = "max_pinned_items"
-        case maxSnippets = "max_snippets"
-        case maxSavedSearches = "max_saved_searches"
-        case maxThemePresets = "max_theme_presets"
+        case maxSnippetItems = "max_snippet_items"
+        case maxSnippetFolders = "max_snippet_folders"
     }
 
     var entitlementLimits: EntitlementLimits {
         return EntitlementLimits(
             maxHistoryItems: maxHistoryItems ?? EntitlementLimits.freeDefault.maxHistoryItems,
             maxPinnedItems: maxPinnedItems ?? EntitlementLimits.freeDefault.maxPinnedItems,
-            maxSnippets: maxSnippets ?? EntitlementLimits.freeDefault.maxSnippets,
-            maxSavedSearches: maxSavedSearches ?? EntitlementLimits.freeDefault.maxSavedSearches,
-            maxThemePresets: maxThemePresets ?? EntitlementLimits.freeDefault.maxThemePresets
+            maxSnippetItems: maxSnippetItems ?? EntitlementLimits.freeDefault.maxSnippetItems,
+            maxSnippetFolders: maxSnippetFolders ?? EntitlementLimits.freeDefault.maxSnippetFolders
         )
     }
 }
 
 private extension EntitlementPlan {
     var isUnlimited: Bool {
-        return self == .pro || self == .founder
+        return self == .pro
     }
 }
 

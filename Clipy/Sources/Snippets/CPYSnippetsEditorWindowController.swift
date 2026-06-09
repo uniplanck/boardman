@@ -97,7 +97,7 @@ extension CPYSnippetsEditorWindowController {
             return
         }
         guard canAddSnippet() else {
-            showProLockedAlert(message: "Free plan includes 5 snippets. Upgrade or activate Founder Lifetime to add more.")
+            showProLockedAlert(message: "Free plan includes 5 snippets. Upgrade to Pro to add more.")
             return
         }
         let snippet = folder.createSnippet()
@@ -553,7 +553,7 @@ private extension CPYSnippetsEditorWindowController {
         if PinnedSnippetStore.shared.isPinned(snippet.identifier) {
             PinnedSnippetStore.shared.remove(snippet.identifier)
         } else if !PinnedSnippetStore.shared.add(snippet.identifier) {
-            showProLockedAlert(message: "Free plan includes 3 pinned items. Upgrade or activate Founder Lifetime to pin more.")
+            showProLockedAlert(message: "Free plan includes 3 pinned items. Upgrade to Pro to pin more.")
         }
         outlineView.reloadData()
     }
@@ -562,10 +562,8 @@ private extension CPYSnippetsEditorWindowController {
 private extension CPYSnippetsEditorWindowController {
 
     func canAddSnippet() -> Bool {
-        let snapshot = EntitlementGate.currentSnapshot()
-        guard !snapshot.isProEntitled else { return true }
         let realm = try! Realm()
-        return realm.objects(CPYSnippet.self).count < snapshot.limits.maxSnippets
+        return EntitlementGate.canCreateSnippet(currentSnippetCount: realm.objects(CPYSnippet.self).count)
     }
 
     func showProLockedAlert(message: String) {
