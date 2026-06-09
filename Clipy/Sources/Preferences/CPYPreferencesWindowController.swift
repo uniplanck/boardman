@@ -442,9 +442,7 @@ private extension CPYPreferencesWindowController {
         preview.addSubview(BoardManPreferenceUI.label("Live Preview", size: 16, weight: .semibold).bmPositioned(originX: 18, originY: preview.frame.height - 42, width: 160, height: 22))
         preview.addSubview(BoardManPreferenceUI.icon("questionmark.circle", size: 14, color: BoardManPreferenceUI.secondaryText).bmPositioned(originX: 122, originY: preview.frame.height - 39, width: 18, height: 18))
         addPreviewScaffold(to: preview, isPro: isPro)
-        if !isPro {
-            addUpgradePanel(to: preview)
-        }
+        addProLockedAppearanceControl(to: preview)
         return root
     }
 
@@ -550,16 +548,24 @@ private extension CPYPreferencesWindowController {
         }
     }
 
-    func addUpgradePanel(to view: NSView) {
-        let panel = NSView(frame: NSRect(x: 46, y: view.frame.height - 158, width: view.frame.width - 92, height: 84))
-        BoardManPreferenceUI.prepare(panel, color: BoardManPreferenceUI.redSoft.withAlphaComponent(0.66), radius: BoardManPreferenceUI.Radius.card, border: BoardManPreferenceUI.red.withAlphaComponent(0.45))
-        panel.addSubview(BoardManPreferenceUI.icon("crown", size: 24).bmPositioned(originX: 18, originY: 30, width: 30, height: 30))
-        panel.addSubview(BoardManPreferenceUI.label("Unlock advanced appearance controls with Board-Man Pro", size: 14, weight: .semibold).bmPositioned(originX: 58, originY: 42, width: 350, height: 20))
-        panel.addSubview(BoardManPreferenceUI.label("Free keeps core appearance controls. Pro enables gradient, glass, blur, layout depth, and extra presets.", size: 12, color: BoardManPreferenceUI.secondaryText).bmPositioned(originX: 58, originY: 18, width: 430, height: 18))
-        let button = BoardManPreferenceUI.primaryButton("Upgrade to Pro")
-        button.frame = NSRect(x: panel.frame.width - 128, y: 25, width: 108, height: 34)
-        panel.addSubview(button)
-        view.addSubview(panel)
+    func addProLockedAppearanceControl(to view: NSView) {
+        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+        popup.addItems(withTitles: ["Transparent", "Gradient", "Blur Glass"])
+        popup.selectItem(withTitle: "Blur Glass")
+
+        let control = BoardManPreferenceProLockedControlView(
+            title: "Advanced Appearance",
+            helper: "Gradient, glass, blur, depth, and extra presets are Pro-only.",
+            feature: .appearanceAdvanced,
+            control: popup,
+            upgrade: (target: self, action: #selector(openBoardManProUpgrade))
+        )
+        control.frame = NSRect(x: 46, y: view.frame.height - 166, width: view.frame.width - 92, height: 96)
+        view.addSubview(control)
+    }
+
+    @objc func openBoardManProUpgrade() {
+        NSWorkspace.shared.open(URL(string: "https://uniplanck.com/board-man")!)
     }
 
     func addSliderRow(to view: NSView, title: String, value: String, originX: CGFloat, originY: CGFloat, locked: Bool) {
@@ -632,6 +638,86 @@ private final class BoardManPreviewCanvasView: NSView {
             BoardManPreferenceUI.redSoft,
             NSColor(bmHex: 0x26334A)
         ])?.draw(in: bounds, angle: 25)
+    }
+}
+
+final class BoardManPreferenceProLockedControlView: NSView {
+    private let feature: EntitlementFeature
+    private let titleLabel = BoardManPreferenceUI.label("", size: 14, weight: .semibold)
+    private let proBadge = BoardManPreferenceUI.proBadge()
+    private let helperLabel = BoardManPreferenceUI.label("", size: 12, color: BoardManPreferenceUI.secondaryText)
+    private let upgradeButton = BoardManPreferenceUI.primaryButton("Upgrade")
+    private let control: NSView
+    private var lockView: NSView?
+
+    init(title: String,
+         helper: String,
+         feature: EntitlementFeature,
+         control: NSView,
+         upgrade: (target: AnyObject?, action: Selector?)) {
+        self.feature = feature
+        self.control = control
+        super.init(frame: .zero)
+
+        BoardManPreferenceUI.prepare(self, color: BoardManPreferenceUI.redSoft.withAlphaComponent(0.66), radius: BoardManPreferenceUI.Radius.card, border: BoardManPreferenceUI.red.withAlphaComponent(0.45))
+
+        titleLabel.stringValue = title
+        addSubview(titleLabel)
+
+        let lock = makeLockView()
+        addSubview(lock)
+        lockView = lock
+
+        helperLabel.stringValue = helper
+        addSubview(helperLabel)
+
+        upgradeButton.target = upgrade.target
+        upgradeButton.action = upgrade.action
+        upgradeButton.toolTip = "Upgrade to unlock this Pro control."
+        addSubview(upgradeButton)
+
+        addSubview(proBadge)
+        addSubview(control)
+        refresh()
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override func layout() {
+        super.layout()
+        lockView?.frame = NSRect(x: 16, y: bounds.height - 36, width: 22, height: 22)
+        titleLabel.frame = NSRect(x: 48, y: bounds.height - 35, width: 190, height: 22)
+        proBadge.frame = NSRect(x: 242, y: bounds.height - 32, width: 34, height: 18)
+        helperLabel.frame = NSRect(x: 48, y: bounds.height - 60, width: max(160, bounds.width - 196), height: 20)
+        upgradeButton.frame = NSRect(x: bounds.width - 120, y: 31, width: 96, height: 32)
+        control.frame = NSRect(x: 48, y: 16, width: max(160, bounds.width - 196), height: 28)
+    }
+
+    func refresh() {
+        let canUse = EntitlementGate.canUse(feature)
+        setEnabled(canUse, in: control)
+        control.alphaValue = canUse ? 1 : 0.48
+        lockView?.isHidden = canUse
+        proBadge.isHidden = canUse
+        upgradeButton.isHidden = canUse
+        helperLabel.textColor = canUse ? BoardManPreferenceUI.secondaryText : BoardManPreferenceUI.mutedText
+        toolTip = canUse ? "Available in your current plan." : "Pro feature. Upgrade to unlock this control."
+    }
+
+    private func makeLockView() -> NSView {
+        if #available(macOS 11.0, *) {
+            return BoardManPreferenceUI.icon("lock.fill", size: 14, color: BoardManPreferenceUI.red)
+        }
+        return BoardManPreferenceUI.label("Locked", size: 11, weight: .semibold, color: BoardManPreferenceUI.red)
+    }
+
+    private func setEnabled(_ enabled: Bool, in view: NSView) {
+        if let control = view as? NSControl {
+            control.isEnabled = enabled
+        }
+        view.subviews.forEach { setEnabled(enabled, in: $0) }
     }
 }
 
