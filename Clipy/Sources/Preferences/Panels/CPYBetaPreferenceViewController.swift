@@ -8,7 +8,7 @@ import Cocoa
 
 final class CPYBetaPreferenceViewController: NSViewController {
     private let licenseField = NSSecureTextField(string: "")
-    private let validationLabel = BoardManPreferenceUI.label("Awaiting activation", size: 12, color: BoardManPreferenceUI.secondaryText)
+    private let validationLabel = BoardManPreferenceUI.label("Not connected yet", size: 12, color: BoardManPreferenceUI.secondaryText)
     private let planLabel = BoardManPreferenceUI.label("Free Plan", size: 28, weight: .bold)
     private let statusPill = BoardManPreferenceUI.label("Free", size: 12, weight: .semibold)
     private let deviceStatus = BoardManPreferenceUI.label("Not activated", size: 12, color: BoardManPreferenceUI.secondaryText)
@@ -41,26 +41,32 @@ final class CPYBetaPreferenceViewController: NSViewController {
         view.addSubview(currentPlan)
 
         let activation = card(x: 395, y: 320, w: 405, h: 250, title: "2. License Key Activation", icon: "key")
-        licenseField.placeholderString = "Enter your license key"
+        licenseField.placeholderString = "License activation is not connected yet"
         licenseField.font = NSFont.systemFont(ofSize: 14)
         licenseField.textColor = BoardManPreferenceUI.primaryText
         licenseField.backgroundColor = BoardManPreferenceUI.field
+        licenseField.isEnabled = false
+        licenseField.toolTip = "License activation is a disabled preview in this build."
         licenseField.frame = NSRect(x: 20, y: 165, width: 365, height: 38)
         activation.addSubview(licenseField)
         let activate = BoardManPreferenceUI.primaryButton("Activate License")
         activate.target = self
         activate.action = #selector(activateLicense)
+        activate.isEnabled = false
+        activate.toolTip = "Activation is not connected yet."
         activate.frame = NSRect(x: 20, y: 115, width: 165, height: 38)
         activation.addSubview(activate)
         let paste = BoardManPreferenceUI.secondaryButton("Paste from Clipboard")
         paste.target = self
         paste.action = #selector(pasteLicense)
+        paste.isEnabled = false
+        paste.toolTip = "License input is disabled until activation is implemented."
         paste.frame = NSRect(x: 195, y: 115, width: 190, height: 38)
         activation.addSubview(paste)
         activation.addSubview(BoardManPreferenceUI.label("Validation status:", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 20, y: 78, w: 130, h: 20))
         validationLabel.frame = NSRect(x: 150, y: 78, width: 220, height: 20)
         activation.addSubview(validationLabel)
-        let empty = BoardManPreferenceUI.label("ⓘ  No license has been activated on this Mac.", size: 13, color: BoardManPreferenceUI.secondaryText)
+        let empty = BoardManPreferenceUI.label("No license has been activated. Activation is not connected in this build.", size: 13, color: BoardManPreferenceUI.secondaryText)
         empty.alignment = .center
         empty.frame = NSRect(x: 20, y: 18, width: 365, height: 44)
         BoardManPreferenceUI.prepare(empty, color: BoardManPreferenceUI.field, radius: BoardManPreferenceUI.Radius.control, border: BoardManPreferenceUI.borderSubtle)
@@ -69,10 +75,10 @@ final class CPYBetaPreferenceViewController: NSViewController {
 
         let device = card(x: 820, y: 320, w: 330, h: 250, title: "3. Device Binding", icon: "laptopcomputer")
         device.addSubview(row("Device name:", Host.current().localizedName ?? "This Mac", y: 165))
-        device.addSubview(row("Masked Device ID:", maskedDeviceID(), y: 132))
+        device.addSubview(row("Masked Device ID:", "Not activated", y: 132))
         device.addSubview(row("Activated at:", "—", y: 99))
-        device.addSubview(BoardManPreferenceUI.label("Each Pro license can be activated on one Mac at a time.", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 20, y: 58, w: 285, h: 38))
-        let deactivate = BoardManPreferenceUI.secondaryButton("🔒  Deactivate this device")
+        device.addSubview(BoardManPreferenceUI.label("1 license = 1 PC. Device binding is not connected in this build.", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 20, y: 58, w: 285, h: 38))
+        let deactivate = BoardManPreferenceUI.secondaryButton("Deactivate this device")
         deactivate.isEnabled = false
         deactivate.frame = NSRect(x: 20, y: 20, width: 290, height: 30)
         device.addSubview(deactivate)
@@ -91,7 +97,7 @@ final class CPYBetaPreferenceViewController: NSViewController {
         cta.layer?.borderColor = BoardManPreferenceUI.red.withAlphaComponent(0.9).cgColor
         cta.addSubview(BoardManPreferenceUI.icon("diamond.fill", size: 34).positioned(x: 143, y: 190, w: 44, h: 36))
         cta.addSubview(BoardManPreferenceUI.label("Unlock the full power of Board-Man", size: 17, weight: .bold).positioned(x: 45, y: 150, w: 250, h: 26))
-        cta.addSubview(BoardManPreferenceUI.label("✓  1 license = 1 PC\n✓  Lifetime access for one Mac", size: 14, color: BoardManPreferenceUI.primaryText).positioned(x: 60, y: 95, w: 220, h: 46))
+        cta.addSubview(BoardManPreferenceUI.label("1 license = 1 PC\nPro unlocks advanced controls", size: 14, color: BoardManPreferenceUI.primaryText).positioned(x: 60, y: 95, w: 220, h: 46))
         let buy = BoardManPreferenceUI.primaryButton("Buy Board-Man Pro  ›")
         buy.target = self
         buy.action = #selector(openBuyPro)
@@ -112,7 +118,7 @@ final class CPYBetaPreferenceViewController: NSViewController {
         statusPill.stringValue = active ? "Active" : "Free"
         statusPill.layer?.backgroundColor = (active ? BoardManPreferenceUI.redSoft : BoardManPreferenceUI.card).cgColor
         deviceStatus.stringValue = active ? "Activated" : "Not activated"
-        validationLabel.stringValue = active ? "Activated" : "Awaiting activation"
+        validationLabel.stringValue = active ? "Activated" : "Not connected yet"
         validationLabel.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
     }
 
@@ -156,23 +162,14 @@ final class CPYBetaPreferenceViewController: NSViewController {
         view.addSubview(BoardManPreferenceUI.label("Free is useful. Pro removes daily limits and unlocks advanced customization.", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 30, y: 562, w: 520, h: 18))
     }
 
-    private func maskedDeviceID() -> String {
-        let id = LocalDeviceIdentityService.shared.deviceID().replacingOccurrences(of: "-", with: "")
-        guard id.count > 8 else { return "••••" }
-        return "BMN-••••-" + String(id.suffix(4)).uppercased()
-    }
-
     @objc private func pasteLicense() {
-        if let copied = NSPasteboard.general.string(forType: .string) {
-            licenseField.stringValue = copied.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        validationLabel.stringValue = "Activation is not connected yet."
+        validationLabel.textColor = BoardManPreferenceUI.secondaryText
     }
 
     @objc private func activateLicense() {
-        let response = StubLicenseActivationClient().activate(LicenseActivationRequest(licenseKey: licenseField.stringValue, localDeviceID: LocalDeviceIdentityService.shared.deviceID()))
-        validationLabel.stringValue = response.message
-        validationLabel.textColor = response.status == .activated ? .systemGreen : BoardManPreferenceUI.red
-        refreshPlanState()
+        validationLabel.stringValue = "Activation is not connected yet."
+        validationLabel.textColor = BoardManPreferenceUI.secondaryText
     }
 
     @objc private func openBuyPro() {

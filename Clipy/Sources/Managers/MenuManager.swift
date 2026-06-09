@@ -2486,20 +2486,22 @@ class BoardManPanel: NSPanel {
         licenseLimitsLabel = limitsLabel
 
         let licenseKey = NSTextField(frame: .zero)
-        licenseKey.placeholderString = "XXXX-XXXX-XXXX-XXXX"
+        licenseKey.placeholderString = "License activation is not connected yet"
         licenseKey.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        licenseKey.toolTip = "Founder codes activate locally. Production licenses still require signed tokens."
+        licenseKey.isEnabled = false
+        licenseKey.toolTip = "License activation is a disabled preview in this build."
         contentView.addSubview(licenseKey)
         licenseKeyField = licenseKey
 
         let activate = NSButton(title: "Activate", target: self, action: #selector(activateLicenseRequested(_:)))
         activate.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         activate.bezelStyle = .rounded
-        activate.toolTip = "Activates an internal founder code locally when it matches."
+        activate.isEnabled = false
+        activate.toolTip = "Activation is not connected yet."
         contentView.addSubview(activate)
         licenseActivateButton = activate
 
-        let activationStatus = NSTextField(labelWithString: "Internal dogfood: founder codes activate locally. Unknown codes stay locked.")
+        let activationStatus = NSTextField(labelWithString: "Activation is not connected yet. Free remains the default runtime entitlement.")
         activationStatus.font = NSFont.systemFont(ofSize: 11)
         activationStatus.textColor = .secondaryLabelColor
         activationStatus.lineBreakMode = .byWordWrapping
@@ -2528,7 +2530,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(lockedProControl)
         licenseProLockedControlView = lockedProControl
 
-        let licenseNote = NSTextField(labelWithString: "Internal dogfood only. Production licensing still requires signed token activation.")
+        let licenseNote = NSTextField(labelWithString: "Static preview only. 1 license = 1 PC. No backend activation, device binding, or license storage is connected.")
         licenseNote.font = NSFont.systemFont(ofSize: 11)
         licenseNote.textColor = .secondaryLabelColor
         licenseNote.lineBreakMode = .byWordWrapping
@@ -4045,12 +4047,8 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func activateLicenseRequested(_ sender: NSButton) {
-        let request = LicenseActivationRequest(
-            licenseKey: licenseKeyField?.stringValue ?? ""
-        )
-        let response = StubLicenseActivationClient().activate(request)
-        licenseActivationStatusLabel?.stringValue = "\(licenseActivationStatusTitle(response.status)): \(response.message)"
-        licenseActivationStatusLabel?.textColor = response.status == .activated ? .systemGreen : (response.status == .invalidInput || response.status == .unsupported ? .systemRed : .secondaryLabelColor)
+        licenseActivationStatusLabel?.stringValue = "Activation is not connected yet. Free remains the default runtime entitlement."
+        licenseActivationStatusLabel?.textColor = .secondaryLabelColor
         refreshLicenseSummary()
     }
 
