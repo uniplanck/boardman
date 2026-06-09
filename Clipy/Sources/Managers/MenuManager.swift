@@ -4117,9 +4117,7 @@ class BoardManPanel: NSPanel {
     private func licensePlanTitle(_ plan: EntitlementPlan) -> String {
         switch plan {
         case .free: return "Free"
-        case .trial: return "Trial"
         case .pro: return "Pro"
-        case .founder: return "Founder Lifetime"
         }
     }
 
@@ -4152,9 +4150,6 @@ class BoardManPanel: NSPanel {
         case .trial:
             return "Temporary Pro access\(dateSuffix(snapshot.expiresAt, prefix: " until "))."
         case .proActive:
-            if snapshot.plan == .founder {
-                return "Founder Lifetime active locally."
-            }
             return "Verified Pro entitlement\(dateSuffix(snapshot.lastVerifiedAt, prefix: ", checked "))."
         case .proExpired:
             return "Pro entitlement is no longer active."

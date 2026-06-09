@@ -108,8 +108,8 @@ final class CPYBetaPreferenceViewController: NSViewController {
     private func refreshPlanState() {
         let snapshot = EntitlementGate.currentSnapshot()
         let active = snapshot.isProEntitled
-        planLabel.stringValue = snapshot.plan == .founder ? "Founder Lifetime" : (active ? "Board-Man Pro" : "Free Plan")
-        statusPill.stringValue = snapshot.plan == .founder ? "Founder" : (active ? "Active" : "Free")
+        planLabel.stringValue = active ? "Board-Man Pro" : "Free Plan"
+        statusPill.stringValue = active ? "Active" : "Free"
         statusPill.layer?.backgroundColor = (active ? BoardManPreferenceUI.redSoft : BoardManPreferenceUI.card).cgColor
         deviceStatus.stringValue = active ? "Activated" : "Not activated"
         validationLabel.stringValue = active ? "Activated" : "Awaiting activation"
