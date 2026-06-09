@@ -565,7 +565,7 @@ private extension CPYPreferencesWindowController {
     }
 
     @objc func openBoardManProUpgrade() {
-        NSWorkspace.shared.open(URL(string: "https://uniplanck.com/board-man")!)
+        BoardManUpgradeRoute.openProPage()
     }
 
     func addSliderRow(to view: NSView, title: String, value: String, originX: CGFloat, originY: CGFloat, locked: Bool) {

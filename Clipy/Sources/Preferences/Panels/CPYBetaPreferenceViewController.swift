@@ -183,7 +183,7 @@ final class CPYBetaPreferenceViewController: NSViewController {
     }
 
     @objc private func openBuyPro() {
-        NSWorkspace.shared.open(URL(string: "https://uniplanck.com/board-man")!)
+        BoardManUpgradeRoute.openProPage()
     }
 
     @objc private func openManageLicense() {

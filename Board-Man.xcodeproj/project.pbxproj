@@ -23,6 +23,7 @@
 		C5F1B7331FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F1B7321FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift */; };
 		FA08EDF81D1FED7D000D1D13 /* HotKeyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */; };
 		FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CE71DDCC61600AC9052 /* ClipService.swift */; };
+		FA0D5CFA1DDCC61600AC9052 /* BoardManUpgradeRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */; };
 		FA0D5CEE1DDCC61600AC9052 /* Entitlement.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */; };
 		FA0D5CF61DDCC61600AC9052 /* LicenseActivationClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF51DDCC61600AC9052 /* LicenseActivationClient.swift */; };
 		FA0D5CF01DDCC61600AC9052 /* LocalDeviceIdentityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CEF1DDCC61600AC9052 /* LocalDeviceIdentityService.swift */; };
@@ -155,6 +156,7 @@
 		C576AD7B2FBD345000B71213 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		C5F1B7321FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPasteboard+Deprecated.swift"; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
+		FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpgradeRoute.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
 		FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Entitlement.swift; sourceTree = "<group>"; };
 		FA0D5CF51DDCC61600AC9052 /* LicenseActivationClient.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LicenseActivationClient.swift; sourceTree = "<group>"; };
@@ -296,6 +298,7 @@
 		FA0D5CE61DDCC5D000AC9052 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */,
 				FA0D5CE71DDCC61600AC9052 /* ClipService.swift */,
 				FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */,
 				FA0D5CF51DDCC61600AC9052 /* LicenseActivationClient.swift */,
@@ -716,6 +719,7 @@
 				FA0D5CF41DDCC61600AC9052 /* LicenseTokenVerifier.swift in Sources */,
 				FA0D5CEA1DDCC61600AC9052 /* PasteCountStore.swift in Sources */,
 				FA0D5CEC1DDCC61600AC9052 /* PasteCountInputService.swift in Sources */,
+				FA0D5CFA1DDCC61600AC9052 /* BoardManUpgradeRoute.swift in Sources */,
 				FA1DB4C91DDCB460007F95C8 /* MenuManager.swift in Sources */,
 				FA1DB4BD1DDCB452007F95C8 /* String+Substring.swift in Sources */,
 				FA1189331E4CD58C00244F12 /* ExcludeAppService.swift in Sources */,
