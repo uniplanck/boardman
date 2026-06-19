@@ -4122,6 +4122,7 @@ class BoardManPanel: NSPanel {
         switch plan {
         case .free: return "Free"
         case .pro: return "Pro"
+        case .ownerLifetime: return "Owner Lifetime"
         }
     }
 
@@ -4130,6 +4131,7 @@ class BoardManPanel: NSPanel {
         case .free: return "Free"
         case .trial: return "Trial"
         case .proActive: return "Pro Active"
+        case .ownerLifetime: return "Owner Lifetime"
         case .proExpired: return "Expired"
         case .invalid: return "Invalid"
         case .offlineGrace: return "Offline Grace"
@@ -4155,6 +4157,8 @@ class BoardManPanel: NSPanel {
             return "Temporary Pro access\(dateSuffix(snapshot.expiresAt, prefix: " until "))."
         case .proActive:
             return "Verified Pro entitlement\(dateSuffix(snapshot.lastVerifiedAt, prefix: ", checked "))."
+        case .ownerLifetime:
+            return "Verified owner lifetime entitlement\(dateSuffix(snapshot.lastVerifiedAt, prefix: ", checked "))."
         case .proExpired:
             return "Pro entitlement is no longer active."
         case .invalid:
@@ -4168,7 +4172,7 @@ class BoardManPanel: NSPanel {
 
     private func licenseStateColor(_ state: LicenseState) -> NSColor {
         switch state {
-        case .proActive: return .systemGreen
+        case .proActive, .ownerLifetime: return .systemGreen
         case .trial, .offlineGrace: return .systemOrange
         case .invalid, .proExpired, .locked: return .systemRed
         case .free: return .secondaryLabelColor

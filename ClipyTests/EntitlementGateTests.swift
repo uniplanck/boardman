@@ -37,6 +37,34 @@ final class EntitlementGateTests {
     }
 
     @Test
+    func ownerLifetimeEntitlementUnlocksThroughCentralGate() {
+        let metadata = LicenseMetadata(
+            licenseKeyMasked: "owner-token-placeholder",
+            deviceIdMasked: "****ABCD",
+            activatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            lastVerifiedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            status: LicenseState.ownerLifetime.rawValue,
+            licenseKind: .ownerLifetime,
+            issuedTo: "developer-owner"
+        )
+        let entitlement = EntitlementSnapshot.ownerLifetime(metadata: metadata)
+        let service = EntitlementService(snapshot: entitlement)
+
+        #expect(entitlement.plan == .ownerLifetime)
+        #expect(entitlement.licenseState == .ownerLifetime)
+        #expect(entitlement.isProEntitled)
+
+        for feature in EntitlementFeature.allCases {
+            #expect(EntitlementGate.canUse(feature: feature, service: service))
+        }
+
+        #expect(EntitlementGate.limit(for: .historyItems, service: service) == nil)
+        #expect(EntitlementGate.limit(for: .pinnedItems, service: service) == nil)
+        #expect(EntitlementGate.limit(for: .snippetItems, service: service) == nil)
+        #expect(EntitlementGate.limit(for: .snippetFolders, service: service) == nil)
+    }
+
+    @Test
     func freeHistoryLimitIsOneHundred() {
         let service = EntitlementService(snapshot: .freeDefault)
 
