@@ -5,6 +5,7 @@
 //
 
 import Foundation
+import Security
 
 enum LicenseKind: String, Equatable {
     case free
@@ -217,16 +218,61 @@ protocol LicenseTokenStoring {
 }
 
 enum LicenseTokenStorageError: Error, Equatable {
-    case notImplemented
+    case encodingFailed
+    case keychain(OSStatus)
 }
 
 final class FutureKeychainLicenseTokenStore: LicenseTokenStoring {
+    private enum Keychain {
+        static let service = "com.uniplanck.BoardMan.LicenseToken"
+        static let account = "signedLicenseToken"
+    }
+
     func loadSignedLicenseToken() -> String? {
-        return nil
+        var query = baseQuery()
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess,
+              let data = item as? Data,
+              let value = String(data: data, encoding: .utf8),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
     }
 
     func storeVerifiedSignedLicenseToken(_ token: SignedLicenseToken) throws {
-        throw LicenseTokenStorageError.notImplemented
+        guard let data = token.rawValue.data(using: .utf8) else {
+            throw LicenseTokenStorageError.encodingFailed
+        }
+
+        let attributes = [kSecValueData as String: data]
+        let updateStatus = SecItemUpdate(baseQuery() as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess {
+            return
+        }
+        guard updateStatus == errSecItemNotFound else {
+            throw LicenseTokenStorageError.keychain(updateStatus)
+        }
+
+        var addQuery = baseQuery()
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw LicenseTokenStorageError.keychain(addStatus)
+        }
+    }
+
+    private func baseQuery() -> [String: Any] {
+        return [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: Keychain.service,
+            kSecAttrAccount as String: Keychain.account
+        ]
     }
 }
 

@@ -2,7 +2,7 @@ import Carbon
 import Foundation
 import Magnet
 import Testing
-@testable import Clipy
+@testable import Board_Man
 
 @Suite(.serialized)
 final class HotKeyServiceTests {

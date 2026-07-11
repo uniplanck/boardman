@@ -197,6 +197,8 @@ extension AppDelegate: NSApplicationDelegate {
         AppEnvironment.replaceCurrent(environment: AppEnvironment.fromStorage())
         // UserDefaults
         CPYUtilities.registerUserDefaultKeys()
+        // Restore a locally verified signed entitlement before gated services/UI are created.
+        LicenseBootstrapService.shared.restoreEntitlement()
         // SDKs
         CPYUtilities.initSDKs()
         // Check permissions without triggering repeated macOS prompts at launch.

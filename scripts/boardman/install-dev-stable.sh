@@ -3,10 +3,12 @@ set -euo pipefail
 
 # Safe local install/stability helper for Board-Man
 # Reduces repeated TCC Accessibility/Input Monitoring permission churn by:
-# - Consistent ad-hoc codesigning with a stable identifier
+# - Consistent certificate signing with one stable identity
+# - Stable bundle identifier and canonical /Applications path
 # - Quarantine xattr removal
 # - Safe quit/replace/reopen sequence
 # - LaunchServices registration for the installed app path
+# - No-index build/backup locations to avoid Spotlight duplicates
 # - Preserves BoardManUsePanelUI by default
 #
 # DOES NOT: bypass TCC prompts, change bundle ID, modify Realm, break V4B-7 behavior, write to TCC DB.
@@ -20,23 +22,31 @@ INSTALLED_PATH="/Applications/${APP_NAME}.app"
 PROJECT="Board-Man.xcodeproj"
 SCHEME="Board-Man"
 CONFIG="Release"
-DERIVED_DATA="${TMPDIR:-/tmp}/BoardManBuild_$(date +%s)"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+CACHE_ROOT="${HOME}/Library/Caches/Board-Man"
+DERIVED_DATA="${CACHE_ROOT}/DerivedData.noindex"
+BACKUP_ROOT="${CACHE_ROOT}/Backups.noindex"
 DIGEST_FILE="${DIGEST_FILE:-/tmp/boardman-install-dev-stable.digest.txt}"
 SCRIPT_NAME=$(basename "$0")
 BUILT_APP_OVERRIDE=""
+SIGNING_IDENTITY="${BOARDMAN_SIGNING_IDENTITY:-Board-Man Local Developer}"
+LOCAL_ARCH="${BOARDMAN_LOCAL_ARCH:-$(uname -m)}"
+OWNER_TOOL="$REPO_ROOT/scripts/boardman/owner-license-tool.swift"
+OWNER_ISSUED_TO="${BOARDMAN_OWNER_ISSUED_TO:-Board-Man Owner}"
+OWNER_SUBJECT="${BOARDMAN_OWNER_SUBJECT:-planckworld}"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 usage() {
   cat << EOF
-Usage: $SCRIPT_NAME [--dry-run] [--no-build] [--built-app PATH] [--configuration Debug|Release] [--override-panel-ui=0|1]
+Usage: $SCRIPT_NAME [--dry-run] [--no-build] [--built-app PATH] [--configuration Debug|Release] [--signing-identity NAME] [--override-panel-ui=0|1]
 
 Safe dev install helper for Board-Man v4b.
 - Builds from $PROJECT (Board-Man scheme)
 - Quits app safely
 - Backs up current /Applications/Board-Man.app
 - Replaces with fresh build or --built-app
-- Removes quarantine, applies stable ad-hoc codesign, verifies
+- Removes quarantine, signs with one stable certificate identity, verifies
+- Uses no-index build/backup paths so Finder search does not collect dev copies
 - Registers only /Applications/Board-Man.app with LaunchServices
 - Optionally preserves/restores BoardManUsePanelUI
 - Reopens app
@@ -47,6 +57,7 @@ Options:
   --no-build         : Skip build, use latest from DerivedData (for quick reinstall)
   --built-app PATH   : Install an already built Board-Man.app
   --configuration Debug|Release : Build configuration (default: Release)
+  --signing-identity NAME : Stable local signing identity (default: Board-Man Local Developer)
   --override-panel-ui=0|1 : Override the UI flag instead of preserving
   --help             : This help
 
@@ -93,6 +104,18 @@ while [[ $# -gt 0 ]]; do
       CONFIG="${1#*=}"
       shift
       ;;
+    --signing-identity)
+      if [ $# -lt 2 ]; then
+        echo "Error: --signing-identity requires a certificate name."
+        exit 1
+      fi
+      SIGNING_IDENTITY="${2:-}"
+      shift 2
+      ;;
+    --signing-identity=*)
+      SIGNING_IDENTITY="${1#*=}"
+      shift
+      ;;
     --override-panel-ui=*)
       OVERRIDE_UI="${1#*=}"
       shift
@@ -122,9 +145,19 @@ if [ -n "$BUILT_APP_OVERRIDE" ] && [ ! -d "$BUILT_APP_OVERRIDE" ]; then
   exit 1
 fi
 
+if ! security find-identity -v -p codesigning 2>/dev/null | grep -Fq "\"$SIGNING_IDENTITY\""; then
+  echo "BLOCKED: Stable signing identity not found: $SIGNING_IDENTITY"
+  echo "Available code-signing identities can be checked with: security find-identity -v -p codesigning"
+  echo "Refusing ad-hoc fallback because it causes macOS permission identity churn."
+  exit 2
+fi
+
 echo "=== Board-Man Stable Dev Install Helper ==="
 echo "Branch: $(cd "$REPO_ROOT" && git branch --show-current 2>/dev/null || echo unknown)"
 echo "Head: $(cd "$REPO_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+echo "Signing identity: $SIGNING_IDENTITY"
+echo "Local architecture: $LOCAL_ARCH"
+echo "DerivedData: $DERIVED_DATA"
 if [ "$DRY_RUN" = true ]; then
   echo "MODE: DRY-RUN (no changes)"
 fi
@@ -173,14 +206,17 @@ fi
 
 # Backup if exists
 if [ -d "$INSTALLED_PATH" ] && [ "$DRY_RUN" = false ]; then
-  BACKUP_PATH="/tmp/${APP_NAME}.app.backup.$(date +%Y%m%d_%H%M%S)"
+  mkdir -p "$BACKUP_ROOT"
+  BACKUP_PATH="${BACKUP_ROOT}/${APP_NAME}-$(date +%Y%m%d_%H%M%S).app"
   echo "Backing up current app to $BACKUP_PATH"
-  cp -a "$INSTALLED_PATH" "$BACKUP_PATH"
-  echo "Backup created (safe to restore if needed)."
+  ditto "$INSTALLED_PATH" "$BACKUP_PATH"
+  echo "Backup created in no-index cache storage."
 fi
 
 # Build (lightweight if possible, but full Release for stability)
 if [ "$DRY_RUN" = false ] && [ "$NO_BUILD" = false ] && [ -z "$BUILT_APP_OVERRIDE" ]; then
+  mkdir -p "$CACHE_ROOT" "$DERIVED_DATA"
+  touch "$DERIVED_DATA/.metadata_never_index"
   echo "Building $SCHEME ($CONFIG) - this may take 30-90s..."
   xcodebuild -project "$REPO_ROOT/$PROJECT" \
     -scheme "$SCHEME" \
@@ -191,7 +227,13 @@ if [ "$DRY_RUN" = false ] && [ "$NO_BUILD" = false ] && [ -z "$BUILT_APP_OVERRID
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
     CODE_SIGN_IDENTITY="" \
+    ARCHS="$LOCAL_ARCH" \
+    ONLY_ACTIVE_ARCH=YES \
     ENABLE_TESTABILITY=NO \
+    DEAD_CODE_STRIPPING=YES \
+    COPY_PHASE_STRIP=YES \
+    DEPLOYMENT_POSTPROCESSING=YES \
+    STRIP_INSTALLED_PRODUCT=YES \
     build | tail -5
   echo "Build completed."
 elif [ -n "$BUILT_APP_OVERRIDE" ]; then
@@ -200,8 +242,7 @@ elif [ "$DRY_RUN" = true ]; then
   echo "[DRY] Would run xcodebuild $CONFIG build to $DERIVED_DATA"
   BUILT_APP_PATH="SIMULATED/$APP_NAME.app"
 else
-  echo "Skipping build (--no-build), using previous build artifact."
-  DERIVED_DATA="${TMPDIR:-/tmp}/BoardManBuild_last" # assume previous
+  echo "Skipping build (--no-build), using the stable no-index DerivedData cache."
 fi
 
 # Locate built app
@@ -235,22 +276,65 @@ if [ "$DRY_RUN" = false ]; then
 
   echo "Replacing app at $INSTALLED_PATH (safe replace after backup)..."
   rm -rf "$INSTALLED_PATH"
-  cp -a "$BUILT_APP_PATH" "$INSTALLED_PATH"
+  ditto "$BUILT_APP_PATH" "$INSTALLED_PATH"
   
   # Remove quarantine/provenance xattrs to reduce TCC friction for local builds.
   xattr -rd com.apple.quarantine "$INSTALLED_PATH" 2>/dev/null || true
   xattr -rd com.apple.provenance "$INSTALLED_PATH" 2>/dev/null || true
   echo "Quarantine/provenance xattrs removed when present."
   
-  echo "Applying stable ad-hoc codesign..."
-  codesign --force --deep --sign - --identifier "$BUNDLE_ID" "$INSTALLED_PATH"
+  echo "Applying stable certificate codesign..."
+  # Do not enable Hardened Runtime for the local self-signed identity. Without an Apple Team ID,
+  # library validation can reject Xcode's debug dylib even when both objects use the same certificate.
+  if [ -f "$INSTALLED_PATH/Contents/MacOS/$APP_NAME.debug.dylib" ]; then
+    codesign --force --timestamp=none --sign "$SIGNING_IDENTITY" \
+      "$INSTALLED_PATH/Contents/MacOS/$APP_NAME.debug.dylib"
+  fi
+  codesign --force --deep --timestamp=none --sign "$SIGNING_IDENTITY" "$INSTALLED_PATH"
   
   # Verify
-  echo "Verifying codesign..."
+  echo "Verifying codesign and bundle identity..."
   codesign --verify --deep --strict "$INSTALLED_PATH"
+  INSTALLED_BUNDLE_ID=$(defaults read "$INSTALLED_PATH/Contents/Info" CFBundleIdentifier 2>/dev/null || echo "")
+  if [ "$INSTALLED_BUNDLE_ID" != "$BUNDLE_ID" ]; then
+    echo "BLOCKED: Bundle ID mismatch after install: $INSTALLED_BUNDLE_ID"
+    exit 3
+  fi
   echo "Codesign verification passed."
 else
-  echo "[DRY] Would backup, rm -rf installed, cp built app, remove quarantine/provenance xattrs, codesign with $BUNDLE_ID, verify."
+  echo "[DRY] Would backup, replace installed app, remove quarantine/provenance xattrs, sign with '$SIGNING_IDENTITY', and verify."
+fi
+
+# Install the owner-only signed lifetime token when this Mac has the issuer key.
+if [ "$DRY_RUN" = false ]; then
+  if security find-generic-password \
+      -s "com.uniplanck.BoardMan.OwnerIssuer" \
+      -a "p256-private-key-v1" >/dev/null 2>&1; then
+    echo "Installing locally signed Owner Lifetime entitlement..."
+    swift -suppress-warnings "$OWNER_TOOL" install \
+      --app "$INSTALLED_PATH" \
+      --issued-to "$OWNER_ISSUED_TO" \
+      --subject "$OWNER_SUBJECT"
+  else
+    echo "Owner issuer key is absent; keeping the normal Free entitlement path."
+  fi
+else
+  echo "[DRY] Would install Owner Lifetime only when the local issuer key exists."
+fi
+
+# Keep build artifacts out of Finder/Spotlight app results without deleting them.
+if [ "$DRY_RUN" = false ]; then
+  if [ -d "$REPO_ROOT/_copy" ]; then
+    touch "$REPO_ROOT/_copy/.metadata_never_index"
+  fi
+  for derived_root in "$HOME"/Library/Developer/Xcode/DerivedData/Board-Man-*; do
+    if [ -d "$derived_root" ]; then
+      touch "$derived_root/.metadata_never_index"
+    fi
+  done
+  echo "Marked Board-Man build artifact roots as non-indexable."
+else
+  echo "[DRY] Would mark Board-Man _copy and DerivedData roots as non-indexable."
 fi
 
 # LaunchServices cleanup and registration for path stability.
@@ -267,22 +351,31 @@ if [ "$DRY_RUN" = false ]; then
         "$LSREGISTER" -u "$stale_path" >/dev/null 2>&1 || true
       fi
     done
-    find "${TMPDIR:-/tmp}" -path "*BoardManMergedBuild/Build/Products/Debug/$APP_NAME.app" -type d -prune 2>/dev/null | while IFS= read -r stale_path; do
-      "$LSREGISTER" -u "$stale_path" >/dev/null 2>&1 || true
-    done
-    "$LSREGISTER" -dump 2>/dev/null \
-      | awk -F'path:[[:space:]]*' '/path: .*Board-Man\.app/ { print $2 }' \
-      | sed 's#\(Board-Man\.app\).*#\1#' \
-      | sort -u \
-      | while IFS= read -r stale_path; do
-        case "$stale_path" in
-          "$INSTALLED_PATH")
-            ;;
-          /private/tmp/*Board-Man.app|/private/var/*/T/*Board-Man.app)
+    {
+      find "${TMPDIR:-/tmp}" -path "*BoardManMergedBuild/Build/Products/Debug/$APP_NAME.app" -type d -prune 2>/dev/null \
+        | while IFS= read -r stale_path; do
+          "$LSREGISTER" -u "$stale_path" >/dev/null 2>&1 || true
+        done
+    } || true
+    {
+      "$LSREGISTER" -dump 2>/dev/null \
+        | awk -F'path:[[:space:]]*' '/path: .*Board-Man\.app/ { print $2 }' \
+        | sed 's#\(Board-Man\.app\).*#\1#' \
+        | sort -u \
+        | while IFS= read -r stale_path; do
+          if [ -n "$stale_path" ] && [ "$stale_path" != "$INSTALLED_PATH" ]; then
             "$LSREGISTER" -u "$stale_path" >/dev/null 2>&1 || true
-            ;;
-        esac
-      done
+          fi
+        done
+    } || true
+    {
+      mdfind 'kMDItemFSName == "Board-Man.app"c' 2>/dev/null \
+        | while IFS= read -r stale_path; do
+          if [ -n "$stale_path" ] && [ "$stale_path" != "$INSTALLED_PATH" ]; then
+            "$LSREGISTER" -u "$stale_path" >/dev/null 2>&1 || true
+          fi
+        done
+    } || true
     "$LSREGISTER" -f "$INSTALLED_PATH" >/dev/null 2>&1 || true
     echo "LaunchServices registered: $INSTALLED_PATH"
   else
@@ -329,8 +422,9 @@ branch=$(cd "$REPO_ROOT" && git branch --show-current 2>/dev/null || echo unknow
 head=$GIT_HEAD
 files_changed=scripts/boardman/install-dev-stable.sh
 helper_paths=scripts/boardman/install-dev-stable.sh (with --dry-run support), scripts/boardman/status-tcc-friendly.sh
-what_it_improves=reduces repeated TCC stale permission re-prompts via safe quit/backup/replace/quarantine-remove/stable-adhoc-codesign/LaunchServices-refresh/verify/preserve-UI/reopen sequence.
-what_it_cannot_do=bypass macOS TCC confirmation dialogs (still requires manual grant in System Settings), no TCC mutation, no bundle change, no schema migration, does not break V4B-7.
+what_it_improves=reduces repeated TCC stale permission re-prompts via one stable certificate identity, canonical install path, no-index build storage, LaunchServices cleanup, verification, and safe reopen.
+what_it_cannot_do=bypass the initial macOS TCC approval, mutate the TCC database, change the bundle id, or guarantee preservation if the signing certificate itself changes.
+signing_identity=$SIGNING_IDENTITY
 build/test_rc=0
 install_performed=$([ "$DRY_RUN" = true ] && echo NO_DRY_RUN || echo YES)
 current_app_running_status=$([ "$DRY_RUN" = true ] && echo NOT_CHANGED_DRY_RUN || echo YES_REOPENED)

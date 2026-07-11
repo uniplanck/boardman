@@ -1,6 +1,7 @@
+import CryptoKit
 import Foundation
 import Testing
-@testable import Clipy
+@testable import Board_Man
 
 @Suite
 final class EntitlementGateTests {
@@ -164,5 +165,72 @@ final class EntitlementGateTests {
 
         #expect(!entitlement.isProEntitled)
         #expect(!EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
+    }
+
+    @Test
+    func signedOwnerTokenRequiresValidSignatureAndDeviceBinding() throws {
+        let privateKey = P256.Signing.PrivateKey()
+        let deviceID = UUID().uuidString
+        let token = try makeOwnerToken(privateKey: privateKey, deviceID: deviceID)
+        let verifier = P256SignedLicenseTokenVerifier(
+            publicKeyBase64: privateKey.publicKey.x963Representation.base64EncodedString()
+        )
+        let context = SignedLicenseTokenVerificationContext(
+            deviceID: deviceID,
+            bundleID: "com.uniplanck.BoardMan",
+            verificationDate: Date()
+        )
+
+        let verified = verifier.verify(token, context: context)
+        if case .verified(let payload) = verified {
+            #expect(payload.plan == .ownerLifetime)
+            #expect(payload.state == .ownerLifetime)
+            #expect(payload.isLifetime)
+        } else {
+            Issue.record("Expected the valid owner token to verify.")
+        }
+
+        let wrongDevice = SignedLicenseTokenVerificationContext(
+            deviceID: UUID().uuidString,
+            bundleID: "com.uniplanck.BoardMan",
+            verificationDate: Date()
+        )
+        #expect(verifier.verify(token, context: wrongDevice) == .invalid(.deviceMismatch))
+
+        let tampered = token + "x"
+        #expect(verifier.verify(tampered, context: context) == .invalid(.signatureInvalid))
+    }
+
+    private func makeOwnerToken(privateKey: P256.Signing.PrivateKey,
+                                deviceID: String) throws -> String {
+        let header = try JSONSerialization.data(withJSONObject: [
+            "alg": "ES256",
+            "kid": "test-owner-v1",
+            "typ": "JWT"
+        ], options: [.sortedKeys])
+        let payload = try JSONSerialization.data(withJSONObject: [
+            "license_id": "OWNER-TEST",
+            "license_kind": "ownerLifetime",
+            "plan": "ownerLifetime",
+            "state": "ownerLifetime",
+            "features": EntitlementFeature.allCases.map(\.rawValue),
+            "issued_to": "test-owner",
+            "sub": "test-owner",
+            "iat": Int(Date().timeIntervalSince1970),
+            "is_lifetime": true,
+            "device_id": deviceID,
+            "bundle_id": "com.uniplanck.BoardMan",
+            "token_version": 1
+        ], options: [.sortedKeys])
+        let signingInput = "\(base64URL(header)).\(base64URL(payload))"
+        let signature = try privateKey.signature(for: Data(signingInput.utf8))
+        return "\(signingInput).\(base64URL(signature.rawRepresentation))"
+    }
+
+    private func base64URL(_ data: Data) -> String {
+        return data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
     }
 }

@@ -29,6 +29,7 @@ final class MenuManager: NSObject {
     fileprivate var snippetMenu: NSMenu?
     // StatusMenu
     fileprivate var statusItem: NSStatusItem?
+    fileprivate var currentStatusType: StatusType?
     fileprivate var boardManPanel: BoardManPanel?
     fileprivate var previousFrontmostApplication: NSRunningApplication?
     // Icon Cache
@@ -391,7 +392,10 @@ private extension MenuManager {
             .compactMap { $0 }
             .asDriver(onErrorDriveWith: .empty())
             .drive(onNext: { [weak self] key in
-                self?.changeStatusItem(StatusType(rawValue: key) ?? .black)
+                let type = StatusType(rawValue: key) ?? .black
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.changeStatusItem(type)
+                }
             })
             .disposed(by: disposeBag)
         // Sort clips
@@ -798,7 +802,13 @@ private extension MenuManager {
 // MARK: - Status Item
 private extension MenuManager {
     func changeStatusItem(_ type: StatusType) {
+        if currentStatusType == type,
+           (type == .none || statusItem != nil) {
+            return
+        }
+
         removeStatusItem()
+        currentStatusType = type
         if type == .none { return }
 
         let image: NSImage?
@@ -811,10 +821,9 @@ private extension MenuManager {
         }
         image?.isTemplate = true
 
-        statusItem = NSStatusBar.system.statusItem(withLength: -1)
-        statusItem?.image = image
-        statusItem?.highlightMode = true
-        statusItem?.toolTip = "\(Constants.Application.name)\(Bundle.main.appVersion ?? "")"
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem?.button?.image = image
+        statusItem?.toolTip = "\(Constants.Application.name) \(Bundle.main.appVersion ?? "")"
         statusItem?.button?.target = self
         statusItem?.button?.action = #selector(statusItemClicked(_:))
         statusItem?.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -1074,45 +1083,6 @@ fileprivate enum BoardManThemePreset: String, CaseIterable {
             return .defaultPreset
         }
         return preset
-    }
-}
-
-private final class BoardManGlassSheenView: NSView {
-    var tintColor: NSColor = .clear {
-        didSet { needsDisplay = true }
-    }
-    var accentColor: NSColor = .controlAccentColor {
-        didSet { needsDisplay = true }
-    }
-
-    override var isOpaque: Bool {
-        return false
-    }
-
-    override func hitTest(_ point: NSPoint) -> NSView? {
-        return nil
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard bounds.width > 0, bounds.height > 0 else { return }
-        NSGradient(colors: [
-            NSColor.white.withAlphaComponent(0.20),
-            tintColor.withAlphaComponent(0.20),
-            NSColor.clear
-        ])?.draw(in: bounds, angle: -90)
-
-        let reflection = NSBezierPath()
-        reflection.move(to: NSPoint(x: bounds.minX, y: bounds.maxY - 32))
-        reflection.line(to: NSPoint(x: bounds.maxX, y: bounds.maxY - 92))
-        reflection.line(to: NSPoint(x: bounds.maxX, y: bounds.maxY - 126))
-        reflection.line(to: NSPoint(x: bounds.minX, y: bounds.maxY - 58))
-        reflection.close()
-        NSColor.white.withAlphaComponent(0.075).setFill()
-        reflection.fill()
-
-        let lowerGlow = NSBezierPath(roundedRect: bounds.insetBy(dx: 18, dy: 18), xRadius: 18, yRadius: 18)
-        accentColor.withAlphaComponent(0.045).setFill()
-        lowerGlow.fill()
     }
 }
 
@@ -1388,12 +1358,12 @@ private final class BoardManHistoryRowView: NSTableRowView {
 
     override func drawBackground(in dirtyRect: NSRect) {
         let row = (superview as? NSTableView)?.row(for: self) ?? -1
-        let rowRect = bounds.insetBy(dx: 0, dy: 4)
+        let rowRect = bounds.insetBy(dx: 6, dy: 3)
         let useLiquidGlass = previewOwner?.isLiquidGlassEnabled == true
         let lightenTheme = previewOwner?.isThemeLightenEnabled == true
         let preset = previewOwner?.themePreset ?? .defaultPreset
         let accentColor = preset.accentColor
-        let path = NSBezierPath(roundedRect: rowRect, xRadius: useLiquidGlass ? 11 : 8, yRadius: useLiquidGlass ? 11 : 8)
+        let path = NSBezierPath(roundedRect: rowRect, xRadius: 9, yRadius: 9)
         if previewOwner?.isSelectedRow(row) == true {
             preset.rowSelectedColor(useLiquidGlass: useLiquidGlass, lighten: lightenTheme).setFill()
             path.fill()
@@ -1413,15 +1383,12 @@ private final class BoardManHistoryRowView: NSTableRowView {
             path.lineWidth = appearance.borderWidth
             path.stroke()
         } else if row >= 0 {
-            (useLiquidGlass
-                ? preset.rowFillColor(useLiquidGlass: true, lighten: lightenTheme)
-                : preset.rowFillColor(useLiquidGlass: false, lighten: lightenTheme)).setFill()
-            path.fill()
-            if useLiquidGlass {
-                preset.edgeColor(useLiquidGlass: true, lighten: lightenTheme).setStroke()
-                path.lineWidth = 1
-                path.stroke()
-            }
+            let separator = NSBezierPath()
+            separator.move(to: NSPoint(x: 18, y: 0.5))
+            separator.line(to: NSPoint(x: max(18, bounds.maxX - 18), y: 0.5))
+            NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.22 : 0.34).setStroke()
+            separator.lineWidth = 0.5
+            separator.stroke()
         } else {
             super.drawBackground(in: dirtyRect)
         }
@@ -1454,13 +1421,13 @@ private final class BoardManHistoryCellView: NSTableCellView {
         primaryLabel.maximumNumberOfLines = 1
         primaryLabel.backgroundColor = .clear
         primaryLabel.drawsBackground = false
-        primaryLabel.font = NSFont.systemFont(ofSize: 13.5, weight: .semibold)
+        primaryLabel.font = NSFont.systemFont(ofSize: 13.5, weight: .medium)
 
         metadataLabel.lineBreakMode = .byTruncatingTail
         metadataLabel.maximumNumberOfLines = 1
         metadataLabel.backgroundColor = .clear
         metadataLabel.drawsBackground = false
-        metadataLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 11.5, weight: .medium)
+        metadataLabel.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
 
         countBadge.alignment = .center
         countBadge.lineBreakMode = .byTruncatingTail
@@ -1468,9 +1435,9 @@ private final class BoardManHistoryCellView: NSTableCellView {
         countBadge.isBordered = false
         countBadge.isEditable = false
         countBadge.wantsLayer = true
-        countBadge.layer?.cornerRadius = 9
+        countBadge.layer?.cornerRadius = 8
         countBadge.layer?.masksToBounds = true
-        countBadge.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        countBadge.font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .medium)
 
         inlineImageView.imageScaling = .scaleProportionallyUpOrDown
         inlineImageView.imageAlignment = .alignCenter
@@ -1499,7 +1466,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
                    themePreset: BoardManThemePreset) {
         primaryLabel.stringValue = item.primaryTitle
         metadataLabel.stringValue = item.metadataText
-        let badgePrefix = usageStyle == "compact" ? "used " : "x"
+        let badgePrefix = usageStyle == "compact" ? "used " : "×"
         let shouldShowCount = item.pasteCount > 0 && !item.countText.isEmpty
         countBadge.stringValue = shouldShowCount ? "\(badgePrefix)\(item.countText)" : ""
         countBadge.isHidden = !shouldShowCount
@@ -1523,13 +1490,13 @@ private final class BoardManHistoryCellView: NSTableCellView {
             inlineImageView.layer?.borderColor = accentColor.withAlphaComponent(lightenTheme ? 0.18 : (useLiquidGlass ? 0.34 : 0.28)).cgColor
         }
         countBadge.layer?.borderColor = themePreset.edgeColor(useLiquidGlass: useLiquidGlass, lighten: lightenTheme).cgColor
-        countBadge.layer?.borderWidth = useLiquidGlass ? 1 : 0
+        countBadge.layer?.borderWidth = 0
         needsLayout = true
     }
 
     override func layout() {
         super.layout()
-        let insetX: CGFloat = 18
+        let insetX: CGFloat = 16
         let topPadding: CGFloat = 8
         let maxContentWidth = max(0, bounds.width - (insetX * 2))
         let badgeWidth: CGFloat = countBadge.isHidden ? 0 : min(maxContentWidth, min(72, max(34, countBadge.intrinsicContentSize.width + 16)))
@@ -1553,12 +1520,6 @@ private final class BoardManHistoryCellView: NSTableCellView {
 class BoardManPanel: NSPanel {
 
     private var glassBackgroundView: NSVisualEffectView?
-    private var glassSheenView: BoardManGlassSheenView?
-    private var themeAccentStripeView: NSView?
-    private var searchGlassView: NSVisualEffectView?
-    private var tabsGlassView: NSVisualEffectView?
-    private var settingsGlassView: NSVisualEffectView?
-    private var listGlassView: NSVisualEffectView?
     private var searchField: NSSearchField?
     private var segmentedControl: NSSegmentedControl?
     private var settingsBackgroundView: NSView?
@@ -1671,6 +1632,7 @@ class BoardManPanel: NSPanel {
     private var keyboardPreviewLockUntil: CFAbsoluteTime = 0
     private var localKeyMonitor: Any?
     private var previewLifecycleObservers: [NSObjectProtocol] = []
+    private var isPanelLayoutScheduled = false
     private var activeTab: BoardManPanelTab = .history
     private var activeSettingsCategory: BoardManInlineSettingsCategory = .general
     private var activeSnippetCategoryIdentifier: String = BoardManPanel.allCategoriesIdentifier
@@ -1732,7 +1694,7 @@ class BoardManPanel: NSPanel {
     static let uncategorizedCategoryIdentifier = "__boardman_uncategorized__"
 
     static func preferredPanelWidth() -> CGFloat {
-        return 640
+        return 720
     }
 
     static func cursorRelativeFrame(size panelSize: NSSize, anchorPoint: NSPoint? = nil) -> NSRect {
@@ -1905,8 +1867,9 @@ class BoardManPanel: NSPanel {
                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView],  // no .hudWindow = no harsh black footer/band
                   backing: .buffered,
                   defer: false)
-        self.minSize = NSSize(width: 460, height: 520)
+        self.minSize = NSSize(width: 560, height: 560)
         self.title = "Board-Man"
+        self.titleVisibility = .hidden
         self.titlebarAppearsTransparent = true
         self.isMovableByWindowBackground = true
         self.isFloatingPanel = true
@@ -1932,25 +1895,13 @@ class BoardManPanel: NSPanel {
         if let contentView = contentView {
             contentView.wantsLayer = true
             if #available(macOS 10.15, *) {
-                contentView.layer?.cornerRadius = 14
+                contentView.layer?.cornerRadius = 16
                 contentView.layer?.masksToBounds = true
             }
-            contentView.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+            contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+            contentView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
             contentView.layer?.borderWidth = 1
         }
-    }
-
-    private func makeGlassSurface(blendingMode: NSVisualEffectView.BlendingMode) -> NSVisualEffectView {
-        let glass = NSVisualEffectView(frame: .zero)
-        glass.autoresizingMask = []
-        glass.blendingMode = blendingMode
-        glass.material = .hudWindow
-        glass.state = .active
-        glass.wantsLayer = true
-        glass.layer?.cornerRadius = 12
-        glass.layer?.masksToBounds = true
-        glass.layer?.borderWidth = 1
-        return glass
     }
 
     private func setupGlassBackgroundIfNeeded() {
@@ -1961,71 +1912,54 @@ class BoardManPanel: NSPanel {
         glass.material = .hudWindow
         glass.state = .active
         glass.wantsLayer = true
-        glass.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.08).cgColor
+        glass.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.18).cgColor
         glass.isHidden = true
         contentView.addSubview(glass, positioned: .below, relativeTo: nil)
         glassBackgroundView = glass
-
-        let sheen = BoardManGlassSheenView(frame: contentView.bounds)
-        sheen.autoresizingMask = [.width, .height]
-        sheen.isHidden = true
-        contentView.addSubview(sheen, positioned: .above, relativeTo: glass)
-        glassSheenView = sheen
     }
 
     private func setupUI() {
         guard let contentView = contentView else { return }
         setupGlassBackgroundIfNeeded()
 
-        let searchGlass = makeGlassSurface(blendingMode: .withinWindow)
-        searchGlass.isHidden = true
-        contentView.addSubview(searchGlass)
-        searchGlassView = searchGlass
-
-        // Search field at top - clean margins
         let search = NSSearchField(frame: .zero)
-        search.placeholderString = "Search history and snippets"
+        search.placeholderString = "Search clipboard history and snippets"
         search.target = self
         search.action = #selector(searchTextChanged(_:))
         search.sendsSearchStringImmediately = true
         search.delegate = self
         search.focusRingType = .none
+        search.controlSize = .large
+        search.font = NSFont.systemFont(ofSize: 14, weight: .regular)
         contentView.addSubview(search)
         searchField = search
 
-        let tabsGlass = makeGlassSurface(blendingMode: .withinWindow)
-        tabsGlass.isHidden = true
-        contentView.addSubview(tabsGlass)
-        tabsGlassView = tabsGlass
-
-        // Tabs: rounded style avoids harsh black blocks; History tab default and visible
+        // Primary navigation stays visible and uses native separated segments.
         let tabs = NSSegmentedControl(frame: .zero)
         tabs.segmentCount = 3
         tabs.setLabel("History", forSegment: 0)
         tabs.setLabel("Snippets", forSegment: 1)
         tabs.setLabel("Settings", forSegment: 2)
-        if #available(macOS 11.0, *), let settingsImage = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings") {
-            tabs.setImage(settingsImage, forSegment: 2)
-            tabs.setLabel("", forSegment: 2)
+        if #available(macOS 11.0, *) {
+            tabs.setImage(NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: "History"), forSegment: 0)
+            tabs.setImage(NSImage(systemSymbolName: "text.badge.plus", accessibilityDescription: "Snippets"), forSegment: 1)
+            tabs.setImage(NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Settings"), forSegment: 2)
         }
         tabs.selectedSegment = 0
         tabs.target = self
         tabs.action = #selector(tabChanged(_:))
         if #available(macOS 10.10, *) {
-            tabs.segmentStyle = .rounded
+            tabs.segmentStyle = .separated
         }
+        tabs.controlSize = .large
+        tabs.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
         contentView.addSubview(tabs)
         segmentedControl = tabs
-
-        let settingsGlass = makeGlassSurface(blendingMode: .withinWindow)
-        settingsGlass.isHidden = true
-        contentView.addSubview(settingsGlass)
-        settingsGlassView = settingsGlass
 
         let settingsBackground = NSView(frame: .zero)
         settingsBackground.wantsLayer = true
         settingsBackground.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        settingsBackground.layer?.cornerRadius = 6
+        settingsBackground.layer?.cornerRadius = 12
         contentView.addSubview(settingsBackground)
         settingsBackgroundView = settingsBackground
 
@@ -2042,8 +1976,10 @@ class BoardManPanel: NSPanel {
         categoryControl.target = self
         categoryControl.action = #selector(settingsCategoryChanged(_:))
         if #available(macOS 10.10, *) {
-            categoryControl.segmentStyle = .rounded
+            categoryControl.segmentStyle = .separated
         }
+        categoryControl.controlSize = .small
+        categoryControl.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
         contentView.addSubview(categoryControl)
         settingsCategoryControl = categoryControl
 
@@ -2465,8 +2401,8 @@ class BoardManPanel: NSPanel {
         licenseSectionLabel = licenseTitle
 
         let planLabel = NSTextField(labelWithString: "")
-        planLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
-        planLabel.textColor = .systemRed
+        planLabel.font = NSFont.systemFont(ofSize: 17, weight: .semibold)
+        planLabel.textColor = .labelColor
         planLabel.lineBreakMode = .byTruncatingTail
         contentView.addSubview(planLabel)
         licensePlanLabel = planLabel
@@ -2486,10 +2422,10 @@ class BoardManPanel: NSPanel {
         licenseLimitsLabel = limitsLabel
 
         let licenseKey = NSTextField(frame: .zero)
-        licenseKey.placeholderString = "License activation is not connected yet"
+        licenseKey.placeholderString = "Secure local license"
         licenseKey.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         licenseKey.isEnabled = false
-        licenseKey.toolTip = "License activation is a disabled preview in this build."
+        licenseKey.toolTip = "Verified licenses are stored securely in Keychain."
         contentView.addSubview(licenseKey)
         licenseKeyField = licenseKey
 
@@ -2501,7 +2437,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(activate)
         licenseActivateButton = activate
 
-        let activationStatus = NSTextField(labelWithString: "Activation is not connected yet. Free remains the default runtime entitlement.")
+        let activationStatus = NSTextField(labelWithString: "Online activation is not connected yet.")
         activationStatus.font = NSFont.systemFont(ofSize: 11)
         activationStatus.textColor = .secondaryLabelColor
         activationStatus.lineBreakMode = .byWordWrapping
@@ -2530,7 +2466,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(lockedProControl)
         licenseProLockedControlView = lockedProControl
 
-        let licenseNote = NSTextField(labelWithString: "Static preview only. 1 license = 1 PC. No backend activation, device binding, or license storage is connected.")
+        let licenseNote = NSTextField(labelWithString: "Verified licenses are stored in Keychain and bound to this Mac. Online purchase activation remains unavailable.")
         licenseNote.font = NSFont.systemFont(ofSize: 11)
         licenseNote.textColor = .secondaryLabelColor
         licenseNote.lineBreakMode = .byWordWrapping
@@ -2578,12 +2514,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(heightText)
         heightLabel = heightText
 
-        // Scroll list: stable margins and taller rows for readability; paste behavior stays on click/Enter.
-        let listGlass = makeGlassSurface(blendingMode: .withinWindow)
-        listGlass.isHidden = true
-        contentView.addSubview(listGlass)
-        listGlassView = listGlass
-
+        // Scroll list: one native surface avoids stacked cards and unnecessary visual-effect layers.
         let scroll = NSScrollView(frame: .zero)
         scroll.hasVerticalScroller = true
         scroll.hasHorizontalScroller = false
@@ -2596,9 +2527,9 @@ class BoardManPanel: NSPanel {
         scroll.contentView.autoresizesSubviews = true
         scroll.contentView.drawsBackground = false
         scroll.wantsLayer = true
-        scroll.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        scroll.layer?.cornerRadius = 8
-        scroll.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
+        scroll.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.72).cgColor
+        scroll.layer?.cornerRadius = 12
+        scroll.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.42).cgColor
         scroll.layer?.borderWidth = 1
 
         let table = BoardManHistoryTableView(frame: .zero)
@@ -2807,57 +2738,38 @@ class BoardManPanel: NSPanel {
         glassBackgroundView?.layer?.backgroundColor = tintColor.cgColor
         glassBackgroundView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         glassBackgroundView?.layer?.borderWidth = useGlass ? 1 : 0
-        glassSheenView?.isHidden = !useGlass
-        glassSheenView?.tintColor = preset.panelTintColor(useLiquidGlass: useGlass, lighten: lightenTheme)
-        glassSheenView?.accentColor = accentColor
         contentView?.layer?.backgroundColor = (useGlass
             ? tintColor
-            : tintColor).cgColor
+            : NSColor.windowBackgroundColor).cgColor
         contentView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         contentView?.layer?.isOpaque = !useGlass
-        [searchGlassView, tabsGlassView, settingsGlassView, listGlassView].forEach { glass in
-            glass?.isHidden = !useGlass
-            glass?.material = preset.glassMaterial
-            glass?.state = .active
-            glass?.layer?.backgroundColor = surfaceTint.cgColor
-            glass?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
-            glass?.layer?.borderWidth = useGlass ? 1 : 0
-        }
         searchField?.wantsLayer = true
-        searchField?.layer?.cornerRadius = useGlass ? 10 : 6
+        searchField?.layer?.cornerRadius = 10
         searchField?.layer?.backgroundColor = (useGlass
-            ? surfaceTint.withAlphaComponent(0.34)
-            : NSColor.clear).cgColor
+            ? surfaceTint.withAlphaComponent(0.26)
+            : NSColor.controlBackgroundColor.withAlphaComponent(0.78)).cgColor
+        searchField?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
+        searchField?.layer?.borderWidth = 1
         segmentedControl?.wantsLayer = true
-        segmentedControl?.layer?.cornerRadius = useGlass ? 10 : 6
-        segmentedControl?.layer?.backgroundColor = (useGlass
-            ? surfaceTint.withAlphaComponent(0.28)
-            : NSColor.clear).cgColor
+        segmentedControl?.layer?.cornerRadius = 9
+        segmentedControl?.layer?.backgroundColor = NSColor.clear.cgColor
         settingsCategoryControl?.wantsLayer = true
-        settingsCategoryControl?.layer?.cornerRadius = useGlass ? 10 : 6
-        settingsCategoryControl?.layer?.backgroundColor = (useGlass
-            ? surfaceTint.withAlphaComponent(0.28)
-            : NSColor.clear).cgColor
+        settingsCategoryControl?.layer?.cornerRadius = 8
+        settingsCategoryControl?.layer?.backgroundColor = NSColor.clear.cgColor
         settingsBackgroundView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.42)
             : tintColor).cgColor
-        settingsBackgroundView?.layer?.cornerRadius = useGlass ? 12 : 6
-        settingsBackgroundView?.layer?.borderColor = (useGlass ? preset.edgeColor(useLiquidGlass: true, lighten: lightenTheme) : accentColor.withAlphaComponent(lightenTheme ? 0.12 : 0.20)).cgColor
-        settingsBackgroundView?.layer?.borderWidth = useGlass ? 1 : (themePreset == .defaultPreset ? 0 : 1)
-        settingsBackgroundView?.layer?.shadowColor = preset.shadowColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
-        settingsBackgroundView?.layer?.shadowOpacity = Float(lightenTheme ? 0.05 : (useGlass ? 0.20 : 0.08))
-        settingsBackgroundView?.layer?.shadowRadius = useGlass ? 14 : 5
-        settingsBackgroundView?.layer?.shadowOffset = NSSize(width: 0, height: -4)
+        settingsBackgroundView?.layer?.cornerRadius = 12
+        settingsBackgroundView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
+        settingsBackgroundView?.layer?.borderWidth = 1
+        settingsBackgroundView?.layer?.shadowOpacity = 0
         scrollView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.30)
             : tintColor).cgColor
-        scrollView?.layer?.cornerRadius = useGlass ? 11 : 8
-        scrollView?.layer?.borderColor = (useGlass ? preset.edgeColor(useLiquidGlass: true, lighten: lightenTheme) : accentColor.withAlphaComponent(lightenTheme ? 0.18 : 0.42)).cgColor
-        scrollView?.layer?.borderWidth = themePreset == .defaultPreset && !useGlass ? 1 : 1
-        scrollView?.layer?.shadowColor = preset.shadowColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
-        scrollView?.layer?.shadowOpacity = Float(lightenTheme ? 0.04 : (useGlass ? 0.18 : 0.06))
-        scrollView?.layer?.shadowRadius = useGlass ? 12 : 4
-        scrollView?.layer?.shadowOffset = NSSize(width: 0, height: -3)
+        scrollView?.layer?.cornerRadius = 12
+        scrollView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
+        scrollView?.layer?.borderWidth = 1
+        scrollView?.layer?.shadowOpacity = 0
         scrollView?.drawsBackground = !useGlass
         placeholderList?.backgroundColor = .clear
         ([launchOnLoginButton, inputPasteCommandButton, rowNumbersButton, usageCountButton, themeLightenButton, autoCloseButton, dedupeButton, overwriteSameHistoryButton, reuseTopButton, snippetFolderEnableButton, snippetEnableButton] + storedTypeButtons.map { Optional($0) }).forEach { button in
@@ -2938,25 +2850,22 @@ class BoardManPanel: NSPanel {
     private func layoutPanelSubviews() {
         guard let contentView = contentView else { return }
         let bounds = contentView.bounds
-        let margin: CGFloat = bounds.width < 540 ? 20 : 28
+        let margin: CGFloat = bounds.width < 620 ? 18 : 24
         let width = bounds.width - (margin * 2)
-        let top = bounds.height - 88
+        let top = bounds.height - 78
         let isSettings = activeTab == .settings
-        glassSheenView?.frame = bounds
-        searchGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
         searchField?.isHidden = isSettings
         let showsSnippetButtons = activeTab == .snippets && !isSettings
         let snippetButtonGap: CGFloat = 6
         let snippetButtonWidths: [CGFloat] = [82, 44, 58]
         let snippetButtonsWidth = showsSnippetButtons ? snippetButtonWidths.reduce(0, +) + (snippetButtonGap * 2) : 0
         let searchWidth = max(160, width - snippetButtonsWidth - (showsSnippetButtons ? 12 : 0))
-        searchGlassView?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 32)
-        searchField?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 32)
+        searchField?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 38)
         snippetAddButton?.isHidden = !showsSnippetButtons
         snippetEditButton?.isHidden = !showsSnippetButtons
         snippetDeleteButton?.isHidden = !showsSnippetButtons
         if showsSnippetButtons {
-            let buttonY = top + 3
+            let buttonY = top + 6
             var buttonX = margin + searchWidth + 12
             snippetAddButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[0], height: 26)
             buttonX += snippetButtonWidths[0] + snippetButtonGap
@@ -2965,24 +2874,20 @@ class BoardManPanel: NSPanel {
             snippetDeleteButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[2], height: 26)
         }
         updateSnippetActionButtons()
-        tabsGlassView?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
-        segmentedControl?.frame = NSRect(x: margin, y: top - 42, width: width, height: 30)
+        segmentedControl?.frame = NSRect(x: margin, y: top - 44, width: width, height: 32)
         updateTabWidths(totalWidth: width)
 
-        let contentTop = top - 60
-        settingsGlassView?.isHidden = !isSettings || !isLiquidGlassEnabled
+        let contentTop = top - 62
         settingsBackgroundView?.isHidden = !isSettings
-        settingsGlassView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
-        settingsBackgroundView?.frame = NSRect(x: margin, y: 30, width: width, height: max(220, contentTop - 30))
+        settingsBackgroundView?.frame = NSRect(x: margin, y: 24, width: width, height: max(220, contentTop - 24))
         layoutInlineSettingsControls(margin: margin, width: width, topY: contentTop, isVisible: isSettings)
         footerNote?.isHidden = true
-        listGlassView?.isHidden = isSettings || !isLiquidGlassEnabled
         scrollView?.isHidden = isSettings
         let showsSnippetCategories = activeTab == .snippets && !isSettings
         snippetEditorView?.isHidden = !showsSnippetCategories
         let categoryRowY = contentTop - 34
         let listTop = showsSnippetCategories ? categoryRowY - 12 : contentTop
-        let listHeight = max(190, listTop - 30)
+        let listHeight = max(190, listTop - 24)
         [snippetCategoryLabel, snippetCategoryPopup, snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton].forEach {
             $0?.isHidden = !showsSnippetCategories
         }
@@ -3004,10 +2909,9 @@ class BoardManPanel: NSPanel {
         let editorGap: CGFloat = showsSnippetCategories ? 12 : 0
         let editorWidth = showsSnippetCategories ? min(250, max(220, floor(width * 0.38))) : 0
         let listWidth = max(180, width - editorWidth - editorGap)
-        listGlassView?.frame = NSRect(x: margin, y: 18, width: listWidth, height: listFrameHeight)
-        scrollView?.frame = NSRect(x: margin, y: 18, width: listWidth, height: listFrameHeight)
+        scrollView?.frame = NSRect(x: margin, y: 16, width: listWidth, height: listFrameHeight)
         if showsSnippetCategories {
-            snippetEditorView?.frame = NSRect(x: margin + listWidth + editorGap, y: 18, width: editorWidth, height: listFrameHeight)
+            snippetEditorView?.frame = NSRect(x: margin + listWidth + editorGap, y: 16, width: editorWidth, height: listFrameHeight)
             layoutSnippetEditorControls(width: editorWidth, height: listFrameHeight)
         }
         synchronizeListGeometry(frameWidth: listWidth, height: listFrameHeight)
@@ -4111,10 +4015,22 @@ class BoardManPanel: NSPanel {
 
     private func refreshLicenseSummary() {
         let snapshot = EntitlementService.shared.currentSnapshot
-        licensePlanLabel?.stringValue = "\(licensePlanTitle(snapshot.plan)) Plan"
+        let isActive = snapshot.isProEntitled
+        licensePlanLabel?.stringValue = licensePlanTitle(snapshot.plan)
+        licensePlanLabel?.textColor = isActive ? .systemGreen : .labelColor
         licenseStateLabel?.stringValue = "\(licenseStateTitle(snapshot.state)): \(licenseStateDescription(snapshot))"
         licenseStateLabel?.textColor = licenseStateColor(snapshot.state)
-        licenseLimitsLabel?.stringValue = "History \(limitText(snapshot.limits.maxHistoryItems)), pins \(limitText(snapshot.limits.maxPinnedItems)), snippets \(limitText(snapshot.limits.maxSnippets))"
+        licenseLimitsLabel?.stringValue = "History \(limitText(snapshot.limits.maxHistoryItems))  •  Pins \(limitText(snapshot.limits.maxPinnedItems))  •  Snippets \(limitText(snapshot.limits.maxSnippets))"
+        licenseKeyField?.placeholderString = isActive ? "Verified in Keychain" : "Secure local license"
+        licenseActivateButton?.isHidden = isActive
+        licenseUpgradeButton?.isHidden = isActive
+        licenseActivationStatusLabel?.stringValue = isActive
+            ? "Verified locally. This entitlement is bound to this Mac and restored automatically at launch."
+            : "Online activation is not connected yet."
+        licenseActivationStatusLabel?.textColor = isActive ? .systemGreen : .secondaryLabelColor
+        licenseMockNoteLabel?.stringValue = isActive
+            ? "The signed license token is stored in Keychain. The signing private key is not embedded in Board-Man."
+            : "Verified licenses are stored in Keychain and bound to this Mac. Online purchase activation remains unavailable."
         licenseProLockedControlView?.refresh()
     }
 
@@ -4404,7 +4320,17 @@ class BoardManPanel: NSPanel {
 
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
         super.setFrame(frameRect, display: flag)
-        layoutPanelSubviews()
+        schedulePanelLayout()
+    }
+
+    private func schedulePanelLayout() {
+        guard !isPanelLayoutScheduled else { return }
+        isPanelLayoutScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isPanelLayoutScheduled = false
+            self.layoutPanelSubviews()
+        }
     }
 
     override func sendEvent(_ event: NSEvent) {
