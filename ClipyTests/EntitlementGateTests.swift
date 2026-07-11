@@ -1,5 +1,7 @@
+import Cocoa
 import CryptoKit
 import Foundation
+import RealmSwift
 import Testing
 @testable import Board_Man
 
@@ -232,5 +234,76 @@ final class EntitlementGateTests {
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+@MainActor @Suite(.serialized)
+final class BoardManPanelLayoutTests {
+
+    @Test
+    func majorTabsAndSettingsCategoriesStayInsidePanel() async {
+        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
+        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let panel = BoardManPanel()
+        panel.setFrame(NSRect(x: 0, y: 0, width: 680, height: 760), display: false)
+        await settlePanelLayout(panel)
+        assertTopLevelLayout(panel, mode: "History", expectsSearch: true)
+
+        panel.openSnippetsManagerMode()
+        await settlePanelLayout(panel)
+        assertTopLevelLayout(panel, mode: "Snippets", expectsSearch: true)
+
+        panel.selectSettingsTab()
+        await settlePanelLayout(panel)
+        guard let root = panel.contentView,
+              let categories = root.subviews.compactMap({ $0 as? NSSegmentedControl }).first(where: { $0.segmentCount == 7 }) else {
+            Issue.record("Settings category control was not created.")
+            return
+        }
+
+        for category in 0..<categories.segmentCount {
+            categories.selectedSegment = category
+            _ = categories.sendAction(categories.action, to: categories.target)
+            await settlePanelLayout(panel)
+            assertTopLevelLayout(panel, mode: "Settings category \(category)", expectsSearch: false)
+        }
+    }
+
+    private func settlePanelLayout(_ panel: BoardManPanel) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
+        panel.contentView?.layoutSubtreeIfNeeded()
+    }
+
+    private func assertTopLevelLayout(_ panel: BoardManPanel,
+                                      mode: String,
+                                      expectsSearch: Bool) {
+        guard let root = panel.contentView else {
+            Issue.record("\(mode): missing content view.")
+            return
+        }
+
+        root.layoutSubtreeIfNeeded()
+        let visible = root.subviews.filter { !$0.isHidden && $0.alphaValue > 0.01 }
+        #expect(!visible.isEmpty, "\(mode): no visible top-level views.")
+
+        let tolerance: CGFloat = 1
+        for view in visible {
+            let frame = view.frame
+            #expect(frame.width > 0 && frame.height > 0, "\(mode): zero-sized \(type(of: view)).")
+            #expect(frame.minX >= -tolerance, "\(mode): \(type(of: view)) extends past the left edge.")
+            #expect(frame.minY >= -tolerance, "\(mode): \(type(of: view)) extends below the panel.")
+            #expect(frame.maxX <= root.bounds.maxX + tolerance, "\(mode): \(type(of: view)) extends past the right edge.")
+            #expect(frame.maxY <= root.bounds.maxY + tolerance, "\(mode): \(type(of: view)) extends above the panel.")
+        }
+
+        let visibleSearchFields = visible.compactMap { $0 as? NSSearchField }
+        #expect((visibleSearchFields.count == 1) == expectsSearch,
+                "\(mode): unexpected search field visibility.")
     }
 }

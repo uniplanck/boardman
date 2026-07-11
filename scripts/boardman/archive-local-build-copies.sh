@@ -56,14 +56,26 @@ neutralize_archived_app_bundles() {
 
   while IFS= read -r app_path; do
     local archived_path
-    archived_path="$(dirname "$app_path")/.archived-app-bundle.payload"
+    if [ "$(basename "$app_path")" = ".archived-app-bundle.payload" ]; then
+      archived_path="$app_path"
+    else
+      archived_path="$(dirname "$app_path")/.archived-app-bundle.payload"
+    fi
+
     if [ "$DRY_RUN" = true ]; then
-      echo "[DRY] $app_path -> $archived_path"
-    elif [ ! -e "$archived_path" ]; then
+      echo "[DRY] Neutralize app bundle: $app_path"
+      continue
+    fi
+
+    if [ "$app_path" != "$archived_path" ] && [ ! -e "$archived_path" ]; then
       mv "$app_path" "$archived_path"
       echo "Archived app bundle payload: $archived_path"
     fi
-  done < <(find "$root" -type d \( -name "${APP_NAME}.app" -o -name "${APP_NAME}.app.archive" \) -prune 2>/dev/null || true)
+    if [ -d "$archived_path/Contents" ] && [ ! -e "$archived_path/.archived-contents" ]; then
+      mv "$archived_path/Contents" "$archived_path/.archived-contents"
+      echo "Neutralized archived app bundle structure: $archived_path"
+    fi
+  done < <(find "$root" -type d \( -name "${APP_NAME}.app" -o -name "${APP_NAME}.app.archive" -o -name ".archived-app-bundle.payload" \) -prune 2>/dev/null || true)
 }
 
 echo "=== Board-Man Local Build Copy Archive ==="

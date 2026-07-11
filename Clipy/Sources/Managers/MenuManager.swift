@@ -3017,12 +3017,9 @@ class BoardManPanel: NSPanel {
         let fieldLabelWidth: CGFloat = 58
         let contentX = margin + 18
         let contentWidth = max(240, width - 36)
-        let useTwoColumns = width >= 620
-        let columnGap: CGFloat = 26
-        let columnWidth = useTwoColumns ? floor((contentWidth - columnGap) / 2) : contentWidth
+        let columnWidth = contentWidth
         let leftX = contentX
-        let rightX = contentX + columnWidth + columnGap
-        let firstY = topY - (useTwoColumns ? 34 : 74)
+        let firstY = topY - 74
 
         let generalControls: [NSView?] = [
             generalSectionLabel, launchOnLoginButton, inputPasteCommandButton,
@@ -3206,50 +3203,36 @@ class BoardManPanel: NSPanel {
         }
 
         refreshLicenseSummary()
-        if useTwoColumns {
-            show(allControls)
-            storedTypeButtons.forEach { $0.isHidden = false }
+        settingsCategoryControl?.isHidden = false
+        settingsCategoryControl?.selectedSegment = activeSettingsCategory.rawValue
+        settingsCategoryControl?.frame = NSRect(x: leftX, y: topY - 34, width: columnWidth, height: 26)
+        switch activeSettingsCategory {
+        case .general:
+            show(generalControls)
             placeGeneralSection(originX: leftX, originY: firstY, width: columnWidth)
             placeShortcutSection(originX: leftX, originY: firstY - 150, width: columnWidth)
-            placeViewSection(originX: leftX, originY: firstY - 242, width: columnWidth)
-            placeHistorySection(originX: rightX, originY: firstY, width: columnWidth)
-            placeSnippetSettingsSection(originX: rightX, originY: firstY - 116, width: columnWidth, scrollHeight: 128)
-            placePrivacySection(originX: rightX, originY: firstY - 350, width: columnWidth)
-            placeStoredTypesSection(originX: rightX, originY: firstY - 452, width: columnWidth)
-            placeFiltersSection(originX: rightX, originY: firstY - 606, width: columnWidth)
-            placeLicenseSection(originX: leftX, originY: firstY - 510, width: columnWidth)
-        } else {
-            settingsCategoryControl?.isHidden = false
-            settingsCategoryControl?.selectedSegment = activeSettingsCategory.rawValue
-            settingsCategoryControl?.frame = NSRect(x: leftX, y: topY - 34, width: columnWidth, height: 26)
-            switch activeSettingsCategory {
-            case .general:
-                show(generalControls)
-                placeGeneralSection(originX: leftX, originY: firstY, width: columnWidth)
-                placeShortcutSection(originX: leftX, originY: firstY - 150, width: columnWidth)
-            case .view:
-                show(viewControls)
-                placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
-                placeLabsSection(originX: leftX, originY: firstY - 296, width: columnWidth)
-            case .history:
-                show(historyControls)
-                placeHistorySection(originX: leftX, originY: firstY, width: columnWidth)
-            case .snippets:
-                show(snippetControls)
-                placeSnippetSettingsSection(originX: leftX, originY: firstY, width: columnWidth, scrollHeight: max(180, topY - 250))
-            case .privacy:
-                show(privacyControls)
-                storedTypeButtons.forEach { $0.isHidden = false }
-                placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
-                placeStoredTypesSection(originX: leftX, originY: firstY - 112, width: columnWidth)
-                placeFiltersSection(originX: leftX, originY: firstY - 268, width: columnWidth)
-            case .updates:
-                show(updatesControls)
-                placeUpdatesSection(originX: leftX, originY: firstY, width: columnWidth)
-            case .license:
-                show(licenseControls)
-                placeLicenseSection(originX: leftX, originY: firstY, width: columnWidth)
-            }
+        case .view:
+            show(viewControls)
+            placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
+            placeLabsSection(originX: leftX, originY: firstY - 296, width: columnWidth)
+        case .history:
+            show(historyControls)
+            placeHistorySection(originX: leftX, originY: firstY, width: columnWidth)
+        case .snippets:
+            show(snippetControls)
+            placeSnippetSettingsSection(originX: leftX, originY: firstY, width: columnWidth, scrollHeight: max(180, topY - 250))
+        case .privacy:
+            show(privacyControls)
+            storedTypeButtons.forEach { $0.isHidden = false }
+            placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
+            placeStoredTypesSection(originX: leftX, originY: firstY - 112, width: columnWidth)
+            placeFiltersSection(originX: leftX, originY: firstY - 268, width: columnWidth)
+        case .updates:
+            show(updatesControls)
+            placeUpdatesSection(originX: leftX, originY: firstY, width: columnWidth)
+        case .license:
+            show(licenseControls)
+            placeLicenseSection(originX: leftX, originY: firstY, width: columnWidth)
         }
     }
 
