@@ -257,17 +257,22 @@ final class BoardManPanelLayoutTests {
 
         panel.selectSettingsTab()
         await settlePanelLayout(panel)
-        guard let root = panel.contentView,
-              let categories = root.subviews.compactMap({ $0 as? NSSegmentedControl }).first(where: { $0.segmentCount == 7 }) else {
-            Issue.record("Settings category control was not created.")
+        guard let root = panel.contentView else {
+            Issue.record("Settings content view was not created.")
             return
         }
+        let expectedTitles = Set(["General", "Appearance", "History", "Snippets", "Privacy", "Updates", "License"])
+        let categories = root.subviews
+            .flatMap { $0.subviews }
+            .compactMap { $0 as? NSButton }
+            .filter { expectedTitles.contains($0.title) }
+            .sorted { $0.tag < $1.tag }
+        #expect(categories.count == expectedTitles.count, "Settings sidebar did not create all categories.")
 
-        for category in 0..<categories.segmentCount {
-            categories.selectedSegment = category
-            _ = categories.sendAction(categories.action, to: categories.target)
+        for category in categories {
+            _ = category.sendAction(category.action, to: category.target)
             await settlePanelLayout(panel)
-            assertTopLevelLayout(panel, mode: "Settings category \(category)", expectsSearch: false)
+            assertTopLevelLayout(panel, mode: "Settings category \(category.tag)", expectsSearch: false)
         }
     }
 

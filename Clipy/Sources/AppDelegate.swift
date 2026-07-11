@@ -52,11 +52,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
 
     // MARK: - Menu Actions
     @objc func openBoardManSettings() {
-        if AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) {
-            AppEnvironment.current.menuManager.showBoardManSettingsPanel()
-            return
-        }
-        showPreferenceWindow()
+        AppEnvironment.current.menuManager.showBoardManSettingsPanel()
     }
 
     @objc func openBoardManSnippetsManager() {
@@ -64,13 +60,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     }
 
     @objc func showPreferenceWindow() {
-        if AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) {
-            AppEnvironment.current.menuManager.showBoardManSettingsPanel()
-            return
-        }
-        AppEnvironment.current.menuManager.hideBoardManPanelForPreferences()
-        NSApp.activate(ignoringOtherApps: true)
-        CPYPreferencesWindowController.sharedController.showWindow(self)
+        AppEnvironment.current.menuManager.showBoardManSettingsPanel()
     }
 
     @objc func showSnippetEditorWindow() {

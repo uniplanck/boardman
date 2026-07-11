@@ -73,45 +73,19 @@ final class MenuManager: NSObject {
 // MARK: - Popup Menu
 extension MenuManager {
     func popUpMenu(_ type: MenuType) {
-        let usePanel = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI)
-        if usePanel && type == .main {
-            showBoardManPanel()
-            return
-        }
-        let menu: NSMenu?
         switch type {
         case .main:
-            menu = clipMenu
+            showBoardManPanel()
         case .history:
-            menu = historyMenu
+            showBoardManPanel()
+            boardManPanel?.selectHistoryTab()
         case .snippet:
-            menu = snippetMenu
+            showBoardManSnippetsPanel()
         }
-        menu?.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 
     func popUpSnippetFolder(_ folder: CPYFolder) {
-        if AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) {
-            showBoardManSnippetsPanel(folderIdentifier: folder.identifier)
-            return
-        }
-
-        let folderMenu = NSMenu(title: folder.title)
-        // Folder title
-        let labelItem = NSMenuItem(title: folder.title, action: nil)
-        labelItem.isEnabled = false
-        folderMenu.addItem(labelItem)
-        // Snippets
-        var index = firstIndexOfMenuItems()
-        folder.snippets
-            .sorted(byKeyPath: #keyPath(CPYSnippet.index), ascending: true)
-            .filter { $0.enable }
-            .forEach { snippet in
-                let subMenuItem = makeSnippetMenuItem(snippet, listNumber: index)
-                folderMenu.addItem(subMenuItem)
-                index += 1
-            }
-        folderMenu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        showBoardManSnippetsPanel(folderIdentifier: folder.identifier)
     }
 
     fileprivate func showBoardManPanel(anchorPoint: NSPoint? = nil) {
@@ -256,7 +230,7 @@ extension MenuManager {
         let showUsageCount = defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true
 
         let pinStore = PinnedSnippetStore.shared
-        let panelHistoryLimit = min(maxHistory, 120)  // V4B-13: keep panel launch fast; full history remains in Realm/legacy menu.
+        let panelHistoryLimit = min(maxHistory, 120)  // Keep panel launch fast; full history remains in Realm.
         let items = Array(clipResults.prefix(panelHistoryLimit)).enumerated().map { index, clip in
             let rawTitle = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let isImageClip = BoardManPanel.isImageClip(clip)
@@ -462,8 +436,7 @@ private extension MenuManager {
 // MARK: - Menus
 private extension MenuManager {
     func createBoardManLiteMenu() {
-        // V4B-14: Panel UI mode does not need legacy history/snippet menu rebuilds.
-        // Keeping the status menu lightweight avoids slow rebuilds after Realm/paste-count changes.
+        // The panel owns history and snippet browsing; keep the status menu lightweight.
         let menu = NSMenu(title: Constants.Application.name)
         menu.addItem(NSMenuItem(title: String(localized: "Open Board-Man Settings"), action: #selector(AppDelegate.openBoardManSettings)))
         menu.addItem(NSMenuItem(title: String(localized: "Manage Snippets"), action: #selector(AppDelegate.openBoardManSnippetsManager)))
@@ -476,36 +449,8 @@ private extension MenuManager {
         statusItem?.menu = nil
     }
 
-     func createClipMenu() {
-        if AppEnvironment.current.defaults.bool(forKey: "BoardManUsePanelUI") {
-            createBoardManLiteMenu()
-            return
-        }
-
-        clipMenu = NSMenu(title: Constants.Application.name)
-        historyMenu = NSMenu(title: Constants.Menu.history)
-        snippetMenu = NSMenu(title: Constants.Menu.snippet)
-
-        addPinnedSnippetItems(clipMenu!)
-        addPinnedSnippetItems(snippetMenu!)
-        addHistoryItems(clipMenu!)
-        addHistoryItems(historyMenu!)
-
-        addSnippetItems(clipMenu!, separateMenu: true)
-        addSnippetItems(snippetMenu!, separateMenu: false)
-
-        clipMenu?.addItem(NSMenuItem.separator())
-
-        if AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.addClearHistoryMenuItem) {
-            clipMenu?.addItem(NSMenuItem(title: String(localized: "Clear History"), action: #selector(AppDelegate.clearAllHistory)))
-        }
-
-        clipMenu?.addItem(NSMenuItem(title: String(localized: "Manage Snippets"), action: #selector(AppDelegate.showSnippetEditorWindow)))
-        clipMenu?.addItem(NSMenuItem(title: String(localized: "Open Board-Man Settings"), action: #selector(AppDelegate.showPreferenceWindow)))
-        clipMenu?.addItem(NSMenuItem.separator())
-        clipMenu?.addItem(NSMenuItem(title: String(localized: "Quit Board-Man"), action: #selector(AppDelegate.terminate)))
-
-        statusItem?.menu = clipMenu
+    func createClipMenu() {
+        createBoardManLiteMenu()
     }
 
     func menuItemTitle(_ title: String, listNumber: NSInteger, isMarkWithNumber: Bool) -> String {
@@ -827,15 +772,13 @@ private extension MenuManager {
         statusItem?.button?.target = self
         statusItem?.button?.action = #selector(statusItemClicked(_:))
         statusItem?.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        statusItem?.menu = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) ? nil : clipMenu
+        statusItem?.menu = nil
     }
 
     @objc func statusItemClicked(_ sender: Any?) {
-        guard AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManUsePanelUI) else { return }
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
-            guard let button = statusItem?.button else { return }
-            clipMenu?.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
+            showBoardManSettingsPanel()
             return
         }
 
@@ -936,8 +879,99 @@ fileprivate enum BoardManPanelTab: Int, CaseIterable {
     }
 }
 
-fileprivate enum BoardManInlineSettingsCategory: Int {
+fileprivate enum BoardManInlineSettingsCategory: Int, CaseIterable {
     case general, view, history, snippets, privacy, updates, license
+
+    var title: String {
+        switch self {
+        case .general: return "General"
+        case .view: return "Appearance"
+        case .history: return "History"
+        case .snippets: return "Snippets"
+        case .privacy: return "Privacy"
+        case .updates: return "Updates"
+        case .license: return "License"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .general: return "Startup, menu bar, and keyboard shortcuts"
+        case .view: return "Layout, timestamps, counts, and theme"
+        case .history: return "Retention, duplicate handling, and cleanup"
+        case .snippets: return "Folders, snippets, and folder shortcuts"
+        case .privacy: return "Excluded apps, stored data, and filters"
+        case .updates: return "Version and update channel"
+        case .license: return "Plan, activation, and usage limits"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .general: return "gearshape"
+        case .view: return "paintbrush"
+        case .history: return "clock.arrow.circlepath"
+        case .snippets: return "text.badge.plus"
+        case .privacy: return "hand.raised"
+        case .updates: return "arrow.triangle.2.circlepath"
+        case .license: return "checkmark.seal"
+        }
+    }
+}
+
+private enum BoardManGlobalShortcutKind: Int, CaseIterable {
+    case openBoardMan, history, snippets, clearHistory
+
+    var title: String {
+        switch self {
+        case .openBoardMan: return "Open Board-Man"
+        case .history: return "Open History"
+        case .snippets: return "Open Snippets"
+        case .clearHistory: return "Clear History"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .openBoardMan: return "Show the main clipboard panel"
+        case .history: return "Jump directly to clipboard history"
+        case .snippets: return "Jump directly to snippets"
+        case .clearHistory: return "Clear history after confirmation"
+        }
+    }
+}
+
+private final class BoardManGlobalShortcutRow {
+    let kind: BoardManGlobalShortcutKind
+    let titleLabel: NSTextField
+    let detailLabel: NSTextField
+    let recordView: RecordView
+    let clearButton: NSButton
+
+    init(kind: BoardManGlobalShortcutKind, keyCombo: KeyCombo?) {
+        self.kind = kind
+        titleLabel = NSTextField(labelWithString: kind.title)
+        titleLabel.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
+        titleLabel.textColor = .labelColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+
+        detailLabel = NSTextField(labelWithString: kind.detail)
+        detailLabel.font = NSFont.systemFont(ofSize: 10.5)
+        detailLabel.textColor = .secondaryLabelColor
+        detailLabel.lineBreakMode = .byTruncatingTail
+
+        recordView = RecordView(frame: .zero)
+        recordView.keyCombo = keyCombo
+
+        clearButton = NSButton(title: "Clear", target: nil, action: nil)
+        clearButton.font = NSFont.systemFont(ofSize: 10)
+        clearButton.bezelStyle = .rounded
+        clearButton.tag = kind.rawValue
+    }
+
+    var views: [NSView] {
+        return [titleLabel, detailLabel, recordView, clearButton]
+    }
 }
 
 private final class BoardManSnippetShortcutRow {
@@ -1523,7 +1557,10 @@ class BoardManPanel: NSPanel {
     private var searchField: NSSearchField?
     private var segmentedControl: NSSegmentedControl?
     private var settingsBackgroundView: NSView?
-    private var settingsCategoryControl: NSSegmentedControl?
+    private var settingsSidebarView: NSView?
+    private var settingsCategoryButtons: [NSButton] = []
+    private var settingsPageTitleLabel: NSTextField?
+    private var settingsPageDescriptionLabel: NSTextField?
     private var scrollView: NSScrollView?
     private var placeholderList: NSTableView?
     private var rowNumbersButton: NSButton?
@@ -1546,8 +1583,8 @@ class BoardManPanel: NSPanel {
     private var statusItemLabel: NSTextField?
     private var statusItemPopup: NSPopUpButton?
     private var shortcutSectionLabel: NSTextField?
-    private var mainShortcutLabel: NSTextField?
-    private var mainShortcutValueLabel: NSTextField?
+    private var globalShortcutRows: [BoardManGlobalShortcutRow] = []
+    private var shortcutStatusLabel: NSTextField?
     private var snippetSettingsSectionLabel: NSTextField?
     private var snippetSummaryLabel: NSTextField?
     private var snippetFoldersLabel: NSTextField?
@@ -1556,13 +1593,6 @@ class BoardManPanel: NSPanel {
     private var snippetShortcutDocumentView: NSView?
     private var snippetShortcutRows: [BoardManSnippetShortcutRow] = []
     private var manageSnippetsButton: NSButton?
-    private var densityLabel: NSTextField?
-    private var densityPopup: NSPopUpButton?
-    private var clickActionLabel: NSTextField?
-    private var clickActionPopup: NSPopUpButton?
-    private var enterActionLabel: NSTextField?
-    private var enterActionPopup: NSPopUpButton?
-    private var autoCloseButton: NSButton?
     private var dedupeButton: NSButton?
     private var overwriteSameHistoryButton: NSButton?
     private var reuseTopButton: NSButton?
@@ -1595,7 +1625,6 @@ class BoardManPanel: NSPanel {
     private let updatesPreferenceViewController = CPYUpdatesPreferenceViewController(nibName: "CPYUpdatesPreferenceViewController", bundle: nil)
     private var updatesPreferenceView: NSView?
     private var viewSectionLabel: NSTextField?
-    private var behaviorSectionLabel: NSTextField?
     private var historySectionLabel: NSTextField?
     private var privacySectionLabel: NSTextField?
     private var labsSectionLabel: NSTextField?
@@ -1642,10 +1671,14 @@ class BoardManPanel: NSPanel {
         return historyItems.count
     }
 
+    func selectHistoryTab() {
+        activateTab(.history)
+    }
+
     func selectSettingsTab() {
         activeTab = .settings
         segmentedControl?.selectedSegment = activeTab.rawValue
-        mainShortcutValueLabel?.stringValue = BoardManPanel.shortcutText(AppEnvironment.current.hotKeyService.mainKeyCombo)
+        refreshGlobalShortcutRows()
         refreshSnippetSettingsSummary()
         refreshExcludedAppsSummary()
         selectedIndex = -1
@@ -1821,6 +1854,23 @@ class BoardManPanel: NSPanel {
         return text.isEmpty ? "Set" : text
     }
 
+    private func globalShortcutKeyCombo(for kind: BoardManGlobalShortcutKind) -> KeyCombo? {
+        switch kind {
+        case .openBoardMan: return AppEnvironment.current.hotKeyService.mainKeyCombo
+        case .history: return AppEnvironment.current.hotKeyService.historyKeyCombo
+        case .snippets: return AppEnvironment.current.hotKeyService.snippetKeyCombo
+        case .clearHistory: return AppEnvironment.current.hotKeyService.clearHistoryKeyCombo
+        }
+    }
+
+    private func refreshGlobalShortcutRows() {
+        globalShortcutRows.forEach { row in
+            row.recordView.keyCombo = globalShortcutKeyCombo(for: row.kind)
+        }
+        shortcutStatusLabel?.stringValue = "Click a shortcut field, then press the new key combination. Changes apply immediately."
+        updateSettingsSidebarSelection()
+    }
+
     private func refreshSnippetSettingsSummary() {
         let realm = try! Realm()
         let folders = Array(realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true))
@@ -1836,7 +1886,7 @@ class BoardManPanel: NSPanel {
 
         snippetSummaryLabel?.stringValue = "\(snippetCount) snippets, \(folders.count) folders (\(enabledSnippetCount) snippets enabled, \(enabledFolderCount) folders enabled)"
         snippetFoldersLabel?.stringValue = "Folders: \(folderPreview)"
-        snippetShortcutsLabel?.stringValue = "Modern Snippets tab is default. Folder shortcuts preserved: \(shortcutCount)"
+        snippetShortcutsLabel?.stringValue = "Folder shortcuts configured: \(shortcutCount)"
         reloadSnippetShortcutRows(with: folders)
     }
 
@@ -1878,7 +1928,7 @@ class BoardManPanel: NSPanel {
         self.hasShadow = true
         self.isRestorable = false
         self.setFrameAutosaveName("")
-        setupModernContainer()
+        setupPanelContainer()
         setupUI()
         setupPreviewBubble()
         installPreviewLifecycleObservers()
@@ -1891,7 +1941,7 @@ class BoardManPanel: NSPanel {
         previewLifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
-    private func setupModernContainer() {
+    private func setupPanelContainer() {
         if let contentView = contentView {
             contentView.wantsLayer = true
             if #available(macOS 10.15, *) {
@@ -1963,25 +2013,45 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(settingsBackground)
         settingsBackgroundView = settingsBackground
 
-        let categoryControl = NSSegmentedControl(frame: .zero)
-        categoryControl.segmentCount = 7
-        categoryControl.setLabel("General", forSegment: 0)
-        categoryControl.setLabel("Appearance", forSegment: 1)
-        categoryControl.setLabel("History", forSegment: 2)
-        categoryControl.setLabel("Snippets", forSegment: 3)
-        categoryControl.setLabel("Privacy", forSegment: 4)
-        categoryControl.setLabel("Updates", forSegment: 5)
-        categoryControl.setLabel("License", forSegment: 6)
-        categoryControl.selectedSegment = 0
-        categoryControl.target = self
-        categoryControl.action = #selector(settingsCategoryChanged(_:))
-        if #available(macOS 10.10, *) {
-            categoryControl.segmentStyle = .separated
+        let sidebar = NSView(frame: .zero)
+        sidebar.wantsLayer = true
+        sidebar.layer?.cornerRadius = 12
+        sidebar.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.72).cgColor
+        sidebar.layer?.borderWidth = 1
+        sidebar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.34).cgColor
+        contentView.addSubview(sidebar)
+        settingsSidebarView = sidebar
+
+        settingsCategoryButtons = BoardManInlineSettingsCategory.allCases.map { category in
+            let button = NSButton(title: category.title, target: self, action: #selector(settingsCategoryButtonPressed(_:)))
+            button.tag = category.rawValue
+            button.isBordered = false
+            button.alignment = .left
+            button.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            button.imagePosition = .imageLeading
+            button.imageHugsTitle = true
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 8
+            button.toolTip = category.detail
+            if #available(macOS 11.0, *) {
+                button.image = NSImage(systemSymbolName: category.symbolName, accessibilityDescription: category.title)
+            }
+            sidebar.addSubview(button)
+            return button
         }
-        categoryControl.controlSize = .small
-        categoryControl.font = NSFont.systemFont(ofSize: 11.5, weight: .medium)
-        contentView.addSubview(categoryControl)
-        settingsCategoryControl = categoryControl
+
+        let pageTitle = NSTextField(labelWithString: activeSettingsCategory.title)
+        pageTitle.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
+        pageTitle.textColor = .labelColor
+        contentView.addSubview(pageTitle)
+        settingsPageTitleLabel = pageTitle
+
+        let pageDescription = NSTextField(labelWithString: activeSettingsCategory.detail)
+        pageDescription.font = NSFont.systemFont(ofSize: 11.5)
+        pageDescription.textColor = .secondaryLabelColor
+        pageDescription.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(pageDescription)
+        settingsPageDescriptionLabel = pageDescription
 
         let generalTitle = BoardManPanel.makeSectionLabel("General")
         contentView.addSubview(generalTitle)
@@ -2044,23 +2114,25 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(statusPopup)
         statusItemPopup = statusPopup
 
-        let shortcutTitle = BoardManPanel.makeSectionLabel("Shortcut")
+        let shortcutTitle = BoardManPanel.makeSectionLabel("Keyboard Shortcuts")
         contentView.addSubview(shortcutTitle)
         shortcutSectionLabel = shortcutTitle
 
-        let shortcutLabel = NSTextField(labelWithString: "Open")
-        shortcutLabel.font = NSFont.systemFont(ofSize: 11)
-        shortcutLabel.textColor = .labelColor
-        contentView.addSubview(shortcutLabel)
-        mainShortcutLabel = shortcutLabel
+        globalShortcutRows = BoardManGlobalShortcutKind.allCases.map { kind in
+            let row = BoardManGlobalShortcutRow(kind: kind, keyCombo: globalShortcutKeyCombo(for: kind))
+            row.recordView.delegate = self
+            row.clearButton.target = self
+            row.clearButton.action = #selector(clearGlobalShortcut(_:))
+            row.views.forEach { contentView.addSubview($0) }
+            return row
+        }
 
-        let shortcutValue = NSTextField(labelWithString: BoardManPanel.shortcutText(AppEnvironment.current.hotKeyService.mainKeyCombo))
-        shortcutValue.font = NSFont.systemFont(ofSize: 11)
-        shortcutValue.textColor = .secondaryLabelColor
-        shortcutValue.lineBreakMode = .byTruncatingTail
-        shortcutValue.toolTip = "Read-only in this migration phase."
-        contentView.addSubview(shortcutValue)
-        mainShortcutValueLabel = shortcutValue
+        let shortcutStatus = NSTextField(labelWithString: "Click a shortcut field, then press the new key combination. Changes apply immediately.")
+        shortcutStatus.font = NSFont.systemFont(ofSize: 10.5)
+        shortcutStatus.textColor = .secondaryLabelColor
+        shortcutStatus.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(shortcutStatus)
+        shortcutStatusLabel = shortcutStatus
 
         let snippetsTitle = BoardManPanel.makeSectionLabel("Snippets")
         contentView.addSubview(snippetsTitle)
@@ -2198,66 +2270,6 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(lighten)
         themeLightenButton = lighten
 
-        let densityText = NSTextField(labelWithString: "Density")
-        densityText.font = NSFont.systemFont(ofSize: 11)
-        densityText.textColor = .labelColor
-        contentView.addSubview(densityText)
-        densityLabel = densityText
-
-        let densityPopupControl = NSPopUpButton(frame: .zero, pullsDown: false)
-        densityPopupControl.addItems(withTitles: ["Comfortable", "Compact"])
-        densityPopupControl.selectItem(withTitle: "Comfortable")
-        densityPopupControl.font = NSFont.systemFont(ofSize: 11)
-        densityPopupControl.isEnabled = false
-        densityPopupControl.toolTip = "Planned: row density is kept comfortable for paste safety."
-        contentView.addSubview(densityPopupControl)
-        densityPopup = densityPopupControl
-
-        let behaviorTitle = BoardManPanel.makeSectionLabel("Behavior")
-        contentView.addSubview(behaviorTitle)
-        behaviorSectionLabel = behaviorTitle
-
-        let clickText = NSTextField(labelWithString: "Click")
-        clickText.font = NSFont.systemFont(ofSize: 11)
-        clickText.textColor = .labelColor
-        contentView.addSubview(clickText)
-        clickActionLabel = clickText
-
-        let clickPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-        clickPopup.addItems(withTitles: ["Paste", "Copy only"])
-        clickPopup.selectItem(withTitle: "Paste")
-        clickPopup.font = NSFont.systemFont(ofSize: 11)
-        clickPopup.isEnabled = false
-        clickPopup.toolTip = "Planned: click behavior is kept as paste for safety."
-        contentView.addSubview(clickPopup)
-        clickActionPopup = clickPopup
-
-        let enterText = NSTextField(labelWithString: "Enter")
-        enterText.font = NSFont.systemFont(ofSize: 11)
-        enterText.textColor = .labelColor
-        contentView.addSubview(enterText)
-        enterActionLabel = enterText
-
-        let enterPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-        enterPopup.addItems(withTitles: ["Paste", "Copy only"])
-        enterPopup.selectItem(withTitle: "Paste")
-        enterPopup.font = NSFont.systemFont(ofSize: 11)
-        enterPopup.isEnabled = false
-        enterPopup.toolTip = "Planned: Enter behavior is kept as paste for safety."
-        contentView.addSubview(enterPopup)
-        enterActionPopup = enterPopup
-
-        let autoClose = NSButton(checkboxWithTitle: "Auto close", target: nil, action: nil)
-        autoClose.state = .on
-        autoClose.font = NSFont.systemFont(ofSize: 11)
-        autoClose.isEnabled = false
-        autoClose.toolTip = "Current paste behavior closes the panel."
-        if #available(macOS 10.14, *) {
-            autoClose.contentTintColor = .labelColor
-        }
-        contentView.addSubview(autoClose)
-        autoCloseButton = autoClose
-
         let historyTitle = BoardManPanel.makeSectionLabel("History")
         contentView.addSubview(historyTitle)
         historySectionLabel = historyTitle
@@ -2317,10 +2329,10 @@ class BoardManPanel: NSPanel {
             return button
         }
 
-        let exclude = NSButton(title: "Open legacy excluded apps", target: self, action: #selector(openExcludedAppsSettings(_:)))
+        let exclude = NSButton(title: "Manage Excluded Apps", target: self, action: #selector(openExcludedAppsSettings(_:)))
         exclude.font = NSFont.systemFont(ofSize: 11)
         exclude.bezelStyle = .rounded
-        exclude.toolTip = "Full add/remove editing still uses the legacy excluded-apps controller."
+        exclude.toolTip = "Choose apps that Board-Man should ignore."
         contentView.addSubview(exclude)
         excludedAppsButton = exclude
 
@@ -2753,9 +2765,16 @@ class BoardManPanel: NSPanel {
         segmentedControl?.wantsLayer = true
         segmentedControl?.layer?.cornerRadius = 9
         segmentedControl?.layer?.backgroundColor = NSColor.clear.cgColor
-        settingsCategoryControl?.wantsLayer = true
-        settingsCategoryControl?.layer?.cornerRadius = 8
-        settingsCategoryControl?.layer?.backgroundColor = NSColor.clear.cgColor
+        settingsSidebarView?.layer?.backgroundColor = (useGlass
+            ? surfaceTint.withAlphaComponent(0.28)
+            : NSColor.controlBackgroundColor.withAlphaComponent(0.72)).cgColor
+        settingsSidebarView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
+        settingsCategoryButtons.forEach { button in
+            if #available(macOS 10.14, *) {
+                button.contentTintColor = themePreset == .defaultPreset ? .labelColor : accentColor
+            }
+        }
+        updateSettingsSidebarSelection()
         settingsBackgroundView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.42)
             : tintColor).cgColor
@@ -2772,7 +2791,7 @@ class BoardManPanel: NSPanel {
         scrollView?.layer?.shadowOpacity = 0
         scrollView?.drawsBackground = !useGlass
         placeholderList?.backgroundColor = .clear
-        ([launchOnLoginButton, inputPasteCommandButton, rowNumbersButton, usageCountButton, themeLightenButton, autoCloseButton, dedupeButton, overwriteSameHistoryButton, reuseTopButton, snippetFolderEnableButton, snippetEnableButton] + storedTypeButtons.map { Optional($0) }).forEach { button in
+        ([launchOnLoginButton, inputPasteCommandButton, rowNumbersButton, usageCountButton, themeLightenButton, dedupeButton, overwriteSameHistoryButton, reuseTopButton, snippetFolderEnableButton, snippetEnableButton] + storedTypeButtons.map { Optional($0) }).forEach { button in
             if #available(macOS 10.14, *) {
                 button?.contentTintColor = accentColor
             }
@@ -2782,12 +2801,21 @@ class BoardManPanel: NSPanel {
                 button?.contentTintColor = themePreset == .defaultPreset ? .labelColor : accentColor
             }
         }
-        [generalSectionLabel, shortcutSectionLabel, viewSectionLabel, behaviorSectionLabel, historySectionLabel, privacySectionLabel, storedTypesSectionLabel, filterSectionLabel, labsSectionLabel, snippetCategoryLabel, snippetEditorTitleLabel, snippetEditorContentLabel].forEach { label in
+        [generalSectionLabel, shortcutSectionLabel, viewSectionLabel, historySectionLabel, privacySectionLabel, storedTypesSectionLabel, filterSectionLabel, labsSectionLabel, snippetCategoryLabel, snippetEditorTitleLabel, snippetEditorContentLabel].forEach { label in
             label?.textColor = themePreset == .defaultPreset ? .labelColor : accentColor
         }
-        [maxHistorySizeLabel, statusItemLabel, mainShortcutLabel, themePresetLabel, timestampLabel, usageStyleLabel, usedItemStyleLabel, clickActionLabel, enterActionLabel, heightControlLabel].forEach { label in
+        [maxHistorySizeLabel, statusItemLabel, themePresetLabel, timestampLabel, usageStyleLabel, usedItemStyleLabel, heightControlLabel].forEach { label in
             label?.textColor = NSColor.labelColor.withAlphaComponent(useGlass ? 0.96 : 1)
         }
+        globalShortcutRows.forEach { row in
+            row.titleLabel.textColor = .labelColor
+            row.detailLabel.textColor = .secondaryLabelColor
+            if #available(macOS 10.14, *) {
+                row.clearButton.contentTintColor = themePreset == .defaultPreset ? .labelColor : accentColor
+            }
+        }
+        settingsPageTitleLabel?.textColor = .labelColor
+        settingsPageDescriptionLabel?.textColor = .secondaryLabelColor
         snippetCategoryPopup?.wantsLayer = true
         snippetCategoryPopup?.layer?.cornerRadius = useGlass ? 9 : 6
         snippetCategoryPopup?.layer?.backgroundColor = useGlass ? surfaceTint.withAlphaComponent(0.30).cgColor : NSColor.clear.cgColor
@@ -2852,21 +2880,27 @@ class BoardManPanel: NSPanel {
         let bounds = contentView.bounds
         let margin: CGFloat = bounds.width < 620 ? 18 : 24
         let width = bounds.width - (margin * 2)
-        let top = bounds.height - 78
+        let headerY = bounds.height - 62
         let isSettings = activeTab == .settings
+        let tabsWidth = min(300, max(238, floor(width * 0.40)))
+        segmentedControl?.frame = NSRect(x: margin, y: headerY, width: tabsWidth, height: 34)
+        updateTabWidths(totalWidth: tabsWidth)
+
         searchField?.isHidden = isSettings
         let showsSnippetButtons = activeTab == .snippets && !isSettings
         let snippetButtonGap: CGFloat = 6
         let snippetButtonWidths: [CGFloat] = [82, 44, 58]
         let snippetButtonsWidth = showsSnippetButtons ? snippetButtonWidths.reduce(0, +) + (snippetButtonGap * 2) : 0
-        let searchWidth = max(160, width - snippetButtonsWidth - (showsSnippetButtons ? 12 : 0))
-        searchField?.frame = NSRect(x: margin, y: top, width: searchWidth, height: 38)
+        let rightX = margin + tabsWidth + 12
+        let rightWidth = max(0, width - tabsWidth - 12)
+        let searchWidth = max(150, rightWidth - snippetButtonsWidth - (showsSnippetButtons ? 12 : 0))
+        searchField?.frame = NSRect(x: rightX, y: headerY - 2, width: searchWidth, height: 38)
         snippetAddButton?.isHidden = !showsSnippetButtons
         snippetEditButton?.isHidden = !showsSnippetButtons
         snippetDeleteButton?.isHidden = !showsSnippetButtons
         if showsSnippetButtons {
-            let buttonY = top + 6
-            var buttonX = margin + searchWidth + 12
+            let buttonY = headerY + 4
+            var buttonX = rightX + searchWidth + 12
             snippetAddButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[0], height: 26)
             buttonX += snippetButtonWidths[0] + snippetButtonGap
             snippetEditButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[1], height: 26)
@@ -2874,13 +2908,18 @@ class BoardManPanel: NSPanel {
             snippetDeleteButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[2], height: 26)
         }
         updateSnippetActionButtons()
-        segmentedControl?.frame = NSRect(x: margin, y: top - 44, width: width, height: 32)
-        updateTabWidths(totalWidth: width)
 
-        let contentTop = top - 62
+        let contentTop = headerY - 18
+        let sidebarWidth: CGFloat = min(162, max(144, floor(width * 0.24)))
+        let settingsGap: CGFloat = 12
+        let settingsContentX = margin + sidebarWidth + settingsGap
+        let settingsContentWidth = max(260, width - sidebarWidth - settingsGap)
+        settingsSidebarView?.isHidden = !isSettings
+        settingsSidebarView?.frame = NSRect(x: margin, y: 24, width: sidebarWidth, height: max(220, contentTop - 24))
+        layoutSettingsSidebar(width: sidebarWidth, height: max(220, contentTop - 24))
         settingsBackgroundView?.isHidden = !isSettings
-        settingsBackgroundView?.frame = NSRect(x: margin, y: 24, width: width, height: max(220, contentTop - 24))
-        layoutInlineSettingsControls(margin: margin, width: width, topY: contentTop, isVisible: isSettings)
+        settingsBackgroundView?.frame = NSRect(x: settingsContentX, y: 24, width: settingsContentWidth, height: max(220, contentTop - 24))
+        layoutInlineSettingsControls(margin: settingsContentX, width: settingsContentWidth, topY: contentTop, isVisible: isSettings)
         footerNote?.isHidden = true
         scrollView?.isHidden = isSettings
         let showsSnippetCategories = activeTab == .snippets && !isSettings
@@ -2983,20 +3022,46 @@ class BoardManPanel: NSPanel {
 
     private func updateTabWidths(totalWidth: CGFloat) {
         guard let segmentedControl else { return }
-        let settingsWidth: CGFloat = 54
-        let minimumReadableWidth: CGFloat = 74
-        let contentWidth = max(minimumReadableWidth, floor((totalWidth - settingsWidth) / 2))
-        for segment in 0...1 {
-            segmentedControl.setWidth(contentWidth, forSegment: segment)
+        let segmentWidth = max(72, floor(totalWidth / 3))
+        for segment in 0..<3 {
+            segmentedControl.setWidth(segmentWidth, forSegment: segment)
         }
-        segmentedControl.setWidth(settingsWidth, forSegment: 2)
+    }
+
+    private func layoutSettingsSidebar(width: CGFloat, height: CGFloat) {
+        guard let sidebar = settingsSidebarView else { return }
+        let inset: CGFloat = 10
+        let buttonHeight: CGFloat = 38
+        let gap: CGFloat = 4
+        var currentY = height - inset - buttonHeight
+        for button in settingsCategoryButtons {
+            button.frame = NSRect(x: inset, y: currentY, width: max(80, width - (inset * 2)), height: buttonHeight)
+            currentY -= buttonHeight + gap
+        }
+        sidebar.needsLayout = true
+        updateSettingsSidebarSelection()
+    }
+
+    private func updateSettingsSidebarSelection() {
+        settingsPageTitleLabel?.stringValue = activeSettingsCategory.title
+        settingsPageDescriptionLabel?.stringValue = activeSettingsCategory.detail
+        for button in settingsCategoryButtons {
+            let isSelected = button.tag == activeSettingsCategory.rawValue
+            button.state = isSelected ? .on : .off
+            button.layer?.backgroundColor = isSelected
+                ? themeAccentColor.withAlphaComponent(isThemeLightenEnabled ? 0.10 : 0.16).cgColor
+                : NSColor.clear.cgColor
+            button.layer?.borderWidth = isSelected ? 1 : 0
+            button.layer?.borderColor = themeAccentColor.withAlphaComponent(0.26).cgColor
+        }
     }
 
     private func layoutInlineSettingsControls(margin: CGFloat, width: CGFloat, topY: CGFloat, isVisible: Bool) {
         let allControls: [NSView?] = [
-            generalSectionLabel, launchOnLoginButton, inputPasteCommandButton, maxHistorySizeLabel, maxHistorySizeStepper, maxHistorySizeValueLabel, statusItemLabel, statusItemPopup, shortcutSectionLabel, mainShortcutLabel, mainShortcutValueLabel,
+            settingsPageTitleLabel, settingsPageDescriptionLabel,
+            generalSectionLabel, launchOnLoginButton, inputPasteCommandButton, maxHistorySizeLabel, maxHistorySizeStepper, maxHistorySizeValueLabel, statusItemLabel, statusItemPopup, shortcutSectionLabel, shortcutStatusLabel,
             snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton,
-            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, themeLightenButton, densityLabel, densityPopup,
+            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, themeLightenButton,
             historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
@@ -3005,12 +3070,13 @@ class BoardManPanel: NSPanel {
             heightControlLabel, heightLabel, heightStepper
         ]
         allControls.forEach { $0?.isHidden = true }
+        globalShortcutRows.flatMap { $0.views }.forEach { $0.isHidden = true }
         updatesPreferenceView?.isHidden = true
-        [behaviorSectionLabel, clickActionLabel, clickActionPopup, enterActionLabel, enterActionPopup, autoCloseButton, pauseRecordingButton].forEach { $0?.isHidden = true }
+        pauseRecordingButton?.isHidden = true
         storedTypeButtons.forEach { $0.isHidden = true }
-        settingsCategoryControl?.isHidden = true
         guard isVisible else { return }
         refreshSnippetSettingsSummary()
+        refreshGlobalShortcutRows()
 
         let rowH: CGFloat = 24
         let rowGap: CGFloat = 32
@@ -3019,20 +3085,23 @@ class BoardManPanel: NSPanel {
         let contentWidth = max(240, width - 36)
         let columnWidth = contentWidth
         let leftX = contentX
-        let firstY = topY - 74
+        settingsPageTitleLabel?.isHidden = false
+        settingsPageDescriptionLabel?.isHidden = false
+        settingsPageTitleLabel?.frame = NSRect(x: leftX, y: topY - 44, width: columnWidth, height: 26)
+        settingsPageDescriptionLabel?.frame = NSRect(x: leftX, y: topY - 66, width: columnWidth, height: 18)
+        let firstY = topY - 102
 
-        let generalControls: [NSView?] = [
+        var generalControls: [NSView?] = [
             generalSectionLabel, launchOnLoginButton, inputPasteCommandButton,
             maxHistorySizeLabel, maxHistorySizeStepper, maxHistorySizeValueLabel,
-            statusItemLabel, statusItemPopup, shortcutSectionLabel,
-            mainShortcutLabel, mainShortcutValueLabel
+            statusItemLabel, statusItemPopup, shortcutSectionLabel, shortcutStatusLabel
         ]
+        generalControls.append(contentsOf: globalShortcutRows.flatMap { $0.views }.map { Optional($0) })
         let viewControls: [NSView?] = [
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel,
             usedItemStylePopup, themePresetLabel, themePresetPopup, themeLightenButton,
-            densityLabel, densityPopup, heightControlLabel, heightLabel, heightStepper,
-            labsSectionLabel, labsNoteLabel
+            heightControlLabel, heightLabel, heightStepper
         ]
         let historyControls: [NSView?] = [historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton]
         let snippetControls: [NSView?] = [snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton]
@@ -3053,10 +3122,6 @@ class BoardManPanel: NSPanel {
 
         func show(_ controls: [NSView?]) {
             controls.forEach { $0?.isHidden = false }
-        }
-
-        [densityLabel, clickActionLabel, enterActionLabel].forEach {
-            $0?.textColor = .secondaryLabelColor
         }
 
         func popupWidth(in columnWidth: CGFloat, labelWidth: CGFloat = fieldLabelWidth) -> CGFloat {
@@ -3084,8 +3149,21 @@ class BoardManPanel: NSPanel {
 
         func placeShortcutSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(shortcutSectionLabel, originX: originX, originY: originY, width: width)
-            mainShortcutLabel?.frame = NSRect(x: originX, y: originY - rowGap + 5, width: 42, height: 14)
-            mainShortcutValueLabel?.frame = NSRect(x: originX + 54, y: originY - rowGap + 5, width: width - 54, height: 14)
+            let shortcutRowHeight: CGFloat = 46
+            let clearWidth: CGFloat = 52
+            let recordWidth: CGFloat = min(168, max(122, floor(width * 0.34)))
+            let textWidth = max(110, width - recordWidth - clearWidth - 24)
+            for (index, row) in globalShortcutRows.enumerated() {
+                let rowY = originY - 34 - CGFloat(index) * shortcutRowHeight
+                row.titleLabel.frame = NSRect(x: originX, y: rowY + 20, width: textWidth, height: 16)
+                row.detailLabel.frame = NSRect(x: originX, y: rowY + 4, width: textWidth, height: 14)
+                row.recordView.frame = NSRect(x: originX + textWidth + 8, y: rowY + 7, width: recordWidth, height: 26)
+                row.clearButton.frame = NSRect(x: originX + textWidth + recordWidth + 16, y: rowY + 7, width: clearWidth, height: 26)
+            }
+            shortcutStatusLabel?.frame = NSRect(x: originX,
+                                                y: originY - 34 - CGFloat(globalShortcutRows.count) * shortcutRowHeight - 2,
+                                                width: width,
+                                                height: 16)
         }
 
         func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -3097,10 +3175,9 @@ class BoardManPanel: NSPanel {
             placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: originX, originY: originY - (rowGap * 4) - 8, width: width)
             placeLabeledRow(label: themePresetLabel, control: themePresetPopup, originX: originX, originY: originY - (rowGap * 5) - 10, width: width)
             themeLightenButton?.frame = NSRect(x: originX, y: originY - (rowGap * 6) - 6, width: 96, height: 18)
-            placeLabeledRow(label: densityLabel, control: densityPopup, originX: originX + 104, originY: originY - (rowGap * 6) - 10, width: max(150, width - 104), labelWidth: 48)
-            heightControlLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 7) - 7, width: fieldLabelWidth, height: 14)
-            heightStepper?.frame = NSRect(x: originX + fieldLabelWidth + 12, y: originY - (rowGap * 7) - 12, width: 72, height: rowH)
-            heightLabel?.frame = NSRect(x: originX + fieldLabelWidth + 92, y: originY - (rowGap * 7) - 7, width: 42, height: 14)
+            heightControlLabel?.frame = NSRect(x: originX + 104, y: originY - (rowGap * 6) - 7, width: fieldLabelWidth, height: 14)
+            heightStepper?.frame = NSRect(x: originX + 104 + fieldLabelWidth + 12, y: originY - (rowGap * 6) - 12, width: 72, height: rowH)
+            heightLabel?.frame = NSRect(x: originX + 104 + fieldLabelWidth + 92, y: originY - (rowGap * 6) - 7, width: 42, height: 14)
         }
 
         func placeHistorySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -3203,9 +3280,7 @@ class BoardManPanel: NSPanel {
         }
 
         refreshLicenseSummary()
-        settingsCategoryControl?.isHidden = false
-        settingsCategoryControl?.selectedSegment = activeSettingsCategory.rawValue
-        settingsCategoryControl?.frame = NSRect(x: leftX, y: topY - 34, width: columnWidth, height: 26)
+        updateSettingsSidebarSelection()
         switch activeSettingsCategory {
         case .general:
             show(generalControls)
@@ -3214,7 +3289,6 @@ class BoardManPanel: NSPanel {
         case .view:
             show(viewControls)
             placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
-            placeLabsSection(originX: leftX, originY: firstY - 296, width: columnWidth)
         case .history:
             show(historyControls)
             placeHistorySection(originX: leftX, originY: firstY, width: columnWidth)
@@ -3845,30 +3919,58 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func tabChanged(_ sender: NSSegmentedControl) {
-        activeTab = BoardManPanelTab(rawValue: sender.selectedSegment) ?? .history
+        activateTab(BoardManPanelTab(rawValue: sender.selectedSegment) ?? .history)
+    }
+
+    private func activateTab(_ tab: BoardManPanelTab) {
+        activeTab = tab
+        segmentedControl?.selectedSegment = tab.rawValue
         selectedIndex = -1
         hoveredRow = -1
         hidePreviewBubble()
-        if activeTab == .snippets && !allItems.contains(where: { $0.source == .snippet }) {
+        if tab == .snippets && !allItems.contains(where: { $0.source == .snippet }) {
             onRefreshRequested?()
-            return
         }
-        if activeTab == .settings {
+        if tab == .settings {
             refreshSnippetSettingsSummary()
+            refreshGlobalShortcutRows()
         }
         reloadSnippetCategoryPopup()
         applyCurrentFilter()
-        if activeTab == .settings {
+        layoutPanelSubviews()
+        if tab == .settings {
             makeFirstResponder(self)
         } else {
             focusTableForKeyboard()
         }
     }
 
-    @objc private func settingsCategoryChanged(_ sender: NSSegmentedControl) {
-        activeSettingsCategory = BoardManInlineSettingsCategory(rawValue: sender.selectedSegment) ?? .view
+    @objc private func settingsCategoryButtonPressed(_ sender: NSButton) {
+        activeSettingsCategory = BoardManInlineSettingsCategory(rawValue: sender.tag) ?? .general
         refreshSnippetSettingsSummary()
+        refreshGlobalShortcutRows()
+        updateSettingsSidebarSelection()
         layoutPanelSubviews()
+    }
+
+    @objc private func clearGlobalShortcut(_ sender: NSButton) {
+        guard let kind = BoardManGlobalShortcutKind(rawValue: sender.tag) else { return }
+        applyGlobalShortcut(kind, keyCombo: nil)
+        refreshGlobalShortcutRows()
+        shortcutStatusLabel?.stringValue = "\(kind.title) shortcut cleared."
+    }
+
+    private func applyGlobalShortcut(_ kind: BoardManGlobalShortcutKind, keyCombo: KeyCombo?) {
+        switch kind {
+        case .openBoardMan:
+            AppEnvironment.current.hotKeyService.change(with: .main, keyCombo: keyCombo)
+        case .history:
+            AppEnvironment.current.hotKeyService.change(with: .history, keyCombo: keyCombo)
+        case .snippets:
+            AppEnvironment.current.hotKeyService.change(with: .snippet, keyCombo: keyCombo)
+        case .clearHistory:
+            AppEnvironment.current.hotKeyService.changeClearHistoryKeyCombo(keyCombo)
+        }
     }
 
     @objc private func launchOnLoginChanged(_ sender: NSButton) {
@@ -4340,6 +4442,10 @@ class BoardManPanel: NSPanel {
         guard event.type == .keyDown else { return false }
         if event.keyCode == 53 { return true }
         guard activeTab != .settings else { return false }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if modifiers.contains(.command), [3, 18, 19, 20, 43].contains(Int(event.keyCode)) {
+            return true
+        }
         if isUpArrow(event) || isDownArrow(event) { return true }
         guard let textView = firstResponder as? NSTextView else { return true }
         if searchField?.currentEditor() === textView {
@@ -4354,6 +4460,26 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate func handlePanelKey(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if activeTab != .settings && modifiers.contains(.command) {
+            switch event.keyCode {
+            case 18:
+                activateTab(.history)
+                return true
+            case 19:
+                activateTab(.snippets)
+                return true
+            case 20, 43:
+                activateTab(.settings)
+                return true
+            case 3:
+                makeFirstResponder(searchField)
+                searchField?.selectText(nil)
+                return true
+            default:
+                break
+            }
+        }
         if isDownArrow(event) {
             return selectRowByKeyboard(delta: 1)
         }
@@ -4408,24 +4534,7 @@ class BoardManPanel: NSPanel {
         guard let currentIndex = tabs.firstIndex(of: activeTab) else { return }
         let nextIndex = min(tabs.count - 1, max(0, currentIndex + delta))
         guard nextIndex != currentIndex else { return }
-        activeTab = tabs[nextIndex]
-        segmentedControl?.selectedSegment = activeTab.rawValue
-        selectedIndex = -1
-        hoveredRow = -1
-        hidePreviewBubble()
-        if activeTab == .snippets && !allItems.contains(where: { $0.source == .snippet }) {
-            onRefreshRequested?()
-            return
-        }
-        if activeTab == .settings {
-            refreshSnippetSettingsSummary()
-        }
-        applyCurrentFilter()
-        if activeTab == .settings {
-            makeFirstResponder(self)
-        } else {
-            focusTableForKeyboard()
-        }
+        activateTab(tabs[nextIndex])
     }
 
     @discardableResult
@@ -4777,14 +4886,36 @@ extension BoardManPanel: NSSearchFieldDelegate {
 
 extension BoardManPanel: RecordViewDelegate {
     func recordViewShouldBeginRecording(_ recordView: RecordView) -> Bool {
-        return snippetShortcutRows.contains { $0.recordView === recordView }
+        return globalShortcutRows.contains { $0.recordView === recordView }
+            || snippetShortcutRows.contains { $0.recordView === recordView }
     }
 
     func recordView(_ recordView: RecordView, canRecordKeyCombo keyCombo: KeyCombo) -> Bool {
-        return snippetShortcutRows.contains { $0.recordView === recordView }
+        guard recordViewShouldBeginRecording(recordView) else { return false }
+        let candidate = BoardManPanel.shortcutText(keyCombo)
+        let globalConflict = globalShortcutRows.contains {
+            $0.recordView !== recordView && BoardManPanel.shortcutText($0.recordView.keyCombo) == candidate
+        }
+        let folderConflict = snippetShortcutRows.contains {
+            $0.recordView !== recordView && BoardManPanel.shortcutText($0.recordView.keyCombo) == candidate
+        }
+        guard !globalConflict && !folderConflict else {
+            shortcutStatusLabel?.stringValue = "That shortcut is already assigned. Choose another combination."
+            NSSound.beep()
+            return false
+        }
+        return true
     }
 
     func recordView(_ recordView: RecordView, didChangeKeyCombo keyCombo: KeyCombo?) {
+        if let row = globalShortcutRows.first(where: { $0.recordView === recordView }) {
+            applyGlobalShortcut(row.kind, keyCombo: keyCombo)
+            shortcutStatusLabel?.stringValue = keyCombo == nil
+                ? "\(row.kind.title) shortcut cleared."
+                : "\(row.kind.title) updated to \(BoardManPanel.shortcutText(keyCombo))."
+            refreshGlobalShortcutRows()
+            return
+        }
         guard let row = snippetShortcutRows.first(where: { $0.recordView === recordView }) else { return }
         AppEnvironment.current.hotKeyService.setSnippetKeyCombo(keyCombo, forFolder: row.folderIdentifier)
         refreshSnippetSettingsSummary()
