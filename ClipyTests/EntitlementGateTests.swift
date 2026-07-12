@@ -420,13 +420,15 @@ final class BoardManPanelLayoutTests {
         await settlePanelLayout(panel)
         #expect(panel.presentationItemScope == .historyOnly)
         assertTopLevelLayout(panel, mode: "History", expectsSearch: true)
-        assertHeaderOutlines(panel, expectsSearch: true)
+        assertHeaderChrome(panel, expectsSearch: true)
+        assertHistoryRowGeometry(panel)
 
         panel.openSnippetsManagerMode()
         await settlePanelLayout(panel)
         #expect(panel.presentationItemScope == .complete)
         assertTopLevelLayout(panel, mode: "Snippets", expectsSearch: true)
-        assertHeaderOutlines(panel, expectsSearch: true)
+        assertHeaderChrome(panel, expectsSearch: true)
+        assertHistoryRowGeometry(panel)
 
         panel.selectSettingsTab()
         await settlePanelLayout(panel)
@@ -463,30 +465,47 @@ final class BoardManPanelLayoutTests {
         panel.contentView?.layoutSubtreeIfNeeded()
     }
 
-    private func assertHeaderOutlines(_ panel: BoardManPanel, expectsSearch: Bool) {
+    private func assertHeaderChrome(_ panel: BoardManPanel, expectsSearch: Bool) {
         guard let root = panel.contentView else {
-            Issue.record("Missing content view while checking header outlines.")
+            Issue.record("Missing content view while checking header chrome.")
             return
         }
-        let tabs = root.subviews.compactMap { $0 as? NSSegmentedControl }.first
-        let tabsOutline = root.subviews.first {
+        let descendants = allSubviews(of: root)
+        #expect(!descendants.contains {
             $0.identifier?.rawValue == "BoardManSegmentedOutline"
-        }
-        #expect(tabs != nil && tabsOutline != nil, "Header tabs outline was not created.")
-        if let tabs, let tabsOutline {
-            #expect(tabsOutline.frame.minX < tabs.frame.minX)
-            #expect(tabsOutline.frame.maxX > tabs.frame.maxX)
-        }
+                || $0.identifier?.rawValue == "BoardManSearchOutline"
+        }, "Legacy duplicate header outline views are still present.")
 
-        let search = root.subviews.compactMap { $0 as? NSSearchField }.first
-        let searchOutline = root.subviews.first {
-            $0.identifier?.rawValue == "BoardManSearchOutline"
+        guard let tabs = descendants.compactMap({ $0 as? BoardManHeaderSegmentedControl }).first else {
+            Issue.record("Hover-aware header tabs were not created.")
+            return
         }
-        #expect(searchOutline?.isHidden == !expectsSearch)
-        if expectsSearch, let search, let searchOutline {
-            #expect(searchOutline.frame.minX < search.frame.minX)
-            #expect(searchOutline.frame.maxX > search.frame.maxX)
+        tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.midX, y: tabs.bounds.midY))
+        #expect(tabs.hoveredSegment == 1, "Header hover tracking did not resolve the middle segment.")
+
+        let search = descendants.compactMap { $0 as? NSSearchField }.first
+        #expect((search != nil) == expectsSearch || search?.isHidden == !expectsSearch)
+        if expectsSearch, let search {
+            #expect(search.cell is NSSearchFieldCell,
+                    "Search field is not using the native AppKit search cell.")
+            #expect((search.layer?.borderWidth ?? 0) == 0,
+                    "Search field has a second custom layer border.")
         }
+    }
+
+    private func assertHistoryRowGeometry(_ panel: BoardManPanel) {
+        guard let root = panel.contentView,
+              let table = allSubviews(of: root).compactMap({ $0 as? NSTableView }).first else {
+            Issue.record("History table was not created.")
+            return
+        }
+        #expect(table.rowHeight == panel.tableView(table, heightOfRow: 0),
+                "Configured and delegated history row heights diverge.")
+        #expect(table.rowHeight == 62)
+    }
+
+    private func allSubviews(of view: NSView) -> [NSView] {
+        return view.subviews + view.subviews.flatMap(allSubviews(of:))
     }
 
     private func assertTopLevelLayout(_ panel: BoardManPanel,
