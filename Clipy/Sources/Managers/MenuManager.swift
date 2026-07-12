@@ -1447,6 +1447,79 @@ private final class BoardManHistoryRowView: NSTableRowView {
     }
 }
 
+final class BoardManHeaderSegmentedControl: NSSegmentedControl {
+    private var hoverTrackingArea: NSTrackingArea?
+    private(set) var hoveredSegment = -1
+
+    override func updateTrackingAreas() {
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let options: NSTrackingArea.Options = [
+            .mouseMoved,
+            .mouseEnteredAndExited,
+            .activeInKeyWindow,
+            .inVisibleRect
+        ]
+        let trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+        super.updateTrackingAreas()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        updateHoveredSegment(at: convert(event.locationInWindow, from: nil))
+        super.mouseMoved(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        setHoveredSegment(-1)
+        super.mouseExited(with: event)
+    }
+
+    func updateHoveredSegment(at point: NSPoint) {
+        guard bounds.contains(point), segmentCount > 0, bounds.width > 0 else {
+            setHoveredSegment(-1)
+            return
+        }
+        let segmentWidth = bounds.width / CGFloat(segmentCount)
+        let index = min(segmentCount - 1, max(0, Int(point.x / segmentWidth)))
+        setHoveredSegment(index)
+    }
+
+    private func setHoveredSegment(_ value: Int) {
+        guard hoveredSegment != value else { return }
+        hoveredSegment = value
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard hoveredSegment >= 0, hoveredSegment < segmentCount, segmentCount > 0 else { return }
+
+        let segmentWidth = bounds.width / CGFloat(segmentCount)
+        let minX = floor(CGFloat(hoveredSegment) * segmentWidth) + 2
+        let maxX = min(bounds.maxX - 2, floor(CGFloat(hoveredSegment + 1) * segmentWidth) - 2)
+        let hoverRect = NSRect(
+            x: minX,
+            y: 3,
+            width: max(0, maxX - minX),
+            height: max(0, bounds.height - 6)
+        )
+        let isSelected = hoveredSegment == selectedSegment
+        let path = NSBezierPath(roundedRect: hoverRect, xRadius: 8, yRadius: 8)
+        (isSelected
+            ? NSColor.selectedControlTextColor.withAlphaComponent(0.12)
+            : NSColor.labelColor.withAlphaComponent(0.10)).setFill()
+        path.fill()
+        (isSelected
+            ? NSColor.selectedControlTextColor.withAlphaComponent(0.36)
+            : NSColor.labelColor.withAlphaComponent(0.28)).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+    }
+}
+
 private final class BoardManHistoryCellView: NSTableCellView {
     private let primaryLabel = NSTextField(labelWithString: "")
     private let metadataLabel = NSTextField(labelWithString: "")
@@ -1544,22 +1617,54 @@ private final class BoardManHistoryCellView: NSTableCellView {
 
     override func layout() {
         super.layout()
-        let insetX: CGFloat = 16
-        let topPadding: CGFloat = 8
-        let maxContentWidth = max(0, bounds.width - (insetX * 2))
-        let badgeWidth: CGFloat = countBadge.isHidden ? 0 : min(maxContentWidth, min(72, max(34, countBadge.intrinsicContentSize.width + 16)))
-        let badgeX = max(insetX, bounds.width - insetX - badgeWidth)
+        let horizontalInset: CGFloat = 16
+        let trailingInset: CGFloat = 14
+        let accessoryGap: CGFloat = 10
+        let titleHeight: CGFloat = 18
+        let metadataHeight: CGFloat = 15
+        let textGap: CGFloat = 4
+        let textBlockHeight = titleHeight + textGap + metadataHeight
+        let textBottom = floor((bounds.height - textBlockHeight) / 2)
+        let maxContentWidth = max(0, bounds.width - horizontalInset - trailingInset)
+        let badgeHeight: CGFloat = 20
+        let badgeWidth: CGFloat = countBadge.isHidden
+            ? 0
+            : min(maxContentWidth, min(72, max(34, countBadge.intrinsicContentSize.width + 16)))
+        let badgeX = max(horizontalInset, floor(bounds.width - trailingInset - badgeWidth))
         let imageSize: CGFloat = inlineImageView.isHidden ? 0 : 32
-        let imageX = imageSize > 0 ? max(insetX, badgeX - imageSize - 10) : 0
-        let textRightLimit = imageSize > 0 ? imageX : (badgeWidth > 0 ? badgeX : bounds.width - insetX)
-        let textWidth = max(0, textRightLimit - insetX - 10)
-        primaryLabel.frame = NSRect(x: insetX, y: bounds.height - topPadding - 18, width: textWidth, height: 18)
-        metadataLabel.frame = NSRect(x: insetX, y: 8, width: textWidth, height: 15)
+        let imageX = imageSize > 0 ? max(horizontalInset, badgeX - imageSize - accessoryGap) : 0
+        let textRightLimit = imageSize > 0
+            ? imageX
+            : (badgeWidth > 0 ? badgeX : bounds.width - trailingInset)
+        let textWidth = max(0, textRightLimit - horizontalInset - accessoryGap)
+
+        metadataLabel.frame = NSIntegralRect(NSRect(
+            x: horizontalInset,
+            y: textBottom,
+            width: textWidth,
+            height: metadataHeight
+        ))
+        primaryLabel.frame = NSIntegralRect(NSRect(
+            x: horizontalInset,
+            y: textBottom + metadataHeight + textGap,
+            width: textWidth,
+            height: titleHeight
+        ))
         if !inlineImageView.isHidden {
-            inlineImageView.frame = NSRect(x: imageX, y: floor((bounds.height - imageSize) / 2), width: imageSize, height: imageSize)
+            inlineImageView.frame = NSIntegralRect(NSRect(
+                x: imageX,
+                y: floor((bounds.height - imageSize) / 2),
+                width: imageSize,
+                height: imageSize
+            ))
         }
         if !countBadge.isHidden {
-            countBadge.frame = NSRect(x: badgeX, y: (bounds.height - 20) / 2, width: badgeWidth, height: 20)
+            countBadge.frame = NSIntegralRect(NSRect(
+                x: badgeX,
+                y: floor((bounds.height - badgeHeight) / 2),
+                width: badgeWidth,
+                height: badgeHeight
+            ))
         }
     }
 }
@@ -1577,15 +1682,13 @@ class BoardManPanel: NSPanel {
         static let horizontalGap: CGFloat = 10
         static let settingsInset: CGFloat = 26
         static let cardCornerRadius: CGFloat = 14
-        static let headerOutlineExpansion: CGFloat = 1
         static let sidebarSymbolLeadingInset: CGFloat = 8
+        static let historyRowHeight: CGFloat = 62
     }
 
     private var glassBackgroundView: NSVisualEffectView?
-    private var searchOutlineView: NSView?
     private var searchField: NSSearchField?
-    private var segmentedOutlineView: NSView?
-    private var segmentedControl: NSSegmentedControl?
+    private var segmentedControl: BoardManHeaderSegmentedControl?
     private var settingsBackgroundView: NSView?
     private var settingsSidebarView: NSView?
     private var settingsCategoryButtons: [NSButton] = []
@@ -1947,16 +2050,6 @@ class BoardManPanel: NSPanel {
         return label
     }
 
-    private static func makeHeaderOutlineView(identifier: String) -> NSView {
-        let view = NSView(frame: .zero)
-        view.identifier = NSUserInterfaceItemIdentifier(identifier)
-        view.wantsLayer = true
-        view.layer?.cornerRadius = 12
-        view.layer?.borderWidth = 1
-        view.layer?.backgroundColor = NSColor.clear.cgColor
-        return view
-    }
-
     private static func paddedSidebarSymbol(named symbolName: String, title: String) -> NSImage? {
         guard #available(macOS 11.0, *),
               let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: title) else {
@@ -2088,10 +2181,6 @@ class BoardManPanel: NSPanel {
         guard let contentView = contentView else { return }
         setupGlassBackgroundIfNeeded()
 
-        let searchOutline = BoardManPanel.makeHeaderOutlineView(identifier: "BoardManSearchOutline")
-        contentView.addSubview(searchOutline)
-        searchOutlineView = searchOutline
-
         let search = NSSearchField(frame: .zero)
         search.placeholderString = "Search clipboard history and snippets"
         search.target = self
@@ -2104,12 +2193,8 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(search)
         searchField = search
 
-        // Primary navigation stays visible and uses native separated segments.
-        let tabsOutline = BoardManPanel.makeHeaderOutlineView(identifier: "BoardManSegmentedOutline")
-        contentView.addSubview(tabsOutline)
-        segmentedOutlineView = tabsOutline
-
-        let tabs = NSSegmentedControl(frame: .zero)
+        // Primary navigation stays visible and uses one native border plus a lightweight hover overlay.
+        let tabs = BoardManHeaderSegmentedControl(frame: .zero)
         tabs.segmentCount = 3
         tabs.setLabel("History", forSegment: 0)
         tabs.setLabel("Snippets", forSegment: 1)
@@ -2679,7 +2764,7 @@ class BoardManPanel: NSPanel {
         table.addTableColumn(column)
         table.headerView = nil  // no oversized header
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.rowHeight = 62
+        table.rowHeight = LayoutMetrics.historyRowHeight
         table.intercellSpacing = NSSize(width: 0, height: 0)
         table.gridStyleMask = []
         table.usesAlternatingRowBackgroundColors = false
@@ -2881,22 +2966,13 @@ class BoardManPanel: NSPanel {
             : NSColor.windowBackgroundColor).cgColor
         contentView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         contentView?.layer?.isOpaque = !useGlass
-        searchField?.wantsLayer = true
-        searchField?.layer?.cornerRadius = 10
-        searchField?.layer?.backgroundColor = (useGlass
+        searchField?.isBezeled = true
+        searchField?.isBordered = true
+        searchField?.drawsBackground = true
+        searchField?.backgroundColor = useGlass
             ? surfaceTint.withAlphaComponent(0.26)
-            : NSColor.controlBackgroundColor.withAlphaComponent(0.78)).cgColor
-        let headerEdgeColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme)
-        searchField?.layer?.borderColor = headerEdgeColor.cgColor
-        searchField?.layer?.borderWidth = 1
-        [searchOutlineView, segmentedOutlineView].forEach { outline in
-            outline?.layer?.borderColor = headerEdgeColor.withAlphaComponent(0.92).cgColor
-            outline?.layer?.borderWidth = 1
-            outline?.layer?.backgroundColor = NSColor.clear.cgColor
-        }
-        segmentedControl?.wantsLayer = true
-        segmentedControl?.layer?.cornerRadius = 9
-        segmentedControl?.layer?.backgroundColor = NSColor.clear.cgColor
+            : NSColor.controlBackgroundColor.withAlphaComponent(0.78)
+        segmentedControl?.needsDisplay = true
         settingsSidebarView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.28)
             : NSColor.controlBackgroundColor.withAlphaComponent(0.72)).cgColor
@@ -3023,14 +3099,9 @@ class BoardManPanel: NSPanel {
         let tabsWidth: CGFloat = isCompact ? 240 : min(324, max(282, floor(width * 0.40)))
         let tabsFrame = NSIntegralRect(NSRect(x: margin, y: headerY, width: tabsWidth, height: 36))
         segmentedControl?.frame = tabsFrame
-        segmentedOutlineView?.frame = tabsFrame.insetBy(
-            dx: -LayoutMetrics.headerOutlineExpansion,
-            dy: -LayoutMetrics.headerOutlineExpansion
-        )
         updateTabWidths(totalWidth: tabsWidth)
 
         searchField?.isHidden = isSettings
-        searchOutlineView?.isHidden = isSettings
         let showsSnippetButtons = activeTab == .snippets && !isSettings
         let snippetButtonGap: CGFloat = isCompact ? 6 : 8
         let snippetButtonWidths: [CGFloat] = isCompact ? [78, 46, 58] : [96, 58, 70]
@@ -3042,10 +3113,6 @@ class BoardManPanel: NSPanel {
                               rightWidth - snippetButtonsWidth - (showsSnippetButtons ? headerGap : 0))
         let searchFrame = NSIntegralRect(NSRect(x: rightX, y: headerY - 2, width: searchWidth, height: 40))
         searchField?.frame = searchFrame
-        searchOutlineView?.frame = searchFrame.insetBy(
-            dx: -LayoutMetrics.headerOutlineExpansion,
-            dy: -LayoutMetrics.headerOutlineExpansion
-        )
         snippetAddButton?.isHidden = !showsSnippetButtons
         snippetEditButton?.isHidden = !showsSnippetButtons
         snippetDeleteButton?.isHidden = !showsSnippetButtons
@@ -5120,7 +5187,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        return 58
+        return LayoutMetrics.historyRowHeight
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
