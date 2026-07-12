@@ -438,6 +438,7 @@ private extension MenuManager {
     func createBoardManLiteMenu() {
         // The panel owns history and snippet browsing; keep the status menu lightweight.
         let menu = NSMenu(title: Constants.Application.name)
+        menu.addItem(NSMenuItem(title: String(localized: "Open Board-Man"), action: #selector(AppDelegate.openBoardMan)))
         menu.addItem(NSMenuItem(title: String(localized: "Open Board-Man Settings"), action: #selector(AppDelegate.openBoardManSettings)))
         menu.addItem(NSMenuItem(title: String(localized: "Manage Snippets"), action: #selector(AppDelegate.openBoardManSnippetsManager)))
         menu.addItem(NSMenuItem.separator())
@@ -778,7 +779,9 @@ private extension MenuManager {
     @objc func statusItemClicked(_ sender: Any?) {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
-            showBoardManSettingsPanel()
+            createBoardManLiteMenu()
+            guard let event, let menu = clipMenu, let button = statusItem?.button else { return }
+            NSMenu.popUpContextMenu(menu, with: event, for: button)
             return
         }
 
