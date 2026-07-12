@@ -7,7 +7,25 @@ import AppKit
 import Carbon
 
 final class PasteCountInputService {
+    enum EventTapMode: Equatable {
+        case listenOnly
+        case accessibilityFallback
+
+        var options: CGEventTapOptions {
+            switch self {
+            case .listenOnly: return .listenOnly
+            case .accessibilityFallback: return .defaultTap
+            }
+        }
+    }
+
     static let shared = PasteCountInputService()
+
+    static func eventTapMode(accessibilityTrusted: Bool, listenEventAccess: Bool) -> EventTapMode? {
+        if listenEventAccess { return .listenOnly }
+        if accessibilityTrusted { return .accessibilityFallback }
+        return nil
+    }
 
     private var globalMonitor: Any?
     private var localMonitor: Any?
@@ -137,29 +155,50 @@ final class PasteCountInputService {
     private func createAndRunCGEventTap(reason: String) {
         autoreleasepool {
             // Manual paste tracking is intentionally limited to keyboard events.
-            // Generic context-menu or app Edit > Paste commands do not emit a reliable
-            // cross-app paste signal without invasive AX text inspection.
-            guard CGPreflightListenEventAccess() else {
+            // Prefer a listen-only tap when Input Monitoring is granted. When it is not,
+            // fall back to an accessibility-authorized pass-through tap and return every
+            // event unchanged. This keeps Cmd+V counting functional with the permission
+            // Board-Man already requires for paste automation.
+            let accessibilityTrusted = AXIsProcessTrusted()
+            let listenEventAccess = CGPreflightListenEventAccess()
+            guard let mode = Self.eventTapMode(
+                accessibilityTrusted: accessibilityTrusted,
+                listenEventAccess: listenEventAccess
+            ) else {
                 DispatchQueue.main.async { [weak self] in
                     self?.isStartingEventTap = false
-                    self?.log("cg event tap skipped reason=listen_event_access_missing trigger=\(reason)")
+                    self?.log("cg event tap skipped reason=permission_missing trigger=\(reason)")
                 }
                 return
             }
 
             let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
 
-            guard let tap = CGEvent.tapCreate(
-                tap: .cgSessionEventTap,
-                place: .tailAppendEventTap,
-                options: .listenOnly,
-                eventsOfInterest: mask,
-                callback: Self.eventTapCallback,
-                userInfo: Unmanaged.passUnretained(self).toOpaque()
-            ) else {
+            let candidateLocations: [CGEventTapLocation] = mode == .listenOnly
+                ? [.cgSessionEventTap]
+                : [.cgSessionEventTap, .cgAnnotatedSessionEventTap]
+            var selectedLocation: CGEventTapLocation?
+            var createdTap: CFMachPort?
+            for location in candidateLocations {
+                if let tap = CGEvent.tapCreate(
+                    tap: location,
+                    place: .tailAppendEventTap,
+                    options: mode.options,
+                    eventsOfInterest: mask,
+                    callback: Self.eventTapCallback,
+                    userInfo: Unmanaged.passUnretained(self).toOpaque()
+                ) {
+                    selectedLocation = location
+                    createdTap = tap
+                    break
+                }
+            }
+
+            guard let tap = createdTap else {
                 DispatchQueue.main.async { [weak self] in
                     self?.isStartingEventTap = false
                     self?.log("cg event tap failed accessibilityTrusted=\(AXIsProcessTrusted()) listenEventAccess=\(CGPreflightListenEventAccess())")
+                    AppEnvironment.current.accessibilityService.showAccessibilityAuthenticationAlert()
                 }
                 return
             }
@@ -182,7 +221,8 @@ final class PasteCountInputService {
                 self?.eventTapSource = source
                 self?.eventTapRunLoop = runLoop
                 self?.isStartingEventTap = false
-                self?.log("cg event tap started enabled=\(CGEvent.tapIsEnabled(tap: tap)) trigger=\(reason)")
+                let locationText = selectedLocation.map { String($0.rawValue) } ?? "none"
+                self?.log("cg event tap started mode=\(mode) location=\(locationText) enabled=\(CGEvent.tapIsEnabled(tap: tap)) trigger=\(reason)")
             }
 
             CFRunLoopRun()

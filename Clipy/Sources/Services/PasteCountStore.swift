@@ -42,6 +42,15 @@ final class PasteCountStore {
         return count(forKey: key(for: clip))
     }
 
+    func count(for clip: CPYClip, in snapshot: [String: NSNumber]) -> Int {
+        return snapshot[key(for: clip)]?.intValue ?? 0
+    }
+
+    func countsSnapshot() -> [String: NSNumber] {
+        lock.lock(); defer { lock.unlock() }
+        return counts()
+    }
+
     func label(for clip: CPYClip) -> String {
         return "\(count(for: clip)) "
     }

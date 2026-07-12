@@ -64,15 +64,24 @@ extension AccessibilityService {
         NSApp.activate(ignoringOtherApps: true)
 
         if alert.runModal() == NSApplication.ModalResponse.alertFirstButtonReturn {
-            guard !openAccessibilitySettingWindow() else { return }
             if !isAccessibilityEnabled(isPrompt: false) {
+                guard !openAccessibilitySettingWindow() else { return }
                 isAccessibilityEnabled(isPrompt: true)
+                return
+            }
+            if !isListenEventAccessEnabled() {
+                _ = openInputMonitoringSettingWindow()
             }
         }
     }
 
     func openAccessibilitySettingWindow() -> Bool {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else { return false }
+        return NSWorkspace.shared.open(url)
+    }
+
+    func openInputMonitoringSettingWindow() -> Bool {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") else { return false }
         return NSWorkspace.shared.open(url)
     }
 }

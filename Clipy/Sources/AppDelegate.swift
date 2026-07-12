@@ -25,6 +25,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     // MARK: - Properties
     private(set) var updaterController: SPUStandardUpdaterController?
     private let screenshotObserver = ScreenShotObserver()
+    private var screenshotObserverThread: Thread?
     private let disposeBag = DisposeBag()
 
     // MARK: - Init
@@ -140,6 +141,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     }
 
     func terminateApplication() {
+        screenshotObserverThread?.cancel()
         NSApplication.shared.terminate(nil)
     }
 
@@ -254,9 +256,27 @@ private extension AppDelegate {
             .filter { $0 }
             .take(1)
             .subscribe(onNext: { [weak self] _ in
-                self?.screenshotObserver.start()
+                self?.startScreenshotObserverIfNeeded()
             })
             .disposed(by: disposeBag)
+    }
+
+    func startScreenshotObserverIfNeeded() {
+        guard screenshotObserverThread == nil else { return }
+        let thread = Thread { [weak self] in
+            guard let self else { return }
+            autoreleasepool {
+                self.screenshotObserver.start()
+                while !Thread.current.isCancelled {
+                    RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.5))
+                }
+                self.screenshotObserver.stop()
+            }
+        }
+        thread.name = "com.uniplanck.BoardMan.ScreenShotObserver"
+        thread.qualityOfService = .utility
+        screenshotObserverThread = thread
+        thread.start()
     }
 }
 
@@ -264,7 +284,9 @@ private extension AppDelegate {
 extension AppDelegate: ScreenShotObserverDelegate {
     func screenShotObserver(_ observer: ScreenShotObserver, addedItem item: NSMetadataItem) {
         guard let path = item.value(forAttribute: NSMetadataItemPathKey) as? String else { return }
-        guard let image = NSImage(contentsOfFile: path) else { return }
-        AppEnvironment.current.clipService.create(with: image)
+        DispatchQueue.main.async {
+            guard let image = NSImage(contentsOfFile: path) else { return }
+            AppEnvironment.current.clipService.create(with: image)
+        }
     }
 }
