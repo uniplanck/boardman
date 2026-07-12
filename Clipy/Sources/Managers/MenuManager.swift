@@ -112,6 +112,9 @@ extension MenuManager {
             // V4B-13: position and show first. Heavy Realm/defaults reload happens after first paint.
             let panelSize = NSSize(width: BoardManPanel.preferredPanelWidth(), height: BoardManPanel.preferredPanelHeight())
             let finalFrame = BoardManPanel.cursorRelativeFrame(size: panelSize, anchorPoint: anchorPoint)
+            if panel.presentationItemScope == .complete {
+                panel.reloadHistoryItems(boardManPanelItems())
+            }
             panel.prepareForFirstVisibleOrder(frame: finalFrame)
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
@@ -120,7 +123,10 @@ extension MenuManager {
 
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(80)) { [weak self, weak panel] in
                 guard let self, let panel else { return }
-                panel.reloadHistoryItems(self.boardManInitialPanelItems())
+                let items = panel.presentationItemScope == .complete
+                    ? self.boardManPanelItems()
+                    : self.boardManInitialPanelItems()
+                panel.reloadHistoryItems(items)
                 panel.focusTableForKeyboard()
             }
         }
@@ -860,6 +866,11 @@ final class PinnedSnippetStore {
 }
 
 // MARK: - BoardMan History Item (lightweight for panel)
+enum BoardManPresentationItemScope: Equatable {
+    case historyOnly
+    case complete
+}
+
 fileprivate enum BoardManPanelTab: Int, CaseIterable {
     case history = 0
     case snippets
@@ -1566,10 +1577,14 @@ class BoardManPanel: NSPanel {
         static let horizontalGap: CGFloat = 10
         static let settingsInset: CGFloat = 26
         static let cardCornerRadius: CGFloat = 14
+        static let headerOutlineExpansion: CGFloat = 1
+        static let sidebarSymbolLeadingInset: CGFloat = 8
     }
 
     private var glassBackgroundView: NSVisualEffectView?
+    private var searchOutlineView: NSView?
     private var searchField: NSSearchField?
+    private var segmentedOutlineView: NSView?
     private var segmentedControl: NSSegmentedControl?
     private var settingsBackgroundView: NSView?
     private var settingsSidebarView: NSView?
@@ -1684,6 +1699,10 @@ class BoardManPanel: NSPanel {
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
         return historyItems.count
+    }
+
+    var presentationItemScope: BoardManPresentationItemScope {
+        return activeTab == .snippets ? .complete : .historyOnly
     }
 
     func selectHistoryTab() {
@@ -1928,6 +1947,43 @@ class BoardManPanel: NSPanel {
         return label
     }
 
+    private static func makeHeaderOutlineView(identifier: String) -> NSView {
+        let view = NSView(frame: .zero)
+        view.identifier = NSUserInterfaceItemIdentifier(identifier)
+        view.wantsLayer = true
+        view.layer?.cornerRadius = 12
+        view.layer?.borderWidth = 1
+        view.layer?.backgroundColor = NSColor.clear.cgColor
+        return view
+    }
+
+    private static func paddedSidebarSymbol(named symbolName: String, title: String) -> NSImage? {
+        guard #available(macOS 11.0, *),
+              let symbol = NSImage(systemSymbolName: symbolName, accessibilityDescription: title) else {
+            return nil
+        }
+        let configured = symbol.withSymbolConfiguration(
+            NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+        ) ?? symbol
+        let symbolSize = NSSize(width: 15, height: 15)
+        let imageSize = NSSize(
+            width: LayoutMetrics.sidebarSymbolLeadingInset + symbolSize.width,
+            height: symbolSize.height
+        )
+        let padded = NSImage(size: imageSize, flipped: false) { _ in
+            configured.draw(in: NSRect(
+                x: LayoutMetrics.sidebarSymbolLeadingInset,
+                y: 0,
+                width: symbolSize.width,
+                height: symbolSize.height
+            ))
+            return true
+        }
+        padded.isTemplate = true
+        padded.accessibilityDescription = title
+        return padded
+    }
+
     private func applyControlMetrics() {
         let actionButtons: [NSButton?] = [
             manageSnippetsButton, clearHistoryButton, excludedAppsButton,
@@ -2032,6 +2088,10 @@ class BoardManPanel: NSPanel {
         guard let contentView = contentView else { return }
         setupGlassBackgroundIfNeeded()
 
+        let searchOutline = BoardManPanel.makeHeaderOutlineView(identifier: "BoardManSearchOutline")
+        contentView.addSubview(searchOutline)
+        searchOutlineView = searchOutline
+
         let search = NSSearchField(frame: .zero)
         search.placeholderString = "Search clipboard history and snippets"
         search.target = self
@@ -2045,6 +2105,10 @@ class BoardManPanel: NSPanel {
         searchField = search
 
         // Primary navigation stays visible and uses native separated segments.
+        let tabsOutline = BoardManPanel.makeHeaderOutlineView(identifier: "BoardManSegmentedOutline")
+        contentView.addSubview(tabsOutline)
+        segmentedOutlineView = tabsOutline
+
         let tabs = NSSegmentedControl(frame: .zero)
         tabs.segmentCount = 3
         tabs.setLabel("History", forSegment: 0)
@@ -2093,9 +2157,10 @@ class BoardManPanel: NSPanel {
             button.wantsLayer = true
             button.layer?.cornerRadius = 8
             button.toolTip = category.detail
-            if #available(macOS 11.0, *) {
-                button.image = NSImage(systemSymbolName: category.symbolName, accessibilityDescription: category.title)
-            }
+            button.image = BoardManPanel.paddedSidebarSymbol(
+                named: category.symbolName,
+                title: category.title
+            )
             sidebar.addSubview(button)
             return button
         }
@@ -2821,8 +2886,14 @@ class BoardManPanel: NSPanel {
         searchField?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.26)
             : NSColor.controlBackgroundColor.withAlphaComponent(0.78)).cgColor
-        searchField?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
+        let headerEdgeColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme)
+        searchField?.layer?.borderColor = headerEdgeColor.cgColor
         searchField?.layer?.borderWidth = 1
+        [searchOutlineView, segmentedOutlineView].forEach { outline in
+            outline?.layer?.borderColor = headerEdgeColor.withAlphaComponent(0.92).cgColor
+            outline?.layer?.borderWidth = 1
+            outline?.layer?.backgroundColor = NSColor.clear.cgColor
+        }
         segmentedControl?.wantsLayer = true
         segmentedControl?.layer?.cornerRadius = 9
         segmentedControl?.layer?.backgroundColor = NSColor.clear.cgColor
@@ -2950,10 +3021,16 @@ class BoardManPanel: NSPanel {
         let headerY = bounds.height - 70
         let isSettings = activeTab == .settings
         let tabsWidth: CGFloat = isCompact ? 240 : min(324, max(282, floor(width * 0.40)))
-        segmentedControl?.frame = NSRect(x: margin, y: headerY, width: tabsWidth, height: 36)
+        let tabsFrame = NSIntegralRect(NSRect(x: margin, y: headerY, width: tabsWidth, height: 36))
+        segmentedControl?.frame = tabsFrame
+        segmentedOutlineView?.frame = tabsFrame.insetBy(
+            dx: -LayoutMetrics.headerOutlineExpansion,
+            dy: -LayoutMetrics.headerOutlineExpansion
+        )
         updateTabWidths(totalWidth: tabsWidth)
 
         searchField?.isHidden = isSettings
+        searchOutlineView?.isHidden = isSettings
         let showsSnippetButtons = activeTab == .snippets && !isSettings
         let snippetButtonGap: CGFloat = isCompact ? 6 : 8
         let snippetButtonWidths: [CGFloat] = isCompact ? [78, 46, 58] : [96, 58, 70]
@@ -2963,7 +3040,12 @@ class BoardManPanel: NSPanel {
         let rightWidth = max(0, width - tabsWidth - headerGap)
         let searchWidth = max(isCompact ? 130 : 170,
                               rightWidth - snippetButtonsWidth - (showsSnippetButtons ? headerGap : 0))
-        searchField?.frame = NSRect(x: rightX, y: headerY - 2, width: searchWidth, height: 40)
+        let searchFrame = NSIntegralRect(NSRect(x: rightX, y: headerY - 2, width: searchWidth, height: 40))
+        searchField?.frame = searchFrame
+        searchOutlineView?.frame = searchFrame.insetBy(
+            dx: -LayoutMetrics.headerOutlineExpansion,
+            dy: -LayoutMetrics.headerOutlineExpansion
+        )
         snippetAddButton?.isHidden = !showsSnippetButtons
         snippetEditButton?.isHidden = !showsSnippetButtons
         snippetDeleteButton?.isHidden = !showsSnippetButtons

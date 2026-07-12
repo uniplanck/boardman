@@ -418,11 +418,15 @@ final class BoardManPanelLayoutTests {
         let panel = BoardManPanel()
         panel.setFrame(NSRect(x: 0, y: 0, width: 680, height: 760), display: false)
         await settlePanelLayout(panel)
+        #expect(panel.presentationItemScope == .historyOnly)
         assertTopLevelLayout(panel, mode: "History", expectsSearch: true)
+        assertHeaderOutlines(panel, expectsSearch: true)
 
         panel.openSnippetsManagerMode()
         await settlePanelLayout(panel)
+        #expect(panel.presentationItemScope == .complete)
         assertTopLevelLayout(panel, mode: "Snippets", expectsSearch: true)
+        assertHeaderOutlines(panel, expectsSearch: true)
 
         panel.selectSettingsTab()
         await settlePanelLayout(panel)
@@ -436,7 +440,12 @@ final class BoardManPanelLayoutTests {
             .compactMap { $0 as? NSButton }
             .filter { expectedTitles.contains($0.title) }
             .sorted { $0.tag < $1.tag }
+        #expect(panel.presentationItemScope == .historyOnly)
         #expect(categories.count == expectedTitles.count, "Settings sidebar did not create all categories.")
+        for category in categories {
+            #expect((category.image?.size.width ?? 0) >= 20,
+                    "Settings sidebar icon is missing its leading content inset.")
+        }
 
         for category in categories {
             _ = category.sendAction(category.action, to: category.target)
@@ -452,6 +461,32 @@ final class BoardManPanelLayoutTests {
             }
         }
         panel.contentView?.layoutSubtreeIfNeeded()
+    }
+
+    private func assertHeaderOutlines(_ panel: BoardManPanel, expectsSearch: Bool) {
+        guard let root = panel.contentView else {
+            Issue.record("Missing content view while checking header outlines.")
+            return
+        }
+        let tabs = root.subviews.compactMap { $0 as? NSSegmentedControl }.first
+        let tabsOutline = root.subviews.first {
+            $0.identifier?.rawValue == "BoardManSegmentedOutline"
+        }
+        #expect(tabs != nil && tabsOutline != nil, "Header tabs outline was not created.")
+        if let tabs, let tabsOutline {
+            #expect(tabsOutline.frame.minX < tabs.frame.minX)
+            #expect(tabsOutline.frame.maxX > tabs.frame.maxX)
+        }
+
+        let search = root.subviews.compactMap { $0 as? NSSearchField }.first
+        let searchOutline = root.subviews.first {
+            $0.identifier?.rawValue == "BoardManSearchOutline"
+        }
+        #expect(searchOutline?.isHidden == !expectsSearch)
+        if expectsSearch, let search, let searchOutline {
+            #expect(searchOutline.frame.minX < search.frame.minX)
+            #expect(searchOutline.frame.maxX > search.frame.maxX)
+        }
     }
 
     private func assertTopLevelLayout(_ panel: BoardManPanel,
