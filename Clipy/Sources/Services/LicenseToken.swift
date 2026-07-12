@@ -6,6 +6,12 @@
 
 import Foundation
 
+enum LicenseKind: String, Equatable {
+    case free
+    case pro
+    case ownerLifetime
+}
+
 struct SignedLicenseToken: Equatable {
 
     struct Header: Equatable {
@@ -16,12 +22,16 @@ struct SignedLicenseToken: Equatable {
 
     struct Payload: Equatable {
         let licenseID: String
+        let licenseKind: LicenseKind
         let plan: EntitlementPlan
         let state: LicenseState
         let features: Set<EntitlementFeature>
         let limits: EntitlementLimits
+        let issuedTo: String?
+        let subject: String?
         let issuedAt: Date?
         let expiresAt: Date?
+        let isLifetime: Bool
         let deviceID: String?
         let bundleID: String?
         let tokenVersion: Int?
@@ -33,7 +43,9 @@ struct SignedLicenseToken: Equatable {
                 deviceIdMasked: deviceID.map(Self.masked),
                 activatedAt: issuedAt,
                 lastVerifiedAt: lastVerifiedAt,
-                status: state.rawValue
+                status: state.rawValue,
+                licenseKind: licenseKind,
+                issuedTo: issuedTo ?? subject
             )
             return EntitlementSnapshot(
                 plan: plan,
@@ -89,8 +101,13 @@ struct SignedLicenseToken: Equatable {
         guard let algorithm = headerDTO.alg,
               let licenseID = payloadDTO.licenseID,
               let planRawValue = payloadDTO.plan,
-              let stateRawValue = payloadDTO.state else {
+              let stateRawValue = payloadDTO.state,
+              let licenseKindRawValue = payloadDTO.licenseKind ?? payloadDTO.plan else {
             throw ParseError.missingRequiredClaim
+        }
+
+        guard let licenseKind = LicenseKind(rawValue: licenseKindRawValue) else {
+            throw ParseError.unknownPlan(licenseKindRawValue)
         }
 
         guard let plan = EntitlementPlan(rawValue: planRawValue) else {
@@ -108,12 +125,16 @@ struct SignedLicenseToken: Equatable {
         self.header = Header(algorithm: algorithm, keyID: headerDTO.kid, type: headerDTO.typ)
         self.payload = Payload(
             licenseID: licenseID,
+            licenseKind: licenseKind,
             plan: plan,
             state: state,
             features: Set((payloadDTO.features ?? []).compactMap(EntitlementFeature.init(rawValue:))),
             limits: payloadDTO.limits?.entitlementLimits ?? (plan.isUnlimited ? .proDefault : .freeDefault),
+            issuedTo: payloadDTO.issuedTo,
+            subject: payloadDTO.subject,
             issuedAt: payloadDTO.iat.flatMap(Date.init(licenseClaimValue:)),
             expiresAt: payloadDTO.exp.flatMap(Date.init(licenseClaimValue:)),
+            isLifetime: payloadDTO.isLifetime ?? (state == .ownerLifetime),
             deviceID: payloadDTO.deviceID,
             bundleID: payloadDTO.bundleID,
             tokenVersion: payloadDTO.tokenVersion
@@ -129,24 +150,32 @@ private struct HeaderDTO: Decodable {
 
 private struct PayloadDTO: Decodable {
     let licenseID: String?
+    let licenseKind: String?
     let plan: String?
     let state: String?
     let features: [String]?
     let limits: LimitsDTO?
+    let issuedTo: String?
+    let subject: String?
     let iat: LicenseClaimDate?
     let exp: LicenseClaimDate?
+    let isLifetime: Bool?
     let deviceID: String?
     let bundleID: String?
     let tokenVersion: Int?
 
     enum CodingKeys: String, CodingKey {
         case licenseID = "license_id"
+        case licenseKind = "license_kind"
         case plan
         case state
         case features
         case limits
+        case issuedTo = "issued_to"
+        case subject = "sub"
         case iat
         case exp
+        case isLifetime = "is_lifetime"
         case deviceID = "device_id"
         case bundleID = "bundle_id"
         case tokenVersion = "token_version"
@@ -178,7 +207,74 @@ private struct LimitsDTO: Decodable {
 
 private extension EntitlementPlan {
     var isUnlimited: Bool {
-        return self == .pro
+        return self == .pro || self == .ownerLifetime
+    }
+}
+
+protocol LicenseTokenStoring {
+    func loadSignedLicenseToken() -> String?
+    func storeVerifiedSignedLicenseToken(_ token: SignedLicenseToken) throws
+}
+
+enum BoardManLocalStatePaths {
+    static var directoryURL: URL {
+        let fileManager = FileManager.default
+        let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support", isDirectory: true)
+        return baseURL.appendingPathComponent("com.uniplanck.BoardMan", isDirectory: true)
+    }
+
+    static var licenseTokenURL: URL {
+        return directoryURL.appendingPathComponent("owner-license.jwt", isDirectory: false)
+    }
+
+    static var deviceIDURL: URL {
+        return directoryURL.appendingPathComponent("device-id", isDirectory: false)
+    }
+
+    static func writePrivateData(_ data: Data, to fileURL: URL) throws {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try data.write(to: fileURL, options: .atomic)
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+    }
+}
+
+enum LicenseTokenStorageError: Error, Equatable {
+    case encodingFailed
+    case fileSystem
+}
+
+final class SignedLicenseTokenFileStore: LicenseTokenStoring {
+    private let fileURL: URL
+
+    init(fileURL: URL = BoardManLocalStatePaths.licenseTokenURL) {
+        self.fileURL = fileURL
+    }
+
+    func loadSignedLicenseToken() -> String? {
+        guard let data = try? Data(contentsOf: fileURL),
+              let value = String(data: data, encoding: .utf8),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    func storeVerifiedSignedLicenseToken(_ token: SignedLicenseToken) throws {
+        guard let data = token.rawValue.data(using: .utf8) else {
+            throw LicenseTokenStorageError.encodingFailed
+        }
+        do {
+            try BoardManLocalStatePaths.writePrivateData(data, to: fileURL)
+        } catch {
+            throw LicenseTokenStorageError.fileSystem
+        }
     }
 }
 

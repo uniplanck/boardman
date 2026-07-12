@@ -10,6 +10,7 @@ enum LicenseState: String, Equatable {
     case free
     case trial
     case proActive
+    case ownerLifetime
     case proExpired
     case invalid
     case offlineGrace
@@ -19,6 +20,7 @@ enum LicenseState: String, Equatable {
 enum Plan: String, Equatable {
     case free
     case pro
+    case ownerLifetime
 }
 
 typealias EntitlementPlan = Plan
@@ -80,6 +82,24 @@ struct LicenseMetadata: Equatable {
     let activatedAt: Date?
     let lastVerifiedAt: Date?
     let status: String
+    let licenseKind: LicenseKind?
+    let issuedTo: String?
+
+    init(licenseKeyMasked: String?,
+         deviceIdMasked: String?,
+         activatedAt: Date?,
+         lastVerifiedAt: Date?,
+         status: String,
+         licenseKind: LicenseKind? = nil,
+         issuedTo: String? = nil) {
+        self.licenseKeyMasked = licenseKeyMasked
+        self.deviceIdMasked = deviceIdMasked
+        self.activatedAt = activatedAt
+        self.lastVerifiedAt = lastVerifiedAt
+        self.status = status
+        self.licenseKind = licenseKind
+        self.issuedTo = issuedTo
+    }
 }
 
 struct Entitlement: Equatable {
@@ -154,6 +174,8 @@ struct Entitlement: Equatable {
         switch licenseState {
         case .trial, .proActive:
             return plan == .pro
+        case .ownerLifetime:
+            return plan == .ownerLifetime
         case .free, .proExpired, .invalid, .offlineGrace, .locked:
             return false
         }
@@ -193,15 +215,14 @@ struct Entitlement: Equatable {
         )
     }
 
-    static func founderLifetime(activatedAt: Date = Date()) -> Entitlement {
-        let metadata = LicenseMetadata(
-            licenseKeyMasked: "internal-founder-lifetime",
-            deviceIdMasked: nil,
-            activatedAt: activatedAt,
-            lastVerifiedAt: activatedAt,
-            status: LicenseState.proActive.rawValue
+    static func ownerLifetime(metadata: LicenseMetadata) -> Entitlement {
+        return Entitlement(
+            plan: .ownerLifetime,
+            licenseState: .ownerLifetime,
+            features: Set(EntitlementFeature.allCases),
+            limits: .proDefault,
+            licenseMetadata: metadata
         )
-        return .proActive(metadata: metadata)
     }
 }
 
@@ -232,9 +253,6 @@ final class EntitlementService {
         self.snapshot = snapshot
     }
 
-    func activateFounderLifetime(activatedAt: Date = Date()) {
-        replaceSnapshot(.founderLifetime(activatedAt: activatedAt))
-    }
 }
 
 enum EntitlementGate {

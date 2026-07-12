@@ -1,6 +1,9 @@
+import Cocoa
+import CryptoKit
 import Foundation
+import RealmSwift
 import Testing
-@testable import Clipy
+@testable import Board_Man
 
 @Suite
 final class EntitlementGateTests {
@@ -28,6 +31,34 @@ final class EntitlementGateTests {
         for feature in EntitlementFeature.allCases {
             #expect(EntitlementGate.canUse(feature: feature, service: service))
             #expect(!EntitlementGate.requiresUpgrade(for: feature, service: service))
+        }
+
+        #expect(EntitlementGate.limit(for: .historyItems, service: service) == nil)
+        #expect(EntitlementGate.limit(for: .pinnedItems, service: service) == nil)
+        #expect(EntitlementGate.limit(for: .snippetItems, service: service) == nil)
+        #expect(EntitlementGate.limit(for: .snippetFolders, service: service) == nil)
+    }
+
+    @Test
+    func ownerLifetimeEntitlementUnlocksThroughCentralGate() {
+        let metadata = LicenseMetadata(
+            licenseKeyMasked: "owner-token-placeholder",
+            deviceIdMasked: "****ABCD",
+            activatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            lastVerifiedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            status: LicenseState.ownerLifetime.rawValue,
+            licenseKind: .ownerLifetime,
+            issuedTo: "developer-owner"
+        )
+        let entitlement = EntitlementSnapshot.ownerLifetime(metadata: metadata)
+        let service = EntitlementService(snapshot: entitlement)
+
+        #expect(entitlement.plan == .ownerLifetime)
+        #expect(entitlement.licenseState == .ownerLifetime)
+        #expect(entitlement.isProEntitled)
+
+        for feature in EntitlementFeature.allCases {
+            #expect(EntitlementGate.canUse(feature: feature, service: service))
         }
 
         #expect(EntitlementGate.limit(for: .historyItems, service: service) == nil)
@@ -136,5 +167,182 @@ final class EntitlementGateTests {
 
         #expect(!entitlement.isProEntitled)
         #expect(!EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
+    }
+
+    @Test
+    func signedOwnerTokenRequiresValidSignatureAndDeviceBinding() throws {
+        let privateKey = P256.Signing.PrivateKey()
+        let deviceID = UUID().uuidString
+        let token = try makeOwnerToken(privateKey: privateKey, deviceID: deviceID)
+        let verifier = P256SignedLicenseTokenVerifier(
+            publicKeyBase64: privateKey.publicKey.x963Representation.base64EncodedString()
+        )
+        let context = SignedLicenseTokenVerificationContext(
+            deviceID: deviceID,
+            bundleID: "com.uniplanck.BoardMan",
+            verificationDate: Date()
+        )
+
+        let verified = verifier.verify(token, context: context)
+        if case .verified(let payload) = verified {
+            #expect(payload.plan == .ownerLifetime)
+            #expect(payload.state == .ownerLifetime)
+            #expect(payload.isLifetime)
+        } else {
+            Issue.record("Expected the valid owner token to verify.")
+        }
+
+        let wrongDevice = SignedLicenseTokenVerificationContext(
+            deviceID: UUID().uuidString,
+            bundleID: "com.uniplanck.BoardMan",
+            verificationDate: Date()
+        )
+        #expect(verifier.verify(token, context: wrongDevice) == .invalid(.deviceMismatch))
+
+        let tampered = token + "x"
+        #expect(verifier.verify(tampered, context: context) == .invalid(.signatureInvalid))
+    }
+
+    @Test
+    func signedLicenseTokenFileStoreRoundTripsWithoutKeychain() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManLicenseStoreTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let deviceID = UUID().uuidString
+        let rawToken = try makeOwnerToken(privateKey: P256.Signing.PrivateKey(), deviceID: deviceID)
+        let token = try SignedLicenseToken(rawValue: rawToken)
+        let fileURL = directoryURL.appendingPathComponent("owner-license.jwt")
+        let store = SignedLicenseTokenFileStore(fileURL: fileURL)
+
+        try store.storeVerifiedSignedLicenseToken(token)
+
+        #expect(store.loadSignedLicenseToken() == rawToken)
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let permissions = attributes[.posixPermissions] as? NSNumber
+        #expect(permissions?.intValue == 0o600)
+    }
+
+    @Test
+    func localDeviceIdentityPersistsWithoutKeychain() {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManDeviceIdentityTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let fileURL = directoryURL.appendingPathComponent("device-id")
+        let firstID = LocalDeviceIdentityService(fileURL: fileURL).deviceID()
+        let secondID = LocalDeviceIdentityService(fileURL: fileURL).deviceID()
+
+        #expect(UUID(uuidString: firstID) != nil)
+        #expect(secondID == firstID)
+    }
+
+    private func makeOwnerToken(privateKey: P256.Signing.PrivateKey,
+                                deviceID: String) throws -> String {
+        let header = try JSONSerialization.data(withJSONObject: [
+            "alg": "ES256",
+            "kid": "test-owner-v1",
+            "typ": "JWT"
+        ], options: [.sortedKeys])
+        let payload = try JSONSerialization.data(withJSONObject: [
+            "license_id": "OWNER-TEST",
+            "license_kind": "ownerLifetime",
+            "plan": "ownerLifetime",
+            "state": "ownerLifetime",
+            "features": EntitlementFeature.allCases.map(\.rawValue),
+            "issued_to": "test-owner",
+            "sub": "test-owner",
+            "iat": Int(Date().timeIntervalSince1970),
+            "is_lifetime": true,
+            "device_id": deviceID,
+            "bundle_id": "com.uniplanck.BoardMan",
+            "token_version": 1
+        ], options: [.sortedKeys])
+        let signingInput = "\(base64URL(header)).\(base64URL(payload))"
+        let signature = try privateKey.signature(for: Data(signingInput.utf8))
+        return "\(signingInput).\(base64URL(signature.rawRepresentation))"
+    }
+
+    private func base64URL(_ data: Data) -> String {
+        return data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+@MainActor @Suite(.serialized)
+final class BoardManPanelLayoutTests {
+
+    @Test
+    func majorTabsAndSettingsCategoriesStayInsidePanel() async {
+        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
+        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let panel = BoardManPanel()
+        panel.setFrame(NSRect(x: 0, y: 0, width: 680, height: 760), display: false)
+        await settlePanelLayout(panel)
+        assertTopLevelLayout(panel, mode: "History", expectsSearch: true)
+
+        panel.openSnippetsManagerMode()
+        await settlePanelLayout(panel)
+        assertTopLevelLayout(panel, mode: "Snippets", expectsSearch: true)
+
+        panel.selectSettingsTab()
+        await settlePanelLayout(panel)
+        guard let root = panel.contentView else {
+            Issue.record("Settings content view was not created.")
+            return
+        }
+        let expectedTitles = Set(["General", "Appearance", "History", "Snippets", "Privacy", "Updates", "License"])
+        let categories = root.subviews
+            .flatMap { $0.subviews }
+            .compactMap { $0 as? NSButton }
+            .filter { expectedTitles.contains($0.title) }
+            .sorted { $0.tag < $1.tag }
+        #expect(categories.count == expectedTitles.count, "Settings sidebar did not create all categories.")
+
+        for category in categories {
+            _ = category.sendAction(category.action, to: category.target)
+            await settlePanelLayout(panel)
+            assertTopLevelLayout(panel, mode: "Settings category \(category.tag)", expectsSearch: false)
+        }
+    }
+
+    private func settlePanelLayout(_ panel: BoardManPanel) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
+        panel.contentView?.layoutSubtreeIfNeeded()
+    }
+
+    private func assertTopLevelLayout(_ panel: BoardManPanel,
+                                      mode: String,
+                                      expectsSearch: Bool) {
+        guard let root = panel.contentView else {
+            Issue.record("\(mode): missing content view.")
+            return
+        }
+
+        root.layoutSubtreeIfNeeded()
+        let visible = root.subviews.filter { !$0.isHidden && $0.alphaValue > 0.01 }
+        #expect(!visible.isEmpty, "\(mode): no visible top-level views.")
+
+        let tolerance: CGFloat = 1
+        for view in visible {
+            let frame = view.frame
+            #expect(frame.width > 0 && frame.height > 0, "\(mode): zero-sized \(type(of: view)).")
+            #expect(frame.minX >= -tolerance, "\(mode): \(type(of: view)) extends past the left edge.")
+            #expect(frame.minY >= -tolerance, "\(mode): \(type(of: view)) extends below the panel.")
+            #expect(frame.maxX <= root.bounds.maxX + tolerance, "\(mode): \(type(of: view)) extends past the right edge.")
+            #expect(frame.maxY <= root.bounds.maxY + tolerance, "\(mode): \(type(of: view)) extends above the panel.")
+        }
+
+        let visibleSearchFields = visible.compactMap { $0 as? NSSearchField }
+        #expect((visibleSearchFields.count == 1) == expectsSearch,
+                "\(mode): unexpected search field visibility.")
     }
 }

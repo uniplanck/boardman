@@ -1,7 +1,7 @@
 import Foundation
 import RealmSwift
 import Testing
-@testable import Clipy
+@testable import Board_Man
 
 @MainActor @Suite(.serialized)
 final class SnippetTests {

@@ -118,16 +118,19 @@ final class CPYBetaPreferenceViewController: NSViewController {
     private func refreshPlanState() {
         let snapshot = EntitlementGate.currentSnapshot()
         let active = snapshot.isProEntitled
-        planLabel.stringValue = active ? "Board-Man Pro" : "Free Plan"
-        statusPill.stringValue = active ? "Active" : "Free"
+        let isOwnerLifetime = snapshot.licenseState == .ownerLifetime && snapshot.plan == .ownerLifetime
+        let planName = isOwnerLifetime ? "Owner Lifetime" : (active ? "Board-Man Pro" : "Free Plan")
+        let statusName = isOwnerLifetime ? "Lifetime" : (active ? "Active" : "Free")
+        planLabel.stringValue = planName
+        statusPill.stringValue = statusName
         statusPill.layer?.backgroundColor = (active ? BoardManPreferenceUI.redSoft : BoardManPreferenceUI.card).cgColor
-        currentPlanValue.stringValue = active ? "Board-Man Pro" : "Free Plan"
-        statusValue.stringValue = active ? "Active" : "Free"
+        currentPlanValue.stringValue = planName
+        statusValue.stringValue = statusName
         lastVerifiedValue.stringValue = active ? "Verified" : "Not verified / Offline"
         lastVerifiedValue.textColor = active ? .systemGreen : BoardManPreferenceUI.red
         deviceStatus.stringValue = active ? "Activated" : "Not activated"
         deviceStatus.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
-        validationLabel.stringValue = active ? "Activated" : "Not connected yet"
+        validationLabel.stringValue = isOwnerLifetime ? "Signed owner token required" : (active ? "Activated" : "Not connected yet")
         validationLabel.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
     }
 

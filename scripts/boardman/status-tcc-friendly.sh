@@ -19,7 +19,11 @@ echo "Installed App:"
 echo "  Path: $INSTALLED_PATH"
 echo "  Bundle ID: $(plutil -extract CFBundleIdentifier raw -o - \"$INSTALLED_PATH/Contents/Info.plist\" 2>/dev/null || echo \"$BUNDLE_ID\")"
 echo "  Name: $(plutil -extract CFBundleName raw -o - \"$INSTALLED_PATH/Contents/Info.plist\" 2>/dev/null || echo \"$APP_NAME\")"
-echo "  Executable: $INSTALLED_PATH/Contents/MacOS/$(plutil -extract CFBundleExecutable raw -o - \"$INSTALLED_PATH/Contents/Info.plist\" 2>/dev/null | tr -d '\"' || echo \"Board-Man\")"
+EXECUTABLE_NAME=$(plutil -extract CFBundleExecutable raw -o - "$INSTALLED_PATH/Contents/Info.plist" 2>/dev/null | tr -d '"' || echo "Board-Man")
+EXECUTABLE_PATH="$INSTALLED_PATH/Contents/MacOS/$EXECUTABLE_NAME"
+echo "  Executable: $EXECUTABLE_PATH"
+echo "  App Size: $(du -sh "$INSTALLED_PATH" | awk '{print $1}')"
+echo "  Architecture: $(file "$EXECUTABLE_PATH" | sed 's/.*: //')"
 
 echo -n "  Codesign Verify: "
 if codesign --verify --deep --strict "$INSTALLED_PATH" >/dev/null 2>&1; then
@@ -28,9 +32,35 @@ else
   echo "FAILED"
   codesign --verify --deep --strict "$INSTALLED_PATH" 2>&1 || true
 fi
+SIGNATURE_SUMMARY=$(codesign -dv --verbose=4 "$INSTALLED_PATH" 2>&1 | grep -E "^(Authority|Signature|TeamIdentifier|Identifier)=" || true)
+if [ -n "$SIGNATURE_SUMMARY" ]; then
+  echo "$SIGNATURE_SUMMARY" | sed 's/^/  /'
+fi
+if codesign -dv --verbose=4 "$INSTALLED_PATH" 2>&1 | grep -q '^Signature=adhoc$'; then
+  echo "  TCC Identity Risk: HIGH — ad-hoc signature changes across rebuilds"
+else
+  echo "  TCC Identity Risk: LOW — certificate-signed app"
+fi
 
 UI_VALUE=$(defaults read "$BUNDLE_ID" BoardManUsePanelUI 2>/dev/null || echo "not set (defaults to 1)")
 echo "  BoardManUsePanelUI: $UI_VALUE"
+
+ENTITLEMENT_STATUS=$(defaults read "$BUNDLE_ID" BoardManDiagnosticEntitlementStatus 2>/dev/null || echo "not checked")
+ENTITLEMENT_PLAN=$(defaults read "$BUNDLE_ID" BoardManDiagnosticEntitlementPlan 2>/dev/null || echo "unknown")
+echo "  Entitlement Diagnostic: $ENTITLEMENT_STATUS / $ENTITLEMENT_PLAN"
+LOCAL_STATE_DIR="$HOME/Library/Application Support/com.uniplanck.BoardMan"
+LOCAL_TOKEN_PATH="$LOCAL_STATE_DIR/owner-license.jwt"
+LOCAL_DEVICE_PATH="$LOCAL_STATE_DIR/device-id"
+if [ -s "$LOCAL_TOKEN_PATH" ]; then
+  echo "  Signed License Token: present in Application Support"
+else
+  echo "  Signed License Token: missing"
+fi
+if [ -s "$LOCAL_DEVICE_PATH" ]; then
+  echo "  Local Device Identity: present in Application Support"
+else
+  echo "  Local Device Identity: missing"
+fi
 
 RUNNING_PIDS=$(pgrep -x "$APP_NAME" || echo "")
 if [ -n "$RUNNING_PIDS" ]; then
@@ -40,19 +70,19 @@ else
 fi
 
 echo ""
-echo "Spotlight Duplicates (potential TCC confusion sources):"
-DUPLICATES=$(mdfind "kMDItemCFBundleIdentifier == '$BUNDLE_ID'" 2>/dev/null | grep -v "^${INSTALLED_PATH}\$" | head -10 || echo "none found")
+echo "Spotlight Duplicates (build artifacts, not separate installs):"
+DUPLICATES=$(mdfind 'kMDItemFSName == "Board-Man.app"c' 2>/dev/null | grep -v "^${INSTALLED_PATH}\$" | head -20 || echo "none found")
 if [ "$DUPLICATES" = "none found" ]; then
   echo "  $DUPLICATES"
 else
   echo "$DUPLICATES" | sed 's/^/  - /'
-  echo "  (Note: Multiple copies can cause TCC permission conflicts on macOS)"
+  echo "  (These should be excluded from Spotlight and unregistered from LaunchServices.)"
 fi
 
 echo ""
 echo "TCC Reminder (no changes made):"
-echo "  macOS TCC (Accessibility / Input Monitoring) permissions are tied to the app's codesign identity and path."
-echo "  This helper ensures consistent ad-hoc codesigning and quarantine removal to reduce 'stale permission' re-prompts."
+echo "  macOS TCC (Accessibility / Input Monitoring) permissions are tied to the app's code requirement and path."
+echo "  The stable installer uses one certificate identity, one bundle id, and /Applications/Board-Man.app."
 echo "  It CANNOT bypass or automate the initial TCC grant dialogs. You must manually approve in"
 echo "  System Settings > Privacy & Security if prompted after install/rebuild."
 echo "  For repeated issues: remove app from TCC lists manually via System Settings (or reset via Privacy & Security UI), then reinstall with this helper."

@@ -56,7 +56,7 @@ final class CPYUtilities {
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.overwriteSameHistory)
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.copySameHistory)
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.showColorPreviewInTheMenu)
-        defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManUsePanelUI)
+        defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.boardManUsePanelUI)
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.boardManShowRowNumbers)
         defaultValues.updateValue("relative", forKey: Constants.UserDefaults.boardManTimestampFormat)
         defaultValues.updateValue(NSNumber(value: 680), forKey: Constants.UserDefaults.boardManPanelHeight)
