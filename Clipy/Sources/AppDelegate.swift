@@ -51,6 +51,10 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     }
 
     // MARK: - Menu Actions
+    @objc func openBoardMan() {
+        AppEnvironment.current.menuManager.popUpMenu(.main)
+    }
+
     @objc func openBoardManSettings() {
         AppEnvironment.current.menuManager.showBoardManSettingsPanel()
     }
