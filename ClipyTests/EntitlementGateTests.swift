@@ -406,6 +406,25 @@ final class LegacySnippetMigrationTests {
     }
 }
 
+@Suite
+struct PasteCountInputServiceTests {
+    @Test
+    func eventTapUsesAccessibilityFallbackWithoutInputMonitoring() {
+        #expect(PasteCountInputService.eventTapMode(
+            accessibilityTrusted: true,
+            listenEventAccess: false
+        ) == .accessibilityFallback)
+        #expect(PasteCountInputService.eventTapMode(
+            accessibilityTrusted: false,
+            listenEventAccess: true
+        ) == .listenOnly)
+        #expect(PasteCountInputService.eventTapMode(
+            accessibilityTrusted: false,
+            listenEventAccess: false
+        ) == nil)
+    }
+}
+
 @MainActor @Suite(.serialized)
 final class BoardManPanelLayoutTests {
 
@@ -445,8 +464,18 @@ final class BoardManPanelLayoutTests {
         #expect(panel.presentationItemScope == .historyOnly)
         #expect(categories.count == expectedTitles.count, "Settings sidebar did not create all categories.")
         for category in categories {
+            #expect(category is BoardManSettingsCategoryButton,
+                    "Settings category is missing hover-aware button behavior.")
             #expect((category.image?.size.width ?? 0) >= 20,
                     "Settings sidebar icon is missing its leading content inset.")
+        }
+        if let hoverTarget = categories.first(where: { $0.tag != 0 }) as? BoardManSettingsCategoryButton {
+            #expect((hoverTarget.layer?.borderWidth ?? 0) == 0)
+            hoverTarget.setHoveringForTesting(true)
+            #expect(hoverTarget.isHovering)
+            #expect((hoverTarget.layer?.borderWidth ?? 0) == 1)
+            hoverTarget.setHoveringForTesting(false)
+            #expect((hoverTarget.layer?.borderWidth ?? 0) == 0)
         }
 
         for category in categories {
@@ -490,6 +519,9 @@ final class BoardManPanelLayoutTests {
                     "Search field is not using the native AppKit search cell.")
             #expect((search.layer?.borderWidth ?? 0) == 0,
                     "Search field has a second custom layer border.")
+            #expect(abs(search.frame.midY - tabs.frame.midY) <= 0.5,
+                    "Search input is not vertically centered with the header tabs.")
+            #expect(search.frame.height == tabs.frame.height)
         }
     }
 

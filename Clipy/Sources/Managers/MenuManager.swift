@@ -32,6 +32,7 @@ final class MenuManager: NSObject {
     fileprivate var currentStatusType: StatusType?
     fileprivate var boardManPanel: BoardManPanel?
     fileprivate var previousFrontmostApplication: NSRunningApplication?
+    fileprivate var panelItemsNeedRefresh = true
     // Icon Cache
     fileprivate let folderIcon = NSImage(resource: .iconFolder)
     fileprivate let snippetIcon = NSImage(resource: .iconText)
@@ -104,17 +105,14 @@ extension MenuManager {
                 }
             }
             boardManPanel?.onRefreshRequested = { [weak self] in
-                guard let strongSelf = self, let panel = strongSelf.boardManPanel else { return }
-                panel.reloadHistoryItems(strongSelf.boardManPanelItems())
+                guard let self, let panel = self.boardManPanel else { return }
+                self.reloadBoardManPanelItems(panel)
             }
         }
         if let panel = boardManPanel {
             // V4B-13: position and show first. Heavy Realm/defaults reload happens after first paint.
             let panelSize = NSSize(width: BoardManPanel.preferredPanelWidth(), height: BoardManPanel.preferredPanelHeight())
             let finalFrame = BoardManPanel.cursorRelativeFrame(size: panelSize, anchorPoint: anchorPoint)
-            if panel.presentationItemScope == .complete {
-                panel.reloadHistoryItems(boardManPanelItems())
-            }
             panel.prepareForFirstVisibleOrder(frame: finalFrame)
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
@@ -123,10 +121,8 @@ extension MenuManager {
 
             DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(80)) { [weak self, weak panel] in
                 guard let self, let panel else { return }
-                let items = panel.presentationItemScope == .complete
-                    ? self.boardManPanelItems()
-                    : self.boardManInitialPanelItems()
-                panel.reloadHistoryItems(items)
+                guard self.panelItemsNeedRefresh || !panel.hasLoadedPanelItems else { return }
+                self.reloadBoardManPanelItems(panel)
                 panel.focusTableForKeyboard()
             }
         }
@@ -141,7 +137,9 @@ extension MenuManager {
         showBoardManPanel()
         guard let panel = boardManPanel else { return }
         panel.openSnippetsManagerMode(categoryIdentifier: folderIdentifier)
-        panel.reloadHistoryItems(boardManPanelItems())
+        if !panel.hasLoadedSnippetItems {
+            panelItemsNeedRefresh = true
+        }
         panel.focusTableForKeyboard()
     }
 
@@ -225,6 +223,14 @@ extension MenuManager {
         return boardManHistoryItems()
     }
 
+    fileprivate func reloadBoardManPanelItems(_ panel: BoardManPanel) {
+        let items = panel.presentationItemScope == .complete
+            ? boardManPanelItems()
+            : boardManInitialPanelItems()
+        panel.reloadHistoryItems(items)
+        panelItemsNeedRefresh = false
+    }
+
     fileprivate func boardManHistoryItems() -> [BoardManHistoryItem] {
         let startedAt = CFAbsoluteTimeGetCurrent()
         let maxHistory = max(1, AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.maxHistorySize))
@@ -236,6 +242,7 @@ extension MenuManager {
         let showUsageCount = defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true
 
         let pinStore = PinnedSnippetStore.shared
+        let pasteCounts = PasteCountStore.shared.countsSnapshot()
         let panelHistoryLimit = min(maxHistory, 120)  // Keep panel launch fast; full history remains in Realm.
         let items = Array(clipResults.prefix(panelHistoryLimit)).enumerated().map { index, clip in
             let rawTitle = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -243,7 +250,7 @@ extension MenuManager {
             let title = rawTitle.isEmpty ? (isImageClip ? BoardManPanel.imageClipTitle(for: clip) : "(empty clipboard item)") : rawTitle
             let firstLine = title.components(separatedBy: .newlines).first ?? title
             let clipped = firstLine.count > 120 ? String(firstLine.prefix(117)) + "..." : firstLine
-            let pasteCount = PasteCountStore.shared.count(for: clip)
+            let pasteCount = PasteCountStore.shared.count(for: clip, in: pasteCounts)
             let isPinned = pinStore.isPinned(clip.dataHash)
             var parts: [String] = []
             if showRowNumbers {
@@ -457,6 +464,7 @@ private extension MenuManager {
     }
 
     func createClipMenu() {
+        panelItemsNeedRefresh = true
         createBoardManLiteMenu()
     }
 
@@ -1447,6 +1455,47 @@ private final class BoardManHistoryRowView: NSTableRowView {
     }
 }
 
+final class BoardManSettingsCategoryButton: NSButton {
+    private var hoverTrackingArea: NSTrackingArea?
+    private(set) var isHovering = false
+    var hoverDidChange: (() -> Void)?
+
+    override func updateTrackingAreas() {
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+        super.updateTrackingAreas()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        setHovering(true)
+        super.mouseEntered(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        setHovering(false)
+        super.mouseExited(with: event)
+    }
+
+    func setHoveringForTesting(_ value: Bool) {
+        setHovering(value)
+    }
+
+    private func setHovering(_ value: Bool) {
+        guard isHovering != value else { return }
+        isHovering = value
+        hoverDidChange?()
+    }
+}
+
 final class BoardManHeaderSegmentedControl: NSSegmentedControl {
     private var hoverTrackingArea: NSTrackingArea?
     private(set) var hoveredSegment = -1
@@ -1802,6 +1851,14 @@ class BoardManPanel: NSPanel {
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
         return historyItems.count
+    }
+
+    var hasLoadedPanelItems: Bool {
+        return !allItems.isEmpty
+    }
+
+    var hasLoadedSnippetItems: Bool {
+        return allItems.contains { $0.source == .snippet }
     }
 
     var presentationItemScope: BoardManPresentationItemScope {
@@ -2232,7 +2289,7 @@ class BoardManPanel: NSPanel {
         settingsSidebarView = sidebar
 
         settingsCategoryButtons = BoardManInlineSettingsCategory.allCases.map { category in
-            let button = NSButton(title: category.title, target: self, action: #selector(settingsCategoryButtonPressed(_:)))
+            let button = BoardManSettingsCategoryButton(title: category.title, target: self, action: #selector(settingsCategoryButtonPressed(_:)))
             button.tag = category.rawValue
             button.isBordered = false
             button.alignment = .left
@@ -2246,6 +2303,9 @@ class BoardManPanel: NSPanel {
                 named: category.symbolName,
                 title: category.title
             )
+            button.hoverDidChange = { [weak self] in
+                self?.updateSettingsSidebarSelection()
+            }
             sidebar.addSubview(button)
             return button
         }
@@ -3111,7 +3171,7 @@ class BoardManPanel: NSPanel {
         let rightWidth = max(0, width - tabsWidth - headerGap)
         let searchWidth = max(isCompact ? 130 : 170,
                               rightWidth - snippetButtonsWidth - (showsSnippetButtons ? headerGap : 0))
-        let searchFrame = NSIntegralRect(NSRect(x: rightX, y: headerY - 2, width: searchWidth, height: 40))
+        let searchFrame = NSIntegralRect(NSRect(x: rightX, y: headerY, width: searchWidth, height: 36))
         searchField?.frame = searchFrame
         snippetAddButton?.isHidden = !showsSnippetButtons
         snippetEditButton?.isHidden = !showsSnippetButtons
@@ -3264,12 +3324,20 @@ class BoardManPanel: NSPanel {
         settingsPageDescriptionLabel?.stringValue = activeSettingsCategory.detail
         for button in settingsCategoryButtons {
             let isSelected = button.tag == activeSettingsCategory.rawValue
+            let isHovering = (button as? BoardManSettingsCategoryButton)?.isHovering == true
             button.state = isSelected ? .on : .off
-            button.layer?.backgroundColor = isSelected
-                ? themeAccentColor.withAlphaComponent(isThemeLightenEnabled ? 0.10 : 0.16).cgColor
-                : NSColor.clear.cgColor
-            button.layer?.borderWidth = isSelected ? 1 : 0
-            button.layer?.borderColor = themeAccentColor.withAlphaComponent(0.26).cgColor
+            if isSelected {
+                button.layer?.backgroundColor = themeAccentColor
+                    .withAlphaComponent(isThemeLightenEnabled ? 0.12 : 0.18).cgColor
+            } else if isHovering {
+                button.layer?.backgroundColor = themeAccentColor
+                    .withAlphaComponent(isThemeLightenEnabled ? 0.07 : 0.11).cgColor
+            } else {
+                button.layer?.backgroundColor = NSColor.clear.cgColor
+            }
+            button.layer?.borderWidth = (isSelected || isHovering) ? 1 : 0
+            button.layer?.borderColor = themeAccentColor
+                .withAlphaComponent(isSelected ? 0.32 : 0.20).cgColor
         }
     }
 

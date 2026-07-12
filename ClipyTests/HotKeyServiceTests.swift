@@ -10,6 +10,7 @@ final class HotKeyServiceTests {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Constants.UserDefaults.hotKeys)
         defaults.removeObject(forKey: Constants.HotKey.migrateNewKeyCombo)
+        defaults.removeObject(forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
         defaults.removeObject(forKey: Constants.HotKey.mainKeyCombo)
         defaults.removeObject(forKey: Constants.HotKey.historyKeyCombo)
         defaults.removeObject(forKey: Constants.HotKey.snippetKeyCombo)
@@ -22,6 +23,7 @@ final class HotKeyServiceTests {
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: Constants.UserDefaults.hotKeys)
         defaults.removeObject(forKey: Constants.HotKey.migrateNewKeyCombo)
+        defaults.removeObject(forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
         defaults.removeObject(forKey: Constants.HotKey.mainKeyCombo)
         defaults.removeObject(forKey: Constants.HotKey.historyKeyCombo)
         defaults.removeObject(forKey: Constants.HotKey.snippetKeyCombo)
@@ -44,7 +46,7 @@ final class HotKeyServiceTests {
 
         let mainKeyCombo = try #require(service.mainKeyCombo)
         #expect(mainKeyCombo.QWERTYKeyCode == 9)
-        #expect(mainKeyCombo.modifiers == 768)
+        #expect(mainKeyCombo.modifiers == (Int(cmdKey) | Int(optionKey)))
         #expect(mainKeyCombo.doubledModifiers == false)
         #expect(mainKeyCombo.keyEquivalent.uppercased() == "V")
 
@@ -153,6 +155,7 @@ final class HotKeyServiceTests {
     func unarchiveSavedKeyCombos() throws {
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
+        defaults.set(true, forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
 
         let mainKeyCombo = try #require(KeyCombo(QWERTYKeyCode: 9, carbonModifiers: 768))
         let historyKeyCombo = try #require(KeyCombo(doubledCocoaModifiers: .command))
@@ -189,6 +192,25 @@ final class HotKeyServiceTests {
     }
 
     @Test
+    func migratesLegacyDefaultMainShortcutToCommandOptionV() throws {
+        let defaults = UserDefaults.standard
+        defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
+        let legacy = try #require(KeyCombo(
+            QWERTYKeyCode: 9,
+            carbonModifiers: Int(cmdKey) | Int(shiftKey)
+        ))
+        defaults.setArchiveData(legacy, forKey: Constants.HotKey.mainKeyCombo)
+
+        let service = HotKeyService()
+        service.setupDefaultHotKeys()
+
+        let migrated = try #require(service.mainKeyCombo)
+        #expect(migrated.QWERTYKeyCode == 9)
+        #expect(migrated.modifiers == (Int(cmdKey) | Int(optionKey)))
+        #expect(defaults.bool(forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV))
+    }
+
+    @Test
     func defaultKeyCombos() {
         let keyCombos = HotKeyService.defaultKeyCombos
         let mainCombos = keyCombos[Constants.Menu.clip] as? [String: Int]
@@ -196,7 +218,7 @@ final class HotKeyServiceTests {
         let snippetCombos = keyCombos[Constants.Menu.snippet] as? [String: Int]
 
         #expect(mainCombos?["keyCode"] == 9)
-        #expect(mainCombos?["modifiers"] == 768)
+        #expect(mainCombos?["modifiers"] == (Int(cmdKey) | Int(optionKey)))
 
         #expect(historyCombos?["keyCode"] == 9)
         #expect(historyCombos?["modifiers"] == 4352)

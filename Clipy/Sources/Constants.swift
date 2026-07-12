@@ -119,6 +119,7 @@ struct Constants {
         static let historyKeyCombo = "kCPYHotKeyHistoryKeyCombo"
         static let snippetKeyCombo = "kCPYHotKeySnippetKeyCombo"
         static let migrateNewKeyCombo = "kCPYMigrateNewKeyCombo"
+        static let migrateOpenBoardManCommandOptionV = "kCPYMigrateOpenBoardManCommandOptionV"
         static let folderKeyCombos = "kCPYFolderKeyCombos"
         static let clearHistoryKeyCombo = "kCPYClearHistoryKeyCombo"
     }

@@ -12,6 +12,7 @@
 
 import Foundation
 import Cocoa
+import Carbon
 import Magnet
 import RealmSwift
 
@@ -19,12 +20,12 @@ final class HotKeyService: NSObject {
 
     // MARK: - Properties
     static var defaultKeyCombos: [String: Any] = {
-        // MainMenu:    ⌘ + Shift + V
+        // MainMenu:    ⌘ + Option + V
         // HistoryMenu: ⌘ + Control + V
-        // SnipeetMenu: ⌘ + Shift B
-        return [Constants.Menu.clip: ["keyCode": 9, "modifiers": 768],
-                Constants.Menu.history: ["keyCode": 9, "modifiers": 4352],
-                Constants.Menu.snippet: ["keyCode": 11, "modifiers": 768]]
+        // SnippetMenu: ⌘ + Shift + B
+        return [Constants.Menu.clip: ["keyCode": 9, "modifiers": Int(cmdKey) | Int(optionKey)],
+                Constants.Menu.history: ["keyCode": 9, "modifiers": Int(cmdKey) | Int(controlKey)],
+                Constants.Menu.snippet: ["keyCode": 11, "modifiers": Int(cmdKey) | Int(shiftKey)]]
     }()
 
     fileprivate(set) var mainKeyCombo: KeyCombo?
@@ -63,6 +64,7 @@ extension HotKeyService {
             AppEnvironment.current.defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
             AppEnvironment.current.defaults.synchronize()
         }
+        migrateLegacyMainShortcutIfNeeded()
         // Snippet hotkey
         setupSnippetHotKeys()
 
@@ -158,6 +160,27 @@ private extension HotKeyService {
         guard let combos = keyCombos[key] as? [String: Any] else { return nil }
         guard let keyCode = combos["keyCode"] as? Int, let modifiers = combos["modifiers"] as? Int else { return nil }
         return (keyCode, modifiers)
+    }
+
+    func migrateLegacyMainShortcutIfNeeded() {
+        let defaults = AppEnvironment.current.defaults
+        guard !defaults.bool(forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV) else { return }
+        defer {
+            defaults.set(true, forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
+            defaults.synchronize()
+        }
+
+        guard let current = savedKeyCombo(forKey: Constants.HotKey.mainKeyCombo),
+              current.QWERTYKeyCode == 9,
+              current.modifiers == (Int(cmdKey) | Int(shiftKey)),
+              current.doubledModifiers == false,
+              let replacement = KeyCombo(
+                QWERTYKeyCode: 9,
+                carbonModifiers: Int(cmdKey) | Int(optionKey)
+              ) else {
+            return
+        }
+        defaults.set(replacement.archive(), forKey: Constants.HotKey.mainKeyCombo)
     }
 }
 
