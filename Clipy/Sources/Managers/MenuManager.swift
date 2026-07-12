@@ -1556,6 +1556,18 @@ private final class BoardManHistoryCellView: NSTableCellView {
 // MARK: - BoardManPanel MVP Shell (embedded in MenuManager.swift per constraints)
 class BoardManPanel: NSPanel {
 
+    private enum LayoutMetrics {
+        static let preferredWidth: CGFloat = 800
+        static let minimumWidth: CGFloat = 640
+        static let outerMargin: CGFloat = 28
+        static let compactOuterMargin: CGFloat = 20
+        static let controlHeight: CGFloat = 28
+        static let actionButtonHeight: CGFloat = 30
+        static let horizontalGap: CGFloat = 10
+        static let settingsInset: CGFloat = 26
+        static let cardCornerRadius: CGFloat = 14
+    }
+
     private var glassBackgroundView: NSVisualEffectView?
     private var searchField: NSSearchField?
     private var segmentedControl: NSSegmentedControl?
@@ -1730,7 +1742,7 @@ class BoardManPanel: NSPanel {
     static let uncategorizedCategoryIdentifier = "__boardman_uncategorized__"
 
     static func preferredPanelWidth() -> CGFloat {
-        return 720
+        return LayoutMetrics.preferredWidth
     }
 
     static func cursorRelativeFrame(size panelSize: NSSize, anchorPoint: NSPoint? = nil) -> NSRect {
@@ -1902,6 +1914,8 @@ class BoardManPanel: NSPanel {
             row.recordView.delegate = self
             row.clearButton.target = self
             row.clearButton.action = #selector(clearSnippetFolderShortcut(_:))
+            row.clearButton.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+            row.clearButton.controlSize = .regular
             row.views.forEach { documentView.addSubview($0) }
             return row
         }
@@ -1909,9 +1923,52 @@ class BoardManPanel: NSPanel {
 
     private static func makeSectionLabel(_ title: String) -> NSTextField {
         let label = NSTextField(labelWithString: title)
-        label.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        label.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         label.textColor = .labelColor
         return label
+    }
+
+    private func applyControlMetrics() {
+        let actionButtons: [NSButton?] = [
+            manageSnippetsButton, clearHistoryButton, excludedAppsButton,
+            addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton,
+            licenseActivateButton, licenseUpgradeButton,
+            snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton,
+            snippetAddButton, snippetEditButton, snippetDeleteButton, snippetSaveButton
+        ]
+        actionButtons.forEach { button in
+            button?.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+            button?.controlSize = .regular
+            button?.bezelStyle = .rounded
+        }
+
+        let checkboxButtons: [NSButton?] = [
+            launchOnLoginButton, inputPasteCommandButton, rowNumbersButton,
+            usageCountButton, themeLightenButton, dedupeButton,
+            overwriteSameHistoryButton, reuseTopButton, pauseRecordingButton,
+            snippetFolderEnableButton, snippetEnableButton
+        ]
+        (checkboxButtons + storedTypeButtons.map { Optional($0) }).forEach { button in
+            button?.font = NSFont.systemFont(ofSize: 12)
+            button?.controlSize = .regular
+        }
+
+        let popups: [NSPopUpButton?] = [
+            statusItemPopup, timestampPopup, usageStylePopup, usedItemStylePopup,
+            themePresetPopup, hideRuleModePopup, snippetCategoryPopup
+        ]
+        popups.forEach { popup in
+            popup?.font = NSFont.systemFont(ofSize: 12)
+            popup?.controlSize = .regular
+        }
+
+        globalShortcutRows.forEach { row in
+            row.clearButton.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+            row.clearButton.controlSize = .regular
+        }
+        [snippetDeleteButton, snippetCategoryDeleteButton, clearHistoryButton, clearHideRulesButton].forEach {
+            $0?.contentTintColor = .systemRed
+        }
     }
 
     convenience init() {
@@ -1920,7 +1977,7 @@ class BoardManPanel: NSPanel {
                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView],  // no .hudWindow = no harsh black footer/band
                   backing: .buffered,
                   defer: false)
-        self.minSize = NSSize(width: 560, height: 560)
+        self.minSize = NSSize(width: LayoutMetrics.minimumWidth, height: 600)
         self.title = "Board-Man"
         self.titleVisibility = .hidden
         self.titlebarAppearsTransparent = true
@@ -1948,7 +2005,7 @@ class BoardManPanel: NSPanel {
         if let contentView = contentView {
             contentView.wantsLayer = true
             if #available(macOS 10.15, *) {
-                contentView.layer?.cornerRadius = 16
+                contentView.layer?.cornerRadius = 18
                 contentView.layer?.masksToBounds = true
             }
             contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
@@ -2012,13 +2069,13 @@ class BoardManPanel: NSPanel {
         let settingsBackground = NSView(frame: .zero)
         settingsBackground.wantsLayer = true
         settingsBackground.layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
-        settingsBackground.layer?.cornerRadius = 12
+        settingsBackground.layer?.cornerRadius = LayoutMetrics.cardCornerRadius
         contentView.addSubview(settingsBackground)
         settingsBackgroundView = settingsBackground
 
         let sidebar = NSView(frame: .zero)
         sidebar.wantsLayer = true
-        sidebar.layer?.cornerRadius = 12
+        sidebar.layer?.cornerRadius = LayoutMetrics.cardCornerRadius
         sidebar.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.72).cgColor
         sidebar.layer?.borderWidth = 1
         sidebar.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.34).cgColor
@@ -2044,13 +2101,13 @@ class BoardManPanel: NSPanel {
         }
 
         let pageTitle = NSTextField(labelWithString: activeSettingsCategory.title)
-        pageTitle.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
+        pageTitle.font = NSFont.systemFont(ofSize: 22, weight: .semibold)
         pageTitle.textColor = .labelColor
         contentView.addSubview(pageTitle)
         settingsPageTitleLabel = pageTitle
 
         let pageDescription = NSTextField(labelWithString: activeSettingsCategory.detail)
-        pageDescription.font = NSFont.systemFont(ofSize: 11.5)
+        pageDescription.font = NSFont.systemFont(ofSize: 12)
         pageDescription.textColor = .secondaryLabelColor
         pageDescription.lineBreakMode = .byTruncatingTail
         contentView.addSubview(pageDescription)
@@ -2543,7 +2600,7 @@ class BoardManPanel: NSPanel {
         scroll.contentView.drawsBackground = false
         scroll.wantsLayer = true
         scroll.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.72).cgColor
-        scroll.layer?.cornerRadius = 12
+        scroll.layer?.cornerRadius = LayoutMetrics.cardCornerRadius
         scroll.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.42).cgColor
         scroll.layer?.borderWidth = 1
 
@@ -2557,7 +2614,7 @@ class BoardManPanel: NSPanel {
         table.addTableColumn(column)
         table.headerView = nil  // no oversized header
         table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
-        table.rowHeight = 58
+        table.rowHeight = 62
         table.intercellSpacing = NSSize(width: 0, height: 0)
         table.gridStyleMask = []
         table.usesAlternatingRowBackgroundColors = false
@@ -2651,7 +2708,7 @@ class BoardManPanel: NSPanel {
 
         let editorView = NSView(frame: .zero)
         editorView.wantsLayer = true
-        editorView.layer?.cornerRadius = 8
+        editorView.layer?.cornerRadius = LayoutMetrics.cardCornerRadius
         editorView.layer?.borderWidth = 1
         editorView.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
         editorView.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.45).cgColor
@@ -2733,6 +2790,7 @@ class BoardManPanel: NSPanel {
         previewBubbleImageView = bubbleImage
 
         // Load initial data
+        applyControlMetrics()
         layoutPanelSubviews()
         table.reloadData()
         synchronizeListGeometry()
@@ -2781,14 +2839,14 @@ class BoardManPanel: NSPanel {
         settingsBackgroundView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.42)
             : tintColor).cgColor
-        settingsBackgroundView?.layer?.cornerRadius = 12
+        settingsBackgroundView?.layer?.cornerRadius = LayoutMetrics.cardCornerRadius
         settingsBackgroundView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         settingsBackgroundView?.layer?.borderWidth = 1
         settingsBackgroundView?.layer?.shadowOpacity = 0
         scrollView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.30)
             : tintColor).cgColor
-        scrollView?.layer?.cornerRadius = 12
+        scrollView?.layer?.cornerRadius = LayoutMetrics.cardCornerRadius
         scrollView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         scrollView?.layer?.borderWidth = 1
         scrollView?.layer?.shadowOpacity = 0
@@ -2799,9 +2857,14 @@ class BoardManPanel: NSPanel {
                 button?.contentTintColor = accentColor
             }
         }
-        [snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton, snippetAddButton, snippetEditButton, snippetDeleteButton, snippetSaveButton, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, clearHistoryButton, excludedAppsButton].forEach { button in
+        [snippetCategoryAddButton, snippetCategoryRenameButton, snippetAddButton, snippetEditButton, snippetSaveButton, addHideRuleButton, removeLastHideRuleButton, excludedAppsButton].forEach { button in
             if #available(macOS 10.14, *) {
                 button?.contentTintColor = themePreset == .defaultPreset ? .labelColor : accentColor
+            }
+        }
+        [snippetDeleteButton, snippetCategoryDeleteButton, clearHistoryButton, clearHideRulesButton].forEach { button in
+            if #available(macOS 10.14, *) {
+                button?.contentTintColor = .systemRed
             }
         }
         [generalSectionLabel, shortcutSectionLabel, viewSectionLabel, historySectionLabel, privacySectionLabel, storedTypesSectionLabel, filterSectionLabel, labsSectionLabel, snippetCategoryLabel, snippetEditorTitleLabel, snippetEditorContentLabel].forEach { label in
@@ -2881,79 +2944,82 @@ class BoardManPanel: NSPanel {
     private func layoutPanelSubviews() {
         guard let contentView = contentView else { return }
         let bounds = contentView.bounds
-        let margin: CGFloat = bounds.width < 620 ? 18 : 24
+        let isCompact = bounds.width < 720
+        let margin = isCompact ? LayoutMetrics.compactOuterMargin : LayoutMetrics.outerMargin
         let width = bounds.width - (margin * 2)
-        let headerY = bounds.height - 62
+        let headerY = bounds.height - 70
         let isSettings = activeTab == .settings
-        let tabsWidth = min(300, max(238, floor(width * 0.40)))
-        segmentedControl?.frame = NSRect(x: margin, y: headerY, width: tabsWidth, height: 34)
+        let tabsWidth: CGFloat = isCompact ? 240 : min(324, max(282, floor(width * 0.40)))
+        segmentedControl?.frame = NSRect(x: margin, y: headerY, width: tabsWidth, height: 36)
         updateTabWidths(totalWidth: tabsWidth)
 
         searchField?.isHidden = isSettings
         let showsSnippetButtons = activeTab == .snippets && !isSettings
-        let snippetButtonGap: CGFloat = 6
-        let snippetButtonWidths: [CGFloat] = [82, 44, 58]
+        let snippetButtonGap: CGFloat = isCompact ? 6 : 8
+        let snippetButtonWidths: [CGFloat] = isCompact ? [78, 46, 58] : [96, 58, 70]
         let snippetButtonsWidth = showsSnippetButtons ? snippetButtonWidths.reduce(0, +) + (snippetButtonGap * 2) : 0
-        let rightX = margin + tabsWidth + 12
-        let rightWidth = max(0, width - tabsWidth - 12)
-        let searchWidth = max(150, rightWidth - snippetButtonsWidth - (showsSnippetButtons ? 12 : 0))
-        searchField?.frame = NSRect(x: rightX, y: headerY - 2, width: searchWidth, height: 38)
+        let headerGap: CGFloat = isCompact ? 12 : 16
+        let rightX = margin + tabsWidth + headerGap
+        let rightWidth = max(0, width - tabsWidth - headerGap)
+        let searchWidth = max(isCompact ? 130 : 170,
+                              rightWidth - snippetButtonsWidth - (showsSnippetButtons ? headerGap : 0))
+        searchField?.frame = NSRect(x: rightX, y: headerY - 2, width: searchWidth, height: 40)
         snippetAddButton?.isHidden = !showsSnippetButtons
         snippetEditButton?.isHidden = !showsSnippetButtons
         snippetDeleteButton?.isHidden = !showsSnippetButtons
         if showsSnippetButtons {
-            let buttonY = headerY + 4
-            var buttonX = rightX + searchWidth + 12
-            snippetAddButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[0], height: 26)
+            let buttonY = headerY + 3
+            var buttonX = rightX + searchWidth + headerGap
+            snippetAddButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[0], height: LayoutMetrics.actionButtonHeight)
             buttonX += snippetButtonWidths[0] + snippetButtonGap
-            snippetEditButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[1], height: 26)
+            snippetEditButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[1], height: LayoutMetrics.actionButtonHeight)
             buttonX += snippetButtonWidths[1] + snippetButtonGap
-            snippetDeleteButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[2], height: 26)
+            snippetDeleteButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[2], height: LayoutMetrics.actionButtonHeight)
         }
         updateSnippetActionButtons()
 
-        let contentTop = headerY - 18
-        let sidebarWidth: CGFloat = min(162, max(144, floor(width * 0.24)))
-        let settingsGap: CGFloat = 12
+        let contentTop = headerY - 24
+        let sidebarWidth: CGFloat = min(184, max(160, floor(width * 0.25)))
+        let settingsGap: CGFloat = 16
         let settingsContentX = margin + sidebarWidth + settingsGap
         let settingsContentWidth = max(260, width - sidebarWidth - settingsGap)
         settingsSidebarView?.isHidden = !isSettings
-        settingsSidebarView?.frame = NSRect(x: margin, y: 24, width: sidebarWidth, height: max(220, contentTop - 24))
-        layoutSettingsSidebar(width: sidebarWidth, height: max(220, contentTop - 24))
+        settingsSidebarView?.frame = NSRect(x: margin, y: 28, width: sidebarWidth, height: max(220, contentTop - 28))
+        layoutSettingsSidebar(width: sidebarWidth, height: max(220, contentTop - 28))
         settingsBackgroundView?.isHidden = !isSettings
-        settingsBackgroundView?.frame = NSRect(x: settingsContentX, y: 24, width: settingsContentWidth, height: max(220, contentTop - 24))
+        settingsBackgroundView?.frame = NSRect(x: settingsContentX, y: 28, width: settingsContentWidth, height: max(220, contentTop - 28))
         layoutInlineSettingsControls(margin: settingsContentX, width: settingsContentWidth, topY: contentTop, isVisible: isSettings)
         footerNote?.isHidden = true
         scrollView?.isHidden = isSettings
         let showsSnippetCategories = activeTab == .snippets && !isSettings
         snippetEditorView?.isHidden = !showsSnippetCategories
-        let categoryRowY = contentTop - 34
-        let listTop = showsSnippetCategories ? categoryRowY - 12 : contentTop
-        let listHeight = max(190, listTop - 24)
+        let categoryRowY = contentTop - 38
+        let listTop = showsSnippetCategories ? categoryRowY - 16 : contentTop
+        let listHeight = max(190, listTop - 28)
         [snippetCategoryLabel, snippetCategoryPopup, snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton].forEach {
             $0?.isHidden = !showsSnippetCategories
         }
         if showsSnippetCategories {
-            snippetCategoryLabel?.frame = NSRect(x: margin, y: categoryRowY + 5, width: 58, height: 16)
-            let categoryButtonGap: CGFloat = 6
-            let categoryButtonWidths: [CGFloat] = width < 560 ? [78, 76, 76] : [86, 92, 88]
+            snippetCategoryLabel?.frame = NSRect(x: margin, y: categoryRowY + 6, width: 64, height: 17)
+            let categoryButtonGap: CGFloat = isCompact ? 6 : 8
+            let categoryButtonWidths: [CGFloat] = isCompact ? [82, 88, 82] : [94, 108, 98]
             let actionWidth = categoryButtonWidths.reduce(0, +) + (categoryButtonGap * 2)
-            let popupWidth = max(120, width - 58 - 10 - actionWidth - 10)
-            snippetCategoryPopup?.frame = NSRect(x: margin + 68, y: categoryRowY, width: popupWidth, height: 24)
-            var categoryButtonX = margin + 68 + popupWidth + 10
-            snippetCategoryAddButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[0], height: 24)
+            let popupWidth = max(120, width - 64 - 12 - actionWidth - 12)
+            snippetCategoryPopup?.frame = NSRect(x: margin + 76, y: categoryRowY, width: popupWidth, height: LayoutMetrics.controlHeight)
+            var categoryButtonX = margin + 76 + popupWidth + 12
+            snippetCategoryAddButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[0], height: LayoutMetrics.controlHeight)
             categoryButtonX += categoryButtonWidths[0] + categoryButtonGap
-            snippetCategoryRenameButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[1], height: 24)
+            snippetCategoryRenameButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[1], height: LayoutMetrics.controlHeight)
             categoryButtonX += categoryButtonWidths[1] + categoryButtonGap
-            snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[2], height: 24)
+            snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[2], height: LayoutMetrics.controlHeight)
         }
-        let listFrameHeight = listHeight + 10
-        let editorGap: CGFloat = showsSnippetCategories ? 12 : 0
-        let editorWidth = showsSnippetCategories ? min(250, max(220, floor(width * 0.38))) : 0
+        let listFrameHeight = listHeight
+        let editorGap: CGFloat = showsSnippetCategories ? 16 : 0
+        let editorWidth = showsSnippetCategories ? min(290, max(250, floor(width * 0.38))) : 0
         let listWidth = max(180, width - editorWidth - editorGap)
-        scrollView?.frame = NSRect(x: margin, y: 16, width: listWidth, height: listFrameHeight)
+        scrollView?.frame = NSRect(x: margin, y: 24, width: listWidth, height: listFrameHeight)
         if showsSnippetCategories {
-            snippetEditorView?.frame = NSRect(x: margin + listWidth + editorGap, y: 16, width: editorWidth, height: listFrameHeight)
+            snippetEditorView?.frame = NSRect(x: margin + listWidth + editorGap, y: 24, width: editorWidth, height: listFrameHeight)
             layoutSnippetEditorControls(width: editorWidth, height: listFrameHeight)
         }
         synchronizeListGeometry(frameWidth: listWidth, height: listFrameHeight)
@@ -2961,18 +3027,17 @@ class BoardManPanel: NSPanel {
     }
 
     private func layoutSnippetEditorControls(width: CGFloat, height: CGFloat) {
-        let inset: CGFloat = 12
+        let inset: CGFloat = 18
         let contentWidth = max(120, width - (inset * 2))
         let topY = height - inset
-        snippetEditorStatusLabel?.frame = NSRect(x: inset, y: topY - 18, width: contentWidth, height: 16)
-        snippetFolderEnableButton?.frame = NSRect(x: inset, y: topY - 46, width: contentWidth, height: 18)
-        snippetEnableButton?.frame = NSRect(x: inset, y: topY - 72, width: contentWidth, height: 18)
-        snippetEditorTitleLabel?.frame = NSRect(x: inset, y: topY - 102, width: contentWidth, height: 16)
-        snippetEditorTitleField?.frame = NSRect(x: inset, y: topY - 132, width: contentWidth, height: 24)
-        snippetEditorContentLabel?.frame = NSRect(x: inset, y: topY - 160, width: contentWidth, height: 16)
-        let saveHeight: CGFloat = 28
-        let contentBottom = inset + saveHeight + 10
-        let contentHeight = max(90, topY - 170 - contentBottom)
+        snippetEditorStatusLabel?.frame = NSRect(x: inset, y: topY - 20, width: contentWidth, height: 17)
+        snippetFolderEnableButton?.frame = NSRect(x: inset, y: topY - 54, width: contentWidth, height: 20)
+        snippetEnableButton?.frame = NSRect(x: inset, y: topY - 86, width: contentWidth, height: 20)
+        snippetEditorTitleLabel?.frame = NSRect(x: inset, y: topY - 122, width: contentWidth, height: 17)
+        snippetEditorTitleField?.frame = NSRect(x: inset, y: topY - 158, width: contentWidth, height: LayoutMetrics.controlHeight)
+        snippetEditorContentLabel?.frame = NSRect(x: inset, y: topY - 192, width: contentWidth, height: 17)
+        let contentBottom = inset + LayoutMetrics.actionButtonHeight + 14
+        let contentHeight = max(90, topY - 204 - contentBottom)
         snippetEditorScrollView?.frame = NSRect(x: inset, y: contentBottom, width: contentWidth, height: contentHeight)
         snippetEditorTextView?.minSize = NSSize(width: 0, height: contentHeight)
         snippetEditorTextView?.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -2980,7 +3045,7 @@ class BoardManPanel: NSPanel {
         snippetEditorTextView?.isHorizontallyResizable = false
         snippetEditorTextView?.textContainer?.containerSize = NSSize(width: contentWidth, height: CGFloat.greatestFiniteMagnitude)
         snippetEditorTextView?.textContainer?.widthTracksTextView = true
-        snippetSaveButton?.frame = NSRect(x: inset, y: inset, width: min(112, contentWidth), height: 24)
+        snippetSaveButton?.frame = NSRect(x: inset, y: inset, width: min(132, contentWidth), height: LayoutMetrics.actionButtonHeight)
     }
 
     fileprivate func synchronizeListGeometry(frameWidth: CGFloat? = nil, height: CGFloat? = nil) {
@@ -3033,9 +3098,9 @@ class BoardManPanel: NSPanel {
 
     private func layoutSettingsSidebar(width: CGFloat, height: CGFloat) {
         guard let sidebar = settingsSidebarView else { return }
-        let inset: CGFloat = 10
-        let buttonHeight: CGFloat = 38
-        let gap: CGFloat = 4
+        let inset: CGFloat = 12
+        let buttonHeight: CGFloat = 42
+        let gap: CGFloat = 6
         var currentY = height - inset - buttonHeight
         for button in settingsCategoryButtons {
             button.frame = NSRect(x: inset, y: currentY, width: max(80, width - (inset * 2)), height: buttonHeight)
@@ -3081,18 +3146,18 @@ class BoardManPanel: NSPanel {
         refreshSnippetSettingsSummary()
         refreshGlobalShortcutRows()
 
-        let rowH: CGFloat = 24
-        let rowGap: CGFloat = 32
-        let fieldLabelWidth: CGFloat = 58
-        let contentX = margin + 18
-        let contentWidth = max(240, width - 36)
+        let rowH = LayoutMetrics.controlHeight
+        let rowGap: CGFloat = 38
+        let fieldLabelWidth: CGFloat = 72
+        let contentX = margin + LayoutMetrics.settingsInset
+        let contentWidth = max(240, width - (LayoutMetrics.settingsInset * 2))
         let columnWidth = contentWidth
         let leftX = contentX
         settingsPageTitleLabel?.isHidden = false
         settingsPageDescriptionLabel?.isHidden = false
-        settingsPageTitleLabel?.frame = NSRect(x: leftX, y: topY - 44, width: columnWidth, height: 26)
-        settingsPageDescriptionLabel?.frame = NSRect(x: leftX, y: topY - 66, width: columnWidth, height: 18)
-        let firstY = topY - 102
+        settingsPageTitleLabel?.frame = NSRect(x: leftX, y: topY - 52, width: columnWidth, height: 30)
+        settingsPageDescriptionLabel?.frame = NSRect(x: leftX, y: topY - 78, width: columnWidth, height: 20)
+        let firstY = topY - 120
 
         var generalControls: [NSView?] = [
             generalSectionLabel, launchOnLoginButton, inputPasteCommandButton,
@@ -3142,26 +3207,26 @@ class BoardManPanel: NSPanel {
 
         func placeGeneralSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(generalSectionLabel, originX: originX, originY: originY, width: width)
-            launchOnLoginButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 150, height: 18)
-            inputPasteCommandButton?.frame = NSRect(x: originX + 162, y: originY - rowGap, width: 150, height: 18)
-            maxHistorySizeLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 5, width: fieldLabelWidth, height: 14)
-            maxHistorySizeStepper?.frame = NSRect(x: originX + fieldLabelWidth + 12, y: originY - (rowGap * 2) - 10, width: 72, height: rowH)
-            maxHistorySizeValueLabel?.frame = NSRect(x: originX + fieldLabelWidth + 92, y: originY - (rowGap * 2) - 5, width: 52, height: 14)
-            placeLabeledRow(label: statusItemLabel, control: statusItemPopup, originX: originX, originY: originY - (rowGap * 3) - 12, width: width, labelWidth: 42)
+            launchOnLoginButton?.frame = NSRect(x: originX, y: originY - 40, width: width, height: 20)
+            inputPasteCommandButton?.frame = NSRect(x: originX, y: originY - 78, width: width, height: 20)
+            maxHistorySizeLabel?.frame = NSRect(x: originX, y: originY - 121, width: fieldLabelWidth, height: 16)
+            maxHistorySizeStepper?.frame = NSRect(x: originX + fieldLabelWidth + 12, y: originY - 128, width: 76, height: rowH)
+            maxHistorySizeValueLabel?.frame = NSRect(x: originX + fieldLabelWidth + 100, y: originY - 121, width: 58, height: 16)
+            placeLabeledRow(label: statusItemLabel, control: statusItemPopup, originX: originX, originY: originY - 170, width: width, labelWidth: fieldLabelWidth)
         }
 
         func placeShortcutSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(shortcutSectionLabel, originX: originX, originY: originY, width: width)
-            let shortcutRowHeight: CGFloat = 46
-            let clearWidth: CGFloat = 52
-            let recordWidth: CGFloat = min(168, max(122, floor(width * 0.34)))
+            let shortcutRowHeight: CGFloat = 50
+            let clearWidth: CGFloat = 60
+            let recordWidth: CGFloat = min(176, max(128, floor(width * 0.34)))
             let textWidth = max(110, width - recordWidth - clearWidth - 24)
             for (index, row) in globalShortcutRows.enumerated() {
                 let rowY = originY - 34 - CGFloat(index) * shortcutRowHeight
                 row.titleLabel.frame = NSRect(x: originX, y: rowY + 20, width: textWidth, height: 16)
                 row.detailLabel.frame = NSRect(x: originX, y: rowY + 4, width: textWidth, height: 14)
-                row.recordView.frame = NSRect(x: originX + textWidth + 8, y: rowY + 7, width: recordWidth, height: 26)
-                row.clearButton.frame = NSRect(x: originX + textWidth + recordWidth + 16, y: rowY + 7, width: clearWidth, height: 26)
+                row.recordView.frame = NSRect(x: originX + textWidth + 8, y: rowY + 6, width: recordWidth, height: 30)
+                row.clearButton.frame = NSRect(x: originX + textWidth + recordWidth + 16, y: rowY + 6, width: clearWidth, height: 30)
             }
             shortcutStatusLabel?.frame = NSRect(x: originX,
                                                 y: originY - 34 - CGFloat(globalShortcutRows.count) * shortcutRowHeight - 2,
@@ -3171,28 +3236,28 @@ class BoardManPanel: NSPanel {
 
         func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(viewSectionLabel, originX: originX, originY: originY, width: width)
-            rowNumbersButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 86, height: 18)
-            placeLabeledRow(label: timestampLabel, control: timestampPopup, originX: originX, originY: originY - (rowGap * 2) - 4, width: width)
-            usageCountButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 2, width: 82, height: 18)
-            placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX + 104, originY: originY - (rowGap * 3) - 6, width: max(150, width - 104), labelWidth: 38)
-            placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: originX, originY: originY - (rowGap * 4) - 8, width: width)
-            placeLabeledRow(label: themePresetLabel, control: themePresetPopup, originX: originX, originY: originY - (rowGap * 5) - 10, width: width)
-            themeLightenButton?.frame = NSRect(x: originX, y: originY - (rowGap * 6) - 6, width: 96, height: 18)
-            heightControlLabel?.frame = NSRect(x: originX + 104, y: originY - (rowGap * 6) - 7, width: fieldLabelWidth, height: 14)
-            heightStepper?.frame = NSRect(x: originX + 104 + fieldLabelWidth + 12, y: originY - (rowGap * 6) - 12, width: 72, height: rowH)
-            heightLabel?.frame = NSRect(x: originX + 104 + fieldLabelWidth + 92, y: originY - (rowGap * 6) - 7, width: 42, height: 14)
+            rowNumbersButton?.frame = NSRect(x: originX, y: originY - 40, width: width, height: 20)
+            placeLabeledRow(label: timestampLabel, control: timestampPopup, originX: originX, originY: originY - 84, width: width)
+            usageCountButton?.frame = NSRect(x: originX, y: originY - 126, width: width, height: 20)
+            placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX, originY: originY - 170, width: width)
+            placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: originX, originY: originY - 214, width: width)
+            placeLabeledRow(label: themePresetLabel, control: themePresetPopup, originX: originX, originY: originY - 258, width: width)
+            themeLightenButton?.frame = NSRect(x: originX, y: originY - 300, width: 116, height: 20)
+            heightControlLabel?.frame = NSRect(x: originX + 136, y: originY - 300, width: fieldLabelWidth, height: 16)
+            heightStepper?.frame = NSRect(x: originX + 136 + fieldLabelWidth + 12, y: originY - 307, width: 76, height: rowH)
+            heightLabel?.frame = NSRect(x: originX + 136 + fieldLabelWidth + 100, y: originY - 300, width: 52, height: 16)
         }
 
         func placeHistorySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(historySectionLabel, originX: originX, originY: originY, width: width)
-            dedupeButton?.frame = NSRect(x: originX, y: originY - rowGap, width: 92, height: 18)
-            reuseTopButton?.frame = NSRect(x: originX + 106, y: originY - rowGap, width: 118, height: 18)
-            overwriteSameHistoryButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 2, width: 136, height: 18)
-            clearHistoryButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 6, width: 86, height: rowH)
+            dedupeButton?.frame = NSRect(x: originX, y: originY - 42, width: width, height: 20)
+            reuseTopButton?.frame = NSRect(x: originX, y: originY - 82, width: width, height: 20)
+            overwriteSameHistoryButton?.frame = NSRect(x: originX, y: originY - 122, width: width, height: 20)
+            clearHistoryButton?.frame = NSRect(x: originX, y: originY - 174, width: 104, height: LayoutMetrics.actionButtonHeight)
         }
 
         func layoutSnippetShortcutRows(width: CGFloat) {
-            let rowHeight: CGFloat = 34
+            let rowHeight: CGFloat = 42
             let documentHeight = max(CGFloat(snippetShortcutRows.count) * rowHeight, snippetShortcutScrollView?.bounds.height ?? 0)
             snippetShortcutDocumentView?.frame = NSRect(x: 0, y: 0, width: width, height: documentHeight)
 
@@ -3201,21 +3266,21 @@ class BoardManPanel: NSPanel {
                 let clearWidth: CGFloat = 52
                 let recordWidth: CGFloat = min(150, max(112, width * 0.32))
                 let textWidth = max(80, width - recordWidth - clearWidth - 20)
-                row.titleLabel.frame = NSRect(x: 0, y: rowOriginY + 17, width: textWidth, height: 14)
-                row.detailLabel.frame = NSRect(x: 0, y: rowOriginY + 3, width: textWidth, height: 13)
-                row.recordView.frame = NSRect(x: textWidth + 8, y: rowOriginY + 5, width: recordWidth, height: 24)
-                row.clearButton.frame = NSRect(x: textWidth + recordWidth + 16, y: rowOriginY + 5, width: clearWidth, height: 24)
+                row.titleLabel.frame = NSRect(x: 0, y: rowOriginY + 22, width: textWidth, height: 15)
+                row.detailLabel.frame = NSRect(x: 0, y: rowOriginY + 6, width: textWidth, height: 14)
+                row.recordView.frame = NSRect(x: textWidth + 8, y: rowOriginY + 7, width: recordWidth, height: 28)
+                row.clearButton.frame = NSRect(x: textWidth + recordWidth + 16, y: rowOriginY + 7, width: clearWidth, height: 28)
             }
         }
 
         func placeSnippetSettingsSection(originX: CGFloat, originY: CGFloat, width: CGFloat, scrollHeight: CGFloat) {
             placeHeader(snippetSettingsSectionLabel, originX: originX, originY: originY, width: width)
-            snippetSummaryLabel?.frame = NSRect(x: originX, y: originY - rowGap + 4, width: width, height: 18)
-            snippetFoldersLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 2) + 2, width: width, height: 18)
-            snippetShortcutsLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3), width: width, height: 18)
-            snippetShortcutScrollView?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - scrollHeight - 6, width: width, height: scrollHeight)
+            snippetSummaryLabel?.frame = NSRect(x: originX, y: originY - 42, width: width, height: 20)
+            snippetFoldersLabel?.frame = NSRect(x: originX, y: originY - 74, width: width, height: 20)
+            snippetShortcutsLabel?.frame = NSRect(x: originX, y: originY - 106, width: width, height: 20)
+            snippetShortcutScrollView?.frame = NSRect(x: originX, y: originY - 118 - scrollHeight, width: width, height: scrollHeight)
             layoutSnippetShortcutRows(width: width)
-            manageSnippetsButton?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - scrollHeight - 38, width: min(136, width), height: rowH)
+            manageSnippetsButton?.frame = NSRect(x: originX, y: originY - 162 - scrollHeight, width: min(156, width), height: LayoutMetrics.actionButtonHeight)
         }
 
         func placePrivacySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -3288,7 +3353,7 @@ class BoardManPanel: NSPanel {
         case .general:
             show(generalControls)
             placeGeneralSection(originX: leftX, originY: firstY, width: columnWidth)
-            placeShortcutSection(originX: leftX, originY: firstY - 150, width: columnWidth)
+            placeShortcutSection(originX: leftX, originY: firstY - 220, width: columnWidth)
         case .view:
             show(viewControls)
             placeViewSection(originX: leftX, originY: firstY, width: columnWidth)
@@ -3297,13 +3362,13 @@ class BoardManPanel: NSPanel {
             placeHistorySection(originX: leftX, originY: firstY, width: columnWidth)
         case .snippets:
             show(snippetControls)
-            placeSnippetSettingsSection(originX: leftX, originY: firstY, width: columnWidth, scrollHeight: max(180, topY - 250))
+            placeSnippetSettingsSection(originX: leftX, originY: firstY, width: columnWidth, scrollHeight: max(160, topY - 300))
         case .privacy:
             show(privacyControls)
             storedTypeButtons.forEach { $0.isHidden = false }
             placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
-            placeStoredTypesSection(originX: leftX, originY: firstY - 112, width: columnWidth)
-            placeFiltersSection(originX: leftX, originY: firstY - 268, width: columnWidth)
+            placeStoredTypesSection(originX: leftX, originY: firstY - 132, width: columnWidth)
+            placeFiltersSection(originX: leftX, originY: firstY - 306, width: columnWidth)
         case .updates:
             show(updatesControls)
             placeUpdatesSection(originX: leftX, originY: firstY, width: columnWidth)

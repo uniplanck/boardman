@@ -271,6 +271,141 @@ final class EntitlementGateTests {
     }
 }
 
+@Suite(.serialized)
+final class LegacySnippetMigrationTests {
+
+    @Test
+    func restoresNewestLegacySnippetsWithoutCopyingHistory() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let destinationURL = root.appendingPathComponent("current/default.realm")
+        let olderSourceURL = root.appendingPathComponent("older/default.realm")
+        let newerSourceURL = root.appendingPathComponent("newer/default.realm")
+        let backupURL = root.appendingPathComponent("backups", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let destination = try makeRealm(at: destinationURL)
+        try destination.write {
+            let clip = CPYClip()
+            clip.dataHash = "keep-current-history"
+            clip.title = "Current history"
+            destination.add(clip)
+        }
+
+        try createLegacyRealm(at: olderSourceURL, snippetCount: 1)
+        try createLegacyRealm(at: newerSourceURL, snippetCount: 2)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 100)], ofItemAtPath: olderSourceURL.path)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 200)], ofItemAtPath: newerSourceURL.path)
+
+        let result = LegacySnippetMigrationService.migrateIfNeeded(
+            into: destination,
+            candidateURLs: [olderSourceURL, newerSourceURL],
+            backupDirectoryURL: backupURL
+        )
+
+        #expect(result == .restored(sourceDirectory: "newer", folderCount: 1, snippetCount: 2))
+        #expect(destination.objects(CPYClip.self).count == 1)
+        #expect(destination.objects(CPYFolder.self).count == 1)
+        #expect(destination.objects(CPYSnippet.self).count == 2)
+        #expect(destination.objects(CPYFolder.self).first?.snippets.count == 2)
+        #expect((try FileManager.default.contentsOfDirectory(at: backupURL, includingPropertiesForKeys: nil)).count == 1)
+    }
+
+    @Test
+    func mergesMissingLegacySnippetsWithoutOverwritingCurrentData() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let destinationURL = root.appendingPathComponent("current/default.realm")
+        let sourceURL = root.appendingPathComponent("legacy/default.realm")
+        let backupURL = root.appendingPathComponent("backups", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let destination = try makeRealm(at: destinationURL)
+        try destination.write {
+            let snippet = CPYSnippet()
+            snippet.identifier = "current-only"
+            snippet.title = "Current"
+            snippet.content = "Keep me"
+            destination.add(snippet)
+        }
+        try createLegacyRealm(at: sourceURL, snippetCount: 2)
+
+        let result = LegacySnippetMigrationService.migrateIfNeeded(
+            into: destination,
+            candidateURLs: [sourceURL],
+            backupDirectoryURL: backupURL
+        )
+
+        #expect(result == .restored(sourceDirectory: "legacy", folderCount: 1, snippetCount: 2))
+        #expect(destination.objects(CPYSnippet.self).count == 3)
+        #expect(destination.object(ofType: CPYSnippet.self, forPrimaryKey: "current-only")?.content == "Keep me")
+        #expect((try FileManager.default.contentsOfDirectory(at: backupURL, includingPropertiesForKeys: nil)).count == 1)
+    }
+
+    @Test
+    func skipsMigrationWhenAllLegacyIdentifiersAlreadyExist() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let destinationURL = root.appendingPathComponent("current/default.realm")
+        let sourceURL = root.appendingPathComponent("legacy/default.realm")
+        let backupURL = root.appendingPathComponent("backups", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let destination = try makeRealm(at: destinationURL)
+        try addLegacyData(to: destination, snippetCount: 2)
+        try createLegacyRealm(at: sourceURL, snippetCount: 2)
+
+        let result = LegacySnippetMigrationService.migrateIfNeeded(
+            into: destination,
+            candidateURLs: [sourceURL],
+            backupDirectoryURL: backupURL
+        )
+
+        #expect(result == .skippedExistingData)
+        #expect(destination.objects(CPYSnippet.self).count == 2)
+        #expect(!FileManager.default.fileExists(atPath: backupURL.path))
+    }
+
+    private func makeRealm(at url: URL) throws -> Realm {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        var configuration = Realm.Configuration(fileURL: url)
+        configuration.schemaVersion = LegacySnippetMigrationService.schemaVersion
+        configuration.objectTypes = [CPYClip.self, CPYFolder.self, CPYSnippet.self]
+        return try Realm(configuration: configuration)
+    }
+
+    private func createLegacyRealm(at url: URL, snippetCount: Int) throws {
+        let seedURL = url.deletingLastPathComponent()
+            .appendingPathComponent("seed-\(UUID().uuidString).realm")
+        let realm = try makeRealm(at: seedURL)
+        try addLegacyData(to: realm, snippetCount: snippetCount)
+        try realm.writeCopy(toFile: url)
+        realm.invalidate()
+    }
+
+    private func addLegacyData(to realm: Realm, snippetCount: Int) throws {
+        try realm.write {
+            let folder = CPYFolder()
+            folder.identifier = "legacy-folder"
+            folder.title = "Legacy"
+            folder.index = 0
+            for index in 0..<snippetCount {
+                let snippet = CPYSnippet()
+                snippet.identifier = "legacy-snippet-\(index)"
+                snippet.index = index
+                snippet.title = "Snippet \(index)"
+                snippet.content = "Content \(index)"
+                folder.snippets.append(snippet)
+            }
+            realm.add(folder)
+
+            let clip = CPYClip()
+            clip.dataHash = "legacy-history-\(snippetCount)"
+            realm.add(clip)
+        }
+    }
+}
+
 @MainActor @Suite(.serialized)
 final class BoardManPanelLayoutTests {
 
