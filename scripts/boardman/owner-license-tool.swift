@@ -9,9 +9,10 @@ private enum ToolError: Error, CustomStringConvertible {
     case keychain(OSStatus)
     case invalidPrivateKey
     case missingIssuerKey
-    case invalidTrustedApplication
-    case invalidAccessControl
+    case issuerKeyMismatch
+    case invalidAppPath
     case encoding
+    case fileSystem
 
     var description: String {
         switch self {
@@ -23,12 +24,14 @@ private enum ToolError: Error, CustomStringConvertible {
             return "The owner issuer private key in Keychain is invalid."
         case .missingIssuerKey:
             return "The owner issuer private key is not installed on this Mac."
-        case .invalidTrustedApplication:
-            return "Could not create the Board-Man trusted application entry."
-        case .invalidAccessControl:
-            return "Could not create Keychain access control for Board-Man."
+        case .issuerKeyMismatch:
+            return "The owner issuer key does not match the public key bundled with Board-Man."
+        case .invalidAppPath:
+            return "The canonical Board-Man app was not found."
         case .encoding:
             return "Could not encode the owner license token."
+        case .fileSystem:
+            return "Could not write Board-Man local license state."
         }
     }
 }
@@ -36,10 +39,30 @@ private enum ToolError: Error, CustomStringConvertible {
 private enum KeychainNames {
     static let issuerService = "com.uniplanck.BoardMan.OwnerIssuer"
     static let issuerAccount = "p256-private-key-v1"
-    static let deviceService = "com.uniplanck.BoardMan.LocalDeviceIdentity"
-    static let deviceAccount = "localDeviceId"
-    static let tokenService = "com.uniplanck.BoardMan.LicenseToken"
-    static let tokenAccount = "signedLicenseToken"
+    static let legacyDeviceService = "com.uniplanck.BoardMan.LocalDeviceIdentity"
+    static let legacyDeviceAccount = "localDeviceId"
+    static let legacyTokenService = "com.uniplanck.BoardMan.LicenseToken"
+    static let legacyTokenAccount = "signedLicenseToken"
+}
+
+private enum LocalState {
+    static let ownerPublicKeyBase64 = "BGGgQPFnOgKAk821OQGix9fQLDPrqJSCEP98KvCBXqs4YZ6Vfw6QmscEpbZROEjiAavFvNNc1V/fCw1cYa62Cuc="
+
+    static var directoryURL: URL {
+        let fileManager = FileManager.default
+        let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support", isDirectory: true)
+        return baseURL.appendingPathComponent("com.uniplanck.BoardMan", isDirectory: true)
+    }
+
+    static var tokenURL: URL {
+        return directoryURL.appendingPathComponent("owner-license.jwt", isDirectory: false)
+    }
+
+    static var deviceIDURL: URL {
+        return directoryURL.appendingPathComponent("device-id", isDirectory: false)
+    }
 }
 
 private func readGenericPassword(service: String, account: String) throws -> Data? {
@@ -59,10 +82,7 @@ private func readGenericPassword(service: String, account: String) throws -> Dat
     return data
 }
 
-private func upsertGenericPassword(service: String,
-                                   account: String,
-                                   data: Data,
-                                   access: SecAccess? = nil) throws {
+private func upsertGenericPassword(service: String, account: String, data: Data) throws {
     let baseQuery: [String: Any] = [
         kSecClass as String: kSecClassGenericPassword,
         kSecAttrService as String: service,
@@ -72,9 +92,7 @@ private func upsertGenericPassword(service: String,
         baseQuery as CFDictionary,
         [kSecValueData as String: data] as CFDictionary
     )
-    if updateStatus == errSecSuccess {
-        return
-    }
+    if updateStatus == errSecSuccess { return }
     guard updateStatus == errSecItemNotFound else {
         throw ToolError.keychain(updateStatus)
     }
@@ -82,12 +100,24 @@ private func upsertGenericPassword(service: String,
     var addQuery = baseQuery
     addQuery[kSecValueData as String] = data
     addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-    if let access {
-        addQuery[kSecAttrAccess as String] = access
-    }
     let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
     guard addStatus == errSecSuccess else {
         throw ToolError.keychain(addStatus)
+    }
+}
+
+private func writePrivateData(_ data: Data, to fileURL: URL) throws {
+    let fileManager = FileManager.default
+    do {
+        try fileManager.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try data.write(to: fileURL, options: .atomic)
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+    } catch {
+        throw ToolError.fileSystem
     }
 }
 
@@ -113,37 +143,34 @@ private func loadOrCreatePrivateKey() throws -> P256.Signing.PrivateKey {
     return key
 }
 
+private func readValidDeviceID(from fileURL: URL) -> String? {
+    guard let data = try? Data(contentsOf: fileURL),
+          let value = String(data: data, encoding: .utf8),
+          UUID(uuidString: value) != nil else {
+        return nil
+    }
+    return value
+}
+
 private func loadOrCreateDeviceID() throws -> String {
-    if let data = try readGenericPassword(service: KeychainNames.deviceService,
-                                          account: KeychainNames.deviceAccount),
-       let value = String(data: data, encoding: .utf8),
-       UUID(uuidString: value) != nil {
-        return value
+    if let existing = readValidDeviceID(from: LocalState.deviceIDURL) {
+        return existing
+    }
+
+    if let legacyData = try readGenericPassword(service: KeychainNames.legacyDeviceService,
+                                                account: KeychainNames.legacyDeviceAccount),
+       let legacyValue = String(data: legacyData, encoding: .utf8),
+       UUID(uuidString: legacyValue) != nil {
+        try writePrivateData(legacyData, to: LocalState.deviceIDURL)
+        print("Legacy device identity migrated to Application Support.")
+        return legacyValue
     }
 
     let value = UUID().uuidString
     guard let data = value.data(using: .utf8) else { throw ToolError.encoding }
-    try upsertGenericPassword(service: KeychainNames.deviceService,
-                              account: KeychainNames.deviceAccount,
-                              data: data)
+    try writePrivateData(data, to: LocalState.deviceIDURL)
+    print("New local device identity created in Application Support.")
     return value
-}
-
-private func boardManAccess(appPath: String) throws -> SecAccess {
-    var trustedApplication: SecTrustedApplication?
-    let trustedStatus = SecTrustedApplicationCreateFromPath(appPath, &trustedApplication)
-    guard trustedStatus == errSecSuccess, let trustedApplication else {
-        throw ToolError.invalidTrustedApplication
-    }
-
-    var access: SecAccess?
-    let accessStatus = SecAccessCreate("Board-Man Owner Lifetime License" as CFString,
-                                      [trustedApplication] as CFArray,
-                                      &access)
-    guard accessStatus == errSecSuccess, let access else {
-        throw ToolError.invalidAccessControl
-    }
-    return access
 }
 
 private func base64URL(_ data: Data) -> String {
@@ -151,6 +178,67 @@ private func base64URL(_ data: Data) -> String {
         .replacingOccurrences(of: "+", with: "-")
         .replacingOccurrences(of: "/", with: "_")
         .replacingOccurrences(of: "=", with: "")
+}
+
+private func decodeBase64URL(_ value: String) -> Data? {
+    var base64 = value
+        .replacingOccurrences(of: "-", with: "+")
+        .replacingOccurrences(of: "_", with: "/")
+    let remainder = base64.count % 4
+    if remainder != 0 {
+        base64.append(String(repeating: "=", count: 4 - remainder))
+    }
+    return Data(base64Encoded: base64)
+}
+
+private func ownerPublicKey() throws -> P256.Signing.PublicKey {
+    guard let data = Data(base64Encoded: LocalState.ownerPublicKeyBase64),
+          let key = try? P256.Signing.PublicKey(x963Representation: data) else {
+        throw ToolError.issuerKeyMismatch
+    }
+    return key
+}
+
+private func isReusableOwnerToken(_ data: Data,
+                                  publicKey: P256.Signing.PublicKey,
+                                  deviceID: String) -> Bool {
+    guard let token = String(data: data, encoding: .utf8) else { return false }
+    let sections = token.split(separator: ".", omittingEmptySubsequences: false)
+    guard sections.count == 3 else { return false }
+
+    let signingInput = "\(sections[0]).\(sections[1])"
+    guard let signingData = signingInput.data(using: .utf8),
+          let signatureData = decodeBase64URL(String(sections[2])),
+          let signature = try? P256.Signing.ECDSASignature(rawRepresentation: signatureData),
+          publicKey.isValidSignature(signature, for: signingData),
+          let payloadData = decodeBase64URL(String(sections[1])),
+          let payload = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] else {
+        return false
+    }
+
+    return payload["plan"] as? String == "ownerLifetime"
+        && payload["state"] as? String == "ownerLifetime"
+        && payload["is_lifetime"] as? Bool == true
+        && payload["device_id"] as? String == deviceID
+        && payload["bundle_id"] as? String == "com.uniplanck.BoardMan"
+}
+
+private func reusableTokenData(deviceID: String,
+                               publicKey: P256.Signing.PublicKey) throws -> Data? {
+    if let currentData = try? Data(contentsOf: LocalState.tokenURL),
+       isReusableOwnerToken(currentData, publicKey: publicKey, deviceID: deviceID) {
+        print("Existing verified Owner Lifetime token preserved.")
+        return currentData
+    }
+
+    if let legacyData = try readGenericPassword(service: KeychainNames.legacyTokenService,
+                                                account: KeychainNames.legacyTokenAccount),
+       isReusableOwnerToken(legacyData, publicKey: publicKey, deviceID: deviceID) {
+        print("Legacy Owner Lifetime token migrated to Application Support.")
+        return legacyData
+    }
+
+    return nil
 }
 
 private func jsonData(_ object: [String: Any]) throws -> Data {
@@ -214,22 +302,37 @@ private func run() throws {
         print(privateKey.publicKey.x963Representation.base64EncodedString())
 
     case "install":
-        let privateKey = try loadPrivateKey()
         let appPath = argumentValue("--app", default: "/Applications/Board-Man.app")
+        guard FileManager.default.fileExists(atPath: appPath) else {
+            throw ToolError.invalidAppPath
+        }
+
         let issuedTo = argumentValue("--issued-to", default: "Board-Man Owner")
         let subject = argumentValue("--subject", default: "planckworld")
         let deviceID = try loadOrCreateDeviceID()
-        let token = try makeOwnerToken(privateKey: privateKey,
-                                       deviceID: deviceID,
-                                       issuedTo: issuedTo,
-                                       subject: subject)
-        guard let tokenData = token.data(using: .utf8) else { throw ToolError.encoding }
-        let access = try boardManAccess(appPath: appPath)
-        try upsertGenericPassword(service: KeychainNames.tokenService,
-                                  account: KeychainNames.tokenAccount,
-                                  data: tokenData,
-                                  access: access)
-        print("Owner Lifetime token installed in Keychain for the canonical Board-Man app.")
+        let publicKey = try ownerPublicKey()
+
+        let tokenData: Data
+        if let reusableData = try reusableTokenData(deviceID: deviceID, publicKey: publicKey) {
+            tokenData = reusableData
+        } else {
+            let privateKey = try loadPrivateKey()
+            guard privateKey.publicKey.x963Representation.base64EncodedString() == LocalState.ownerPublicKeyBase64 else {
+                throw ToolError.issuerKeyMismatch
+            }
+            let token = try makeOwnerToken(privateKey: privateKey,
+                                           deviceID: deviceID,
+                                           issuedTo: issuedTo,
+                                           subject: subject)
+            guard let generatedData = token.data(using: .utf8) else {
+                throw ToolError.encoding
+            }
+            tokenData = generatedData
+            print("New Owner Lifetime token generated.")
+        }
+
+        try writePrivateData(tokenData, to: LocalState.tokenURL)
+        print("Owner Lifetime local state installed without application Keychain access.")
 
     default:
         throw ToolError.invalidCommand

@@ -203,6 +203,40 @@ final class EntitlementGateTests {
         #expect(verifier.verify(tampered, context: context) == .invalid(.signatureInvalid))
     }
 
+    @Test
+    func signedLicenseTokenFileStoreRoundTripsWithoutKeychain() throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManLicenseStoreTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let deviceID = UUID().uuidString
+        let rawToken = try makeOwnerToken(privateKey: P256.Signing.PrivateKey(), deviceID: deviceID)
+        let token = try SignedLicenseToken(rawValue: rawToken)
+        let fileURL = directoryURL.appendingPathComponent("owner-license.jwt")
+        let store = SignedLicenseTokenFileStore(fileURL: fileURL)
+
+        try store.storeVerifiedSignedLicenseToken(token)
+
+        #expect(store.loadSignedLicenseToken() == rawToken)
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        let permissions = attributes[.posixPermissions] as? NSNumber
+        #expect(permissions?.intValue == 0o600)
+    }
+
+    @Test
+    func localDeviceIdentityPersistsWithoutKeychain() {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManDeviceIdentityTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        let fileURL = directoryURL.appendingPathComponent("device-id")
+        let firstID = LocalDeviceIdentityService(fileURL: fileURL).deviceID()
+        let secondID = LocalDeviceIdentityService(fileURL: fileURL).deviceID()
+
+        #expect(UUID(uuidString: firstID) != nil)
+        #expect(secondID == firstID)
+    }
+
     private func makeOwnerToken(privateKey: P256.Signing.PrivateKey,
                                 deviceID: String) throws -> String {
         let header = try JSONSerialization.data(withJSONObject: [

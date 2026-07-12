@@ -113,7 +113,7 @@ final class LicenseBootstrapService {
     private let tokenStore: LicenseTokenStoring
     private let verifier: SignedLicenseTokenVerifying
 
-    init(tokenStore: LicenseTokenStoring = FutureKeychainLicenseTokenStore(),
+    init(tokenStore: LicenseTokenStoring = SignedLicenseTokenFileStore(),
          verifier: SignedLicenseTokenVerifying = P256SignedLicenseTokenVerifier()) {
         self.tokenStore = tokenStore
         self.verifier = verifier

@@ -305,21 +305,23 @@ else
   echo "[DRY] Would backup, replace installed app, remove quarantine/provenance xattrs, sign with '$SIGNING_IDENTITY', and verify."
 fi
 
-# Install the owner-only signed lifetime token when this Mac has the issuer key.
+# Preserve an existing signed owner token without touching Keychain. The issuer private key
+# is consulted only when no reusable local token exists and a new token must be generated.
+LOCAL_OWNER_TOKEN="$HOME/Library/Application Support/com.uniplanck.BoardMan/owner-license.jwt"
 if [ "$DRY_RUN" = false ]; then
-  if security find-generic-password \
+  if [ -s "$LOCAL_OWNER_TOKEN" ] || security find-generic-password \
       -s "com.uniplanck.BoardMan.OwnerIssuer" \
       -a "p256-private-key-v1" >/dev/null 2>&1; then
-    echo "Installing locally signed Owner Lifetime entitlement..."
+    echo "Installing signed Owner Lifetime local state..."
     swift -suppress-warnings "$OWNER_TOOL" install \
       --app "$INSTALLED_PATH" \
       --issued-to "$OWNER_ISSUED_TO" \
       --subject "$OWNER_SUBJECT"
   else
-    echo "Owner issuer key is absent; keeping the normal Free entitlement path."
+    echo "Owner token and issuer key are absent; keeping the normal Free entitlement path."
   fi
 else
-  echo "[DRY] Would install Owner Lifetime only when the local issuer key exists."
+  echo "[DRY] Would preserve a local Owner token or generate one only when the issuer key exists."
 fi
 
 # Keep build artifacts out of Finder/Spotlight app results without deleting them.

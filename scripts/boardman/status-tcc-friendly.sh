@@ -48,10 +48,18 @@ echo "  BoardManUsePanelUI: $UI_VALUE"
 ENTITLEMENT_STATUS=$(defaults read "$BUNDLE_ID" BoardManDiagnosticEntitlementStatus 2>/dev/null || echo "not checked")
 ENTITLEMENT_PLAN=$(defaults read "$BUNDLE_ID" BoardManDiagnosticEntitlementPlan 2>/dev/null || echo "unknown")
 echo "  Entitlement Diagnostic: $ENTITLEMENT_STATUS / $ENTITLEMENT_PLAN"
-if security find-generic-password -s "com.uniplanck.BoardMan.LicenseToken" -a "signedLicenseToken" >/dev/null 2>&1; then
-  echo "  Signed License Token: present in Keychain"
+LOCAL_STATE_DIR="$HOME/Library/Application Support/com.uniplanck.BoardMan"
+LOCAL_TOKEN_PATH="$LOCAL_STATE_DIR/owner-license.jwt"
+LOCAL_DEVICE_PATH="$LOCAL_STATE_DIR/device-id"
+if [ -s "$LOCAL_TOKEN_PATH" ]; then
+  echo "  Signed License Token: present in Application Support"
 else
   echo "  Signed License Token: missing"
+fi
+if [ -s "$LOCAL_DEVICE_PATH" ]; then
+  echo "  Local Device Identity: present in Application Support"
+else
+  echo "  Local Device Identity: missing"
 fi
 
 RUNNING_PIDS=$(pgrep -x "$APP_NAME" || echo "")

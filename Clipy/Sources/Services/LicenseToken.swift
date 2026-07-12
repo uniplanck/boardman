@@ -5,7 +5,6 @@
 //
 
 import Foundation
-import Security
 
 enum LicenseKind: String, Equatable {
     case free
@@ -217,26 +216,49 @@ protocol LicenseTokenStoring {
     func storeVerifiedSignedLicenseToken(_ token: SignedLicenseToken) throws
 }
 
-enum LicenseTokenStorageError: Error, Equatable {
-    case encodingFailed
-    case keychain(OSStatus)
+enum BoardManLocalStatePaths {
+    static var directoryURL: URL {
+        let fileManager = FileManager.default
+        let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support", isDirectory: true)
+        return baseURL.appendingPathComponent("com.uniplanck.BoardMan", isDirectory: true)
+    }
+
+    static var licenseTokenURL: URL {
+        return directoryURL.appendingPathComponent("owner-license.jwt", isDirectory: false)
+    }
+
+    static var deviceIDURL: URL {
+        return directoryURL.appendingPathComponent("device-id", isDirectory: false)
+    }
+
+    static func writePrivateData(_ data: Data, to fileURL: URL) throws {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: fileURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        try data.write(to: fileURL, options: .atomic)
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
+    }
 }
 
-final class FutureKeychainLicenseTokenStore: LicenseTokenStoring {
-    private enum Keychain {
-        static let service = "com.uniplanck.BoardMan.LicenseToken"
-        static let account = "signedLicenseToken"
+enum LicenseTokenStorageError: Error, Equatable {
+    case encodingFailed
+    case fileSystem
+}
+
+final class SignedLicenseTokenFileStore: LicenseTokenStoring {
+    private let fileURL: URL
+
+    init(fileURL: URL = BoardManLocalStatePaths.licenseTokenURL) {
+        self.fileURL = fileURL
     }
 
     func loadSignedLicenseToken() -> String? {
-        var query = baseQuery()
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess,
-              let data = item as? Data,
+        guard let data = try? Data(contentsOf: fileURL),
               let value = String(data: data, encoding: .utf8),
               !value.isEmpty else {
             return nil
@@ -248,31 +270,11 @@ final class FutureKeychainLicenseTokenStore: LicenseTokenStoring {
         guard let data = token.rawValue.data(using: .utf8) else {
             throw LicenseTokenStorageError.encodingFailed
         }
-
-        let attributes = [kSecValueData as String: data]
-        let updateStatus = SecItemUpdate(baseQuery() as CFDictionary, attributes as CFDictionary)
-        if updateStatus == errSecSuccess {
-            return
+        do {
+            try BoardManLocalStatePaths.writePrivateData(data, to: fileURL)
+        } catch {
+            throw LicenseTokenStorageError.fileSystem
         }
-        guard updateStatus == errSecItemNotFound else {
-            throw LicenseTokenStorageError.keychain(updateStatus)
-        }
-
-        var addQuery = baseQuery()
-        addQuery[kSecValueData as String] = data
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-        guard addStatus == errSecSuccess else {
-            throw LicenseTokenStorageError.keychain(addStatus)
-        }
-    }
-
-    private func baseQuery() -> [String: Any] {
-        return [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Keychain.service,
-            kSecAttrAccount as String: Keychain.account
-        ]
     }
 }
 
