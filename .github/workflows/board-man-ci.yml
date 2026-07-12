@@ -36,8 +36,9 @@ jobs:
       - name: Whitespace check
         run: |
           if [ -n "${GITHUB_BASE_REF:-}" ]; then
-            git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
-            git diff --check "origin/$GITHUB_BASE_REF...HEAD"
+            git fetch --no-tags origin "$GITHUB_BASE_REF"
+            base_sha="$(git merge-base "origin/$GITHUB_BASE_REF" HEAD)"
+            git diff --check "$base_sha..HEAD"
           else
             git diff --check HEAD~1..HEAD
           fi
