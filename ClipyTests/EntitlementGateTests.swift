@@ -515,13 +515,21 @@ final class BoardManPanelLayoutTests {
         let search = descendants.compactMap { $0 as? NSSearchField }.first
         #expect((search != nil) == expectsSearch || search?.isHidden == !expectsSearch)
         if expectsSearch, let search {
-            #expect(search.cell is NSSearchFieldCell,
-                    "Search field is not using the native AppKit search cell.")
+            guard let searchCell = search.cell as? BoardManSearchFieldCell else {
+                Issue.record("Search field is not using the vertically centered Board-Man search cell.")
+                return
+            }
             #expect((search.layer?.borderWidth ?? 0) == 0,
                     "Search field has a second custom layer border.")
             #expect(abs(search.frame.midY - tabs.frame.midY) <= 0.5,
                     "Search input is not vertically centered with the header tabs.")
             #expect(search.frame.height == tabs.frame.height)
+            let textRect = searchCell.searchTextRect(forBounds: search.bounds)
+            let buttonRect = searchCell.searchButtonRect(forBounds: search.bounds)
+            #expect(abs(textRect.midY - search.bounds.midY) <= 0.5,
+                    "Search text is not vertically centered inside its border.")
+            #expect(abs(buttonRect.midY - search.bounds.midY) <= 0.5,
+                    "Search icon is not vertically centered inside its border.")
         }
     }
 
@@ -534,6 +542,15 @@ final class BoardManPanelLayoutTests {
         #expect(table.rowHeight == panel.tableView(table, heightOfRow: 0),
                 "Configured and delegated history row heights diverge.")
         #expect(table.rowHeight == 62)
+
+        let rowBounds = NSRect(x: 0, y: 0, width: max(240, table.bounds.width), height: table.rowHeight)
+        let badgeFrame = BoardManHistoryCellView.usageBadgeFrame(in: rowBounds, intrinsicWidth: 16)
+        #expect(badgeFrame.maxX <= rowBounds.maxX - 21,
+                "Usage badge does not reserve enough trailing space inside the rounded row.")
+        #expect(abs(badgeFrame.midY - rowBounds.midY) <= 0.5,
+                "Usage badge is not vertically centered in the row.")
+        #expect(badgeFrame.width >= 38,
+                "Usage badge is too narrow and may clip its text.")
     }
 
     private func allSubviews(of view: NSView) -> [NSView] {
