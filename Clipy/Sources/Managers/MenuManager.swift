@@ -1569,7 +1569,28 @@ final class BoardManHeaderSegmentedControl: NSSegmentedControl {
     }
 }
 
-private final class BoardManHistoryCellView: NSTableCellView {
+final class BoardManSearchFieldCell: NSSearchFieldCell {
+    private func verticallyCentered(_ contentRect: NSRect, in bounds: NSRect) -> NSRect {
+        guard contentRect.height > 0 else { return contentRect }
+        var centered = contentRect
+        centered.origin.y = floor(bounds.midY - (contentRect.height / 2))
+        return centered
+    }
+
+    override func searchTextRect(forBounds rect: NSRect) -> NSRect {
+        return verticallyCentered(super.searchTextRect(forBounds: rect), in: rect)
+    }
+
+    override func searchButtonRect(forBounds rect: NSRect) -> NSRect {
+        return verticallyCentered(super.searchButtonRect(forBounds: rect), in: rect)
+    }
+
+    override func cancelButtonRect(forBounds rect: NSRect) -> NSRect {
+        return verticallyCentered(super.cancelButtonRect(forBounds: rect), in: rect)
+    }
+}
+
+final class BoardManHistoryCellView: NSTableCellView {
     private let primaryLabel = NSTextField(labelWithString: "")
     private let metadataLabel = NSTextField(labelWithString: "")
     private let countBadge = NSTextField(labelWithString: "")
@@ -1602,6 +1623,8 @@ private final class BoardManHistoryCellView: NSTableCellView {
         countBadge.alignment = .center
         countBadge.lineBreakMode = .byTruncatingTail
         countBadge.maximumNumberOfLines = 1
+        countBadge.cell?.usesSingleLineMode = true
+        countBadge.cell?.wraps = false
         countBadge.isBordered = false
         countBadge.isEditable = false
         countBadge.wantsLayer = true
@@ -1628,7 +1651,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
         addSubview(countBadge)
     }
 
-    func configure(item: BoardManHistoryItem,
+    fileprivate func configure(item: BoardManHistoryItem,
                    isSelected: Bool,
                    usageStyle: String,
                    useLiquidGlass: Bool,
@@ -1664,22 +1687,35 @@ private final class BoardManHistoryCellView: NSTableCellView {
         needsLayout = true
     }
 
+    static func usageBadgeFrame(in bounds: NSRect, intrinsicWidth: CGFloat) -> NSRect {
+        let horizontalInset: CGFloat = 16
+        let trailingInset: CGFloat = 22
+        let badgeHeight: CGFloat = 20
+        let maxContentWidth = max(0, bounds.width - horizontalInset - trailingInset)
+        let badgeWidth = min(maxContentWidth, min(76, max(38, ceil(intrinsicWidth) + 20)))
+        return NSIntegralRect(NSRect(
+            x: max(horizontalInset, floor(bounds.maxX - trailingInset - badgeWidth)),
+            y: floor(bounds.midY - (badgeHeight / 2)),
+            width: badgeWidth,
+            height: badgeHeight
+        ))
+    }
+
     override func layout() {
         super.layout()
         let horizontalInset: CGFloat = 16
-        let trailingInset: CGFloat = 14
+        let trailingInset: CGFloat = 22
         let accessoryGap: CGFloat = 10
         let titleHeight: CGFloat = 18
         let metadataHeight: CGFloat = 15
         let textGap: CGFloat = 4
         let textBlockHeight = titleHeight + textGap + metadataHeight
         let textBottom = floor((bounds.height - textBlockHeight) / 2)
-        let maxContentWidth = max(0, bounds.width - horizontalInset - trailingInset)
-        let badgeHeight: CGFloat = 20
-        let badgeWidth: CGFloat = countBadge.isHidden
-            ? 0
-            : min(maxContentWidth, min(72, max(34, countBadge.intrinsicContentSize.width + 16)))
-        let badgeX = max(horizontalInset, floor(bounds.width - trailingInset - badgeWidth))
+        let badgeFrame = countBadge.isHidden
+            ? .zero
+            : Self.usageBadgeFrame(in: bounds, intrinsicWidth: countBadge.intrinsicContentSize.width)
+        let badgeWidth = badgeFrame.width
+        let badgeX = badgeFrame.minX
         let imageSize: CGFloat = inlineImageView.isHidden ? 0 : 32
         let imageX = imageSize > 0 ? max(horizontalInset, badgeX - imageSize - accessoryGap) : 0
         let textRightLimit = imageSize > 0
@@ -1708,12 +1744,7 @@ private final class BoardManHistoryCellView: NSTableCellView {
             ))
         }
         if !countBadge.isHidden {
-            countBadge.frame = NSIntegralRect(NSRect(
-                x: badgeX,
-                y: floor((bounds.height - badgeHeight) / 2),
-                width: badgeWidth,
-                height: badgeHeight
-            ))
+            countBadge.frame = badgeFrame
         }
     }
 }
@@ -2239,6 +2270,7 @@ class BoardManPanel: NSPanel {
         setupGlassBackgroundIfNeeded()
 
         let search = NSSearchField(frame: .zero)
+        search.cell = BoardManSearchFieldCell(textCell: "")
         search.placeholderString = "Search clipboard history and snippets"
         search.target = self
         search.action = #selector(searchTextChanged(_:))
