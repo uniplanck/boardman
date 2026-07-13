@@ -461,6 +461,42 @@ struct PasteCountInputServiceTests {
     }
 
     @Test
+    func pasteCountRequiresObservedEditableTargetChange() {
+        let unchanged = PasteTargetSnapshot(
+            processIdentifier: 100,
+            role: "AXTextArea",
+            valueFingerprint: 10,
+            selectedTextFingerprint: 20,
+            selectedRange: CFRange(location: 4, length: 0),
+            numberOfCharacters: 12,
+            childrenCount: 0
+        )
+        #expect(!PasteCountInputService.pasteTargetChanged(from: unchanged, to: unchanged))
+
+        let changedValue = PasteTargetSnapshot(
+            processIdentifier: 100,
+            role: "AXTextArea",
+            valueFingerprint: 11,
+            selectedTextFingerprint: 20,
+            selectedRange: CFRange(location: 4, length: 0),
+            numberOfCharacters: 13,
+            childrenCount: 0
+        )
+        #expect(PasteCountInputService.pasteTargetChanged(from: unchanged, to: changedValue))
+
+        let differentApplication = PasteTargetSnapshot(
+            processIdentifier: 200,
+            role: "AXTextArea",
+            valueFingerprint: 11,
+            selectedTextFingerprint: 21,
+            selectedRange: CFRange(location: 5, length: 0),
+            numberOfCharacters: 13,
+            childrenCount: 1
+        )
+        #expect(!PasteCountInputService.pasteTargetChanged(from: unchanged, to: differentApplication))
+    }
+
+    @Test
     func imageFingerprintSurvivesArchiveRoundTripAndDistinguishesPixels() throws {
         let firstImage = testImage(color: .systemRed)
         let secondImage = testImage(color: .systemBlue)
@@ -494,6 +530,16 @@ final class BoardManPanelLayoutTests {
         let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
         Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
         defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let defaults = AppEnvironment.current.defaults
+        let originalTimestampFormat = defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)
+        let originalTimestampPosition = defaults.string(forKey: Constants.UserDefaults.boardManTimestampPosition)
+        defaults.set("relative", forKey: Constants.UserDefaults.boardManTimestampFormat)
+        defaults.set("below", forKey: Constants.UserDefaults.boardManTimestampPosition)
+        defer {
+            defaults.set(originalTimestampFormat, forKey: Constants.UserDefaults.boardManTimestampFormat)
+            defaults.set(originalTimestampPosition, forKey: Constants.UserDefaults.boardManTimestampPosition)
+        }
 
         let panel = BoardManPanel()
         panel.setFrame(NSRect(x: 0, y: 0, width: 680, height: 760), display: false)
@@ -552,8 +598,15 @@ final class BoardManPanelLayoutTests {
                     "Appearance mode choices are missing.")
             #expect(popupTitles.contains(Set(["Default", "Simple", "Monochrome"])),
                     "UI style choices are missing.")
-            #expect(popupTitles.contains(Set(["System", "Rounded", "Serif", "Monospaced"])),
-                    "Font choices are missing.")
+            let builtInFonts = Set(["System", "Rounded", "Serif", "Monospaced"])
+            #expect(popupTitles.contains { builtInFonts.isSubset(of: $0) },
+                    "Built-in font choices are missing from the installed-font picker.")
+            if let installedFamily = NSFontManager.shared.availableFontFamilies.first {
+                #expect(popupTitles.contains { $0.contains(installedFamily) },
+                        "Installed Finder font families are missing from the font picker.")
+            }
+            #expect(popupTitles.contains { Set(["Hidden", "Below", "Left", "Right"]).isSubset(of: $0) },
+                    "Timestamp position choices are missing.")
             #expect(popupTitles.contains { $0.contains("Scarlet") && $0.contains("Emerald") && $0.contains("Violet") },
                     "Expanded theme colors are missing.")
             #expect(popupTitles.contains { $0.contains("Teal") && $0.contains("Green") && $0.contains("Purple") && $0.contains("Indigo") },

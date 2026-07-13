@@ -5,23 +5,152 @@
 
 import AppKit
 import Carbon
+import RealmSwift
 
-final class PasteCountInputService {
-    enum EventTapMode: Equatable {
-        case listenOnly
-        case accessibilityFallback
+struct PasteTargetSnapshot {
+    let processIdentifier: pid_t
+    let role: String
+    let valueFingerprint: Int?
+    let selectedTextFingerprint: Int?
+    let selectedRange: CFRange?
+    let numberOfCharacters: Int?
+    let childrenCount: Int?
+}
 
-        var options: CGEventTapOptions {
-            switch self {
-            case .listenOnly: return .listenOnly
-            case .accessibilityFallback: return .defaultTap
+enum PasteTargetVerifier {
+    private static let verificationDelays: [TimeInterval] = [0.16, 0.38, 0.70]
+
+    static func snapshot(for application: NSRunningApplication?) -> PasteTargetSnapshot? {
+        guard AXIsProcessTrusted(), let application else { return nil }
+        let appElement = AXUIElementCreateApplication(application.processIdentifier)
+        var focusedObject: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            appElement,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedObject
+        ) == .success,
+        let focusedObject else {
+            return nil
+        }
+
+        let focusedElement = focusedObject as! AXUIElement // swiftlint:disable:this force_cast
+        guard isEditable(element: focusedElement) else { return nil }
+        return snapshot(of: focusedElement, processIdentifier: application.processIdentifier)
+    }
+
+    static func confirmChange(from snapshot: PasteTargetSnapshot,
+                              delayIndex: Int = 0,
+                              completion: @escaping (Bool) -> Void) {
+        guard delayIndex < verificationDelays.count else {
+            completion(false)
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + verificationDelays[delayIndex]) {
+            let application = NSRunningApplication(processIdentifier: snapshot.processIdentifier)
+            if let current = self.snapshot(for: application), changed(from: snapshot, to: current) {
+                completion(true)
+                return
             }
+            confirmChange(from: snapshot, delayIndex: delayIndex + 1, completion: completion)
         }
     }
 
+    static func changed(from before: PasteTargetSnapshot, to after: PasteTargetSnapshot) -> Bool {
+        guard before.processIdentifier == after.processIdentifier else { return false }
+        if let lhs = before.valueFingerprint, let rhs = after.valueFingerprint, lhs != rhs { return true }
+        if let lhs = before.selectedTextFingerprint, let rhs = after.selectedTextFingerprint, lhs != rhs { return true }
+        if let lhs = before.selectedRange, let rhs = after.selectedRange,
+           lhs.location != rhs.location || lhs.length != rhs.length { return true }
+        if let lhs = before.numberOfCharacters, let rhs = after.numberOfCharacters, lhs != rhs { return true }
+        if let lhs = before.childrenCount, let rhs = after.childrenCount, lhs != rhs { return true }
+        return false
+    }
+
+    private static func isEditable(element: AXUIElement) -> Bool {
+        let role = stringAttribute(kAXRoleAttribute, from: element) ?? ""
+        let subrole = stringAttribute(kAXSubroleAttribute, from: element) ?? ""
+        if boolAttribute("AXEditable", from: element) == true { return true }
+        let editableRoles: Set<String> = [
+            kAXTextFieldRole as String,
+            kAXTextAreaRole as String,
+            kAXComboBoxRole as String,
+            "AXEditableText"
+        ]
+        if editableRoles.contains(role) { return true }
+        return role == "AXWebArea" && subrole == "AXEditableWebArea"
+    }
+
+    private static func snapshot(of element: AXUIElement, processIdentifier: pid_t) -> PasteTargetSnapshot {
+        return PasteTargetSnapshot(
+            processIdentifier: processIdentifier,
+            role: stringAttribute(kAXRoleAttribute, from: element) ?? "",
+            valueFingerprint: attributeFingerprint(kAXValueAttribute, from: element),
+            selectedTextFingerprint: attributeFingerprint(kAXSelectedTextAttribute, from: element),
+            selectedRange: rangeAttribute(kAXSelectedTextRangeAttribute, from: element),
+            numberOfCharacters: numberAttribute("AXNumberOfCharacters", from: element),
+            childrenCount: arrayCountAttribute(kAXChildrenAttribute, from: element)
+        )
+    }
+
+    private static func attributeFingerprint(_ attribute: String, from element: AXUIElement) -> Int? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
+              let value else { return nil }
+        return String(describing: value).hashValue
+    }
+
+    private static func rangeAttribute(_ attribute: String, from element: AXUIElement) -> CFRange? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success,
+              let value,
+              CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+        let axValue = value as! AXValue // swiftlint:disable:this force_cast
+        guard AXValueGetType(axValue) == .cfRange else { return nil }
+        var range = CFRange()
+        return AXValueGetValue(axValue, .cfRange, &range) ? range : nil
+    }
+
+    private static func numberAttribute(_ attribute: String, from element: AXUIElement) -> Int? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return (value as? NSNumber)?.intValue
+    }
+
+    private static func arrayCountAttribute(_ attribute: String, from element: AXUIElement) -> Int? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return (value as? [Any])?.count
+    }
+
+    private static func stringAttribute(_ attribute: String, from element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return value as? String
+    }
+
+    private static func boolAttribute(_ attribute: String, from element: AXUIElement) -> Bool? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return value as? Bool
+    }
+}
+
+enum PasteCountEventTapMode: Equatable {
+    case listenOnly
+    case accessibilityFallback
+
+    var options: CGEventTapOptions {
+        switch self {
+        case .listenOnly: return .listenOnly
+        case .accessibilityFallback: return .defaultTap
+        }
+    }
+}
+
+final class PasteCountInputService {
     static let shared = PasteCountInputService()
 
-    static func eventTapMode(accessibilityTrusted: Bool, listenEventAccess: Bool) -> EventTapMode? {
+    static func eventTapMode(accessibilityTrusted: Bool, listenEventAccess: Bool) -> PasteCountEventTapMode? {
         if listenEventAccess { return .listenOnly }
         if accessibilityTrusted { return .accessibilityFallback }
         return nil
@@ -39,6 +168,8 @@ final class PasteCountInputService {
     private var lastCountedIdentity: String?
     private var lastCountedAt = Date.distantPast
     private var lastDetectedAt = Date.distantPast
+    private let sequentialPasteLock = NSLock()
+    private var pendingSequentialHashes = Set<String>()
     private let debounceInterval: TimeInterval = 0.45
     private let duplicateDetectionInterval: TimeInterval = 0.12
     private let boardManPasteSuppressionInterval: TimeInterval = 0.35
@@ -122,17 +253,6 @@ final class PasteCountInputService {
             NotificationCenter.default.removeObserver(appDidBecomeActiveObserver)
         }
         appDidBecomeActiveObserver = nil
-    }
-
-    func suppressNextGlobalPaste() {
-        suppressUntil = Date().addingTimeInterval(boardManPasteSuppressionInterval)
-        log("suppress next global paste")
-    }
-
-    func logBoardManPerformance(_ name: String, startedAt: CFAbsoluteTime, details: String = "") {
-        let elapsedMs = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
-        let suffix = details.isEmpty ? "" : " \(details)"
-        log(String(format: "perf %@ %.1fms%@", name, elapsedMs, suffix))
     }
 
     private func startCGEventTap(reason: String) {
@@ -304,9 +424,66 @@ final class PasteCountInputService {
         guard flags.contains(.maskCommand) else { return }
         guard !flags.contains(.maskControl), !flags.contains(.maskAlternate) else { return }
 
+        if prepareSequentialUnusedPasteIfNeeded() {
+            return
+        }
         DispatchQueue.main.async { [weak self] in
             self?.handleDetectedCommandV(source: "cgEventTap")
         }
+    }
+
+    private func prepareSequentialUnusedPasteIfNeeded() -> Bool {
+        let defaults = AppEnvironment.current.defaults
+        guard defaults.string(forKey: Constants.UserDefaults.boardManHistoryUsageFilter) == "Unused" else {
+            return false
+        }
+        guard let targetApplication = NSWorkspace.shared.frontmostApplication,
+              targetApplication.bundleIdentifier != Bundle.main.bundleIdentifier,
+              let targetSnapshot = editableTargetSnapshot(for: targetApplication) else {
+            return false
+        }
+
+        let realm = try! Realm()
+        let counts = PasteCountStore.shared.countsSnapshot()
+        sequentialPasteLock.lock()
+        let pending = pendingSequentialHashes
+        sequentialPasteLock.unlock()
+        let clips = realm.objects(CPYClip.self)
+            .sorted(byKeyPath: #keyPath(CPYClip.createdTime), ascending: false)
+        guard let clip = clips.first(where: {
+            !pending.contains($0.dataHash) && PasteCountStore.shared.count(for: $0, in: counts) == 0
+        }) else {
+            log("unused sequence skipped reason=empty_queue")
+            return false
+        }
+
+        let dataHash = clip.dataHash
+        let pasteCountKey = PasteCountStore.shared.key(for: clip)
+        sequentialPasteLock.lock()
+        pendingSequentialHashes.insert(dataHash)
+        sequentialPasteLock.unlock()
+
+        AppEnvironment.current.pasteService.copyToPasteboard(with: clip)
+        suppressUntil = Date().addingTimeInterval(1.0)
+        log("unused sequence prepared hash=redacted")
+
+        confirmPasteChange(from: targetSnapshot) { [weak self] confirmed in
+            guard let self else { return }
+            self.sequentialPasteLock.lock()
+            self.pendingSequentialHashes.remove(dataHash)
+            self.sequentialPasteLock.unlock()
+            guard confirmed else {
+                self.log("unused sequence confirmation failed")
+                return
+            }
+            let confirmationRealm = try! Realm()
+            if let confirmedClip = confirmationRealm.object(ofType: CPYClip.self, forPrimaryKey: dataHash) {
+                PasteCountStore.shared.markUsed(clip: confirmedClip, in: confirmationRealm)
+            }
+            PasteCountStore.shared.increment(forKey: pasteCountKey)
+            self.log("unused sequence confirmation success")
+        }
+        return true
     }
 
     private func handleDetectedCommandV(source: String) {
@@ -347,63 +524,13 @@ final class PasteCountInputService {
         guard AXIsProcessTrusted() else {
             return (false, "accessibility_untrusted")
         }
-
-        guard let frontmostApplication = NSWorkspace.shared.frontmostApplication else {
+        guard let application = NSWorkspace.shared.frontmostApplication else {
             return (false, "frontmost_app_unavailable")
         }
-
-        let appElement = AXUIElementCreateApplication(frontmostApplication.processIdentifier)
-        var focusedObject: CFTypeRef?
-        let focusedResult = AXUIElementCopyAttributeValue(
-            appElement,
-            kAXFocusedUIElementAttribute as CFString,
-            &focusedObject
-        )
-
-        guard focusedResult == .success, let focusedObject else {
-            return (false, "focused_element_unavailable")
+        guard editableTargetSnapshot(for: application) != nil else {
+            return (false, "focused_element_not_editable")
         }
-
-        let focusedElement = focusedObject as! AXUIElement // swiftlint:disable:this force_cast
-        let role = stringAttribute(kAXRoleAttribute, from: focusedElement) ?? ""
-        let subrole = stringAttribute(kAXSubroleAttribute, from: focusedElement) ?? ""
-        let isEditable = boolAttribute("AXEditable", from: focusedElement)
-
-        if isEditable == true {
-            return (true, "editable_attribute")
-        }
-
-        let editableRoles: Set<String> = [
-            kAXTextFieldRole as String,
-            kAXTextAreaRole as String,
-            kAXComboBoxRole as String,
-            "AXEditableText"
-        ]
-        if editableRoles.contains(role) {
-            return (true, "editable_role_\(role)")
-        }
-
-        if role == "AXWebArea", isEditable == true || subrole == "AXEditableWebArea" {
-            return (true, "editable_web_area")
-        }
-
-        return (false, role.isEmpty ? "role_unavailable" : "non_editable_role_\(role)")
-    }
-
-    private func stringAttribute(_ attribute: String, from element: AXUIElement) -> String? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
-            return nil
-        }
-        return value as? String
-    }
-
-    private func boolAttribute(_ attribute: String, from element: AXUIElement) -> Bool? {
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else {
-            return nil
-        }
-        return value as? Bool
+        return (true, "editable_target")
     }
 
     private func countCurrentClipboardIfNeeded(source: String) {
@@ -477,5 +604,36 @@ final class PasteCountInputService {
                 try? data.write(to: logURL)
             }
         }
+    }
+}
+
+extension PasteCountInputService {
+    func editableTargetSnapshot(
+        for application: NSRunningApplication? = NSWorkspace.shared.frontmostApplication
+    ) -> PasteTargetSnapshot? {
+        return PasteTargetVerifier.snapshot(for: application)
+    }
+
+    func confirmPasteChange(from snapshot: PasteTargetSnapshot,
+                            completion: @escaping (Bool) -> Void) {
+        PasteTargetVerifier.confirmChange(from: snapshot, completion: completion)
+    }
+
+    static func pasteTargetChanged(from before: PasteTargetSnapshot,
+                                   to after: PasteTargetSnapshot) -> Bool {
+        return PasteTargetVerifier.changed(from: before, to: after)
+    }
+
+    func suppressNextGlobalPaste() {
+        suppressUntil = Date().addingTimeInterval(boardManPasteSuppressionInterval)
+        log("suppress next global paste")
+    }
+
+    func logBoardManPerformance(_ name: String,
+                                startedAt: CFAbsoluteTime,
+                                details: String = "") {
+        let elapsedMs = (CFAbsoluteTimeGetCurrent() - startedAt) * 1000
+        let suffix = details.isEmpty ? "" : " \(details)"
+        log(String(format: "perf %@ %.1fms%@", name, elapsedMs, suffix))
     }
 }
