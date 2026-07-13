@@ -53,6 +53,19 @@ extension Realm {
                     }
                 }
             }
+            if oldSchemaVersion < 8 {
+                migration.enumerateObjects(ofType: CPYClip.className()) { oldObject, newObject in
+                    let updateTime = oldObject?["updateTime"] as? Int ?? 0
+                    var createdTime = updateTime * 1000
+                    if let dataPath = oldObject?["dataPath"] as? String,
+                       !dataPath.isEmpty,
+                       let attributes = try? FileManager.default.attributesOfItem(atPath: dataPath),
+                       let fileDate = (attributes[.creationDate] as? Date) ?? (attributes[.modificationDate] as? Date) {
+                        createdTime = Int(fileDate.timeIntervalSince1970 * 1000)
+                    }
+                    newObject?["createdTime"] = createdTime
+                }
+            }
         })
         Realm.Configuration.defaultConfiguration = config
 
@@ -73,7 +86,7 @@ enum LegacySnippetMigrationResult: Equatable {
 }
 
 enum LegacySnippetMigrationService {
-    static let schemaVersion: UInt64 = 7
+    static let schemaVersion: UInt64 = 8
 
     private struct SnippetSnapshot {
         let index: Int

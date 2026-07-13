@@ -154,6 +154,7 @@ extension ClipService {
         let title = data.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? (data.imageDisplayTitle ?? data.stringValue) : data.stringValue
         clip.title = title[0...10000]
         clip.dataHash = "\(savedHash)"
+        clip.createdTime = Int(Date().timeIntervalSince1970 * 1000)
         clip.updateTime = unixTime
         clip.primaryType = data.primaryType?.rawValue ?? ""
 
