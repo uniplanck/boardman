@@ -1470,9 +1470,7 @@ fileprivate final class BoardManHistoryConditionStore {
 
     func save(_ condition: BoardManHistoryCondition, for filter: BoardManHistoryUsageFilter) {
         var next = conditions
-        var enabledCondition = condition
-        enabledCondition.isEnabled = true
-        next[filter.rawValue] = enabledCondition
+        next[filter.rawValue] = condition
         save(next)
     }
 
@@ -2030,7 +2028,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         metadataLabel.isHidden = usesCompactRow
         timestampAccessoryLabel.stringValue = item.timestampText
         timestampAccessoryLabel.isHidden = item.timestampText.isEmpty || timestampPosition == .hidden || timestampPosition == .below
-        timestampAccessoryLabel.alignment = timestampPosition == .right ? .right : .left
+        timestampAccessoryLabel.alignment = .center
         let badgePrefix = usageStyle == "compact" ? "used " : "×"
         let shouldShowCount = item.pasteCount > 0 && !item.countText.isEmpty
         countBadge.stringValue = shouldShowCount ? "\(badgePrefix)\(item.countText)" : ""
@@ -2063,7 +2061,7 @@ final class BoardManHistoryCellView: NSTableCellView {
 
     static func usageBadgeFrame(in bounds: NSRect, intrinsicWidth: CGFloat) -> NSRect {
         let horizontalInset: CGFloat = 10
-        let trailingInset: CGFloat = 14
+        let trailingInset: CGFloat = 24
         let badgeHeight: CGFloat = 20
         let maxContentWidth = max(0, bounds.width - horizontalInset - trailingInset)
         let badgeWidth = min(maxContentWidth, max(56, min(64, ceil(intrinsicWidth) + 20)))
@@ -2078,12 +2076,12 @@ final class BoardManHistoryCellView: NSTableCellView {
     override func layout() {
         super.layout()
         let horizontalInset: CGFloat = 10
-        let trailingInset: CGFloat = 14
-        let accessoryGap: CGFloat = 12
+        let trailingInset: CGFloat = 24
+        let accessoryGap: CGFloat = 10
         let titleHeight: CGFloat = 18
         let metadataHeight: CGFloat = 15
         let textGap: CGFloat = 4
-        let timeWidth: CGFloat = 76
+        let timeWidth: CGFloat = 72
         let countWidth: CGFloat = 64
         let accessoryHeight: CGFloat = 20
         var textLeft = horizontalInset
@@ -2820,11 +2818,12 @@ class BoardManPanel: NSPanel {
         historySortButton = historySort
         updateHistorySortButton()
 
-        let historyCondition = NSButton(title: "", target: self, action: #selector(historyConditionButtonPressed(_:)))
+        let historyCondition = NSButton(title: "Condition", target: self, action: #selector(historyConditionButtonPressed(_:)))
         historyCondition.bezelStyle = .texturedRounded
         historyCondition.controlSize = .small
-        historyCondition.imagePosition = .imageOnly
-        historyCondition.setAccessibilityLabel("History condition")
+        historyCondition.imagePosition = .imageLeading
+        historyCondition.font = NSFont.systemFont(ofSize: 10.5, weight: .medium)
+        historyCondition.setAccessibilityLabel("Edit history condition")
         historyCondition.identifier = NSUserInterfaceItemIdentifier("BoardManHistoryConditionButton")
         contentView.addSubview(historyCondition)
         historyConditionButton = historyCondition
@@ -3895,7 +3894,7 @@ class BoardManPanel: NSPanel {
                 }
             }
             historySortButton?.frame = NSRect(x: margin + filterWidth + 8, y: historyToolbarY, width: 32, height: 26)
-            historyConditionButton?.frame = NSRect(x: margin + filterWidth + 48, y: historyToolbarY, width: 32, height: 26)
+            historyConditionButton?.frame = NSRect(x: margin + filterWidth + 48, y: historyToolbarY, width: 96, height: 26)
         }
 
         let sidebarWidth: CGFloat = min(184, max(160, floor(width * 0.25)))
@@ -5289,100 +5288,117 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func historyConditionButtonPressed(_ sender: NSButton) {
-        let filter = currentHistoryUsageFilter
-        let condition = BoardManHistoryConditionStore.shared.condition(for: filter)
-        let menu = NSMenu(title: "\(filter.rawValue) Condition")
-
-        let edit = NSMenuItem(title: condition == nil ? "Add Condition…" : "Edit Condition…",
-                              action: #selector(editCurrentHistoryCondition(_:)),
-                              keyEquivalent: "")
-        edit.target = self
-        menu.addItem(edit)
-
-        if let condition {
-            let toggleTitle = condition.isEnabled ? "Disable Condition" : "Enable Condition"
-            let toggle = NSMenuItem(title: toggleTitle,
-                                    action: #selector(toggleCurrentHistoryCondition(_:)),
-                                    keyEquivalent: "")
-            toggle.target = self
-            menu.addItem(toggle)
-            menu.addItem(NSMenuItem.separator())
-            let delete = NSMenuItem(title: "Delete Condition",
-                                    action: #selector(deleteCurrentHistoryCondition(_:)),
-                                    keyEquivalent: "")
-            delete.target = self
-            menu.addItem(delete)
-        }
-        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 2), in: sender)
+        editCurrentHistoryCondition(sender)
     }
 
     @objc private func editCurrentHistoryCondition(_ sender: Any?) {
         let filter = currentHistoryUsageFilter
-        let existing = BoardManHistoryConditionStore.shared.condition(for: filter) ?? .empty
+        let storedCondition = BoardManHistoryConditionStore.shared.condition(for: filter)
+        let existing = storedCondition ?? .empty
         let alert = NSAlert()
-        alert.messageText = "\(filter.rawValue) Condition"
-        alert.informativeText = "All enabled criteria are combined. Included words can use ALL or ANY matching."
+        alert.alertStyle = .informational
+        alert.messageText = "Filter \(filter.rawValue) history"
+        alert.informativeText = "Only matching items remain visible. Empty fields are ignored; clearing every field removes this condition."
         alert.addButton(withTitle: "Save")
         alert.addButton(withTitle: "Cancel")
+        if storedCondition != nil {
+            alert.addButton(withTitle: "Delete")
+        }
 
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 188))
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 246))
         func label(_ title: String, originY: CGFloat) -> NSTextField {
             let field = NSTextField(labelWithString: title)
-            field.frame = NSRect(x: 0, y: originY + 4, width: 112, height: 18)
-            field.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+            field.frame = NSRect(x: 0, y: originY, width: 118, height: 18)
+            field.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
             accessory.addSubview(field)
             return field
         }
-        label("Minimum length", originY: 150)
-        label("Contains words", originY: 110)
-        label("Excludes words", originY: 70)
-        label("Included match", originY: 30)
+        func hint(_ title: String, originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            let field = NSTextField(labelWithString: title)
+            field.frame = NSRect(x: originX, y: originY, width: width, height: 16)
+            field.font = NSFont.systemFont(ofSize: 9.5)
+            field.textColor = .secondaryLabelColor
+            accessory.addSubview(field)
+        }
 
-        let minimumField = NSTextField(frame: NSRect(x: 124, y: 150, width: 90, height: 24))
+        let enabledButton = NSButton(checkboxWithTitle: "Enable this condition", target: nil, action: nil)
+        enabledButton.frame = NSRect(x: 0, y: 218, width: 220, height: 20)
+        enabledButton.state = existing.isEnabled ? .on : .off
+        accessory.addSubview(enabledButton)
+        let scopeLabel = NSTextField(labelWithString: "Applies only to the \(filter.rawValue) tab")
+        scopeLabel.frame = NSRect(x: 276, y: 219, width: 244, height: 18)
+        scopeLabel.alignment = .right
+        scopeLabel.font = NSFont.systemFont(ofSize: 10.5, weight: .medium)
+        scopeLabel.textColor = .secondaryLabelColor
+        accessory.addSubview(scopeLabel)
+
+        label("Minimum characters", originY: 181)
+        let minimumField = NSTextField(frame: NSRect(x: 132, y: 176, width: 82, height: 26))
         minimumField.stringValue = existing.minimumLength > 0 ? "\(existing.minimumLength)" : ""
-        minimumField.placeholderString = "0"
+        minimumField.placeholderString = "No limit"
+        let formatter = NumberFormatter()
+        formatter.allowsFloats = false
+        formatter.minimum = 0
+        minimumField.formatter = formatter
         accessory.addSubview(minimumField)
+        hint("Example: 100 keeps text with 100 characters or more.", originX: 228, originY: 181, width: 292)
 
-        let includedField = NSTextField(frame: NSRect(x: 124, y: 110, width: 336, height: 24))
+        label("Must contain", originY: 137)
+        let includedField = NSTextField(frame: NSRect(x: 132, y: 132, width: 280, height: 26))
         includedField.stringValue = existing.includedTerms.joined(separator: ", ")
-        includedField.placeholderString = "word1, word2"
+        includedField.placeholderString = "git, deploy, Cloudflare"
         accessory.addSubview(includedField)
-
-        let excludedField = NSTextField(frame: NSRect(x: 124, y: 70, width: 336, height: 24))
-        excludedField.stringValue = existing.excludedTerms.joined(separator: ", ")
-        excludedField.placeholderString = "ignore, draft"
-        accessory.addSubview(excludedField)
-
-        let matchPopup = NSPopUpButton(frame: NSRect(x: 124, y: 28, width: 150, height: 26), pullsDown: false)
-        matchPopup.addItems(withTitles: ["ALL words", "ANY word"])
+        let matchPopup = NSPopUpButton(frame: NSRect(x: 422, y: 132, width: 98, height: 26), pullsDown: false)
+        matchPopup.addItems(withTitles: ["ALL", "ANY"])
         matchPopup.selectItem(at: existing.matchesAllIncludedTerms ? 0 : 1)
         accessory.addSubview(matchPopup)
+        hint("Separate words with commas. ALL requires every word; ANY requires one.", originX: 132, originY: 113, width: 388)
+
+        label("Must not contain", originY: 78)
+        let excludedField = NSTextField(frame: NSRect(x: 132, y: 73, width: 388, height: 26))
+        excludedField.stringValue = existing.excludedTerms.joined(separator: ", ")
+        excludedField.placeholderString = "draft, temporary, ignore"
+        accessory.addSubview(excludedField)
+        hint("Any matching excluded word hides the item.", originX: 132, originY: 54, width: 388)
 
         let shellButton = NSButton(checkboxWithTitle: "Shell-script-like text only", target: nil, action: nil)
-        shellButton.frame = NSRect(x: 292, y: 30, width: 168, height: 20)
+        shellButton.frame = NSRect(x: 0, y: 19, width: 210, height: 20)
         shellButton.state = existing.shellLikeOnly ? .on : .off
-        shellButton.toolTip = "Matches shebangs, common shell commands, pipes, &&, ||, and command substitution."
+        shellButton.toolTip = "Detects shebangs, common shell commands, pipes, &&, ||, and command substitution without executing anything."
         accessory.addSubview(shellButton)
+        hint("Detection only. Board-Man never executes the text.", originX: 228, originY: 21, width: 292)
         alert.accessoryView = accessory
 
         NSApp.activate(ignoringOtherApps: true)
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let minimumLength = max(0, Int(minimumField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0)
-        let condition = BoardManHistoryCondition(
-            isEnabled: true,
-            minimumLength: minimumLength,
-            includedTerms: BoardManHistoryCondition.parsedTerms(includedField.stringValue),
-            excludedTerms: BoardManHistoryCondition.parsedTerms(excludedField.stringValue),
-            matchesAllIncludedTerms: matchPopup.indexOfSelectedItem == 0,
-            shellLikeOnly: shellButton.state == .on
-        )
-        guard condition.hasCriteria else {
-            NSSound.beep()
-            return
+        alert.beginSheetModal(for: self) { [weak self] response in
+            guard let self else { return }
+            if response == .alertThirdButtonReturn {
+                BoardManHistoryConditionStore.shared.delete(for: filter)
+            } else if response == .alertFirstButtonReturn {
+                let minimumLength = max(0, Int(minimumField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0)
+                let condition = BoardManHistoryCondition(
+                    isEnabled: enabledButton.state == .on,
+                    minimumLength: minimumLength,
+                    includedTerms: BoardManHistoryCondition.parsedTerms(includedField.stringValue),
+                    excludedTerms: BoardManHistoryCondition.parsedTerms(excludedField.stringValue),
+                    matchesAllIncludedTerms: matchPopup.indexOfSelectedItem == 0,
+                    shellLikeOnly: shellButton.state == .on
+                )
+                if condition.hasCriteria {
+                    BoardManHistoryConditionStore.shared.save(condition, for: filter)
+                } else {
+                    BoardManHistoryConditionStore.shared.delete(for: filter)
+                }
+            } else {
+                return
+            }
+            self.updateHistoryConditionButton()
+            self.applyCurrentFilter()
         }
-        BoardManHistoryConditionStore.shared.save(condition, for: filter)
-        updateHistoryConditionButton()
-        applyCurrentFilter()
+        DispatchQueue.main.async {
+            alert.window.level = .floating
+            alert.window.makeFirstResponder(includedField)
+        }
     }
 
     @objc private func toggleCurrentHistoryCondition(_ sender: Any?) {
@@ -5410,11 +5426,11 @@ class BoardManPanel: NSPanel {
         if #available(macOS 11.0, *) {
             let symbol = isEnabled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
             button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "History condition")
-            button.title = ""
-            button.imagePosition = .imageOnly
+            button.title = isEnabled ? "Condition ON" : "Condition"
+            button.imagePosition = .imageLeading
         } else {
             button.image = nil
-            button.title = condition == nil ? "Rule" : (isEnabled ? "Rule ✓" : "Rule")
+            button.title = isEnabled ? "Condition ON" : "Condition"
             button.imagePosition = .noImage
         }
         if #available(macOS 10.14, *) {
