@@ -503,6 +503,25 @@ final class BoardManPanelLayoutTests {
             #expect((hoverTarget.layer?.borderWidth ?? 0) == 0)
         }
 
+        if let appearanceCategory = categories.first(where: { $0.title == "Appearance" }) {
+            _ = appearanceCategory.sendAction(appearanceCategory.action, to: appearanceCategory.target)
+            await settlePanelLayout(panel)
+            let popupTitles = allSubviews(of: root)
+                .compactMap { $0 as? NSPopUpButton }
+                .filter { !$0.isHidden }
+                .map { Set($0.itemTitles) }
+            #expect(popupTitles.contains(Set(["System", "Light", "Dark"])),
+                    "Appearance mode choices are missing.")
+            #expect(popupTitles.contains(Set(["Default", "Simple", "Monochrome"])),
+                    "UI style choices are missing.")
+            #expect(popupTitles.contains(Set(["System", "Rounded", "Serif", "Monospaced"])),
+                    "Font choices are missing.")
+            #expect(popupTitles.contains { $0.contains("Scarlet") && $0.contains("Emerald") && $0.contains("Violet") },
+                    "Expanded theme colors are missing.")
+            #expect(popupTitles.contains { $0.contains("Teal") && $0.contains("Green") && $0.contains("Purple") && $0.contains("Indigo") },
+                    "Expanded Used colors are missing.")
+        }
+
         for category in categories {
             _ = category.sendAction(category.action, to: category.target)
             await settlePanelLayout(panel)
@@ -540,8 +559,8 @@ final class BoardManPanelLayoutTests {
         let search = descendants.compactMap { $0 as? NSSearchField }.first
         #expect((search != nil) == expectsSearch || search?.isHidden == !expectsSearch)
         if expectsSearch, let search {
-            #expect(search.cell is NSSearchFieldCell,
-                    "Search field is not using the native interactive AppKit search cell.")
+            #expect(search.cell is BoardManCenteredSearchFieldCell,
+                    "Search field is not using the centered interactive AppKit search cell.")
             #expect((search.layer?.borderWidth ?? 0) == 0,
                     "Search field has a second custom layer border.")
             #expect(abs(search.frame.midY - tabs.frame.midY) <= 0.5,
@@ -552,6 +571,14 @@ final class BoardManPanelLayoutTests {
                     "Search control cannot receive text input.")
             #expect(search.target != nil && search.action != nil,
                     "Search control is missing its input action wiring.")
+            if let cell = search.cell as? BoardManCenteredSearchFieldCell {
+                let textRect = cell.searchTextRect(forBounds: search.bounds)
+                let iconRect = cell.searchButtonRect(forBounds: search.bounds)
+                #expect(abs(textRect.midY - search.bounds.midY) <= 0.5,
+                        "Search text is not vertically centered.")
+                #expect(abs(iconRect.midY - search.bounds.midY) <= 0.5,
+                        "Search icon is not vertically centered.")
+            }
         }
     }
 
