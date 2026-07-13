@@ -73,6 +73,7 @@ struct Constants {
         static let boardManUsePanelUI = "BoardManUsePanelUI"
         static let boardManShowRowNumbers = "BoardManShowRowNumbers"
         static let boardManHistoryUsageFilter = "BoardManHistoryUsageFilter"
+        static let boardManHistoryConditionsJSON = "BoardManHistoryConditionsJSON"
         static let boardManTimestampFormat = "BoardManTimestampFormat"
         static let boardManTimestampPosition = "BoardManTimestampPosition"
         static let boardManPanelHeight = "BoardManPanelHeight"
@@ -127,6 +128,7 @@ struct Constants {
         static let migrateOpenBoardManCommandOptionV = "kCPYMigrateOpenBoardManCommandOptionV"
         static let folderKeyCombos = "kCPYFolderKeyCombos"
         static let clearHistoryKeyCombo = "kCPYClearHistoryKeyCombo"
+        static let quickModeKeyCombo = "kCPYQuickModeKeyCombo"
     }
 
 }
