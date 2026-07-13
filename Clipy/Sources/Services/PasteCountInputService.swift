@@ -36,7 +36,7 @@ final class PasteCountInputService {
     private var isMonitoringStarted = false
     private var isStartingEventTap = false
     private var suppressUntil = Date.distantPast
-    private var lastCountedText: String?
+    private var lastCountedIdentity: String?
     private var lastCountedAt = Date.distantPast
     private var lastDetectedAt = Date.distantPast
     private let debounceInterval: TimeInterval = 0.45
@@ -407,32 +407,42 @@ final class PasteCountInputService {
     }
 
     private func countCurrentClipboardIfNeeded(source: String) {
-        guard let pastedText = NSPasteboard.general.string(forType: .string)
-            ?? NSPasteboard.general.string(forType: .deprecatedString),
-              !pastedText.isEmpty else {
-            log("matched clip key=no reason=empty_clipboard source=\(source)")
+        let pasteboard = NSPasteboard.general
+        let text = pasteboard.string(forType: .string)
+            ?? pasteboard.string(forType: .deprecatedString)
+        let image = pasteboard.readObjects(forClasses: [NSImage.self], options: nil)?.first as? NSImage
+
+        let identity: String
+        let lookupKey: () -> String?
+        if let text, !text.isEmpty {
+            identity = "text:\(text)"
+            lookupKey = { PasteCountStore.shared.keyForLatestClip(matching: text) }
+        } else if let image,
+                  let fingerprint = PasteCountStore.imageFingerprint(for: image) {
+            identity = "image:\(fingerprint)"
+            lookupKey = { PasteCountStore.shared.keyForLatestImageClip(matching: image) }
+        } else {
+            log("matched clip key=no reason=unsupported_clipboard source=\(source)")
             return
         }
 
         let now = Date()
-        if pastedText == lastCountedText,
+        if identity == lastCountedIdentity,
            now.timeIntervalSince(lastCountedAt) < debounceInterval {
             log("matched clip key=no reason=debounced source=\(source)")
             return
         }
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            guard let key = PasteCountStore.shared.keyForLatestClip(matching: pastedText) else {
+            guard let key = lookupKey() else {
                 self?.log("matched clip key=no source=\(source)")
                 return
             }
 
             DispatchQueue.main.async { [weak self] in
                 PasteCountStore.shared.increment(forKey: key)
-
-                self?.lastCountedText = pastedText
+                self?.lastCountedIdentity = identity
                 self?.lastCountedAt = now
-
                 self?.log("count increment success source=\(source) key=\(key)")
             }
         }
