@@ -81,6 +81,9 @@ struct Constants {
         static let boardManHideRulesJSON = "BoardManHideRulesJSON"
         static let boardManThemePreset = "BoardManThemePreset"
         static let boardManThemeLighten = "BoardManThemeLighten"
+        static let boardManAppearanceMode = "BoardManAppearanceMode"
+        static let boardManUIStyle = "BoardManUIStyle"
+        static let boardManFontChoice = "BoardManFontChoice"
     }
 
     struct Beta {

@@ -1032,12 +1032,72 @@ private final class BoardManSnippetShortcutRow {
     }
 }
 
+fileprivate enum BoardManAppearanceMode: String, CaseIterable {
+    case system = "System"
+    case light = "Light"
+    case dark = "Dark"
+
+    var appearance: NSAppearance? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return NSAppearance(named: .aqua)
+        case .dark:
+            return NSAppearance(named: .darkAqua)
+        }
+    }
+
+    static func allowed(_ value: String?) -> BoardManAppearanceMode {
+        return allCases.first(where: { $0.rawValue == value }) ?? .system
+    }
+}
+
+fileprivate enum BoardManUIStyle: String, CaseIterable {
+    case defaultStyle = "Default"
+    case simple = "Simple"
+    case monochrome = "Monochrome"
+
+    static func allowed(_ value: String?) -> BoardManUIStyle {
+        return allCases.first(where: { $0.rawValue == value }) ?? .defaultStyle
+    }
+}
+
+fileprivate enum BoardManFontChoice: String, CaseIterable {
+    case system = "System"
+    case rounded = "Rounded"
+    case serif = "Serif"
+    case monospaced = "Monospaced"
+
+    static func allowed(_ value: String?) -> BoardManFontChoice {
+        return allCases.first(where: { $0.rawValue == value }) ?? .system
+    }
+
+    func font(ofSize size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        let base = NSFont.systemFont(ofSize: size, weight: weight)
+        guard self != .system else { return base }
+        let design: NSFontDescriptor.SystemDesign
+        switch self {
+        case .rounded: design = .rounded
+        case .serif: design = .serif
+        case .monospaced: design = .monospaced
+        case .system: return base
+        }
+        guard let descriptor = base.fontDescriptor.withDesign(design) else { return base }
+        return NSFont(descriptor: descriptor, size: size) ?? base
+    }
+}
+
 fileprivate enum BoardManThemePreset: String, CaseIterable {
     case defaultPreset = "Default"
     case graphite = "Graphite"
     case ocean = "Ocean"
     case amber = "Amber"
     case rose = "Rose"
+    case scarlet = "Scarlet"
+    case emerald = "Emerald"
+    case violet = "Violet"
+    case indigo = "Indigo"
 
     var title: String {
         return rawValue
@@ -1050,6 +1110,10 @@ fileprivate enum BoardManThemePreset: String, CaseIterable {
         case .ocean: return .systemTeal
         case .amber: return .systemOrange
         case .rose: return .systemPink
+        case .scarlet: return .systemRed
+        case .emerald: return .systemGreen
+        case .violet: return .systemPurple
+        case .indigo: return .systemIndigo
         }
     }
 
@@ -1060,6 +1124,10 @@ fileprivate enum BoardManThemePreset: String, CaseIterable {
         case .ocean: return NSColor.systemTeal.withAlphaComponent(0.16)
         case .amber: return NSColor.systemOrange.withAlphaComponent(0.15)
         case .rose: return NSColor.systemPink.withAlphaComponent(0.15)
+        case .scarlet: return NSColor.systemRed.withAlphaComponent(0.15)
+        case .emerald: return NSColor.systemGreen.withAlphaComponent(0.15)
+        case .violet: return NSColor.systemPurple.withAlphaComponent(0.15)
+        case .indigo: return NSColor.systemIndigo.withAlphaComponent(0.15)
         }
     }
 
@@ -1089,6 +1157,10 @@ fileprivate enum BoardManThemePreset: String, CaseIterable {
             case .ocean: return NSColor.systemTeal.withAlphaComponent(lighten ? 0.08 : 0.15)
             case .amber: return NSColor.systemOrange.withAlphaComponent(lighten ? 0.08 : 0.14)
             case .rose: return NSColor.systemPink.withAlphaComponent(lighten ? 0.08 : 0.14)
+            case .scarlet: return NSColor.systemRed.withAlphaComponent(lighten ? 0.08 : 0.14)
+            case .emerald: return NSColor.systemGreen.withAlphaComponent(lighten ? 0.08 : 0.14)
+            case .violet: return NSColor.systemPurple.withAlphaComponent(lighten ? 0.08 : 0.14)
+            case .indigo: return NSColor.systemIndigo.withAlphaComponent(lighten ? 0.08 : 0.14)
             }
         }
         return lighten ? tintColor.withAlphaComponent(lightenedAlpha(tintColor.alphaComponent)) : tintColor
@@ -1570,15 +1642,98 @@ final class BoardManHeaderSegmentedControl: NSSegmentedControl {
 }
 
 final class BoardManCenteredTextFieldCell: NSTextFieldCell {
+    private func centeredTextRect(forBounds rect: NSRect) -> NSRect {
+        var textRect = super.drawingRect(forBounds: rect)
+        guard let font else { return textRect }
+        let textHeight = min(textRect.height, ceil(font.ascender - font.descender + font.leading) + 2)
+        textRect.origin.y = floor(rect.midY - (textHeight / 2))
+        textRect.size.height = textHeight
+        return textRect
+    }
+
     override func drawingRect(forBounds rect: NSRect) -> NSRect {
-        var drawingRect = super.drawingRect(forBounds: rect)
-        guard let font else { return drawingRect }
-        let textHeight = ceil(font.ascender - font.descender + font.leading)
-        if textHeight < drawingRect.height {
-            drawingRect.origin.y = floor(rect.midY - (textHeight / 2))
-            drawingRect.size.height = textHeight
-        }
-        return drawingRect
+        return centeredTextRect(forBounds: rect)
+    }
+
+    override func edit(withFrame aRect: NSRect,
+                       in controlView: NSView,
+                       editor textObj: NSText,
+                       delegate: Any?,
+                       event: NSEvent?) {
+        super.edit(withFrame: centeredTextRect(forBounds: aRect),
+                   in: controlView,
+                   editor: textObj,
+                   delegate: delegate,
+                   event: event)
+    }
+
+    override func select(withFrame aRect: NSRect,
+                         in controlView: NSView,
+                         editor textObj: NSText,
+                         delegate: Any?,
+                         start selStart: Int,
+                         length selLength: Int) {
+        super.select(withFrame: centeredTextRect(forBounds: aRect),
+                     in: controlView,
+                     editor: textObj,
+                     delegate: delegate,
+                     start: selStart,
+                     length: selLength)
+    }
+}
+
+final class BoardManCenteredSearchFieldCell: NSSearchFieldCell {
+    private func verticallyCentered(_ rect: NSRect, height: CGFloat) -> NSRect {
+        let targetHeight = min(rect.height, height)
+        return NSIntegralRect(NSRect(
+            x: rect.origin.x,
+            y: floor(rect.midY - (targetHeight / 2)),
+            width: rect.width,
+            height: targetHeight
+        ))
+    }
+
+    override func searchTextRect(forBounds rect: NSRect) -> NSRect {
+        let original = super.searchTextRect(forBounds: rect)
+        guard let font else { return original }
+        let textHeight = ceil(font.ascender - font.descender + font.leading) + 4
+        return verticallyCentered(original, height: textHeight)
+    }
+
+    override func searchButtonRect(forBounds rect: NSRect) -> NSRect {
+        let original = super.searchButtonRect(forBounds: rect)
+        return verticallyCentered(original, height: original.height)
+    }
+
+    override func cancelButtonRect(forBounds rect: NSRect) -> NSRect {
+        let original = super.cancelButtonRect(forBounds: rect)
+        return verticallyCentered(original, height: original.height)
+    }
+
+    override func edit(withFrame aRect: NSRect,
+                       in controlView: NSView,
+                       editor textObj: NSText,
+                       delegate: Any?,
+                       event: NSEvent?) {
+        super.edit(withFrame: searchTextRect(forBounds: aRect),
+                   in: controlView,
+                   editor: textObj,
+                   delegate: delegate,
+                   event: event)
+    }
+
+    override func select(withFrame aRect: NSRect,
+                         in controlView: NSView,
+                         editor textObj: NSText,
+                         delegate: Any?,
+                         start selStart: Int,
+                         length selLength: Int) {
+        super.select(withFrame: searchTextRect(forBounds: aRect),
+                     in: controlView,
+                     editor: textObj,
+                     delegate: delegate,
+                     start: selStart,
+                     length: selLength)
     }
 }
 
@@ -1650,6 +1805,12 @@ final class BoardManHistoryCellView: NSTableCellView {
                    useLiquidGlass: Bool,
                    lightenTheme: Bool,
                    themePreset: BoardManThemePreset) {
+        let fontChoice = BoardManFontChoice.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice)
+        )
+        primaryLabel.font = fontChoice.font(ofSize: 13.5, weight: .medium)
+        metadataLabel.font = fontChoice.font(ofSize: 11.5, weight: .regular)
+        countBadge.font = fontChoice.font(ofSize: 10.5, weight: .medium)
         primaryLabel.stringValue = item.primaryTitle
         metadataLabel.stringValue = item.metadataText
         let badgePrefix = usageStyle == "compact" ? "used " : "×"
@@ -1779,6 +1940,12 @@ class BoardManPanel: NSPanel {
     private var usedItemStylePopup: NSPopUpButton?
     private var themePresetLabel: NSTextField?
     private var themePresetPopup: NSPopUpButton?
+    private var appearanceModeLabel: NSTextField?
+    private var appearanceModePopup: NSPopUpButton?
+    private var uiStyleLabel: NSTextField?
+    private var uiStylePopup: NSPopUpButton?
+    private var fontChoiceLabel: NSTextField?
+    private var fontChoicePopup: NSPopUpButton?
     private var themeLightenButton: NSButton?
     private var generalSectionLabel: NSTextField?
     private var launchOnLoginButton: NSButton?
@@ -1929,8 +2096,24 @@ class BoardManPanel: NSPanel {
         return AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManThemeLighten)
     }
 
-    fileprivate var themePreset: BoardManThemePreset {
+    fileprivate var appearanceMode: BoardManAppearanceMode {
+        return BoardManAppearanceMode.allowed(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManAppearanceMode))
+    }
+
+    fileprivate var uiStyle: BoardManUIStyle {
+        return BoardManUIStyle.allowed(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUIStyle))
+    }
+
+    fileprivate var fontChoice: BoardManFontChoice {
+        return BoardManFontChoice.allowed(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice))
+    }
+
+    fileprivate var selectedThemePreset: BoardManThemePreset {
         return BoardManThemePreset.allowed(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManThemePreset))
+    }
+
+    fileprivate var themePreset: BoardManThemePreset {
+        return uiStyle == .monochrome ? .graphite : selectedThemePreset
     }
 
     fileprivate var themeAccentColor: NSColor {
@@ -2034,7 +2217,10 @@ class BoardManPanel: NSPanel {
     }
 
     private static func allowedUsedItemStyle(_ value: String?) -> String {
-        let allowed = ["Default", "Subtle Red", "Amber", "Blue", "Monochrome"]
+        let allowed = [
+            "Default", "Subtle Red", "Amber", "Blue", "Teal",
+            "Green", "Purple", "Indigo", "Gray", "Monochrome"
+        ]
         guard let value, allowed.contains(value) else { return "Default" }
         return value
     }
@@ -2185,7 +2371,8 @@ class BoardManPanel: NSPanel {
 
         let popups: [NSPopUpButton?] = [
             statusItemPopup, timestampPopup, usageStylePopup, usedItemStylePopup,
-            themePresetPopup, hideRuleModePopup, snippetCategoryPopup
+            themePresetPopup, appearanceModePopup, uiStylePopup, fontChoicePopup,
+            hideRuleModePopup, snippetCategoryPopup
         ]
         popups.forEach { popup in
             popup?.font = NSFont.systemFont(ofSize: 12)
@@ -2218,6 +2405,7 @@ class BoardManPanel: NSPanel {
         self.hasShadow = true
         self.isRestorable = false
         self.setFrameAutosaveName("")
+        self.appearance = appearanceMode.appearance
         setupPanelContainer()
         setupUI()
         setupPreviewBubble()
@@ -2263,14 +2451,15 @@ class BoardManPanel: NSPanel {
         setupGlassBackgroundIfNeeded()
 
         let search = NSSearchField(frame: .zero)
+        search.cell = BoardManCenteredSearchFieldCell(textCell: "")
         search.placeholderString = "Search clipboard history and snippets"
         search.target = self
         search.action = #selector(searchTextChanged(_:))
         search.sendsSearchStringImmediately = true
         search.delegate = self
         search.focusRingType = .none
-        search.controlSize = .large
-        search.font = NSFont.systemFont(ofSize: 14, weight: .regular)
+        search.controlSize = .regular
+        search.font = NSFont.systemFont(ofSize: 13, weight: .regular)
         search.isEditable = true
         search.isSelectable = true
         search.isEnabled = true
@@ -2533,7 +2722,10 @@ class BoardManPanel: NSPanel {
         usedItemStyleLabel = usedItemText
 
         let usedItemStyle = NSPopUpButton(frame: .zero, pullsDown: false)
-        usedItemStyle.addItems(withTitles: ["Default", "Subtle Red", "Amber", "Blue", "Monochrome"])
+        usedItemStyle.addItems(withTitles: [
+            "Default", "Subtle Red", "Amber", "Blue", "Teal",
+            "Green", "Purple", "Indigo", "Gray", "Monochrome"
+        ])
         usedItemStyle.selectItem(withTitle: BoardManPanel.allowedUsedItemStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsedItemStyle)))
         usedItemStyle.font = NSFont.systemFont(ofSize: 11)
         usedItemStyle.target = self
@@ -2556,6 +2748,54 @@ class BoardManPanel: NSPanel {
         themePresetControl.toolTip = "Changes Board-Man panel accents only."
         contentView.addSubview(themePresetControl)
         themePresetPopup = themePresetControl
+
+        let appearanceText = NSTextField(labelWithString: "Mode")
+        appearanceText.font = NSFont.systemFont(ofSize: 11)
+        appearanceText.textColor = .labelColor
+        contentView.addSubview(appearanceText)
+        appearanceModeLabel = appearanceText
+
+        let appearanceControl = NSPopUpButton(frame: .zero, pullsDown: false)
+        appearanceControl.addItems(withTitles: BoardManAppearanceMode.allCases.map { $0.rawValue })
+        appearanceControl.selectItem(withTitle: appearanceMode.rawValue)
+        appearanceControl.font = NSFont.systemFont(ofSize: 11)
+        appearanceControl.target = self
+        appearanceControl.action = #selector(appearanceModeChanged(_:))
+        appearanceControl.toolTip = "Follow macOS, force Light, or force Dark for Board-Man."
+        contentView.addSubview(appearanceControl)
+        appearanceModePopup = appearanceControl
+
+        let uiStyleText = NSTextField(labelWithString: "UI")
+        uiStyleText.font = NSFont.systemFont(ofSize: 11)
+        uiStyleText.textColor = .labelColor
+        contentView.addSubview(uiStyleText)
+        uiStyleLabel = uiStyleText
+
+        let uiStyleControl = NSPopUpButton(frame: .zero, pullsDown: false)
+        uiStyleControl.addItems(withTitles: BoardManUIStyle.allCases.map { $0.rawValue })
+        uiStyleControl.selectItem(withTitle: uiStyle.rawValue)
+        uiStyleControl.font = NSFont.systemFont(ofSize: 11)
+        uiStyleControl.target = self
+        uiStyleControl.action = #selector(uiStyleChanged(_:))
+        uiStyleControl.toolTip = "Default keeps the full visual system, Simple reduces decoration, and Monochrome removes hue."
+        contentView.addSubview(uiStyleControl)
+        uiStylePopup = uiStyleControl
+
+        let fontText = NSTextField(labelWithString: "Font")
+        fontText.font = NSFont.systemFont(ofSize: 11)
+        fontText.textColor = .labelColor
+        contentView.addSubview(fontText)
+        fontChoiceLabel = fontText
+
+        let fontControl = NSPopUpButton(frame: .zero, pullsDown: false)
+        fontControl.addItems(withTitles: BoardManFontChoice.allCases.map { $0.rawValue })
+        fontControl.selectItem(withTitle: fontChoice.rawValue)
+        fontControl.font = NSFont.systemFont(ofSize: 11)
+        fontControl.target = self
+        fontControl.action = #selector(fontChoiceChanged(_:))
+        fontControl.toolTip = "Changes Board-Man panel typography immediately."
+        contentView.addSubview(fontControl)
+        fontChoicePopup = fontControl
 
         let lighten = NSButton(checkboxWithTitle: "Lighten", target: self, action: #selector(themeLightenChanged(_:)))
         lighten.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManThemeLighten) ? .on : .off
@@ -2646,6 +2886,7 @@ class BoardManPanel: NSPanel {
         filterSectionLabel = filtersTitle
 
         let hideText = NSTextField(frame: .zero)
+        hideText.cell = BoardManCenteredTextFieldCell(textCell: "")
         hideText.placeholderString = "word or phrase"
         hideText.font = NSFont.systemFont(ofSize: 11)
         hideText.target = self
@@ -2731,6 +2972,7 @@ class BoardManPanel: NSPanel {
         licenseLimitsLabel = limitsLabel
 
         let licenseKey = NSTextField(frame: .zero)
+        licenseKey.cell = BoardManCenteredTextFieldCell(textCell: "")
         licenseKey.placeholderString = "Secure local license"
         licenseKey.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         licenseKey.isEnabled = false
@@ -2960,6 +3202,7 @@ class BoardManPanel: NSPanel {
         snippetEditorTitleLabel = editorTitleLabel
 
         let editorTitle = NSTextField(frame: .zero)
+        editorTitle.cell = BoardManCenteredTextFieldCell(textCell: "")
         editorTitle.font = NSFont.systemFont(ofSize: 12)
         editorTitle.placeholderString = "untitled snippet"
         editorView.addSubview(editorTitle)
@@ -3033,16 +3276,54 @@ class BoardManPanel: NSPanel {
         synchronizeListGeometry()
     }
 
+    private func inferredFontWeight(_ font: NSFont) -> NSFont.Weight {
+        let traits = font.fontDescriptor.symbolicTraits
+        if traits.contains(.bold) { return .semibold }
+        return .regular
+    }
+
+    private func applyTypography() {
+        let choice = fontChoice
+        func apply(to view: NSView) {
+            if let textField = view as? NSTextField, let currentFont = textField.font {
+                textField.font = choice.font(ofSize: currentFont.pointSize, weight: inferredFontWeight(currentFont))
+            } else if let button = view as? NSButton, let currentFont = button.font {
+                button.font = choice.font(ofSize: currentFont.pointSize, weight: inferredFontWeight(currentFont))
+            } else if let popup = view as? NSPopUpButton, let currentFont = popup.font {
+                popup.font = choice.font(ofSize: currentFont.pointSize, weight: inferredFontWeight(currentFont))
+            } else if let textView = view as? NSTextView, let currentFont = textView.font {
+                textView.font = choice.font(ofSize: currentFont.pointSize, weight: inferredFontWeight(currentFont))
+            }
+            view.subviews.forEach(apply)
+        }
+        if let contentView { apply(to: contentView) }
+        if let bubbleContent = previewBubblePanel?.contentView { apply(to: bubbleContent) }
+        placeholderList?.reloadData()
+    }
+
+    private func applyAppearanceMode() {
+        appearance = appearanceMode.appearance
+        previewBubblePanel?.appearance = appearanceMode.appearance
+    }
+
     private func applyLiquidGlassStyle() {
-        let useGlass = isLiquidGlassEnabled
+        applyAppearanceMode()
+        let simpleStyle = uiStyle == .simple
+        let useGlass = isLiquidGlassEnabled && !simpleStyle
         let lightenTheme = isThemeLightenEnabled
         let preset = themePreset
         let accentColor = preset.accentColor
-        let tintColor = preset.panelTintColor(useLiquidGlass: useGlass, lighten: lightenTheme)
-        let surfaceTint = preset.surfaceTintColor(useLiquidGlass: useGlass, lighten: lightenTheme)
+        let presetTint = preset.panelTintColor(useLiquidGlass: useGlass, lighten: lightenTheme)
+        let tintColor = simpleStyle
+            ? NSColor.controlBackgroundColor.withAlphaComponent(0.18)
+            : presetTint
+        let surfaceTint = simpleStyle
+            ? NSColor.controlBackgroundColor.withAlphaComponent(0.24)
+            : preset.surfaceTintColor(useLiquidGlass: useGlass, lighten: lightenTheme)
         backgroundColor = useGlass ? .clear : .windowBackgroundColor
         isOpaque = !useGlass
-        hasShadow = true
+        hasShadow = !simpleStyle
+        contentView?.layer?.cornerRadius = simpleStyle ? 10 : 18
         glassBackgroundView?.isHidden = !useGlass
         glassBackgroundView?.material = preset.glassMaterial
         glassBackgroundView?.layer?.backgroundColor = tintColor.cgColor
@@ -3062,7 +3343,8 @@ class BoardManPanel: NSPanel {
         segmentedControl?.needsDisplay = true
         settingsSidebarView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.28)
-            : NSColor.controlBackgroundColor.withAlphaComponent(0.72)).cgColor
+            : NSColor.controlBackgroundColor.withAlphaComponent(simpleStyle ? 0.42 : 0.72)).cgColor
+        settingsSidebarView?.layer?.cornerRadius = simpleStyle ? 7 : LayoutMetrics.cardCornerRadius
         settingsSidebarView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         settingsCategoryButtons.forEach { button in
             if #available(macOS 10.14, *) {
@@ -3073,14 +3355,14 @@ class BoardManPanel: NSPanel {
         settingsBackgroundView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.42)
             : tintColor).cgColor
-        settingsBackgroundView?.layer?.cornerRadius = LayoutMetrics.cardCornerRadius
+        settingsBackgroundView?.layer?.cornerRadius = simpleStyle ? 7 : LayoutMetrics.cardCornerRadius
         settingsBackgroundView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         settingsBackgroundView?.layer?.borderWidth = 1
         settingsBackgroundView?.layer?.shadowOpacity = 0
         scrollView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.30)
             : tintColor).cgColor
-        scrollView?.layer?.cornerRadius = LayoutMetrics.cardCornerRadius
+        scrollView?.layer?.cornerRadius = simpleStyle ? 7 : LayoutMetrics.cardCornerRadius
         scrollView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         scrollView?.layer?.borderWidth = 1
         scrollView?.layer?.shadowOpacity = 0
@@ -3104,7 +3386,7 @@ class BoardManPanel: NSPanel {
         [generalSectionLabel, shortcutSectionLabel, viewSectionLabel, historySectionLabel, privacySectionLabel, storedTypesSectionLabel, filterSectionLabel, labsSectionLabel, snippetCategoryLabel, snippetEditorTitleLabel, snippetEditorContentLabel].forEach { label in
             label?.textColor = themePreset == .defaultPreset ? .labelColor : accentColor
         }
-        [maxHistorySizeLabel, statusItemLabel, themePresetLabel, timestampLabel, usageStyleLabel, usedItemStyleLabel, heightControlLabel].forEach { label in
+        [maxHistorySizeLabel, statusItemLabel, themePresetLabel, appearanceModeLabel, uiStyleLabel, fontChoiceLabel, timestampLabel, usageStyleLabel, usedItemStyleLabel, heightControlLabel].forEach { label in
             label?.textColor = NSColor.labelColor.withAlphaComponent(useGlass ? 0.96 : 1)
         }
         globalShortcutRows.forEach { row in
@@ -3119,11 +3401,18 @@ class BoardManPanel: NSPanel {
         snippetCategoryPopup?.wantsLayer = true
         snippetCategoryPopup?.layer?.cornerRadius = useGlass ? 9 : 6
         snippetCategoryPopup?.layer?.backgroundColor = useGlass ? surfaceTint.withAlphaComponent(0.30).cgColor : NSColor.clear.cgColor
+        snippetEditorView?.layer?.cornerRadius = simpleStyle ? 7 : LayoutMetrics.cardCornerRadius
         snippetEditorView?.layer?.backgroundColor = (useGlass ? surfaceTint.withAlphaComponent(0.30) : tintColor).cgColor
         snippetEditorView?.layer?.borderColor = (useGlass ? preset.edgeColor(useLiquidGlass: true, lighten: lightenTheme) : accentColor.withAlphaComponent(lightenTheme ? 0.18 : 0.42)).cgColor
         previewBubblePanel?.contentView?.layer?.cornerRadius = useGlass ? 11 : 8
         previewBubblePanel?.contentView?.layer?.backgroundColor = surfaceTint.withAlphaComponent(useGlass ? 0.42 : 0.95).cgColor
         previewBubblePanel?.contentView?.layer?.borderColor = accentColor.withAlphaComponent(lightenTheme ? 0.18 : (useGlass ? 0.46 : 0.42)).cgColor
+        themePresetPopup?.isEnabled = uiStyle != .monochrome
+        appearanceModePopup?.selectItem(withTitle: appearanceMode.rawValue)
+        uiStylePopup?.selectItem(withTitle: uiStyle.rawValue)
+        fontChoicePopup?.selectItem(withTitle: fontChoice.rawValue)
+        themePresetPopup?.selectItem(withTitle: selectedThemePreset.title)
+        applyTypography()
         placeholderList?.reloadData()
         synchronizeListGeometry()
     }
@@ -3379,7 +3668,7 @@ class BoardManPanel: NSPanel {
             settingsPageTitleLabel, settingsPageDescriptionLabel,
             generalSectionLabel, launchOnLoginButton, inputPasteCommandButton, maxHistorySizeLabel, maxHistorySizeStepper, maxHistorySizeValueLabel, statusItemLabel, statusItemPopup, shortcutSectionLabel, shortcutStatusLabel,
             snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton,
-            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, themeLightenButton,
+            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup, themeLightenButton,
             historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
@@ -3418,7 +3707,9 @@ class BoardManPanel: NSPanel {
         let viewControls: [NSView?] = [
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel,
-            usedItemStylePopup, themePresetLabel, themePresetPopup, themeLightenButton,
+            usedItemStylePopup, themePresetLabel, themePresetPopup,
+            appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup,
+            fontChoiceLabel, fontChoicePopup, themeLightenButton,
             heightControlLabel, heightLabel, heightStepper
         ]
         let historyControls: [NSView?] = [historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton]
@@ -3489,9 +3780,19 @@ class BoardManPanel: NSPanel {
             rowNumbersButton?.frame = NSRect(x: originX, y: originY - 40, width: width, height: 20)
             placeLabeledRow(label: timestampLabel, control: timestampPopup, originX: originX, originY: originY - 84, width: width)
             usageCountButton?.frame = NSRect(x: originX, y: originY - 126, width: width, height: 20)
-            placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX, originY: originY - 170, width: width)
-            placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: originX, originY: originY - 214, width: width)
-            placeLabeledRow(label: themePresetLabel, control: themePresetPopup, originX: originX, originY: originY - 258, width: width)
+
+            let columnGap: CGFloat = 16
+            let halfWidth = max(180, floor((width - columnGap) / 2))
+            let rightX = originX + halfWidth + columnGap
+            let compactLabelWidth: CGFloat = 50
+
+            placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX, originY: originY - 170, width: halfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: rightX, originY: originY - 170, width: halfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: themePresetLabel, control: themePresetPopup, originX: originX, originY: originY - 214, width: halfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: appearanceModeLabel, control: appearanceModePopup, originX: rightX, originY: originY - 214, width: halfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: uiStyleLabel, control: uiStylePopup, originX: originX, originY: originY - 258, width: halfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: fontChoiceLabel, control: fontChoicePopup, originX: rightX, originY: originY - 258, width: halfWidth, labelWidth: compactLabelWidth)
+
             themeLightenButton?.frame = NSRect(x: originX, y: originY - 300, width: 116, height: 20)
             heightControlLabel?.frame = NSRect(x: originX + 136, y: originY - 300, width: fieldLabelWidth, height: 16)
             heightStepper?.frame = NSRect(x: originX + 136 + fieldLabelWidth + 12, y: originY - 307, width: 76, height: rowH)
@@ -3695,6 +3996,34 @@ class BoardManPanel: NSPanel {
         let preset = BoardManThemePreset.allCases.first { $0.title == title } ?? .defaultPreset
         AppEnvironment.current.defaults.set(preset.title, forKey: Constants.UserDefaults.boardManThemePreset)
         applyLiquidGlassStyle()
+        layoutPanelSubviews()
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+        contentView?.needsDisplay = true
+    }
+
+    @objc private func appearanceModeChanged(_ sender: NSPopUpButton) {
+        let mode = BoardManAppearanceMode.allowed(sender.titleOfSelectedItem)
+        AppEnvironment.current.defaults.set(mode.rawValue, forKey: Constants.UserDefaults.boardManAppearanceMode)
+        applyLiquidGlassStyle()
+        layoutPanelSubviews()
+        contentView?.needsDisplay = true
+    }
+
+    @objc private func uiStyleChanged(_ sender: NSPopUpButton) {
+        let style = BoardManUIStyle.allowed(sender.titleOfSelectedItem)
+        AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManUIStyle)
+        applyLiquidGlassStyle()
+        layoutPanelSubviews()
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+        contentView?.needsDisplay = true
+    }
+
+    @objc private func fontChoiceChanged(_ sender: NSPopUpButton) {
+        let choice = BoardManFontChoice.allowed(sender.titleOfSelectedItem)
+        AppEnvironment.current.defaults.set(choice.rawValue, forKey: Constants.UserDefaults.boardManFontChoice)
+        applyTypography()
         layoutPanelSubviews()
         placeholderList?.reloadData()
         synchronizeListGeometry()
@@ -5012,9 +5341,15 @@ class BoardManPanel: NSPanel {
 
     fileprivate func usedItemAppearance(for row: Int) -> (background: NSColor, border: NSColor, borderWidth: CGFloat)? {
         guard row >= 0, let item = historyItems[safe: row], item.pasteCount >= 1 else { return nil }
-        let style = BoardManPanel.allowedUsedItemStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsedItemStyle))
-        let alpha: CGFloat = isThemeLightenEnabled ? 0.09 : (isLiquidGlassEnabled ? 0.16 : 0.20)
-        let borderAlpha: CGFloat = isThemeLightenEnabled ? 0.24 : 0.42
+        let storedStyle = BoardManPanel.allowedUsedItemStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsedItemStyle))
+        let style = uiStyle == .monochrome ? "Monochrome" : storedStyle
+        let alpha: CGFloat
+        if uiStyle == .simple {
+            alpha = isThemeLightenEnabled ? 0.05 : 0.09
+        } else {
+            alpha = isThemeLightenEnabled ? 0.09 : (isLiquidGlassEnabled ? 0.16 : 0.20)
+        }
+        let borderAlpha: CGFloat = uiStyle == .simple ? 0.24 : (isThemeLightenEnabled ? 0.24 : 0.42)
         switch style {
         case "Subtle Red":
             return (NSColor.systemRed.withAlphaComponent(alpha), NSColor.systemRed.withAlphaComponent(borderAlpha), 1)
@@ -5022,6 +5357,16 @@ class BoardManPanel: NSPanel {
             return (NSColor.systemOrange.withAlphaComponent(alpha), NSColor.systemOrange.withAlphaComponent(borderAlpha), 1)
         case "Blue":
             return (NSColor.systemBlue.withAlphaComponent(alpha), NSColor.systemBlue.withAlphaComponent(borderAlpha), 1)
+        case "Teal":
+            return (NSColor.systemTeal.withAlphaComponent(alpha), NSColor.systemTeal.withAlphaComponent(borderAlpha), 1)
+        case "Green":
+            return (NSColor.systemGreen.withAlphaComponent(alpha), NSColor.systemGreen.withAlphaComponent(borderAlpha), 1)
+        case "Purple":
+            return (NSColor.systemPurple.withAlphaComponent(alpha), NSColor.systemPurple.withAlphaComponent(borderAlpha), 1)
+        case "Indigo":
+            return (NSColor.systemIndigo.withAlphaComponent(alpha), NSColor.systemIndigo.withAlphaComponent(borderAlpha), 1)
+        case "Gray":
+            return (NSColor.systemGray.withAlphaComponent(alpha), NSColor.systemGray.withAlphaComponent(borderAlpha), 1)
         case "Monochrome":
             return (NSColor.labelColor.withAlphaComponent(isLiquidGlassEnabled ? 0.10 : 0.08), NSColor.separatorColor.withAlphaComponent(0.70), 1)
         default:

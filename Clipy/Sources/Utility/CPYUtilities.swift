@@ -62,8 +62,13 @@ final class CPYUtilities {
         defaultValues.updateValue(NSNumber(value: 680), forKey: Constants.UserDefaults.boardManPanelHeight)
         defaultValues.updateValue(NSNumber(value: true), forKey: Constants.UserDefaults.boardManShowUsageCount)
         defaultValues.updateValue("badge", forKey: Constants.UserDefaults.boardManUsageCountStyle)
+        defaultValues.updateValue("Default", forKey: Constants.UserDefaults.boardManUsedItemStyle)
+        defaultValues.updateValue("Default", forKey: Constants.UserDefaults.boardManThemePreset)
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManLiquidGlass)
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManThemeLighten)
+        defaultValues.updateValue("System", forKey: Constants.UserDefaults.boardManAppearanceMode)
+        defaultValues.updateValue("Default", forKey: Constants.UserDefaults.boardManUIStyle)
+        defaultValues.updateValue("System", forKey: Constants.UserDefaults.boardManFontChoice)
 
         /* Updates */
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.Update.enableAutomaticCheck)
