@@ -425,6 +425,42 @@ struct PasteCountInputServiceTests {
     }
 
     @Test
+    func recentUseOrderDoesNotOverwriteCopyOrder() throws {
+        var configuration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        configuration.objectTypes = [CPYClip.self]
+        let realm = try Realm(configuration: configuration)
+        let defaultsSuite = "BoardManHistoryOrderTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: defaultsSuite))
+        defer { defaults.removePersistentDomain(forName: defaultsSuite) }
+
+        let olderClip = CPYClip()
+        olderClip.dataHash = "older"
+        olderClip.createdTime = 1_000
+        olderClip.updateTime = 100
+
+        let newerClip = CPYClip()
+        newerClip.dataHash = "newer"
+        newerClip.createdTime = 2_000
+        newerClip.updateTime = 200
+
+        try realm.write {
+            realm.add([olderClip, newerClip])
+        }
+
+        #expect(realm.objects(CPYClip.self)
+            .sorted(byKeyPath: #keyPath(CPYClip.createdTime), ascending: false)
+            .first?.dataHash == "newer")
+        #expect(PasteCountStore(defaults: defaults).markUsed(clip: olderClip, in: realm))
+        #expect(olderClip.createdTime == 1_000)
+        #expect(realm.objects(CPYClip.self)
+            .sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: false)
+            .first?.dataHash == "older")
+        #expect(realm.objects(CPYClip.self)
+            .sorted(byKeyPath: #keyPath(CPYClip.createdTime), ascending: false)
+            .first?.dataHash == "newer")
+    }
+
+    @Test
     func imageFingerprintSurvivesArchiveRoundTripAndDistinguishesPixels() throws {
         let firstImage = testImage(color: .systemRed)
         let secondImage = testImage(color: .systemBlue)
@@ -465,6 +501,7 @@ final class BoardManPanelLayoutTests {
         #expect(panel.presentationItemScope == .historyOnly)
         assertTopLevelLayout(panel, mode: "History", expectsSearch: true)
         assertHeaderChrome(panel, expectsSearch: true)
+        assertHistoryToolbar(panel, expectsVisible: true)
         assertHistoryRowGeometry(panel)
 
         panel.openSnippetsManagerMode()
@@ -472,6 +509,7 @@ final class BoardManPanelLayoutTests {
         #expect(panel.presentationItemScope == .complete)
         assertTopLevelLayout(panel, mode: "Snippets", expectsSearch: true)
         assertHeaderChrome(panel, expectsSearch: true)
+        assertHistoryToolbar(panel, expectsVisible: false)
         assertHistoryRowGeometry(panel)
 
         panel.selectSettingsTab()
@@ -578,6 +616,32 @@ final class BoardManPanelLayoutTests {
                         "Search text is not vertically centered.")
                 #expect(abs(iconRect.midY - search.bounds.midY) <= 0.5,
                         "Search icon is not vertically centered.")
+            }
+        }
+    }
+
+    private func assertHistoryToolbar(_ panel: BoardManPanel, expectsVisible: Bool) {
+        guard let root = panel.contentView else {
+            Issue.record("Missing content view while checking the history toolbar.")
+            return
+        }
+        let descendants = allSubviews(of: root)
+        let usageFilter = descendants
+            .compactMap { $0 as? NSSegmentedControl }
+            .first { !($0 is BoardManHeaderSegmentedControl) && $0.segmentCount == 3 }
+        let sortButton = descendants
+            .compactMap { $0 as? NSButton }
+            .first { ($0.toolTip ?? "").contains("Copy Order") || ($0.toolTip ?? "").contains("Recent Use") }
+
+        #expect(usageFilter != nil, "History usage filter was not created.")
+        #expect(sortButton != nil, "History sort toggle was not created.")
+        #expect(usageFilter?.isHidden == !expectsVisible)
+        #expect(sortButton?.isHidden == !expectsVisible)
+        if expectsVisible, let usageFilter {
+            #expect(usageFilter.selectedSegment >= 0 && usageFilter.selectedSegment < 3)
+            for segment in 0..<usageFilter.segmentCount {
+                #expect(!(usageFilter.toolTip(forSegment: segment) ?? "").isEmpty,
+                        "History usage filter segment is missing its hover explanation.")
             }
         }
     }

@@ -20,6 +20,7 @@ final class CPYClip: Object {
     @objc dynamic var title = ""
     @objc dynamic var dataHash = ""
     @objc dynamic var primaryType = ""
+    @objc dynamic var createdTime = 0
     @objc dynamic var updateTime = 0
     @objc dynamic var thumbnailPath = ""
     @objc dynamic var isColorCode = false

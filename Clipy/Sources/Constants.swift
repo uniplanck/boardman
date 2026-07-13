@@ -72,6 +72,7 @@ struct Constants {
         static let pasteCounts = "kCPYPasteCounts"
         static let boardManUsePanelUI = "BoardManUsePanelUI"
         static let boardManShowRowNumbers = "BoardManShowRowNumbers"
+        static let boardManHistoryUsageFilter = "BoardManHistoryUsageFilter"
         static let boardManTimestampFormat = "BoardManTimestampFormat"
         static let boardManPanelHeight = "BoardManPanelHeight"
         static let boardManShowUsageCount = "BoardManShowUsageCount"

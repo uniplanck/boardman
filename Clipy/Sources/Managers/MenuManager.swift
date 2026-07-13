@@ -233,10 +233,11 @@ extension MenuManager {
 
     fileprivate func boardManHistoryItems() -> [BoardManHistoryItem] {
         let startedAt = CFAbsoluteTimeGetCurrent()
-        let maxHistory = max(1, AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.maxHistorySize))
-        let ascending = !AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting)
-        let clipResults = realm.objects(CPYClip.self).sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: ascending)
         let defaults = AppEnvironment.current.defaults
+        let maxHistory = max(1, defaults.integer(forKey: Constants.UserDefaults.maxHistorySize))
+        let usesRecentOrder = defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting)
+        let sortKeyPath = usesRecentOrder ? #keyPath(CPYClip.updateTime) : #keyPath(CPYClip.createdTime)
+        let clipResults = realm.objects(CPYClip.self).sorted(byKeyPath: sortKeyPath, ascending: false)
         let showRowNumbers = defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true
         let timestampFormat = BoardManPanel.allowedTimestampFormat(defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat))
         let showUsageCount = defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true
@@ -564,8 +565,9 @@ private extension MenuManager {
         var subMenuCount = placeInLine
         var subMenuIndex = 1 + placeInLine
 
-        let ascending = !AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting)
-        let clipResults = realm.objects(CPYClip.self).sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: ascending)
+        let usesRecentOrder = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting)
+        let sortKeyPath = usesRecentOrder ? #keyPath(CPYClip.updateTime) : #keyPath(CPYClip.createdTime)
+        let clipResults = realm.objects(CPYClip.self).sorted(byKeyPath: sortKeyPath, ascending: false)
         let currentSize = Int(clipResults.count)
         var i = 0
         for clip in clipResults {
@@ -1060,6 +1062,40 @@ fileprivate enum BoardManUIStyle: String, CaseIterable {
 
     static func allowed(_ value: String?) -> BoardManUIStyle {
         return allCases.first(where: { $0.rawValue == value }) ?? .defaultStyle
+    }
+}
+
+fileprivate enum BoardManHistoryUsageFilter: String, CaseIterable {
+    case all = "All"
+    case unused = "Unused"
+    case used = "Used"
+
+    static func allowed(_ value: String?) -> BoardManHistoryUsageFilter {
+        return allCases.first(where: { $0.rawValue == value }) ?? .all
+    }
+
+    var symbolName: String {
+        switch self {
+        case .all: return "square.stack.3d.up"
+        case .unused: return "circle"
+        case .used: return "checkmark.circle.fill"
+        }
+    }
+
+    var toolTip: String {
+        switch self {
+        case .all: return "All — show every clipboard history item (default)."
+        case .unused: return "Unused — show items that have not been pasted yet."
+        case .used: return "Used — show items pasted at least once."
+        }
+    }
+
+    func includes(_ item: BoardManHistoryItem) -> Bool {
+        switch self {
+        case .all: return true
+        case .unused: return item.pasteCount == 0
+        case .used: return item.pasteCount > 0
+        }
     }
 }
 
@@ -1923,6 +1959,8 @@ class BoardManPanel: NSPanel {
     private var glassBackgroundView: NSVisualEffectView?
     private var searchField: NSSearchField?
     private var segmentedControl: BoardManHeaderSegmentedControl?
+    private var historyUsageFilterControl: NSSegmentedControl?
+    private var historySortButton: NSButton?
     private var settingsBackgroundView: NSView?
     private var settingsSidebarView: NSView?
     private var settingsCategoryButtons: [NSButton] = []
@@ -2487,6 +2525,40 @@ class BoardManPanel: NSPanel {
         tabs.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
         contentView.addSubview(tabs)
         segmentedControl = tabs
+
+        let historyFilter = NSSegmentedControl(frame: .zero)
+        historyFilter.segmentCount = BoardManHistoryUsageFilter.allCases.count
+        historyFilter.trackingMode = .selectOne
+        historyFilter.segmentStyle = .rounded
+        historyFilter.controlSize = .small
+        historyFilter.target = self
+        historyFilter.action = #selector(historyUsageFilterChanged(_:))
+        let selectedUsageFilter = BoardManHistoryUsageFilter.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManHistoryUsageFilter)
+        )
+        for (index, filter) in BoardManHistoryUsageFilter.allCases.enumerated() {
+            historyFilter.setLabel(filter.rawValue, forSegment: index)
+            historyFilter.setToolTip(filter.toolTip, forSegment: index)
+            if #available(macOS 11.0, *) {
+                historyFilter.setLabel("", forSegment: index)
+                historyFilter.setImage(NSImage(systemSymbolName: filter.symbolName, accessibilityDescription: filter.rawValue), forSegment: index)
+            }
+        }
+        historyFilter.selectedSegment = BoardManHistoryUsageFilter.allCases.firstIndex(of: selectedUsageFilter) ?? 0
+        historyFilter.setAccessibilityLabel("History usage filter")
+        contentView.addSubview(historyFilter)
+        historyUsageFilterControl = historyFilter
+
+        let historySort = NSButton(title: "", target: self, action: #selector(historySortOrderChanged(_:)))
+        historySort.setButtonType(.toggle)
+        historySort.bezelStyle = .texturedRounded
+        historySort.controlSize = .small
+        historySort.imagePosition = .imageOnly
+        historySort.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting) ? .on : .off
+        historySort.setAccessibilityLabel("History sort order")
+        contentView.addSubview(historySort)
+        historySortButton = historySort
+        updateHistorySortButton()
 
         let settingsBackground = NSView(frame: .zero)
         settingsBackground.wantsLayer = true
@@ -3341,6 +3413,7 @@ class BoardManPanel: NSPanel {
             ? surfaceTint.withAlphaComponent(0.26)
             : NSColor.controlBackgroundColor.withAlphaComponent(0.78)
         segmentedControl?.needsDisplay = true
+        updateHistorySortButton()
         settingsSidebarView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.28)
             : NSColor.controlBackgroundColor.withAlphaComponent(simpleStyle ? 0.42 : 0.72)).cgColor
@@ -3510,6 +3583,22 @@ class BoardManPanel: NSPanel {
         updateSnippetActionButtons()
 
         let contentTop = headerY - 24
+        let showsHistoryToolbar = activeTab == .history && !isSettings
+        historyUsageFilterControl?.isHidden = !showsHistoryToolbar
+        historySortButton?.isHidden = !showsHistoryToolbar
+        let historyToolbarY = contentTop - 30
+        if showsHistoryToolbar {
+            let filterWidth: CGFloat = 114
+            historyUsageFilterControl?.frame = NSRect(x: margin, y: historyToolbarY, width: filterWidth, height: 26)
+            if let filter = historyUsageFilterControl {
+                let segmentWidth = floor(filterWidth / CGFloat(max(1, filter.segmentCount)))
+                for segment in 0..<filter.segmentCount {
+                    filter.setWidth(segmentWidth, forSegment: segment)
+                }
+            }
+            historySortButton?.frame = NSRect(x: margin + filterWidth + 8, y: historyToolbarY, width: 32, height: 26)
+        }
+
         let sidebarWidth: CGFloat = min(184, max(160, floor(width * 0.25)))
         let settingsGap: CGFloat = 16
         let settingsContentX = margin + sidebarWidth + settingsGap
@@ -3525,7 +3614,14 @@ class BoardManPanel: NSPanel {
         let showsSnippetCategories = activeTab == .snippets && !isSettings
         snippetEditorView?.isHidden = !showsSnippetCategories
         let categoryRowY = contentTop - 38
-        let listTop = showsSnippetCategories ? categoryRowY - 16 : contentTop
+        let listTop: CGFloat
+        if showsSnippetCategories {
+            listTop = categoryRowY - 16
+        } else if showsHistoryToolbar {
+            listTop = historyToolbarY - 12
+        } else {
+            listTop = contentTop
+        }
         let listHeight = max(190, listTop - 28)
         [snippetCategoryLabel, snippetCategoryPopup, snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton].forEach {
             $0?.isHidden = !showsSnippetCategories
@@ -4652,6 +4748,7 @@ class BoardManPanel: NSPanel {
 
     @objc private func reuseTopChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.reorderClipsAfterPasting)
+        updateHistorySortButton()
         onRefreshRequested?()
     }
 
@@ -4857,14 +4954,64 @@ class BoardManPanel: NSPanel {
         applyCurrentFilter()
     }
 
+    @objc private func historyUsageFilterChanged(_ sender: NSSegmentedControl) {
+        guard let filter = BoardManHistoryUsageFilter.allCases[safe: sender.selectedSegment] else { return }
+        AppEnvironment.current.defaults.set(filter.rawValue, forKey: Constants.UserDefaults.boardManHistoryUsageFilter)
+        selectedIndex = -1
+        hoveredRow = -1
+        hidePreviewBubble()
+        applyCurrentFilter()
+    }
+
+    @objc private func historySortOrderChanged(_ sender: NSButton) {
+        let usesRecentOrder = sender.state == .on
+        AppEnvironment.current.defaults.set(usesRecentOrder, forKey: Constants.UserDefaults.reorderClipsAfterPasting)
+        reuseTopButton?.state = usesRecentOrder ? .on : .off
+        selectedIndex = -1
+        hoveredRow = -1
+        hidePreviewBubble()
+        updateHistorySortButton()
+        onRefreshRequested?()
+    }
+
+    private func updateHistorySortButton() {
+        guard let button = historySortButton else { return }
+        let usesRecentOrder = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting)
+        button.state = usesRecentOrder ? .on : .off
+        button.toolTip = usesRecentOrder
+            ? "Recent Use — move pasted items to the top; newly copied items still appear first."
+            : "Copy Order — keep history fixed in the order items were copied."
+        if #available(macOS 11.0, *) {
+            let symbolName = usesRecentOrder ? "clock.arrow.circlepath" : "doc.on.doc"
+            let description = usesRecentOrder ? "Recent Use" : "Copy Order"
+            button.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description)
+            button.title = ""
+            button.imagePosition = .imageOnly
+        } else {
+            button.image = nil
+            button.title = usesRecentOrder ? "Use" : "Copy"
+            button.imagePosition = .noImage
+        }
+        if #available(macOS 10.14, *) {
+            button.contentTintColor = usesRecentOrder ? themeAccentColor : .secondaryLabelColor
+        }
+    }
+
     private func applyCurrentFilter() {
         let query = (searchField?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let tabbedItems: [BoardManHistoryItem]
         switch activeTab {
         case .history:
-            let pinnedItems = allItems.filter { $0.isPinned && $0.isEnabled }
-            let regularHistory = allItems.filter { $0.source == .clip && !$0.isPinned }
-            tabbedItems = pinnedItems + regularHistory
+            let usageFilter = BoardManHistoryUsageFilter.allowed(
+                AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManHistoryUsageFilter)
+            )
+            let filteredClips = allItems.filter { $0.source == .clip && $0.isEnabled && usageFilter.includes($0) }
+            let pinnedClips = filteredClips.filter { $0.isPinned }
+            let regularHistory = filteredClips.filter { !$0.isPinned }
+            let pinnedNonHistoryItems = usageFilter == .all
+                ? allItems.filter { $0.source != .clip && $0.isPinned && $0.isEnabled }
+                : []
+            tabbedItems = pinnedClips + pinnedNonHistoryItems + regularHistory
         case .snippets:
             let snippetItems = allItems.filter { $0.source == .snippet }
             if activeSnippetCategoryIdentifier == BoardManPanel.allCategoriesIdentifier {
