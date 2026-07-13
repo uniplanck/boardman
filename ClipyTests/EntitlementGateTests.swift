@@ -423,6 +423,31 @@ struct PasteCountInputServiceTests {
             listenEventAccess: false
         ) == nil)
     }
+
+    @Test
+    func imageFingerprintSurvivesArchiveRoundTripAndDistinguishesPixels() throws {
+        let firstImage = testImage(color: .systemRed)
+        let secondImage = testImage(color: .systemBlue)
+        let encoded = try NSKeyedArchiver.archivedData(
+            withRootObject: CPYClipData(image: firstImage),
+            requiringSecureCoding: false
+        )
+        let decodedObject = try NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(encoded)
+        let decodedData = try #require(decodedObject as? CPYClipData)
+        let decodedImage = try #require(decodedData.image)
+
+        #expect(PasteCountStore.imageFingerprint(for: firstImage) == PasteCountStore.imageFingerprint(for: decodedImage))
+        #expect(PasteCountStore.imageFingerprint(for: firstImage) != PasteCountStore.imageFingerprint(for: secondImage))
+    }
+
+    private func testImage(color: NSColor) -> NSImage {
+        let image = NSImage(size: NSSize(width: 12, height: 12))
+        image.lockFocus()
+        color.setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 12, height: 12)).fill()
+        image.unlockFocus()
+        return image
+    }
 }
 
 @MainActor @Suite(.serialized)
@@ -515,21 +540,18 @@ final class BoardManPanelLayoutTests {
         let search = descendants.compactMap { $0 as? NSSearchField }.first
         #expect((search != nil) == expectsSearch || search?.isHidden == !expectsSearch)
         if expectsSearch, let search {
-            guard let searchCell = search.cell as? BoardManSearchFieldCell else {
-                Issue.record("Search field is not using the vertically centered Board-Man search cell.")
-                return
-            }
+            #expect(search.cell is NSSearchFieldCell,
+                    "Search field is not using the native interactive AppKit search cell.")
             #expect((search.layer?.borderWidth ?? 0) == 0,
                     "Search field has a second custom layer border.")
             #expect(abs(search.frame.midY - tabs.frame.midY) <= 0.5,
-                    "Search input is not vertically centered with the header tabs.")
-            #expect(search.frame.height == tabs.frame.height)
-            let textRect = searchCell.searchTextRect(forBounds: search.bounds)
-            let buttonRect = searchCell.searchButtonRect(forBounds: search.bounds)
-            #expect(abs(textRect.midY - search.bounds.midY) <= 0.5,
-                    "Search text is not vertically centered inside its border.")
-            #expect(abs(buttonRect.midY - search.bounds.midY) <= 0.5,
-                    "Search icon is not vertically centered inside its border.")
+                    "Search control is not vertically centered with the header tabs.")
+            #expect(search.frame.height >= 28 && search.frame.height <= 32,
+                    "Search control is stretched beyond its native interactive height.")
+            #expect(search.isEditable && search.isSelectable && search.isEnabled,
+                    "Search control cannot receive text input.")
+            #expect(search.target != nil && search.action != nil,
+                    "Search control is missing its input action wiring.")
         }
     }
 
@@ -551,6 +573,13 @@ final class BoardManPanelLayoutTests {
                 "Usage badge is not vertically centered in the row.")
         #expect(badgeFrame.width >= 38,
                 "Usage badge is too narrow and may clip its text.")
+
+        let badgeCell = BoardManCenteredTextFieldCell(textCell: "×567")
+        badgeCell.font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .medium)
+        let badgeBounds = NSRect(x: 0, y: 0, width: 48, height: 20)
+        let textRect = badgeCell.drawingRect(forBounds: badgeBounds)
+        #expect(abs(textRect.midY - badgeBounds.midY) <= 0.5,
+                "Usage count text is not vertically centered inside its badge.")
     }
 
     private func allSubviews(of view: NSView) -> [NSView] {

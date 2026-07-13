@@ -62,18 +62,36 @@ final class PasteCountStore {
             return nil
         }
 
-        let pasteCountKey = key(for: clip)
-        let unixTime = Int(Date().timeIntervalSince1970)
-        do {
-            try realm.write {
-                clip.updateTime = unixTime
+        return markUsedAndReturnKey(for: clip, in: realm)
+    }
+
+    func keyForLatestImageClip(matching image: NSImage) -> String? {
+        guard let targetFingerprint = Self.imageFingerprint(for: image) else { return nil }
+        let realm = try! Realm()
+        let candidates = realm.objects(CPYClip.self)
+            .sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: false)
+            .filter { self.isImageClip($0) }
+            .prefix(120)
+
+        for clip in candidates {
+            guard !clip.dataPath.isEmpty,
+                  let archivedData = NSKeyedUnarchiver.unarchiveObject(withFile: clip.dataPath) as? CPYClipData,
+                  let archivedImage = archivedData.image,
+                  Self.imageFingerprint(for: archivedImage) == targetFingerprint else {
+                continue
             }
-        } catch {
+            return markUsedAndReturnKey(for: clip, in: realm)
+        }
+        return nil
+    }
+
+    static func imageFingerprint(for image: NSImage) -> String? {
+        guard let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else {
             return nil
         }
-
-        postPasteCountDidChange()
-        return pasteCountKey
+        return "\(bitmap.pixelsWide)x\(bitmap.pixelsHigh):\(stableHash(pngData))"
     }
 
     @discardableResult
@@ -121,6 +139,11 @@ final class PasteCountStore {
         return defaults.dictionary(forKey: Constants.UserDefaults.pasteCounts) as? [String: NSNumber] ?? [:]
     }
 
+    private func markUsedAndReturnKey(for clip: CPYClip, in realm: Realm) -> String? {
+        let pasteCountKey = key(for: clip)
+        return markUsed(clip: clip, in: realm) ? pasteCountKey : nil
+    }
+
     private func latestTextClip(in realm: Realm, matching string: String) -> CPYClip? {
         // Manual Cmd+V count must stay fast: use Realm metadata only.
         // Reading every archived CPYClipData file blocks UI on large histories.
@@ -154,8 +177,12 @@ final class PasteCountStore {
     }
 
     private func stableHash(_ string: String) -> String {
+        return Self.stableHash(Data(string.utf8))
+    }
+
+    private static func stableHash(_ data: Data) -> String {
         var hash: UInt64 = 14_695_981_039_346_656_037
-        for byte in string.utf8 {
+        for byte in data {
             hash ^= UInt64(byte)
             hash = hash &* 1_099_511_628_211
         }

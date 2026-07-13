@@ -1569,24 +1569,16 @@ final class BoardManHeaderSegmentedControl: NSSegmentedControl {
     }
 }
 
-final class BoardManSearchFieldCell: NSSearchFieldCell {
-    private func verticallyCentered(_ contentRect: NSRect, in bounds: NSRect) -> NSRect {
-        guard contentRect.height > 0 else { return contentRect }
-        var centered = contentRect
-        centered.origin.y = floor(bounds.midY - (contentRect.height / 2))
-        return centered
-    }
-
-    override func searchTextRect(forBounds rect: NSRect) -> NSRect {
-        return verticallyCentered(super.searchTextRect(forBounds: rect), in: rect)
-    }
-
-    override func searchButtonRect(forBounds rect: NSRect) -> NSRect {
-        return verticallyCentered(super.searchButtonRect(forBounds: rect), in: rect)
-    }
-
-    override func cancelButtonRect(forBounds rect: NSRect) -> NSRect {
-        return verticallyCentered(super.cancelButtonRect(forBounds: rect), in: rect)
+final class BoardManCenteredTextFieldCell: NSTextFieldCell {
+    override func drawingRect(forBounds rect: NSRect) -> NSRect {
+        var drawingRect = super.drawingRect(forBounds: rect)
+        guard let font else { return drawingRect }
+        let textHeight = ceil(font.ascender - font.descender + font.leading)
+        if textHeight < drawingRect.height {
+            drawingRect.origin.y = floor(rect.midY - (textHeight / 2))
+            drawingRect.size.height = textHeight
+        }
+        return drawingRect
     }
 }
 
@@ -1620,6 +1612,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         metadataLabel.drawsBackground = false
         metadataLabel.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
 
+        countBadge.cell = BoardManCenteredTextFieldCell(textCell: "")
         countBadge.alignment = .center
         countBadge.lineBreakMode = .byTruncatingTail
         countBadge.maximumNumberOfLines = 1
@@ -2270,7 +2263,6 @@ class BoardManPanel: NSPanel {
         setupGlassBackgroundIfNeeded()
 
         let search = NSSearchField(frame: .zero)
-        search.cell = BoardManSearchFieldCell(textCell: "")
         search.placeholderString = "Search clipboard history and snippets"
         search.target = self
         search.action = #selector(searchTextChanged(_:))
@@ -2279,6 +2271,9 @@ class BoardManPanel: NSPanel {
         search.focusRingType = .none
         search.controlSize = .large
         search.font = NSFont.systemFont(ofSize: 14, weight: .regular)
+        search.isEditable = true
+        search.isSelectable = true
+        search.isEnabled = true
         contentView.addSubview(search)
         searchField = search
 
@@ -3203,7 +3198,13 @@ class BoardManPanel: NSPanel {
         let rightWidth = max(0, width - tabsWidth - headerGap)
         let searchWidth = max(isCompact ? 130 : 170,
                               rightWidth - snippetButtonsWidth - (showsSnippetButtons ? headerGap : 0))
-        let searchFrame = NSIntegralRect(NSRect(x: rightX, y: headerY, width: searchWidth, height: 36))
+        let searchHeight = min(32, max(28, ceil(searchField?.intrinsicContentSize.height ?? 30)))
+        let searchFrame = NSIntegralRect(NSRect(
+            x: rightX,
+            y: floor(tabsFrame.midY - (searchHeight / 2)),
+            width: searchWidth,
+            height: searchHeight
+        ))
         searchField?.frame = searchFrame
         snippetAddButton?.isHidden = !showsSnippetButtons
         snippetEditButton?.isHidden = !showsSnippetButtons
