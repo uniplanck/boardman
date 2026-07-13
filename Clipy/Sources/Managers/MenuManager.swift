@@ -89,7 +89,7 @@ extension MenuManager {
         showBoardManSnippetsPanel(folderIdentifier: folder.identifier)
     }
 
-    fileprivate func showBoardManPanel(anchorPoint: NSPoint? = nil) {
+    fileprivate func showBoardManPanel(anchorPoint: NSPoint? = nil, quickMode: Bool = false) {
         let startedAt = CFAbsoluteTimeGetCurrent()
         previousFrontmostApplication = NSWorkspace.shared.frontmostApplication
         if boardManPanel == nil {
@@ -110,8 +110,11 @@ extension MenuManager {
             }
         }
         if let panel = boardManPanel {
+            panel.setQuickMode(quickMode)
             // V4B-13: position and show first. Heavy Realm/defaults reload happens after first paint.
-            let panelSize = NSSize(width: BoardManPanel.preferredPanelWidth(), height: BoardManPanel.preferredPanelHeight())
+            let panelSize = quickMode
+                ? BoardManPanel.quickPanelSize()
+                : NSSize(width: BoardManPanel.preferredPanelWidth(), height: BoardManPanel.preferredPanelHeight())
             let finalFrame = BoardManPanel.cursorRelativeFrame(size: panelSize, anchorPoint: anchorPoint)
             panel.prepareForFirstVisibleOrder(frame: finalFrame)
             NSApp.activate(ignoringOtherApps: true)
@@ -131,6 +134,11 @@ extension MenuManager {
     func showBoardManSettingsPanel() {
         showBoardManPanel()
         boardManPanel?.selectSettingsTab()
+    }
+
+    func showBoardManQuickPanel() {
+        showBoardManPanel(quickMode: true)
+        boardManPanel?.selectHistoryTab()
     }
 
     func showBoardManSnippetsPanel(folderIdentifier: String? = nil) {
@@ -957,11 +965,12 @@ fileprivate enum BoardManInlineSettingsCategory: Int, CaseIterable {
 }
 
 private enum BoardManGlobalShortcutKind: Int, CaseIterable {
-    case openBoardMan, history, snippets, clearHistory
+    case openBoardMan, quickMode, history, snippets, clearHistory
 
     var title: String {
         switch self {
         case .openBoardMan: return "Open Board-Man"
+        case .quickMode: return "Quick Mode"
         case .history: return "Open History"
         case .snippets: return "Open Snippets"
         case .clearHistory: return "Clear History"
@@ -971,6 +980,7 @@ private enum BoardManGlobalShortcutKind: Int, CaseIterable {
     var detail: String {
         switch self {
         case .openBoardMan: return "Show the main clipboard panel"
+        case .quickMode: return "Show the top 3 items from the selected History filter"
         case .history: return "Jump directly to clipboard history"
         case .snippets: return "Jump directly to snippets"
         case .clearHistory: return "Clear history after confirmation"
@@ -1391,6 +1401,108 @@ fileprivate final class BoardManHideRuleStore {
         guard let data = try? JSONEncoder().encode(rules),
               let json = String(data: data, encoding: .utf8) else { return }
         defaults.set(json, forKey: Constants.UserDefaults.boardManHideRulesJSON)
+        defaults.synchronize()
+    }
+}
+
+struct BoardManHistoryCondition: Codable, Equatable {
+    var isEnabled: Bool
+    var minimumLength: Int
+    var includedTerms: [String]
+    var excludedTerms: [String]
+    var matchesAllIncludedTerms: Bool
+    var shellLikeOnly: Bool
+
+    static let empty = BoardManHistoryCondition(
+        isEnabled: true,
+        minimumLength: 0,
+        includedTerms: [],
+        excludedTerms: [],
+        matchesAllIncludedTerms: true,
+        shellLikeOnly: false
+    )
+
+    var hasCriteria: Bool {
+        return minimumLength > 0 || !includedTerms.isEmpty || !excludedTerms.isEmpty || shellLikeOnly
+    }
+
+    func matches(_ text: String) -> Bool {
+        guard isEnabled else { return true }
+        let normalized = text.lowercased()
+        if minimumLength > 0, text.count < minimumLength { return false }
+        if shellLikeOnly, !Self.looksLikeShellScript(text) { return false }
+        if !includedTerms.isEmpty {
+            let results = includedTerms.map { normalized.contains($0.lowercased()) }
+            if matchesAllIncludedTerms ? results.contains(false) : !results.contains(true) { return false }
+        }
+        if excludedTerms.contains(where: { normalized.contains($0.lowercased()) }) { return false }
+        return true
+    }
+
+    static func parsedTerms(_ value: String) -> [String] {
+        return value
+            .components(separatedBy: CharacterSet(charactersIn: ",\n"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    static func looksLikeShellScript(_ text: String) -> Bool {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if normalized.hasPrefix("#!") { return true }
+        if normalized.contains(" && ") || normalized.contains(" || ") || normalized.contains("$(") { return true }
+        let commandPattern = "(^|\\n)\\s*(sudo|cd|ls|grep|find|curl|wget|git|npm|pnpm|yarn|brew|docker|python|python3|node|chmod|chown|ssh|scp|rsync|echo|export|source)\\b"
+        if normalized.range(of: commandPattern, options: [.regularExpression, .caseInsensitive]) != nil { return true }
+        return normalized.range(of: "\\s\\|\\s", options: .regularExpression) != nil
+    }
+}
+
+fileprivate final class BoardManHistoryConditionStore {
+    static let shared = BoardManHistoryConditionStore()
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = AppEnvironment.current.defaults) {
+        self.defaults = defaults
+    }
+
+    func condition(for filter: BoardManHistoryUsageFilter) -> BoardManHistoryCondition? {
+        return conditions[filter.rawValue]
+    }
+
+    func save(_ condition: BoardManHistoryCondition, for filter: BoardManHistoryUsageFilter) {
+        var next = conditions
+        var enabledCondition = condition
+        enabledCondition.isEnabled = true
+        next[filter.rawValue] = enabledCondition
+        save(next)
+    }
+
+    func setEnabled(_ enabled: Bool, for filter: BoardManHistoryUsageFilter) {
+        var next = conditions
+        guard var condition = next[filter.rawValue] else { return }
+        condition.isEnabled = enabled
+        next[filter.rawValue] = condition
+        save(next)
+    }
+
+    func delete(for filter: BoardManHistoryUsageFilter) {
+        var next = conditions
+        next.removeValue(forKey: filter.rawValue)
+        save(next)
+    }
+
+    private var conditions: [String: BoardManHistoryCondition] {
+        guard let json = defaults.string(forKey: Constants.UserDefaults.boardManHistoryConditionsJSON),
+              let data = json.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([String: BoardManHistoryCondition].self, from: data) else {
+            return [:]
+        }
+        return decoded
+    }
+
+    private func save(_ conditions: [String: BoardManHistoryCondition]) {
+        guard let data = try? JSONEncoder().encode(conditions),
+              let json = String(data: data, encoding: .utf8) else { return }
+        defaults.set(json, forKey: Constants.UserDefaults.boardManHistoryConditionsJSON)
         defaults.synchronize()
     }
 }
@@ -1950,8 +2062,8 @@ final class BoardManHistoryCellView: NSTableCellView {
     }
 
     static func usageBadgeFrame(in bounds: NSRect, intrinsicWidth: CGFloat) -> NSRect {
-        let horizontalInset: CGFloat = 16
-        let trailingInset: CGFloat = 22
+        let horizontalInset: CGFloat = 10
+        let trailingInset: CGFloat = 14
         let badgeHeight: CGFloat = 20
         let maxContentWidth = max(0, bounds.width - horizontalInset - trailingInset)
         let badgeWidth = min(maxContentWidth, max(56, min(64, ceil(intrinsicWidth) + 20)))
@@ -1965,13 +2077,13 @@ final class BoardManHistoryCellView: NSTableCellView {
 
     override func layout() {
         super.layout()
-        let horizontalInset: CGFloat = 16
-        let trailingInset: CGFloat = 22
-        let accessoryGap: CGFloat = 10
+        let horizontalInset: CGFloat = 10
+        let trailingInset: CGFloat = 14
+        let accessoryGap: CGFloat = 12
         let titleHeight: CGFloat = 18
         let metadataHeight: CGFloat = 15
         let textGap: CGFloat = 4
-        let timeWidth: CGFloat = 84
+        let timeWidth: CGFloat = 76
         let countWidth: CGFloat = 64
         let accessoryHeight: CGFloat = 20
         var textLeft = horizontalInset
@@ -2056,8 +2168,8 @@ class BoardManPanel: NSPanel {
     private enum LayoutMetrics {
         static let preferredWidth: CGFloat = 800
         static let minimumWidth: CGFloat = 640
-        static let outerMargin: CGFloat = 28
-        static let compactOuterMargin: CGFloat = 20
+        static let outerMargin: CGFloat = 18
+        static let compactOuterMargin: CGFloat = 14
         static let controlHeight: CGFloat = 28
         static let actionButtonHeight: CGFloat = 30
         static let horizontalGap: CGFloat = 10
@@ -2073,6 +2185,7 @@ class BoardManPanel: NSPanel {
     private var segmentedControl: BoardManHeaderSegmentedControl?
     private var historyUsageFilterControl: NSSegmentedControl?
     private var historySortButton: NSButton?
+    private var historyConditionButton: NSButton?
     private var settingsBackgroundView: NSView?
     private var settingsSidebarView: NSView?
     private var settingsCategoryButtons: [NSButton] = []
@@ -2187,6 +2300,7 @@ class BoardManPanel: NSPanel {
     private var localKeyMonitor: Any?
     private var previewLifecycleObservers: [NSObjectProtocol] = []
     private var isPanelLayoutScheduled = false
+    private var isQuickMode = false
     private var activeTab: BoardManPanelTab = .history
     private var activeSettingsCategory: BoardManInlineSettingsCategory = .general
     private var activeSnippetCategoryIdentifier: String = BoardManPanel.allCategoriesIdentifier
@@ -2210,6 +2324,21 @@ class BoardManPanel: NSPanel {
 
     func selectHistoryTab() {
         activateTab(.history)
+    }
+
+    func setQuickMode(_ enabled: Bool) {
+        isQuickMode = enabled
+        minSize = enabled
+            ? NSSize(width: 520, height: 220)
+            : NSSize(width: LayoutMetrics.minimumWidth, height: 600)
+        if enabled {
+            activeTab = .history
+            segmentedControl?.selectedSegment = BoardManPanelTab.history.rawValue
+        }
+        selectedIndex = -1
+        hoveredRow = -1
+        hidePreviewBubble()
+        applyCurrentFilter()
     }
 
     func selectSettingsTab() {
@@ -2291,6 +2420,12 @@ class BoardManPanel: NSPanel {
 
     static func preferredPanelWidth() -> CGFloat {
         return LayoutMetrics.preferredWidth
+    }
+
+    static let quickItemLimit = 3
+
+    static func quickPanelSize() -> NSSize {
+        return NSSize(width: 680, height: 260)
     }
 
     static func cursorRelativeFrame(size panelSize: NSSize, anchorPoint: NSPoint? = nil) -> NSRect {
@@ -2423,6 +2558,7 @@ class BoardManPanel: NSPanel {
     private func globalShortcutKeyCombo(for kind: BoardManGlobalShortcutKind) -> KeyCombo? {
         switch kind {
         case .openBoardMan: return AppEnvironment.current.hotKeyService.mainKeyCombo
+        case .quickMode: return AppEnvironment.current.hotKeyService.quickModeKeyCombo
         case .history: return AppEnvironment.current.hotKeyService.historyKeyCombo
         case .snippets: return AppEnvironment.current.hotKeyService.snippetKeyCombo
         case .clearHistory: return AppEnvironment.current.hotKeyService.clearHistoryKeyCombo
@@ -2683,6 +2819,16 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(historySort)
         historySortButton = historySort
         updateHistorySortButton()
+
+        let historyCondition = NSButton(title: "", target: self, action: #selector(historyConditionButtonPressed(_:)))
+        historyCondition.bezelStyle = .texturedRounded
+        historyCondition.controlSize = .small
+        historyCondition.imagePosition = .imageOnly
+        historyCondition.setAccessibilityLabel("History condition")
+        historyCondition.identifier = NSUserInterfaceItemIdentifier("BoardManHistoryConditionButton")
+        contentView.addSubview(historyCondition)
+        historyConditionButton = historyCondition
+        updateHistoryConditionButton()
 
         let settingsBackground = NSView(frame: .zero)
         settingsBackground.wantsLayer = true
@@ -3563,6 +3709,7 @@ class BoardManPanel: NSPanel {
             : NSColor.controlBackgroundColor.withAlphaComponent(0.78)
         segmentedControl?.needsDisplay = true
         updateHistorySortButton()
+        updateHistoryConditionButton()
         settingsSidebarView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.28)
             : NSColor.controlBackgroundColor.withAlphaComponent(simpleStyle ? 0.42 : 0.72)).cgColor
@@ -3690,17 +3837,18 @@ class BoardManPanel: NSPanel {
         guard let contentView = contentView else { return }
         let bounds = contentView.bounds
         let isCompact = bounds.width < 720
-        let margin = isCompact ? LayoutMetrics.compactOuterMargin : LayoutMetrics.outerMargin
+        let margin = isQuickMode ? 12 : (isCompact ? LayoutMetrics.compactOuterMargin : LayoutMetrics.outerMargin)
         let width = bounds.width - (margin * 2)
-        let headerY = bounds.height - 70
-        let isSettings = activeTab == .settings
+        let headerY = isQuickMode ? bounds.height - 42 : bounds.height - 70
+        let isSettings = activeTab == .settings && !isQuickMode
         let tabsWidth: CGFloat = isCompact ? 240 : min(324, max(282, floor(width * 0.40)))
         let tabsFrame = NSIntegralRect(NSRect(x: margin, y: headerY, width: tabsWidth, height: 36))
         segmentedControl?.frame = tabsFrame
+        segmentedControl?.isHidden = isQuickMode
         updateTabWidths(totalWidth: tabsWidth)
 
-        searchField?.isHidden = isSettings
-        let showsSnippetButtons = activeTab == .snippets && !isSettings
+        searchField?.isHidden = isSettings || isQuickMode
+        let showsSnippetButtons = activeTab == .snippets && !isSettings && !isQuickMode
         let snippetButtonGap: CGFloat = isCompact ? 6 : 8
         let snippetButtonWidths: [CGFloat] = isCompact ? [78, 46, 58] : [96, 58, 70]
         let snippetButtonsWidth = showsSnippetButtons ? snippetButtonWidths.reduce(0, +) + (snippetButtonGap * 2) : 0
@@ -3731,11 +3879,12 @@ class BoardManPanel: NSPanel {
         }
         updateSnippetActionButtons()
 
-        let contentTop = headerY - 24
+        let contentTop = isQuickMode ? bounds.height - 18 : headerY - 24
         let showsHistoryToolbar = activeTab == .history && !isSettings
         historyUsageFilterControl?.isHidden = !showsHistoryToolbar
         historySortButton?.isHidden = !showsHistoryToolbar
-        let historyToolbarY = contentTop - 30
+        historyConditionButton?.isHidden = !showsHistoryToolbar
+        let historyToolbarY = isQuickMode ? bounds.height - 50 : contentTop - 30
         if showsHistoryToolbar {
             let filterWidth: CGFloat = 114
             historyUsageFilterControl?.frame = NSRect(x: margin, y: historyToolbarY, width: filterWidth, height: 26)
@@ -3746,6 +3895,7 @@ class BoardManPanel: NSPanel {
                 }
             }
             historySortButton?.frame = NSRect(x: margin + filterWidth + 8, y: historyToolbarY, width: 32, height: 26)
+            historyConditionButton?.frame = NSRect(x: margin + filterWidth + 48, y: historyToolbarY, width: 32, height: 26)
         }
 
         let sidebarWidth: CGFloat = min(184, max(160, floor(width * 0.25)))
@@ -3771,7 +3921,8 @@ class BoardManPanel: NSPanel {
         } else {
             listTop = contentTop
         }
-        let listHeight = max(190, listTop - 28)
+        let listBottom: CGFloat = isQuickMode ? 12 : 24
+        let listHeight = isQuickMode ? max(1, listTop - listBottom) : max(190, listTop - 28)
         [snippetCategoryLabel, snippetCategoryPopup, snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton].forEach {
             $0?.isHidden = !showsSnippetCategories
         }
@@ -3793,7 +3944,7 @@ class BoardManPanel: NSPanel {
         let editorGap: CGFloat = showsSnippetCategories ? 16 : 0
         let editorWidth = showsSnippetCategories ? min(290, max(250, floor(width * 0.38))) : 0
         let listWidth = max(180, width - editorWidth - editorGap)
-        scrollView?.frame = NSRect(x: margin, y: 24, width: listWidth, height: listFrameHeight)
+        scrollView?.frame = NSRect(x: margin, y: listBottom, width: listWidth, height: listFrameHeight)
         if showsSnippetCategories {
             snippetEditorView?.frame = NSRect(x: margin + listWidth + editorGap, y: 24, width: editorWidth, height: listFrameHeight)
             layoutSnippetEditorControls(width: editorWidth, height: listFrameHeight)
@@ -4872,6 +5023,8 @@ class BoardManPanel: NSPanel {
         switch kind {
         case .openBoardMan:
             AppEnvironment.current.hotKeyService.change(with: .main, keyCombo: keyCombo)
+        case .quickMode:
+            AppEnvironment.current.hotKeyService.changeQuickModeKeyCombo(keyCombo)
         case .history:
             AppEnvironment.current.hotKeyService.change(with: .history, keyCombo: keyCombo)
         case .snippets:
@@ -5119,13 +5272,154 @@ class BoardManPanel: NSPanel {
         applyCurrentFilter()
     }
 
+    private var currentHistoryUsageFilter: BoardManHistoryUsageFilter {
+        return BoardManHistoryUsageFilter.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManHistoryUsageFilter)
+        )
+    }
+
     @objc private func historyUsageFilterChanged(_ sender: NSSegmentedControl) {
         guard let filter = BoardManHistoryUsageFilter.allCases[safe: sender.selectedSegment] else { return }
         AppEnvironment.current.defaults.set(filter.rawValue, forKey: Constants.UserDefaults.boardManHistoryUsageFilter)
         selectedIndex = -1
         hoveredRow = -1
         hidePreviewBubble()
+        updateHistoryConditionButton()
         applyCurrentFilter()
+    }
+
+    @objc private func historyConditionButtonPressed(_ sender: NSButton) {
+        let filter = currentHistoryUsageFilter
+        let condition = BoardManHistoryConditionStore.shared.condition(for: filter)
+        let menu = NSMenu(title: "\(filter.rawValue) Condition")
+
+        let edit = NSMenuItem(title: condition == nil ? "Add Condition…" : "Edit Condition…",
+                              action: #selector(editCurrentHistoryCondition(_:)),
+                              keyEquivalent: "")
+        edit.target = self
+        menu.addItem(edit)
+
+        if let condition {
+            let toggleTitle = condition.isEnabled ? "Disable Condition" : "Enable Condition"
+            let toggle = NSMenuItem(title: toggleTitle,
+                                    action: #selector(toggleCurrentHistoryCondition(_:)),
+                                    keyEquivalent: "")
+            toggle.target = self
+            menu.addItem(toggle)
+            menu.addItem(NSMenuItem.separator())
+            let delete = NSMenuItem(title: "Delete Condition",
+                                    action: #selector(deleteCurrentHistoryCondition(_:)),
+                                    keyEquivalent: "")
+            delete.target = self
+            menu.addItem(delete)
+        }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.height + 2), in: sender)
+    }
+
+    @objc private func editCurrentHistoryCondition(_ sender: Any?) {
+        let filter = currentHistoryUsageFilter
+        let existing = BoardManHistoryConditionStore.shared.condition(for: filter) ?? .empty
+        let alert = NSAlert()
+        alert.messageText = "\(filter.rawValue) Condition"
+        alert.informativeText = "All enabled criteria are combined. Included words can use ALL or ANY matching."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 188))
+        func label(_ title: String, originY: CGFloat) -> NSTextField {
+            let field = NSTextField(labelWithString: title)
+            field.frame = NSRect(x: 0, y: originY + 4, width: 112, height: 18)
+            field.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+            accessory.addSubview(field)
+            return field
+        }
+        label("Minimum length", originY: 150)
+        label("Contains words", originY: 110)
+        label("Excludes words", originY: 70)
+        label("Included match", originY: 30)
+
+        let minimumField = NSTextField(frame: NSRect(x: 124, y: 150, width: 90, height: 24))
+        minimumField.stringValue = existing.minimumLength > 0 ? "\(existing.minimumLength)" : ""
+        minimumField.placeholderString = "0"
+        accessory.addSubview(minimumField)
+
+        let includedField = NSTextField(frame: NSRect(x: 124, y: 110, width: 336, height: 24))
+        includedField.stringValue = existing.includedTerms.joined(separator: ", ")
+        includedField.placeholderString = "word1, word2"
+        accessory.addSubview(includedField)
+
+        let excludedField = NSTextField(frame: NSRect(x: 124, y: 70, width: 336, height: 24))
+        excludedField.stringValue = existing.excludedTerms.joined(separator: ", ")
+        excludedField.placeholderString = "ignore, draft"
+        accessory.addSubview(excludedField)
+
+        let matchPopup = NSPopUpButton(frame: NSRect(x: 124, y: 28, width: 150, height: 26), pullsDown: false)
+        matchPopup.addItems(withTitles: ["ALL words", "ANY word"])
+        matchPopup.selectItem(at: existing.matchesAllIncludedTerms ? 0 : 1)
+        accessory.addSubview(matchPopup)
+
+        let shellButton = NSButton(checkboxWithTitle: "Shell-script-like text only", target: nil, action: nil)
+        shellButton.frame = NSRect(x: 292, y: 30, width: 168, height: 20)
+        shellButton.state = existing.shellLikeOnly ? .on : .off
+        shellButton.toolTip = "Matches shebangs, common shell commands, pipes, &&, ||, and command substitution."
+        accessory.addSubview(shellButton)
+        alert.accessoryView = accessory
+
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let minimumLength = max(0, Int(minimumField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0)
+        let condition = BoardManHistoryCondition(
+            isEnabled: true,
+            minimumLength: minimumLength,
+            includedTerms: BoardManHistoryCondition.parsedTerms(includedField.stringValue),
+            excludedTerms: BoardManHistoryCondition.parsedTerms(excludedField.stringValue),
+            matchesAllIncludedTerms: matchPopup.indexOfSelectedItem == 0,
+            shellLikeOnly: shellButton.state == .on
+        )
+        guard condition.hasCriteria else {
+            NSSound.beep()
+            return
+        }
+        BoardManHistoryConditionStore.shared.save(condition, for: filter)
+        updateHistoryConditionButton()
+        applyCurrentFilter()
+    }
+
+    @objc private func toggleCurrentHistoryCondition(_ sender: Any?) {
+        let filter = currentHistoryUsageFilter
+        guard let condition = BoardManHistoryConditionStore.shared.condition(for: filter) else { return }
+        BoardManHistoryConditionStore.shared.setEnabled(!condition.isEnabled, for: filter)
+        updateHistoryConditionButton()
+        applyCurrentFilter()
+    }
+
+    @objc private func deleteCurrentHistoryCondition(_ sender: Any?) {
+        BoardManHistoryConditionStore.shared.delete(for: currentHistoryUsageFilter)
+        updateHistoryConditionButton()
+        applyCurrentFilter()
+    }
+
+    private func updateHistoryConditionButton() {
+        guard let button = historyConditionButton else { return }
+        let filter = currentHistoryUsageFilter
+        let condition = BoardManHistoryConditionStore.shared.condition(for: filter)
+        let isEnabled = condition?.isEnabled == true
+        button.toolTip = condition == nil
+            ? "Add a condition for \(filter.rawValue)."
+            : (isEnabled ? "Condition enabled for \(filter.rawValue)." : "Condition saved but disabled for \(filter.rawValue).")
+        if #available(macOS 11.0, *) {
+            let symbol = isEnabled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
+            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "History condition")
+            button.title = ""
+            button.imagePosition = .imageOnly
+        } else {
+            button.image = nil
+            button.title = condition == nil ? "Rule" : (isEnabled ? "Rule ✓" : "Rule")
+            button.imagePosition = .noImage
+        }
+        if #available(macOS 10.14, *) {
+            button.contentTintColor = isEnabled ? themeAccentColor : .secondaryLabelColor
+        }
     }
 
     @objc private func historySortOrderChanged(_ sender: NSButton) {
@@ -5167,10 +5461,13 @@ class BoardManPanel: NSPanel {
         let tabbedItems: [BoardManHistoryItem]
         switch activeTab {
         case .history:
-            let usageFilter = BoardManHistoryUsageFilter.allowed(
-                AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManHistoryUsageFilter)
-            )
-            let filteredClips = allItems.filter { $0.source == .clip && $0.isEnabled && usageFilter.includes($0) }
+            let usageFilter = currentHistoryUsageFilter
+            let condition = BoardManHistoryConditionStore.shared.condition(for: usageFilter)
+            let filteredClips = allItems.filter { item in
+                guard item.source == .clip, item.isEnabled, usageFilter.includes(item) else { return false }
+                guard let condition, condition.isEnabled else { return true }
+                return condition.matches(item.previewTitle)
+            }
             let pinnedClips = filteredClips.filter { $0.isPinned }
             let regularHistory = filteredClips.filter { !$0.isPinned }
             let pinnedNonHistoryItems = usageFilter == .all
@@ -5194,9 +5491,10 @@ class BoardManPanel: NSPanel {
                 .joined(separator: "\n")
             return !hideRules.contains { $0.matches(searchableText) }
         }
-        historyItems = query.isEmpty ? visibleItems : visibleItems.filter {
+        let searchedItems = query.isEmpty ? visibleItems : visibleItems.filter {
             $0.title.lowercased().contains(query) || $0.previewTitle.lowercased().contains(query)
         }
+        historyItems = isQuickMode ? Array(searchedItems.prefix(Self.quickItemLimit)) : searchedItems
         if historyItems.isEmpty {
             selectedIndex = -1
         } else if selectedIndex >= historyItems.count {
@@ -5210,6 +5508,7 @@ class BoardManPanel: NSPanel {
         synchronizeListGeometry()
         syncNativeSelection()
         updateSnippetActionButtons()
+        updateHistoryConditionButton()
     }
 
     // Single-click paste handler (left click on row pastes immediately; spec #1, #4). Uses safe bounds, selects row for feedback, triggers handlePanelPaste via callback (orderOut first, no close(), strong retain via MenuManager var, no terminate).

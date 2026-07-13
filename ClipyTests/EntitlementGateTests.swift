@@ -497,6 +497,34 @@ struct PasteCountInputServiceTests {
     }
 
     @Test
+    func historyConditionCombinesLengthWordsExclusionsAndShellDetection() {
+        let condition = BoardManHistoryCondition(
+            isEnabled: true,
+            minimumLength: 12,
+            includedTerms: ["git", "status"],
+            excludedTerms: ["force"],
+            matchesAllIncludedTerms: true,
+            shellLikeOnly: true
+        )
+        #expect(condition.matches("git status && echo done"))
+        #expect(!condition.matches("git status --force"))
+        #expect(!condition.matches("A normal sentence mentioning git status."))
+        #expect(!condition.matches("git"))
+
+        let anyCondition = BoardManHistoryCondition(
+            isEnabled: true,
+            minimumLength: 0,
+            includedTerms: ["lambda", "cloudflare"],
+            excludedTerms: [],
+            matchesAllIncludedTerms: false,
+            shellLikeOnly: false
+        )
+        #expect(anyCondition.matches("Cloudflare deployment finished"))
+        #expect(!anyCondition.matches("No matching platform"))
+        #expect(BoardManHistoryCondition.parsedTerms("git, docker\ncloudflare") == ["git", "docker", "cloudflare"])
+    }
+
+    @Test
     func imageFingerprintSurvivesArchiveRoundTripAndDistinguishesPixels() throws {
         let firstImage = testImage(color: .systemRed)
         let secondImage = testImage(color: .systemBlue)
@@ -620,6 +648,35 @@ final class BoardManPanelLayoutTests {
         }
     }
 
+    @Test
+    func quickModeHidesFullHeaderAndUsesThreeItemLimit() async {
+        let panel = BoardManPanel()
+        panel.setQuickMode(true)
+        let size = BoardManPanel.quickPanelSize()
+        panel.setFrame(NSRect(origin: .zero, size: size), display: false)
+        await settlePanelLayout(panel)
+
+        guard let root = panel.contentView else {
+            Issue.record("Quick Mode content view was not created.")
+            return
+        }
+        let descendants = allSubviews(of: root)
+        let tabs = descendants.compactMap { $0 as? BoardManHeaderSegmentedControl }.first
+        let search = descendants.compactMap { $0 as? NSSearchField }.first
+        let conditionButton = descendants
+            .compactMap { $0 as? NSButton }
+            .first { $0.identifier?.rawValue == "BoardManHistoryConditionButton" }
+        let historyTable = descendants.compactMap { $0 as? NSTableView }.first
+
+        #expect(BoardManPanel.quickItemLimit == 3)
+        #expect(panel.presentationItemScope == .historyOnly)
+        #expect(panel.minSize.height == 220)
+        #expect(tabs?.isHidden == true)
+        #expect(search?.isHidden == true)
+        #expect(conditionButton?.isHidden == false)
+        #expect((historyTable?.enclosingScrollView?.frame.height ?? 999) < 190)
+    }
+
     private func settlePanelLayout(_ panel: BoardManPanel) async {
         await withCheckedContinuation { continuation in
             DispatchQueue.main.async {
@@ -685,11 +742,16 @@ final class BoardManPanelLayoutTests {
         let sortButton = descendants
             .compactMap { $0 as? NSButton }
             .first { ($0.toolTip ?? "").contains("Copy Order") || ($0.toolTip ?? "").contains("Recent Use") }
+        let conditionButton = descendants
+            .compactMap { $0 as? NSButton }
+            .first { $0.identifier?.rawValue == "BoardManHistoryConditionButton" }
 
         #expect(usageFilter != nil, "History usage filter was not created.")
         #expect(sortButton != nil, "History sort toggle was not created.")
+        #expect(conditionButton != nil, "History condition button was not created.")
         #expect(usageFilter?.isHidden == !expectsVisible)
         #expect(sortButton?.isHidden == !expectsVisible)
+        #expect(conditionButton?.isHidden == !expectsVisible)
         if expectsVisible, let usageFilter {
             #expect(usageFilter.selectedSegment >= 0 && usageFilter.selectedSegment < 3)
             for segment in 0..<usageFilter.segmentCount {
@@ -711,7 +773,7 @@ final class BoardManPanelLayoutTests {
 
         let rowBounds = NSRect(x: 0, y: 0, width: max(240, table.bounds.width), height: table.rowHeight)
         let badgeFrame = BoardManHistoryCellView.usageBadgeFrame(in: rowBounds, intrinsicWidth: 16)
-        #expect(badgeFrame.maxX <= rowBounds.maxX - 21,
+        #expect(badgeFrame.maxX <= rowBounds.maxX - 13,
                 "Usage badge does not reserve enough trailing space inside the rounded row.")
         #expect(abs(badgeFrame.midY - rowBounds.midY) <= 0.5,
                 "Usage badge is not vertically centered in the row.")

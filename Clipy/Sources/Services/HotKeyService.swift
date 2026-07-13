@@ -32,6 +32,7 @@ final class HotKeyService: NSObject {
     fileprivate(set) var historyKeyCombo: KeyCombo?
     fileprivate(set) var snippetKeyCombo: KeyCombo?
     fileprivate(set) var clearHistoryKeyCombo: KeyCombo?
+    fileprivate(set) var quickModeKeyCombo: KeyCombo?
 
 }
 
@@ -52,6 +53,10 @@ extension HotKeyService {
     @objc func popUpClearHistoryAlert() {
         guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
         appDelegate.clearAllHistory()
+    }
+
+    @objc func popupQuickMode() {
+        AppEnvironment.current.menuManager.showBoardManQuickPanel()
     }
 }
 
@@ -76,6 +81,8 @@ extension HotKeyService {
         change(with: .snippet, keyCombo: savedKeyCombo(forKey: Constants.HotKey.snippetKeyCombo))
         // Clear History
         changeClearHistoryKeyCombo(savedKeyCombo(forKey: Constants.HotKey.clearHistoryKeyCombo))
+        // Quick Mode
+        changeQuickModeKeyCombo(savedKeyCombo(forKey: Constants.HotKey.quickModeKeyCombo))
     }
 
     func change(with type: MenuType, keyCombo: KeyCombo?) {
@@ -99,6 +106,21 @@ extension HotKeyService {
         // Register new hotkey
         guard let keyCombo = keyCombo else { return }
         let hotkey = HotKey(identifier: "ClearHistory", keyCombo: keyCombo, target: self, action: #selector(HotKeyService.popUpClearHistoryAlert))
+        hotkey.register()
+    }
+
+    func changeQuickModeKeyCombo(_ keyCombo: KeyCombo?) {
+        quickModeKeyCombo = keyCombo
+        AppEnvironment.current.defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.quickModeKeyCombo)
+        AppEnvironment.current.defaults.synchronize()
+        HotKeyCenter.shared.unregisterHotKey(with: "QuickMode")
+        guard let keyCombo else { return }
+        let hotkey = HotKey(
+            identifier: "QuickMode",
+            keyCombo: keyCombo,
+            target: self,
+            action: #selector(HotKeyService.popupQuickMode)
+        )
         hotkey.register()
     }
 
