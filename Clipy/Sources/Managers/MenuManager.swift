@@ -145,16 +145,18 @@ extension MenuManager {
 
     fileprivate func handlePanelPaste(dataHash: String, clickStartedAt: CFAbsoluteTime?) {
         guard let panel = boardManPanel else { return }
-
-        // V4B-15: close panel first, restore target app, then paste directly.
-        // Avoid dummy NSMenuItem + AppDelegate.selectClipMenuItem indirection.
-        panel.orderOut(nil)
-
-        if let prevApp = previousFrontmostApplication {
-            prevApp.activate(options: [.activateIgnoringOtherApps])
+        let targetApplication = previousFrontmostApplication
+        guard let targetSnapshot = PasteCountInputService.shared.editableTargetSnapshot(for: targetApplication) else {
+            NSSound.beep()
+            panel.focusTableForKeyboard()
+            return
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { [weak self] in
+        // Close only after confirming that the original app still has an editable target.
+        panel.orderOut(nil)
+        targetApplication?.activate(options: [.activateIgnoringOtherApps])
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             guard let self else { return }
 
             if let clickStartedAt {
@@ -169,14 +171,20 @@ extension MenuManager {
                 return
             }
 
-            let didPaste = AppEnvironment.current.pasteService.paste(with: clip)
-
-            if didPaste {
-                let pasteCountKey = PasteCountStore.shared.key(for: clip)
-                PasteCountStore.shared.markUsed(clip: clip, in: realm)
-                PasteCountStore.shared.increment(forKey: pasteCountKey)
+            let pasteCountKey = PasteCountStore.shared.key(for: clip)
+            guard AppEnvironment.current.pasteService.paste(with: clip) else {
+                self.previousFrontmostApplication = nil
+                return
             }
 
+            PasteCountInputService.shared.confirmPasteChange(from: targetSnapshot) { confirmed in
+                guard confirmed else { return }
+                let confirmationRealm = try! Realm()
+                if let confirmedClip = confirmationRealm.object(ofType: CPYClip.self, forPrimaryKey: dataHash) {
+                    PasteCountStore.shared.markUsed(clip: confirmedClip, in: confirmationRealm)
+                }
+                PasteCountStore.shared.increment(forKey: pasteCountKey)
+            }
             self.previousFrontmostApplication = nil
         }
     }
@@ -253,25 +261,26 @@ extension MenuManager {
             let clipped = firstLine.count > 120 ? String(firstLine.prefix(117)) + "..." : firstLine
             let pasteCount = PasteCountStore.shared.count(for: clip, in: pasteCounts)
             let isPinned = pinStore.isPinned(clip.dataHash)
-            var parts: [String] = []
+            var contextParts: [String] = []
             if showRowNumbers {
-                parts.append("\(index + 1).")
-            }
-            let timestamp = BoardManPanel.timestampText(for: clip.updateTime, format: timestampFormat)
-            if !timestamp.isEmpty {
-                parts.append(timestamp)
+                contextParts.append("\(index + 1).")
             }
             if isPinned {
-                parts.append("[PIN]")
+                contextParts.append("[PIN]")
             }
             if isImageClip {
-                parts.append("Image")
+                contextParts.append("Image")
             }
+            let timestamp = BoardManPanel.timestampText(for: clip.updateTime, format: timestampFormat)
+            let belowParts = contextParts + (timestamp.isEmpty ? [] : [timestamp])
+            let compactTitle = (contextParts + [clipped]).joined(separator: " ")
             let countText = showUsageCount && pasteCount > 0 ? "\(pasteCount)" : ""
-            let displayTitle = (parts + [clipped]).joined(separator: " ")
+            let displayTitle = (belowParts + [clipped]).joined(separator: " ")
             return BoardManHistoryItem(title: displayTitle,
                                        primaryTitle: clipped,
-                                       metadataText: parts.joined(separator: "   "),
+                                       compactTitle: compactTitle,
+                                       metadataText: belowParts.joined(separator: "   "),
+                                       timestampText: timestamp,
                                        countText: countText,
                                        previewTitle: title,
                                        dataHash: clip.dataHash,
@@ -307,7 +316,9 @@ extension MenuManager {
                         let disabled = folder.enable && snippet.enable ? "" : " [OFF]"
                         return BoardManHistoryItem(title: "\(pin)\(prefix) / \(title)",
                                                    primaryTitle: title,
+                                                   compactTitle: title,
                                                    metadataText: "\(pin)\(prefix)\(disabled)",
+                                                   timestampText: "",
                                                    countText: "",
                                                    previewTitle: snippet.content,
                                                    dataHash: snippet.identifier,
@@ -337,7 +348,9 @@ extension MenuManager {
                 let disabled = snippet.enable ? "" : " [OFF]"
                 return BoardManHistoryItem(title: "\(pin)Uncategorized / \(title)",
                                            primaryTitle: title,
+                                           compactTitle: title,
                                            metadataText: "\(pin)Uncategorized\(disabled)",
+                                           timestampText: "",
                                            countText: "",
                                            previewTitle: snippet.content,
                                            dataHash: snippet.identifier,
@@ -1085,7 +1098,7 @@ fileprivate enum BoardManHistoryUsageFilter: String, CaseIterable {
     var toolTip: String {
         switch self {
         case .all: return "All — show every clipboard history item (default)."
-        case .unused: return "Unused — show items that have not been pasted yet."
+        case .unused: return "Unused — show unpasted items. While selected, Command+V pastes the next unused item in copy order."
         case .used: return "Used — show items pasted at least once."
         }
     }
@@ -1099,28 +1112,60 @@ fileprivate enum BoardManHistoryUsageFilter: String, CaseIterable {
     }
 }
 
-fileprivate enum BoardManFontChoice: String, CaseIterable {
-    case system = "System"
-    case rounded = "Rounded"
-    case serif = "Serif"
-    case monospaced = "Monospaced"
+fileprivate enum BoardManTimestampPosition: String, CaseIterable {
+    case hidden = "Hidden"
+    case below = "Below"
+    case left = "Left"
+    case right = "Right"
+
+    static func allowed(_ value: String?) -> BoardManTimestampPosition {
+        return allCases.first(where: { $0.rawValue.lowercased() == value?.lowercased() }) ?? .below
+    }
+}
+
+fileprivate struct BoardManFontChoice: Equatable {
+    let rawValue: String
+
+    static let system = BoardManFontChoice(rawValue: "System")
+    static let rounded = BoardManFontChoice(rawValue: "Rounded")
+    static let serif = BoardManFontChoice(rawValue: "Serif")
+    static let monospaced = BoardManFontChoice(rawValue: "Monospaced")
+    static let builtIns: [BoardManFontChoice] = [.system, .rounded, .serif, .monospaced]
+
+    static var installedFamilies: [String] {
+        let builtInNames = Set(builtIns.map(\.rawValue))
+        return NSFontManager.shared.availableFontFamilies
+            .filter { !builtInNames.contains($0) }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
 
     static func allowed(_ value: String?) -> BoardManFontChoice {
-        return allCases.first(where: { $0.rawValue == value }) ?? .system
+        guard let value, !value.isEmpty else { return .system }
+        if let builtIn = builtIns.first(where: { $0.rawValue == value }) {
+            return builtIn
+        }
+        return installedFamilies.contains(value) ? BoardManFontChoice(rawValue: value) : .system
     }
 
     func font(ofSize size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
         let base = NSFont.systemFont(ofSize: size, weight: weight)
-        guard self != .system else { return base }
-        let design: NSFontDescriptor.SystemDesign
-        switch self {
-        case .rounded: design = .rounded
-        case .serif: design = .serif
-        case .monospaced: design = .monospaced
-        case .system: return base
+        switch rawValue {
+        case Self.system.rawValue:
+            return base
+        case Self.rounded.rawValue, Self.serif.rawValue, Self.monospaced.rawValue:
+            let design: NSFontDescriptor.SystemDesign = rawValue == Self.rounded.rawValue
+                ? .rounded
+                : (rawValue == Self.serif.rawValue ? .serif : .monospaced)
+            guard let descriptor = base.fontDescriptor.withDesign(design) else { return base }
+            return NSFont(descriptor: descriptor, size: size) ?? base
+        default:
+            let descriptor = NSFontDescriptor(fontAttributes: [
+                .family: rawValue,
+                .traits: [NSFontDescriptor.TraitKey.weight: weight.rawValue]
+            ])
+            return NSFont(descriptor: descriptor, size: size)
+                ?? NSFontManager.shared.convert(base, toFamily: rawValue)
         }
-        guard let descriptor = base.fontDescriptor.withDesign(design) else { return base }
-        return NSFont(descriptor: descriptor, size: size) ?? base
     }
 }
 
@@ -1459,7 +1504,9 @@ fileprivate final class BoardManProLockedControlView: NSView {
 fileprivate struct BoardManHistoryItem {
     let title: String
     let primaryTitle: String
+    let compactTitle: String
     let metadataText: String
+    let timestampText: String
     let countText: String
     let previewTitle: String
     let dataHash: String
@@ -1776,8 +1823,10 @@ final class BoardManCenteredSearchFieldCell: NSSearchFieldCell {
 final class BoardManHistoryCellView: NSTableCellView {
     private let primaryLabel = NSTextField(labelWithString: "")
     private let metadataLabel = NSTextField(labelWithString: "")
+    private let timestampAccessoryLabel = NSTextField(labelWithString: "")
     private let countBadge = NSTextField(labelWithString: "")
     private let inlineImageView = NSImageView(frame: .zero)
+    private var timestampPosition: BoardManTimestampPosition = .below
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -1803,6 +1852,18 @@ final class BoardManHistoryCellView: NSTableCellView {
         metadataLabel.drawsBackground = false
         metadataLabel.font = NSFont.systemFont(ofSize: 11.5, weight: .regular)
 
+        timestampAccessoryLabel.cell = BoardManCenteredTextFieldCell(textCell: "")
+        timestampAccessoryLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .medium)
+        timestampAccessoryLabel.textColor = .secondaryLabelColor
+        timestampAccessoryLabel.lineBreakMode = .byTruncatingTail
+        timestampAccessoryLabel.maximumNumberOfLines = 1
+        timestampAccessoryLabel.cell?.usesSingleLineMode = true
+        timestampAccessoryLabel.cell?.wraps = false
+        timestampAccessoryLabel.isBordered = false
+        timestampAccessoryLabel.isEditable = false
+        timestampAccessoryLabel.backgroundColor = .clear
+        timestampAccessoryLabel.drawsBackground = false
+
         countBadge.cell = BoardManCenteredTextFieldCell(textCell: "")
         countBadge.alignment = .center
         countBadge.lineBreakMode = .byTruncatingTail
@@ -1823,7 +1884,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         inlineImageView.layer?.masksToBounds = true
         inlineImageView.layer?.borderWidth = 1
 
-        [primaryLabel, metadataLabel, countBadge].forEach {
+        [primaryLabel, metadataLabel, timestampAccessoryLabel, countBadge].forEach {
             $0.cell?.truncatesLastVisibleLine = true
             $0.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         }
@@ -1831,6 +1892,7 @@ final class BoardManHistoryCellView: NSTableCellView {
 
         addSubview(primaryLabel)
         addSubview(metadataLabel)
+        addSubview(timestampAccessoryLabel)
         addSubview(inlineImageView)
         addSubview(countBadge)
     }
@@ -1840,15 +1902,23 @@ final class BoardManHistoryCellView: NSTableCellView {
                    usageStyle: String,
                    useLiquidGlass: Bool,
                    lightenTheme: Bool,
-                   themePreset: BoardManThemePreset) {
+                   themePreset: BoardManThemePreset,
+                   timestampPosition requestedTimestampPosition: BoardManTimestampPosition) {
         let fontChoice = BoardManFontChoice.allowed(
             AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice)
         )
         primaryLabel.font = fontChoice.font(ofSize: 13.5, weight: .medium)
         metadataLabel.font = fontChoice.font(ofSize: 11.5, weight: .regular)
+        timestampAccessoryLabel.font = fontChoice.font(ofSize: 10.5, weight: .medium)
         countBadge.font = fontChoice.font(ofSize: 10.5, weight: .medium)
-        primaryLabel.stringValue = item.primaryTitle
+        timestampPosition = requestedTimestampPosition
+        let usesCompactRow = timestampPosition != .below
+        primaryLabel.stringValue = usesCompactRow ? item.compactTitle : item.primaryTitle
         metadataLabel.stringValue = item.metadataText
+        metadataLabel.isHidden = usesCompactRow
+        timestampAccessoryLabel.stringValue = item.timestampText
+        timestampAccessoryLabel.isHidden = item.timestampText.isEmpty || timestampPosition == .hidden || timestampPosition == .below
+        timestampAccessoryLabel.alignment = timestampPosition == .right ? .right : .left
         let badgePrefix = usageStyle == "compact" ? "used " : "×"
         let shouldShowCount = item.pasteCount > 0 && !item.countText.isEmpty
         countBadge.stringValue = shouldShowCount ? "\(badgePrefix)\(item.countText)" : ""
@@ -1859,6 +1929,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         if isSelected {
             primaryLabel.textColor = .selectedMenuItemTextColor
             metadataLabel.textColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.86)
+            timestampAccessoryLabel.textColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.86)
             countBadge.textColor = .selectedMenuItemTextColor
             countBadge.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(useLiquidGlass ? 0.20 : 0.18).cgColor
             inlineImageView.layer?.backgroundColor = NSColor.selectedMenuItemTextColor.withAlphaComponent(0.10).cgColor
@@ -1867,6 +1938,7 @@ final class BoardManHistoryCellView: NSTableCellView {
             let accentColor = themePreset.accentColor
             primaryLabel.textColor = .labelColor
             metadataLabel.textColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.92) : .secondaryLabelColor
+            timestampAccessoryLabel.textColor = useLiquidGlass ? NSColor.secondaryLabelColor.withAlphaComponent(0.92) : .secondaryLabelColor
             countBadge.textColor = .labelColor
             countBadge.layer?.backgroundColor = accentColor.withAlphaComponent(lightenTheme ? 0.10 : (useLiquidGlass ? 0.22 : 0.18)).cgColor
             inlineImageView.layer?.backgroundColor = themePreset.surfaceTintColor(useLiquidGlass: useLiquidGlass, lighten: lightenTheme).cgColor
@@ -1882,7 +1954,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         let trailingInset: CGFloat = 22
         let badgeHeight: CGFloat = 20
         let maxContentWidth = max(0, bounds.width - horizontalInset - trailingInset)
-        let badgeWidth = min(maxContentWidth, min(76, max(38, ceil(intrinsicWidth) + 20)))
+        let badgeWidth = min(maxContentWidth, max(56, min(64, ceil(intrinsicWidth) + 20)))
         return NSIntegralRect(NSRect(
             x: max(horizontalInset, floor(bounds.maxX - trailingInset - badgeWidth)),
             y: floor(bounds.midY - (badgeHeight / 2)),
@@ -1899,42 +1971,81 @@ final class BoardManHistoryCellView: NSTableCellView {
         let titleHeight: CGFloat = 18
         let metadataHeight: CGFloat = 15
         let textGap: CGFloat = 4
-        let textBlockHeight = titleHeight + textGap + metadataHeight
-        let textBottom = floor((bounds.height - textBlockHeight) / 2)
-        let badgeFrame = countBadge.isHidden
-            ? .zero
-            : Self.usageBadgeFrame(in: bounds, intrinsicWidth: countBadge.intrinsicContentSize.width)
-        let badgeWidth = badgeFrame.width
-        let badgeX = badgeFrame.minX
-        let imageSize: CGFloat = inlineImageView.isHidden ? 0 : 32
-        let imageX = imageSize > 0 ? max(horizontalInset, badgeX - imageSize - accessoryGap) : 0
-        let textRightLimit = imageSize > 0
-            ? imageX
-            : (badgeWidth > 0 ? badgeX : bounds.width - trailingInset)
-        let textWidth = max(0, textRightLimit - horizontalInset - accessoryGap)
+        let timeWidth: CGFloat = 84
+        let countWidth: CGFloat = 64
+        let accessoryHeight: CGFloat = 20
+        var textLeft = horizontalInset
+        var textRight = bounds.width - trailingInset
 
-        metadataLabel.frame = NSIntegralRect(NSRect(
-            x: horizontalInset,
-            y: textBottom,
-            width: textWidth,
-            height: metadataHeight
-        ))
-        primaryLabel.frame = NSIntegralRect(NSRect(
-            x: horizontalInset,
-            y: textBottom + metadataHeight + textGap,
-            width: textWidth,
-            height: titleHeight
-        ))
+        timestampAccessoryLabel.frame = .zero
+        countBadge.frame = .zero
+        inlineImageView.frame = .zero
+
+        if !timestampAccessoryLabel.isHidden, timestampPosition == .left {
+            timestampAccessoryLabel.frame = NSIntegralRect(NSRect(
+                x: textLeft,
+                y: floor(bounds.midY - accessoryHeight / 2),
+                width: timeWidth,
+                height: accessoryHeight
+            ))
+            textLeft = timestampAccessoryLabel.frame.maxX + accessoryGap
+        }
+
+        if !timestampAccessoryLabel.isHidden, timestampPosition == .right {
+            timestampAccessoryLabel.frame = NSIntegralRect(NSRect(
+                x: textRight - timeWidth,
+                y: floor(bounds.midY - accessoryHeight / 2),
+                width: timeWidth,
+                height: accessoryHeight
+            ))
+            textRight = timestampAccessoryLabel.frame.minX - accessoryGap
+        }
+
+        if !countBadge.isHidden {
+            countBadge.frame = NSIntegralRect(NSRect(
+                x: max(textLeft, textRight - countWidth),
+                y: floor(bounds.midY - accessoryHeight / 2),
+                width: min(countWidth, max(0, textRight - textLeft)),
+                height: accessoryHeight
+            ))
+            textRight = countBadge.frame.minX - accessoryGap
+        }
+
         if !inlineImageView.isHidden {
+            let imageSize: CGFloat = timestampPosition == .below ? 32 : 28
             inlineImageView.frame = NSIntegralRect(NSRect(
-                x: imageX,
+                x: max(textLeft, textRight - imageSize),
                 y: floor((bounds.height - imageSize) / 2),
-                width: imageSize,
+                width: min(imageSize, max(0, textRight - textLeft)),
                 height: imageSize
             ))
+            textRight = inlineImageView.frame.minX - accessoryGap
         }
-        if !countBadge.isHidden {
-            countBadge.frame = badgeFrame
+
+        let textWidth = max(0, textRight - textLeft)
+        if timestampPosition == .below {
+            let textBlockHeight = titleHeight + textGap + metadataHeight
+            let textBottom = floor((bounds.height - textBlockHeight) / 2)
+            metadataLabel.frame = NSIntegralRect(NSRect(
+                x: textLeft,
+                y: textBottom,
+                width: textWidth,
+                height: metadataHeight
+            ))
+            primaryLabel.frame = NSIntegralRect(NSRect(
+                x: textLeft,
+                y: textBottom + metadataHeight + textGap,
+                width: textWidth,
+                height: titleHeight
+            ))
+        } else {
+            metadataLabel.frame = .zero
+            primaryLabel.frame = NSIntegralRect(NSRect(
+                x: textLeft,
+                y: floor(bounds.midY - titleHeight / 2),
+                width: textWidth,
+                height: titleHeight
+            ))
         }
     }
 }
@@ -1954,6 +2065,7 @@ class BoardManPanel: NSPanel {
         static let cardCornerRadius: CGFloat = 14
         static let sidebarSymbolLeadingInset: CGFloat = 8
         static let historyRowHeight: CGFloat = 62
+        static let compactHistoryRowHeight: CGFloat = 46
     }
 
     private var glassBackgroundView: NSVisualEffectView?
@@ -1971,6 +2083,8 @@ class BoardManPanel: NSPanel {
     private var rowNumbersButton: NSButton?
     private var timestampLabel: NSTextField?
     private var timestampPopup: NSPopUpButton?
+    private var timestampPositionLabel: NSTextField?
+    private var timestampPositionPopup: NSPopUpButton?
     private var usageCountButton: NSButton?
     private var usageStyleLabel: NSTextField?
     private var usageStylePopup: NSPopUpButton?
@@ -2144,6 +2258,16 @@ class BoardManPanel: NSPanel {
 
     fileprivate var fontChoice: BoardManFontChoice {
         return BoardManFontChoice.allowed(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice))
+    }
+
+    fileprivate var timestampPosition: BoardManTimestampPosition {
+        let format = BoardManPanel.allowedTimestampFormat(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)
+        )
+        if format == "none" { return .hidden }
+        return BoardManTimestampPosition.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManTimestampPosition)
+        )
     }
 
     fileprivate var selectedThemePreset: BoardManThemePreset {
@@ -2408,7 +2532,7 @@ class BoardManPanel: NSPanel {
         }
 
         let popups: [NSPopUpButton?] = [
-            statusItemPopup, timestampPopup, usageStylePopup, usedItemStylePopup,
+            statusItemPopup, timestampPopup, timestampPositionPopup, usageStylePopup, usedItemStylePopup,
             themePresetPopup, appearanceModePopup, uiStylePopup, fontChoicePopup,
             hideRuleModePopup, snippetCategoryPopup
         ]
@@ -2755,13 +2879,33 @@ class BoardManPanel: NSPanel {
         timestampLabel = timeText
 
         let popup = NSPopUpButton(frame: .zero, pullsDown: false)
-        popup.addItems(withTitles: ["Relative", "24-hour", "24-hour + seconds", "12-hour", "12-hour + seconds", "Date + time", "Hidden"])
-        popup.selectItem(withTitle: BoardManPanel.timestampMenuTitle(for: AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)))
+        popup.addItems(withTitles: ["Relative", "24-hour", "24-hour + seconds", "12-hour", "12-hour + seconds", "Date + time"])
+        let storedTimestampTitle = BoardManPanel.timestampMenuTitle(
+            for: AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)
+        )
+        popup.selectItem(withTitle: storedTimestampTitle == "Hidden" ? "Relative" : storedTimestampTitle)
         popup.font = NSFont.systemFont(ofSize: 11)
         popup.target = self
         popup.action = #selector(timestampFormatChanged(_:))
+        popup.toolTip = "時刻の表示形式を選択します。"
         contentView.addSubview(popup)
         timestampPopup = popup
+
+        let timePositionText = NSTextField(labelWithString: "位置")
+        timePositionText.font = NSFont.systemFont(ofSize: 11)
+        timePositionText.textColor = .labelColor
+        contentView.addSubview(timePositionText)
+        timestampPositionLabel = timePositionText
+
+        let timePositionControl = NSPopUpButton(frame: .zero, pullsDown: false)
+        timePositionControl.addItems(withTitles: BoardManTimestampPosition.allCases.map(\.rawValue))
+        timePositionControl.selectItem(withTitle: timestampPosition.rawValue)
+        timePositionControl.font = NSFont.systemFont(ofSize: 11)
+        timePositionControl.target = self
+        timePositionControl.action = #selector(timestampPositionChanged(_:))
+        timePositionControl.toolTip = "Hiddenで1行表示、Left/Rightで固定幅の時刻列、Belowで2行表示にします。"
+        contentView.addSubview(timePositionControl)
+        timestampPositionPopup = timePositionControl
 
         let usage = NSButton(checkboxWithTitle: "Count", target: self, action: #selector(usageCountChanged(_:)))
         usage.state = (AppEnvironment.current.defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true) ? .on : .off
@@ -2853,19 +2997,24 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(uiStyleControl)
         uiStylePopup = uiStyleControl
 
-        let fontText = NSTextField(labelWithString: "Font")
+        let fontText = NSTextField(labelWithString: "Font / フォント")
         fontText.font = NSFont.systemFont(ofSize: 11)
         fontText.textColor = .labelColor
         contentView.addSubview(fontText)
         fontChoiceLabel = fontText
 
         let fontControl = NSPopUpButton(frame: .zero, pullsDown: false)
-        fontControl.addItems(withTitles: BoardManFontChoice.allCases.map { $0.rawValue })
+        BoardManFontChoice.builtIns.forEach { fontControl.addItem(withTitle: $0.rawValue) }
+        fontControl.menu?.addItem(.separator())
+        let installedHeader = NSMenuItem(title: "Installed Fonts / インストール済み", action: nil, keyEquivalent: "")
+        installedHeader.isEnabled = false
+        fontControl.menu?.addItem(installedHeader)
+        BoardManFontChoice.installedFamilies.forEach { fontControl.addItem(withTitle: $0) }
         fontControl.selectItem(withTitle: fontChoice.rawValue)
         fontControl.font = NSFont.systemFont(ofSize: 11)
         fontControl.target = self
         fontControl.action = #selector(fontChoiceChanged(_:))
-        fontControl.toolTip = "Changes Board-Man panel typography immediately."
+        fontControl.toolTip = "Macにインストール済みのフォントを選択できます。日本語グリフはmacOSのフォールバックで補完します。"
         contentView.addSubview(fontControl)
         fontChoicePopup = fontControl
 
@@ -3459,7 +3608,7 @@ class BoardManPanel: NSPanel {
         [generalSectionLabel, shortcutSectionLabel, viewSectionLabel, historySectionLabel, privacySectionLabel, storedTypesSectionLabel, filterSectionLabel, labsSectionLabel, snippetCategoryLabel, snippetEditorTitleLabel, snippetEditorContentLabel].forEach { label in
             label?.textColor = themePreset == .defaultPreset ? .labelColor : accentColor
         }
-        [maxHistorySizeLabel, statusItemLabel, themePresetLabel, appearanceModeLabel, uiStyleLabel, fontChoiceLabel, timestampLabel, usageStyleLabel, usedItemStyleLabel, heightControlLabel].forEach { label in
+        [maxHistorySizeLabel, statusItemLabel, themePresetLabel, appearanceModeLabel, uiStyleLabel, fontChoiceLabel, timestampLabel, timestampPositionLabel, usageStyleLabel, usedItemStyleLabel, heightControlLabel].forEach { label in
             label?.textColor = NSColor.labelColor.withAlphaComponent(useGlass ? 0.96 : 1)
         }
         globalShortcutRows.forEach { row in
@@ -3764,7 +3913,7 @@ class BoardManPanel: NSPanel {
             settingsPageTitleLabel, settingsPageDescriptionLabel,
             generalSectionLabel, launchOnLoginButton, inputPasteCommandButton, maxHistorySizeLabel, maxHistorySizeStepper, maxHistorySizeValueLabel, statusItemLabel, statusItemPopup, shortcutSectionLabel, shortcutStatusLabel,
             snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton,
-            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup, themeLightenButton,
+            viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, timestampPositionLabel, timestampPositionPopup, usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup, themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup, themeLightenButton,
             historySectionLabel, dedupeButton, overwriteSameHistoryButton, reuseTopButton, clearHistoryButton,
             privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
@@ -3802,6 +3951,7 @@ class BoardManPanel: NSPanel {
         generalControls.append(contentsOf: globalShortcutRows.flatMap { $0.views }.map { Optional($0) })
         let viewControls: [NSView?] = [
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup,
+            timestampPositionLabel, timestampPositionPopup,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel,
             usedItemStylePopup, themePresetLabel, themePresetPopup,
             appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup,
@@ -3874,7 +4024,10 @@ class BoardManPanel: NSPanel {
         func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(viewSectionLabel, originX: originX, originY: originY, width: width)
             rowNumbersButton?.frame = NSRect(x: originX, y: originY - 40, width: width, height: 20)
-            placeLabeledRow(label: timestampLabel, control: timestampPopup, originX: originX, originY: originY - 84, width: width)
+            let timeGap: CGFloat = 16
+            let timeHalfWidth = max(180, floor((width - timeGap) / 2))
+            placeLabeledRow(label: timestampLabel, control: timestampPopup, originX: originX, originY: originY - 84, width: timeHalfWidth)
+            placeLabeledRow(label: timestampPositionLabel, control: timestampPositionPopup, originX: originX + timeHalfWidth + timeGap, originY: originY - 84, width: timeHalfWidth, labelWidth: 42)
             usageCountButton?.frame = NSRect(x: originX, y: originY - 126, width: width, height: 20)
 
             let columnGap: CGFloat = 16
@@ -4066,6 +4219,18 @@ class BoardManPanel: NSPanel {
     @objc private func timestampFormatChanged(_ sender: NSPopUpButton) {
         let value = BoardManPanel.timestampFormat(forMenuTitle: sender.titleOfSelectedItem)
         AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.boardManTimestampFormat)
+        onRefreshRequested?()
+    }
+
+    @objc private func timestampPositionChanged(_ sender: NSPopUpButton) {
+        let position = BoardManTimestampPosition.allowed(sender.titleOfSelectedItem)
+        AppEnvironment.current.defaults.set(position.rawValue.lowercased(),
+                                            forKey: Constants.UserDefaults.boardManTimestampPosition)
+        if position != .hidden,
+           BoardManPanel.allowedTimestampFormat(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)) == "none" {
+            AppEnvironment.current.defaults.set("relative", forKey: Constants.UserDefaults.boardManTimestampFormat)
+            timestampPopup?.selectItem(withTitle: "Relative")
+        }
         onRefreshRequested?()
     }
 
@@ -5037,6 +5202,9 @@ class BoardManPanel: NSPanel {
         } else if selectedIndex >= historyItems.count {
             selectedIndex = historyItems.count - 1
         }
+        placeholderList?.rowHeight = activeTab == .history && timestampPosition != .below
+            ? LayoutMetrics.compactHistoryRowHeight
+            : LayoutMetrics.historyRowHeight
         layoutPanelSubviews()
         placeholderList?.reloadData()
         synchronizeListGeometry()
@@ -5775,11 +5943,15 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
                        usageStyle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)),
                        useLiquidGlass: isLiquidGlassEnabled,
                        lightenTheme: isThemeLightenEnabled,
-                       themePreset: themePreset)
+                       themePreset: themePreset,
+                       timestampPosition: activeTab == .history ? timestampPosition : .below)
         return cell
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        if activeTab == .history, timestampPosition != .below {
+            return LayoutMetrics.compactHistoryRowHeight
+        }
         return LayoutMetrics.historyRowHeight
     }
 

@@ -74,6 +74,7 @@ struct Constants {
         static let boardManShowRowNumbers = "BoardManShowRowNumbers"
         static let boardManHistoryUsageFilter = "BoardManHistoryUsageFilter"
         static let boardManTimestampFormat = "BoardManTimestampFormat"
+        static let boardManTimestampPosition = "BoardManTimestampPosition"
         static let boardManPanelHeight = "BoardManPanelHeight"
         static let boardManShowUsageCount = "BoardManShowUsageCount"
         static let boardManUsageCountStyle = "BoardManUsageCountStyle"
