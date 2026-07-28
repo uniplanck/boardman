@@ -1,3 +1,5 @@
+// swiftlint:disable file_length
+
 import Cocoa
 import CryptoKit
 import Foundation
@@ -99,6 +101,90 @@ final class EntitlementGateTests {
     }
 
     @Test
+    func pinnedHistorySurvivesStoreReloadAndIsExcludedFromRetentionDeletion() throws {
+        let suiteName = "PinnedSnippetStoreTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = PinnedSnippetStore(defaults: defaults)
+        #expect(store.add("pinned-history"))
+        #expect(PinnedSnippetStore(defaults: defaults).isPinned("pinned-history"))
+
+        let removable = store.oldestUnpinnedIdentifiers(
+            in: ["newest", "pinned-history", "oldest"],
+            maximumCount: 2
+        )
+        #expect(removable == Set(["oldest", "newest"]))
+        #expect(!removable.contains("pinned-history"))
+    }
+
+    @Test
+    func historyDisplayNamePersistsAndNameOnlyRequiresAName() throws {
+        let suiteName = "HistoryDisplayNameStoreTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = HistoryDisplayNameStore(defaults: defaults)
+        store.setName("Deploy command", for: "history-1")
+        store.setNameOnly(true, for: "history-1")
+
+        let reloaded = HistoryDisplayNameStore(defaults: defaults)
+        #expect(reloaded.name(for: "history-1") == "Deploy command")
+        #expect(reloaded.isNameOnly("history-1"))
+
+        reloaded.setName("", for: "history-1")
+        #expect(reloaded.name(for: "history-1") == nil)
+        #expect(!reloaded.isNameOnly("history-1"))
+    }
+
+    @Test
+    func configuredHistoryLimitIsCappedByEntitlement() throws {
+        let suiteName = "HistoryRetentionPolicyTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(40, forKey: Constants.UserDefaults.maxHistorySize)
+        #expect(BoardManHistoryRetentionPolicy.effectiveLimit(defaults: defaults, entitlementLimit: 100) == 40)
+        #expect(BoardManHistoryRetentionPolicy.effectiveLimit(defaults: defaults, entitlementLimit: nil) == 40)
+
+        defaults.set(500, forKey: Constants.UserDefaults.maxHistorySize)
+        #expect(BoardManHistoryRetentionPolicy.effectiveLimit(defaults: defaults, entitlementLimit: 100) == 100)
+    }
+
+    @Test
+    func overflowArchiveStoresTextWithDateAndSkipsImages() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TextHistoryArchiveStoreTests-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = root.appendingPathComponent("history.jsonl")
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let textClip = CPYClip()
+        textClip.dataHash = "text-entry"
+        textClip.title = "git status --short"
+        textClip.updateTime = 1_700_000_000
+        textClip.primaryType = NSPasteboard.PasteboardType.string.rawValue
+
+        let imageClip = CPYClip()
+        imageClip.dataHash = "image-entry"
+        imageClip.title = "image pixels"
+        imageClip.updateTime = 1_700_000_001
+        imageClip.primaryType = NSPasteboard.PasteboardType.png.rawValue
+
+        let store = TextHistoryArchiveStore(fileURL: fileURL)
+        let removable = store.clipsSafeToRemove([textClip, imageClip])
+        #expect(Set(removable.map(\.dataHash)) == Set(["text-entry", "image-entry"]))
+        let entries = try store.readEntries()
+        #expect(entries == [ArchivedTextHistoryEntry(
+            identifier: "text-entry",
+            copiedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            content: "git status --short"
+        )])
+        let rawContents = try String(contentsOf: fileURL, encoding: .utf8)
+        #expect(rawContents.contains("2023-11-14T22:13:20Z"))
+        #expect(!rawContents.contains("image pixels"))
+    }
+
+    @Test
     func freeSnippetLimitIsFive() {
         let service = EntitlementService(snapshot: .freeDefault)
 
@@ -134,6 +220,55 @@ final class EntitlementGateTests {
         #expect(EntitlementGate.canPinItem(currentPinnedCount: 10_000, service: service))
         #expect(EntitlementGate.canCreateSnippet(currentSnippetCount: 10_000, service: service))
         #expect(EntitlementGate.canCreateSnippetFolder(currentFolderCount: 10_000, service: service))
+    }
+
+    @Test
+    func timedPinStoreEnforcesFreeLimitAndExpires() {
+        let suiteName = "BoardManTimedPinStoreTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var currentDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let store = BoardManTimedPinStore(defaults: defaults, now: { currentDate })
+
+        #expect(store.setPin("first", durationValue: 1, unit: .hours, maximumActiveCount: 1))
+        #expect(!store.setPin("second", durationValue: 1, unit: .hours, maximumActiveCount: 1))
+        #expect(store.isPinned("first"))
+
+        currentDate = currentDate.addingTimeInterval(3_601)
+        #expect(store.removeExpired())
+        #expect(!store.isPinned("first"))
+        #expect(store.setPin("second", durationValue: 1, unit: .days, maximumActiveCount: 1))
+    }
+
+    @Test
+    func itemHighlightStoreRoundTripsAndClears() {
+        let suiteName = "BoardManHighlightStoreTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = BoardManItemHighlightStore(defaults: defaults)
+
+        store.set(.purple, for: "item")
+        #expect(store.highlight(for: "item") == .purple)
+        store.set(nil, for: "item")
+        #expect(store.highlight(for: "item") == nil)
+    }
+
+    @Test
+    func historyCSVExporterEscapesCommasQuotesAndNewlines() {
+        let row = BoardManHistoryCSVRow(
+            copiedAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 1),
+            displayName: "name, one",
+            content: "line \"one\"\nline two",
+            pasteCount: 3,
+            isPinned: true,
+            primaryType: "public.utf8-plain-text"
+        )
+        let csv = BoardManHistoryCSVExporter.csv(rows: [row])
+
+        #expect(csv.contains("\"name, one\""))
+        #expect(csv.contains("\"line \"\"one\"\"\nline two\""))
+        #expect(csv.contains(",3,true,public.utf8-plain-text"))
     }
 
     @Test
@@ -461,6 +596,75 @@ struct PasteCountInputServiceTests {
     }
 
     @Test
+    func clipboardTextReconciliationRemovesOnlyExactDuplicatedLineBreaks() {
+        let richText = "A\nB\n\nC"
+        let duplicatedPlainText = "A\n\nB\n\n\n\nC"
+
+        #expect(CPYClipData.preferredTextValue(
+            plainText: duplicatedPlainText,
+            richText: richText
+        ) == richText)
+    }
+
+    @Test
+    func clipboardTextReconciliationHandlesChromeHTMLTrailingLineBreak() {
+        let chromePlainText = "A\n\nB\n\nC"
+        let htmlAsText = "A\nB\nC\n"
+        #expect(CPYClipData.preferredTextValue(
+            plainText: chromePlainText,
+            richText: htmlAsText
+        ) == "A\nB\nC")
+    }
+
+    @Test
+    func clipboardTextReconciliationPreservesIntentionalBlankLinesWithoutProof() {
+        let intentionalBlankLine = "A\nB\n\nC"
+        #expect(CPYClipData.preferredTextValue(
+            plainText: intentionalBlankLine,
+            richText: nil
+        ) == intentionalBlankLine)
+
+        let nonMatchingRichText = "A\nB\nC"
+        #expect(CPYClipData.preferredTextValue(
+            plainText: intentionalBlankLine,
+            richText: nonMatchingRichText
+        ) == intentionalBlankLine)
+    }
+
+    @Test
+    func clipboardTextReconciliationCanonicalizesLineEndingEncoding() {
+        #expect(CPYClipData.preferredTextValue(
+            plainText: "A\r\nB\r\n\r\nC",
+            richText: nil
+        ) == "A\nB\n\nC")
+    }
+
+    @Test
+    func pasteCountCacheUpdatesImmediatelyAndFlushesToDefaults() throws {
+        let defaultsSuite = "PasteCountCacheTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: defaultsSuite))
+        defer { defaults.removePersistentDomain(forName: defaultsSuite) }
+
+        let clip = CPYClip()
+        clip.dataHash = "cached-count"
+        clip.title = "cached paste count"
+        clip.primaryType = NSPasteboard.PasteboardType.string.rawValue
+
+        let seedStore = PasteCountStore(defaults: defaults)
+        let key = seedStore.key(for: clip)
+        defaults.set([key: NSNumber(value: 41)], forKey: Constants.UserDefaults.pasteCounts)
+
+        let store = PasteCountStore(defaults: defaults)
+        #expect(store.count(for: clip) == 41)
+        #expect(store.increment(forKey: key))
+        #expect(store.count(for: clip) == 42)
+
+        store.flushPendingPersistence()
+        let persisted = defaults.dictionary(forKey: Constants.UserDefaults.pasteCounts) as? [String: NSNumber]
+        #expect(persisted?[key]?.intValue == 42)
+    }
+
+    @Test
     func pasteCountRequiresObservedEditableTargetChange() {
         let unchanged = PasteTargetSnapshot(
             processIdentifier: 100,
@@ -562,11 +766,14 @@ final class BoardManPanelLayoutTests {
         let defaults = AppEnvironment.current.defaults
         let originalTimestampFormat = defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)
         let originalTimestampPosition = defaults.string(forKey: Constants.UserDefaults.boardManTimestampPosition)
+        let originalLanguage = defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
         defaults.set("relative", forKey: Constants.UserDefaults.boardManTimestampFormat)
         defaults.set("below", forKey: Constants.UserDefaults.boardManTimestampPosition)
+        defaults.set("English", forKey: Constants.UserDefaults.boardManLanguage)
         defer {
             defaults.set(originalTimestampFormat, forKey: Constants.UserDefaults.boardManTimestampFormat)
             defaults.set(originalTimestampPosition, forKey: Constants.UserDefaults.boardManTimestampPosition)
+            defaults.set(originalLanguage, forKey: Constants.UserDefaults.boardManLanguage)
         }
 
         let panel = BoardManPanel()
@@ -649,6 +856,24 @@ final class BoardManPanelLayoutTests {
     }
 
     @Test
+    func panelHidesWhenApplicationDeactivates() async {
+        let panel = BoardManPanel()
+        #expect(panel.hidesOnDeactivate)
+
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        await settlePanelLayout(panel)
+        #expect(panel.isVisible)
+
+        NotificationCenter.default.post(
+            name: NSApplication.didResignActiveNotification,
+            object: NSApp
+        )
+        await settlePanelLayout(panel)
+        #expect(!panel.isVisible)
+    }
+
+    @Test
     func quickModeHidesFullHeaderAndUsesThreeItemLimit() async {
         let panel = BoardManPanel()
         panel.setQuickMode(true)
@@ -722,10 +947,12 @@ final class BoardManPanelLayoutTests {
             if let cell = search.cell as? BoardManCenteredSearchFieldCell {
                 let textRect = cell.searchTextRect(forBounds: search.bounds)
                 let iconRect = cell.searchButtonRect(forBounds: search.bounds)
-                #expect(abs(textRect.midY - search.bounds.midY) <= 0.5,
-                        "Search text is not vertically centered.")
-                #expect(abs(iconRect.midY - search.bounds.midY) <= 0.5,
-                        "Search icon is not vertically centered.")
+                #expect(cell.opticalYOffset == 2,
+                        "Search optical correction must stay at the requested 2pt downward offset.")
+                #expect(abs((textRect.midY - search.bounds.midY) - cell.opticalYOffset) <= 0.5,
+                        "Search text does not match its optical vertical offset.")
+                #expect(abs((iconRect.midY - search.bounds.midY) - cell.opticalYOffset) <= 0.5,
+                        "Search icon does not match its optical vertical offset.")
             }
         }
     }
@@ -819,3 +1046,5 @@ final class BoardManPanelLayoutTests {
                 "\(mode): unexpected search field visibility.")
     }
 }
+
+// swiftlint:enable file_length

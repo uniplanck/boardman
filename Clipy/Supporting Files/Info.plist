@@ -31,7 +31,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Board-Man by UniPlanck. Portions copyright © Clipy Project.</string>
+	<string>Board-Man © 2026 UniPlanck.</string>
 	<key>NSInputMonitoringUsageDescription</key>
 	<string>Board-Man monitors Command+V keyboard paste events to update paste counts for matching clipboard history items.</string>
 	<key>NSMainNibFile</key>

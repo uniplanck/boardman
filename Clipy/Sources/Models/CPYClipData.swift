@@ -96,6 +96,101 @@ final class CPYClipData: NSObject {
         return NSImage.create(with: color, size: NSSize(width: 20, height: 20))
     }
 
+    var boardManTextValue: String {
+        return Self.preferredTextValue(
+            plainText: stringValue,
+            richText: Self.richTextString(from: RTFData, types: types)
+        )
+    }
+
+    static func preferredTextValue(plainText: String, richText: String?) -> String {
+        let plain = canonicalLineEndings(plainText)
+        guard let richText else { return plain }
+        var rich = canonicalLineEndings(richText)
+        guard !rich.isEmpty else { return plain }
+
+        // HTML -> attributed-string conversion commonly appends one terminal line break that
+        // is not present in the plain representation. Ignore only that parser artifact.
+        if !plain.hasSuffix("\n"), rich.hasSuffix("\n") {
+            rich.removeLast()
+        }
+        guard plain != rich else { return plain }
+
+        // Some apps (notably Chrome for block-level HTML) expose a plain-text fallback where
+        // every visual line break is duplicated. Only correct that exact relationship.
+        // Intentional blank lines remain intact because two rich breaks become four in the
+        // broken plain representation.
+        let doubledRichLineBreaks = rich.replacingOccurrences(of: "\n", with: "\n\n")
+        return plain == doubledRichLineBreaks ? rich : plain
+    }
+
+    static func liveSanitizedPlainText(from pasteboard: NSPasteboard) -> String? {
+        guard let plain = pasteboard.string(forType: .string)
+                ?? pasteboard.string(forType: .deprecatedString),
+              let rich = richTextString(from: pasteboard) else {
+            return nil
+        }
+        let canonicalPlain = canonicalLineEndings(plain)
+        let preferred = preferredTextValue(plainText: plain, richText: rich)
+        return preferred == canonicalPlain ? nil : preferred
+    }
+
+    private static func canonicalLineEndings(_ value: String) -> String {
+        return value
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\u{2028}", with: "\n")
+            .replacingOccurrences(of: "\u{2029}", with: "\n")
+    }
+
+    private static func richTextString(from data: Data?,
+                                       types: [NSPasteboard.PasteboardType]) -> String? {
+        guard let data else { return nil }
+        let documentTypes: [NSAttributedString.DocumentType] = types.contains(.deprecatedRTFD)
+            ? [.rtfd, .rtf]
+            : [.rtf, .rtfd]
+        return richTextString(from: data, documentTypes: documentTypes)
+    }
+
+    private static func richTextString(from pasteboard: NSPasteboard) -> String? {
+        // Rich representations are consulted transiently even when the user chose not to
+        // retain RTF/HTML in history. They are only evidence for correcting a broken plain
+        // fallback and are never persisted unless that type was already enabled for storage.
+        let candidates: [(NSPasteboard.PasteboardType, NSAttributedString.DocumentType)] = [
+            (.deprecatedRTFD, .rtfd),
+            (.deprecatedRTF, .rtf),
+            (.rtf, .rtf),
+            (.html, .html)
+        ]
+        var checkedTypes = Set<String>()
+        for (pasteboardType, documentType) in candidates {
+            guard checkedTypes.insert(pasteboardType.rawValue).inserted,
+                  let data = pasteboard.data(forType: pasteboardType),
+                  let text = richTextString(from: data, documentTypes: [documentType]) else {
+                continue
+            }
+            return text
+        }
+        return nil
+    }
+
+    private static func richTextString(from data: Data,
+                                       documentTypes: [NSAttributedString.DocumentType]) -> String? {
+        for documentType in documentTypes {
+            let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+                .documentType: documentType
+            ]
+            if let attributed = try? NSAttributedString(
+                data: data,
+                options: options,
+                documentAttributes: nil
+            ) {
+                return attributed.string
+            }
+        }
+        return nil
+    }
+
     static var availableTypes: [NSPasteboard.PasteboardType] {
         return [.deprecatedString,
                 .deprecatedRTF,
@@ -152,6 +247,14 @@ final class CPYClipData: NSObject {
                 }
             default: break
             }
+        }
+        if !stringValue.isEmpty {
+            let transientRichText = Self.richTextString(from: pasteboard)
+            let storedRichText = Self.richTextString(from: RTFData, types: types)
+            stringValue = Self.preferredTextValue(
+                plainText: stringValue,
+                richText: transientRichText ?? storedRichText
+            )
         }
     }
 

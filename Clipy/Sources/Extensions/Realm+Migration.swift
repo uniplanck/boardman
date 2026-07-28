@@ -240,8 +240,7 @@ enum LegacySnippetMigrationService {
         }
         return [
             "com.uniplanck.BoardMan2",
-            "com.uniplanck.BoardManDogfood",
-            "com.clipy-app.Clipy"
+            "com.uniplanck.BoardManDogfood"
         ].map { supportURL.appendingPathComponent($0).appendingPathComponent("default.realm") }
     }
 

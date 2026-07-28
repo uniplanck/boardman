@@ -115,9 +115,13 @@ final class HotKeyServiceTests {
         #expect(defaults.archiveDataForKey(KeyCombo.self, key: Constants.HotKey.snippetKeyCombo) == nil)
 
         service.setupDefaultHotKeys()
-        #expect(service.mainKeyCombo == nil)
+        let restoredMainKeyCombo = try #require(service.mainKeyCombo)
+        #expect(restoredMainKeyCombo.QWERTYKeyCode == 9)
+        #expect(restoredMainKeyCombo.modifiers == (Int(cmdKey) | Int(optionKey)))
+        #expect(restoredMainKeyCombo.doubledModifiers == false)
         #expect(service.historyKeyCombo == nil)
         #expect(service.snippetKeyCombo == nil)
+        #expect(defaults.archiveDataForKey(KeyCombo.self, key: Constants.HotKey.mainKeyCombo) != nil)
 
         let mainKeyCombo = try #require(KeyCombo(QWERTYKeyCode: 9, carbonModifiers: 768))
         let historyKeyCombo = try #require(KeyCombo(doubledCocoaModifiers: .command))

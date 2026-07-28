@@ -33,12 +33,37 @@ final class HotKeyService: NSObject {
     fileprivate(set) var snippetKeyCombo: KeyCombo?
     fileprivate(set) var clearHistoryKeyCombo: KeyCombo?
     fileprivate(set) var quickModeKeyCombo: KeyCombo?
+    private var globalMainHotKeyEventTap: CFMachPort?
+    private var globalMainHotKeyRunLoopSource: CFRunLoopSource?
+    private var globalMainHotKeyMonitor: Any?
+    private var globalMainHotKeyActivationObserver: NSObjectProtocol?
+    private var didRequestListenEventAccess = false
+    private var lastMainHotKeyInvocation: CFAbsoluteTime = 0
+
+    deinit {
+        if let monitor = globalMainHotKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        if let observer = globalMainHotKeyActivationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let source = globalMainHotKeyRunLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+        }
+        if let tap = globalMainHotKeyEventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+    }
 
 }
 
 // MARK: - Actions
 extension HotKeyService {
     @objc func popupMainMenu() {
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastMainHotKeyInvocation > 0.18 else { return }
+        lastMainHotKeyInvocation = now
         AppEnvironment.current.menuManager.popUpMenu(.main)
     }
 
@@ -73,8 +98,9 @@ extension HotKeyService {
         // Snippet hotkey
         setupSnippetHotKeys()
 
-        // Main menu
-        change(with: .main, keyCombo: savedKeyCombo(forKey: Constants.HotKey.mainKeyCombo))
+        // Main menu. A missing/corrupt archive must not leave Board-Man unreachable.
+        let mainKeyCombo = savedKeyCombo(forKey: Constants.HotKey.mainKeyCombo) ?? restoreDefaultMainKeyCombo()
+        change(with: .main, keyCombo: mainKeyCombo)
         // History menu
         change(with: .history, keyCombo: savedKeyCombo(forKey: Constants.HotKey.historyKeyCombo))
         // Snippet menu
@@ -83,6 +109,7 @@ extension HotKeyService {
         changeClearHistoryKeyCombo(savedKeyCombo(forKey: Constants.HotKey.clearHistoryKeyCombo))
         // Quick Mode
         changeQuickModeKeyCombo(savedKeyCombo(forKey: Constants.HotKey.quickModeKeyCombo))
+        setupGlobalMainHotKeyFallback()
     }
 
     func change(with type: MenuType, keyCombo: KeyCombo?) {
@@ -129,6 +156,143 @@ extension HotKeyService {
         guard let keyCombo = NSKeyedUnarchiver.unarchiveObject(with: data) as? KeyCombo else { return nil }
         return keyCombo
     }
+
+    private func restoreDefaultMainKeyCombo() -> KeyCombo? {
+        guard let keyCombo = KeyCombo(
+            QWERTYKeyCode: 9,
+            carbonModifiers: Int(cmdKey) | Int(optionKey)
+        ) else {
+            return nil
+        }
+        AppEnvironment.current.defaults.set(keyCombo.archive(), forKey: Constants.HotKey.mainKeyCombo)
+        AppEnvironment.current.defaults.synchronize()
+        NSLog("Board-Man main hotkey archive missing or invalid; restored default Command-Option-V")
+        return keyCombo
+    }
+}
+
+// MARK: - Global Main HotKey Fallback
+private extension HotKeyService {
+    func setupGlobalMainHotKeyFallback() {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        if globalMainHotKeyMonitor == nil {
+            globalMainHotKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                guard let self, self.shouldHandleGlobalMainHotKey(event) else { return }
+                DispatchQueue.main.async { [weak self] in
+                    self?.invokeGlobalMainHotKeyFallback()
+                }
+            }
+        }
+        if globalMainHotKeyActivationObserver == nil {
+            globalMainHotKeyActivationObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didBecomeActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.setupGlobalMainHotKeyEventTapIfPossible()
+            }
+        }
+        setupGlobalMainHotKeyEventTapIfPossible()
+    }
+
+    func setupGlobalMainHotKeyEventTapIfPossible() {
+        guard globalMainHotKeyEventTap == nil else { return }
+
+        if #available(macOS 10.15, *) {
+            guard CGPreflightListenEventAccess() else {
+                if !didRequestListenEventAccess {
+                    didRequestListenEventAccess = true
+                    let granted = CGRequestListenEventAccess()
+                    NSLog("Board-Man Input Monitoring request granted=%@", granted.description)
+                }
+                return
+            }
+        }
+
+        let eventMask = CGEventMask(1 << CGEventType.keyDown.rawValue)
+        guard let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap,
+            place: .headInsertEventTap,
+            options: .listenOnly,
+            eventsOfInterest: eventMask,
+            callback: Self.globalMainHotKeyEventTapCallback,
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ), let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
+            NSLog("Board-Man global hotkey event tap creation failed")
+            return
+        }
+
+        globalMainHotKeyEventTap = tap
+        globalMainHotKeyRunLoopSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        NSLog("Board-Man global hotkey event tap started")
+    }
+
+    static let globalMainHotKeyEventTapCallback: CGEventTapCallBack = { _, type, event, refcon in
+        guard let refcon else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        let service = Unmanaged<HotKeyService>.fromOpaque(refcon).takeUnretainedValue()
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = service.globalMainHotKeyEventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passUnretained(event)
+        }
+
+        guard type == .keyDown, service.shouldHandleGlobalMainHotKey(event) else {
+            return Unmanaged.passUnretained(event)
+        }
+
+        DispatchQueue.main.async { [weak service] in
+            service?.invokeGlobalMainHotKeyFallback()
+        }
+        return Unmanaged.passUnretained(event)
+    }
+
+    func invokeGlobalMainHotKeyFallback() {
+        popupMainMenu()
+        setupGlobalMainHotKeyEventTapIfPossible()
+    }
+
+    func shouldHandleGlobalMainHotKey(_ event: NSEvent) -> Bool {
+        guard !event.isARepeat else { return false }
+        guard let keyCombo = mainKeyCombo,
+              !keyCombo.doubledModifiers else {
+            return false
+        }
+
+        guard Int(event.keyCode) == Int(keyCombo.currentKeyCode) else { return false }
+
+        var modifiers = 0
+        let flags = event.modifierFlags
+        if flags.contains(.command) { modifiers |= cmdKey }
+        if flags.contains(.option) { modifiers |= optionKey }
+        if flags.contains(.control) { modifiers |= controlKey }
+        if flags.contains(.shift) { modifiers |= shiftKey }
+        return modifiers == keyCombo.modifiers
+    }
+
+    func shouldHandleGlobalMainHotKey(_ event: CGEvent) -> Bool {
+        guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0 else { return false }
+        guard let keyCombo = mainKeyCombo,
+              !keyCombo.doubledModifiers else {
+            return false
+        }
+
+        let keyCode = Int(event.getIntegerValueField(.keyboardEventKeycode))
+        guard keyCode == Int(keyCombo.currentKeyCode) else { return false }
+
+        var modifiers = 0
+        let flags = event.flags
+        if flags.contains(.maskCommand) { modifiers |= cmdKey }
+        if flags.contains(.maskAlternate) { modifiers |= optionKey }
+        if flags.contains(.maskControl) { modifiers |= controlKey }
+        if flags.contains(.maskShift) { modifiers |= shiftKey }
+        return modifiers == keyCombo.modifiers
+    }
 }
 
 // MARK: - Register
@@ -140,7 +304,10 @@ private extension HotKeyService {
         // Register new hotkey
         guard let keyCombo = keyCombo else { return }
         let hotKey = HotKey(identifier: type.rawValue, keyCombo: keyCombo, target: self, action: type.hotKeySelector)
-        hotKey.register()
+        let registered = hotKey.register()
+        if type == .main {
+            NSLog("Board-Man main hotkey Carbon registration=%@", registered.description)
+        }
     }
 
     func save(with type: MenuType, keyCombo: KeyCombo?) {

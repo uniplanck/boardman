@@ -24,7 +24,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
 
     // MARK: - Properties
     private(set) var updaterController: SPUStandardUpdaterController?
-    private let screenshotObserver = ScreenShotObserver()
+    private lazy var screenshotObserver = ScreenShotObserver()
     private var screenshotObserverThread: Thread?
     private let disposeBag = DisposeBag()
 
@@ -71,6 +71,43 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     @objc func showSnippetEditorWindow() {
         NSApp.activate(ignoringOtherApps: true)
         CPYSnippetsEditorWindowController.sharedController.showWindow(self)
+    }
+
+    @objc func restartBoardMan() {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [
+            "-c",
+            "sleep 0.35; exec /usr/bin/open -n \"$1\"",
+            "boardman-restart",
+            Bundle.main.bundlePath
+        ]
+        do {
+            try process.run()
+            terminateApplication()
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Board-Man could not restart"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+    }
+
+    @objc func openArchivedTextHistory() {
+        let store = TextHistoryArchiveStore.shared
+        do {
+            try store.ensureArchiveFileExists()
+            NSWorkspace.shared.activateFileViewerSelecting([store.archiveFileURL])
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Archived history could not be opened"
+            alert.informativeText = error.localizedDescription
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 
     @objc func terminate() {
@@ -141,6 +178,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     }
 
     func terminateApplication() {
+        PasteCountStore.shared.flushPendingPersistence()
         screenshotObserverThread?.cancel()
         NSApplication.shared.terminate(nil)
     }
@@ -227,8 +265,15 @@ extension AppDelegate: NSApplicationDelegate {
 
         // Managers
         AppEnvironment.current.menuManager.setup()
-        // Screenshot
-        screenshotObserver.delegate = self
+        // Build the hidden panel during idle launch time so the first global shortcut does not
+        // pay the full AppKit construction + initial history load cost.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            AppEnvironment.current.menuManager.prewarmBoardManPanel()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            guard !AppEnvironment.current.accessibilityService.isAccessibilityEnabled(isPrompt: false) else { return }
+            AppEnvironment.current.accessibilityService.showAccessibilityAuthenticationAlert()
+        }
     }
 
 }
@@ -263,6 +308,7 @@ private extension AppDelegate {
 
     func startScreenshotObserverIfNeeded() {
         guard screenshotObserverThread == nil else { return }
+        screenshotObserver.delegate = self
         let thread = Thread { [weak self] in
             guard let self else { return }
             autoreleasepool {

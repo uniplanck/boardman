@@ -178,7 +178,10 @@ final class PasteCountInputService {
     private let eventTapStartDelay: TimeInterval = 1.75
     private let maxLogSize: UInt64 = 128 * 1024
     private let logQueue = DispatchQueue(label: "com.uniplanck.BoardMan.PasteCountInputService.log", qos: .utility)
+    private let logDateFormatter = ISO8601DateFormatter()
     private let logURL: URL
+    private var logHandle: FileHandle?
+    private var logFileSize: UInt64 = 0
 
     private init() {
         let logDirectory = FileManager.default.homeDirectoryForCurrentUser
@@ -411,6 +414,11 @@ final class PasteCountInputService {
 
     private func handleNSEventKeyDown(_ event: NSEvent, source: String) {
         guard isCommandV(event) else { return }
+        // CGEventTap is the primary path when available. Keep NSEvent monitors installed
+        // only as a fallback instead of processing every Command+V twice.
+        if let eventTap, CGEvent.tapIsEnabled(tap: eventTap) {
+            return
+        }
         DispatchQueue.main.async { [weak self] in
             self?.handleDetectedCommandV(source: source)
         }
@@ -420,10 +428,16 @@ final class PasteCountInputService {
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
 
-        guard keyCode == UInt16(kVK_ANSI_V) else { return }
         guard flags.contains(.maskCommand) else { return }
         guard !flags.contains(.maskControl), !flags.contains(.maskAlternate) else { return }
 
+        if (keyCode == UInt16(kVK_ANSI_C) || keyCode == UInt16(kVK_ANSI_X)),
+           !flags.contains(.maskShift) {
+            AppEnvironment.current.clipService.sanitizePasteboardSoonAfterUserCopy()
+            return
+        }
+
+        guard keyCode == UInt16(kVK_ANSI_V) else { return }
         if prepareSequentialUnusedPasteIfNeeded() {
             return
         }
@@ -537,15 +551,16 @@ final class PasteCountInputService {
         let pasteboard = NSPasteboard.general
         let text = pasteboard.string(forType: .string)
             ?? pasteboard.string(forType: .deprecatedString)
-        let image = pasteboard.readObjects(forClasses: [NSImage.self], options: nil)?.first as? NSImage
 
         let identity: String
         let lookupKey: () -> String?
         if let text, !text.isEmpty {
-            identity = "text:\(text)"
+            // Keep debounce identity bounded even for very large clipboard text.
+            identity = "text:\(text.hashValue):\(text.utf8.count)"
             lookupKey = { PasteCountStore.shared.keyForLatestClip(matching: text) }
-        } else if let image,
+        } else if let image = pasteboard.readObjects(forClasses: [NSImage.self], options: nil)?.first as? NSImage,
                   let fingerprint = PasteCountStore.imageFingerprint(for: image) {
+            // Normal text pastes never decode an NSImage.
             identity = "image:\(fingerprint)"
             lookupKey = { PasteCountStore.shared.keyForLatestImageClip(matching: image) }
         } else {
@@ -575,33 +590,55 @@ final class PasteCountInputService {
         }
     }
 
-    private func rotateLogIfNeeded() {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: logURL.path),
-              let sizeNumber = attributes[.size] as? NSNumber,
-              sizeNumber.uint64Value > maxLogSize else {
-            return
-        }
+}
 
-        guard let data = try? Data(contentsOf: logURL) else { return }
-        let suffix = data.suffix(Int(maxLogSize / 2))
-        try? Data(suffix).write(to: logURL)
+private extension PasteCountInputService {
+    func prepareLogFileIfNeeded() {
+        guard logHandle == nil else { return }
+        let fileManager = FileManager.default
+        try? fileManager.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if !fileManager.fileExists(atPath: logURL.path) {
+            _ = fileManager.createFile(atPath: logURL.path, contents: nil)
+        }
+        guard let handle = try? FileHandle(forWritingTo: logURL) else { return }
+        _ = try? handle.seekToEnd()
+        logHandle = handle
+        if let attributes = try? fileManager.attributesOfItem(atPath: logURL.path),
+           let sizeNumber = attributes[.size] as? NSNumber {
+            logFileSize = sizeNumber.uint64Value
+        } else {
+            logFileSize = 0
+        }
     }
 
-    private func log(_ message: String) {
-        logQueue.async { [logURL] in
-            try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
-            guard let data = line.data(using: .utf8) else { return }
-            self.rotateLogIfNeeded()
+    func rotateLogIfNeeded(incomingByteCount: Int) {
+        guard logFileSize + UInt64(incomingByteCount) > maxLogSize else { return }
+        try? logHandle?.close()
+        logHandle = nil
 
-            if FileManager.default.fileExists(atPath: logURL.path) {
-                if let handle = try? FileHandle(forWritingTo: logURL) {
-                    try? handle.seekToEnd()
-                    try? handle.write(contentsOf: data)
-                    try? handle.close()
-                }
-            } else {
-                try? data.write(to: logURL)
+        if let data = try? Data(contentsOf: logURL) {
+            let compacted = Data(data.suffix(Int(maxLogSize / 2)))
+            try? compacted.write(to: logURL, options: .atomic)
+            logFileSize = UInt64(compacted.count)
+        } else {
+            logFileSize = 0
+        }
+        prepareLogFileIfNeeded()
+    }
+
+    func log(_ message: String) {
+        logQueue.async {
+            let line = "[\(self.logDateFormatter.string(from: Date()))] \(message)\n"
+            guard let data = line.data(using: .utf8) else { return }
+            self.prepareLogFileIfNeeded()
+            self.rotateLogIfNeeded(incomingByteCount: data.count)
+            guard let handle = self.logHandle else { return }
+            do {
+                try handle.write(contentsOf: data)
+                self.logFileSize += UInt64(data.count)
+            } catch {
+                try? handle.close()
+                self.logHandle = nil
             }
         }
     }

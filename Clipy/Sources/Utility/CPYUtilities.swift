@@ -15,6 +15,12 @@ import RealmSwift
 
 final class CPYUtilities {
 
+    private static let applicationSupportFolderPath: String = {
+        let paths = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true)
+        let basePath = paths.first ?? NSTemporaryDirectory()
+        return (basePath as NSString).appendingPathComponent(Constants.Application.name)
+    }()
+
     static func initSDKs() {
         // Fabric
         AppEnvironment.current.defaults.register(defaults: ["NSApplicationCrashOnExceptions": true])
@@ -71,6 +77,14 @@ final class CPYUtilities {
         defaultValues.updateValue("System", forKey: Constants.UserDefaults.boardManAppearanceMode)
         defaultValues.updateValue("Default", forKey: Constants.UserDefaults.boardManUIStyle)
         defaultValues.updateValue("System", forKey: Constants.UserDefaults.boardManFontChoice)
+        defaultValues.updateValue("System", forKey: Constants.UserDefaults.boardManLanguage)
+        defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManSkipPinnedInKeyboardNavigation)
+        defaultValues.updateValue("togglePin", forKey: Constants.UserDefaults.boardManLongPressAction)
+        defaultValues.updateValue(NSNumber(value: 1), forKey: Constants.UserDefaults.boardManTimedPinDurationValue)
+        defaultValues.updateValue("hours", forKey: Constants.UserDefaults.boardManTimedPinDurationUnit)
+        defaultValues.updateValue(NSNumber(value: 1.0), forKey: Constants.UserDefaults.boardManCustomAccentOpacity)
+        defaultValues.updateValue(NSNumber(value: 0.16), forKey: Constants.UserDefaults.boardManCustomPanelOpacity)
+        defaultValues.updateValue(NSNumber(value: 0.18), forKey: Constants.UserDefaults.boardManCustomUsedOpacity)
 
         /* Updates */
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.Update.enableAutomaticCheck)
@@ -86,13 +100,10 @@ final class CPYUtilities {
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.Beta.observerScreenshot)
 
         AppEnvironment.current.defaults.register(defaults: defaultValues)
-        AppEnvironment.current.defaults.synchronize()
     }
 
     static func applicationSupportFolder() -> String {
-        let paths = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true)
-        let basePath: String = paths.first ?? NSTemporaryDirectory()
-        return (basePath as NSString).appendingPathComponent(Constants.Application.name)
+        return applicationSupportFolderPath
     }
 
     static func prepareSaveToPath(_ path: String) -> Bool {
