@@ -87,6 +87,19 @@ struct Constants {
         static let boardManAppearanceMode = "BoardManAppearanceMode"
         static let boardManUIStyle = "BoardManUIStyle"
         static let boardManFontChoice = "BoardManFontChoice"
+        static let boardManLanguage = "BoardManLanguage"
+        static let boardManSkipPinnedInKeyboardNavigation = "BoardManSkipPinnedInKeyboardNavigation"
+        static let boardManLongPressAction = "BoardManLongPressAction"
+        static let boardManTimedPinDurationValue = "BoardManTimedPinDurationValue"
+        static let boardManTimedPinDurationUnit = "BoardManTimedPinDurationUnit"
+        static let boardManTimedPinsJSON = "BoardManTimedPinsJSON"
+        static let boardManItemHighlightsJSON = "BoardManItemHighlightsJSON"
+        static let boardManCustomAccentColor = "BoardManCustomAccentColor"
+        static let boardManCustomAccentOpacity = "BoardManCustomAccentOpacity"
+        static let boardManCustomPanelColor = "BoardManCustomPanelColor"
+        static let boardManCustomPanelOpacity = "BoardManCustomPanelOpacity"
+        static let boardManCustomUsedColor = "BoardManCustomUsedColor"
+        static let boardManCustomUsedOpacity = "BoardManCustomUsedOpacity"
     }
 
     struct Beta {
@@ -107,6 +120,7 @@ struct Constants {
     struct Notification {
         static let closeSnippetEditor = "kCPYSnippetEditorWillCloseNotification"
         static let pasteCountDidChange = "kCPYPasteCountDidChangeNotification"
+        static let boardManTimedPinDidChange = "BoardManTimedPinDidChangeNotification"
     }
 
     struct Xml {

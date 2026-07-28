@@ -20,56 +20,74 @@ import RxCocoa
 final class ClipService {
 
     // MARK: - Properties
-    fileprivate var cachedChangeCount = BehaviorRelay<Int>(value: 0)
+    fileprivate var cachedChangeCount = 0
     fileprivate var storeTypes = [String: NSNumber]()
-    fileprivate let scheduler = SerialDispatchQueueScheduler(qos: .userInteractive)
+    fileprivate let monitorQueue = DispatchQueue(label: "com.uniplanck.BoardMan.ClipService.pasteboard", qos: .utility)
+    fileprivate var pasteboardTimer: DispatchSourceTimer?
     fileprivate let lock = NSRecursiveLock(name: "com.uniplanck.BoardMan.ClipUpdatable")
     fileprivate var disposeBag = DisposeBag()
     fileprivate var ignoredPasteboardChangeCount: Int?
     fileprivate var ignoredPasteboardFingerprint: Int?
+    private let livePlainTextTypeRawValues: Set<String> = [
+        NSPasteboard.PasteboardType.string.rawValue,
+        NSPasteboard.PasteboardType.deprecatedString.rawValue,
+        "public.utf16-external-plain-text",
+        "public.utf16-plain-text"
+    ]
+
+    deinit {
+        pasteboardTimer?.cancel()
+    }
 
     // MARK: - Clips
     func startMonitoring() {
         disposeBag = DisposeBag()
         storeTypes = AppEnvironment.current.defaults.dictionary(forKey: Constants.UserDefaults.storeTypes) as? [String: NSNumber] ?? AppDelegate.storeTypesDictinary()
-        cachedChangeCount.accept(NSPasteboard.general.changeCount)
-        // Pasteboard observe timer
-        Observable<Int>.interval(.milliseconds(250), scheduler: scheduler)
-            .map { _ in NSPasteboard.general.changeCount }
-            .withLatestFrom(cachedChangeCount.asObservable()) { ($0, $1) }
-            .filter { $0 != $1 }
-            .subscribe(onNext: { [weak self] changeCount, _ in
-                self?.cachedChangeCount.accept(changeCount)
-                self?.create()
-            })
-            .disposed(by: disposeBag)
+        lock.lock()
+        cachedChangeCount = NSPasteboard.general.changeCount
+        lock.unlock()
+
+        pasteboardTimer?.cancel()
+        let timer = DispatchSource.makeTimerSource(queue: monitorQueue)
+        timer.schedule(deadline: .now() + .milliseconds(100),
+                       repeating: .milliseconds(100),
+                       leeway: .milliseconds(25))
+        timer.setEventHandler { [weak self] in
+            self?.pollPasteboard()
+        }
+        pasteboardTimer = timer
+        timer.resume()
+
         // Store types
         AppEnvironment.current.defaults.rx
             .observe([String: NSNumber].self, Constants.UserDefaults.storeTypes)
             .compactMap { $0 }
             .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] in
-                self?.storeTypes = $0
+            .drive(onNext: { [weak self] storeTypes in
+                guard let self else { return }
+                self.lock.lock()
+                self.storeTypes = storeTypes
+                self.lock.unlock()
             })
             .disposed(by: disposeBag)
     }
 
     func clearAll() {
         let realm = try! Realm()
-        let clips = realm.objects(CPYClip.self)
+        let clips = Array(realm.objects(CPYClip.self))
+        let deletableClips = clips.filter { !PinnedSnippetStore.shared.isPinned($0.dataHash) }
 
-        // Delete saved images
-        clips
+        // Pinned history is durable until the user explicitly unpins it.
+        deletableClips
             .filter { !$0.thumbnailPath.isEmpty }
             .map { $0.thumbnailPath }
             .forEach { PINCache.shared.removeObject(forKey: $0) }
-        // Delete Realm
-        realm.transaction { realm.delete(clips) }
-        // Delete writed datas
+        realm.transaction { realm.delete(deletableClips.filter { !$0.isInvalidated }) }
         AppEnvironment.current.dataCleanService.cleanDatas()
     }
 
     func delete(with clip: CPYClip) {
+        guard !PinnedSnippetStore.shared.isPinned(clip.dataHash) else { return }
         let realm = try! Realm()
         // Delete saved images
         let path = clip.thumbnailPath
@@ -81,14 +99,15 @@ final class ClipService {
     }
 
     func incrementChangeCount() {
-        cachedChangeCount.accept(cachedChangeCount.value + 1)
+        lock.lock(); defer { lock.unlock() }
+        cachedChangeCount += 1
     }
 
     func markCurrentPasteboardChangeAsHandled() {
         lock.lock(); defer { lock.unlock() }
 
         let pasteboard = NSPasteboard.general
-        cachedChangeCount.accept(pasteboard.changeCount)
+        cachedChangeCount = pasteboard.changeCount
         ignoredPasteboardChangeCount = pasteboard.changeCount
         ignoredPasteboardFingerprint = fingerprint(with: pasteboard)
     }
@@ -97,6 +116,71 @@ final class ClipService {
         create()
     }
 
+    func sanitizePasteboardSoonAfterUserCopy() {
+        monitorQueue.asyncAfter(deadline: .now() + .milliseconds(35)) { [weak self] in
+            self?.processPasteboardChangeIfNeeded()
+        }
+    }
+
+    private func pollPasteboard() {
+        processPasteboardChangeIfNeeded()
+    }
+
+    private func processPasteboardChangeIfNeeded() {
+        let pasteboard = NSPasteboard.general
+        let changeCount = pasteboard.changeCount
+        lock.lock()
+        guard changeCount != cachedChangeCount else {
+            lock.unlock()
+            return
+        }
+        cachedChangeCount = changeCount
+        lock.unlock()
+
+        if sanitizeLivePlainTextIfNeeded(pasteboard) {
+            lock.lock()
+            cachedChangeCount = pasteboard.changeCount
+            lock.unlock()
+        }
+        create()
+    }
+
+    @discardableResult
+    private func sanitizeLivePlainTextIfNeeded(_ pasteboard: NSPasteboard) -> Bool {
+        guard !AppEnvironment.current.excludeAppService.frontProcessIsExcludedApplication() else { return false }
+        guard !AppEnvironment.current.excludeAppService.copiedProcessIsExcludedApplications(pasteboard: pasteboard) else { return false }
+        guard let corrected = CPYClipData.liveSanitizedPlainText(from: pasteboard),
+              let items = pasteboard.pasteboardItems,
+              !items.isEmpty else {
+            return false
+        }
+
+        let originalChangeCount = pasteboard.changeCount
+        var replacements: [NSPasteboardItem] = []
+        replacements.reserveCapacity(items.count)
+
+        for (index, item) in items.enumerated() {
+            let replacement = NSPasteboardItem()
+            for type in item.types {
+                if index == 0, livePlainTextTypeRawValues.contains(type.rawValue) {
+                    _ = replacement.setString(corrected, forType: type)
+                } else if let data = item.data(forType: type) {
+                    _ = replacement.setData(data, forType: type)
+                } else if let string = item.string(forType: type) {
+                    _ = replacement.setString(string, forType: type)
+                } else if let propertyList = item.propertyList(forType: type) {
+                    _ = replacement.setPropertyList(propertyList, forType: type)
+                }
+            }
+            replacements.append(replacement)
+        }
+
+        // Never overwrite a newer clipboard value that arrived while lazy pasteboard data was
+        // being materialized.
+        guard pasteboard.changeCount == originalChangeCount else { return false }
+        pasteboard.clearContents()
+        return pasteboard.writeObjects(replacements)
+    }
 }
 
 // MARK: - Create Clip
@@ -183,23 +267,32 @@ extension ClipService {
     }
 
     private func trimHistoryIfNeeded(in realm: Realm) {
-        guard let limit = EntitlementGate.historyRetentionLimit(),
-              limit > 0 else {
-            return
-        }
+        guard let limit = BoardManHistoryRetentionPolicy.effectiveLimit(),
+              limit > 0 else { return }
 
-        let clips = realm.objects(CPYClip.self).sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: false)
+        let clips = Array(
+            realm.objects(CPYClip.self).sorted(byKeyPath: #keyPath(CPYClip.updateTime), ascending: false)
+        )
         guard clips.count > limit else { return }
 
-        let overflowingClips = Array(clips.dropFirst(limit))
-        overflowingClips
+        let removableIdentifiers = PinnedSnippetStore.shared.oldestUnpinnedIdentifiers(
+            in: clips.map(\.dataHash),
+            maximumCount: clips.count - limit
+        )
+        let overflowingClips = clips.filter { removableIdentifiers.contains($0.dataHash) }
+        let removableClips = TextHistoryArchiveStore.shared.clipsSafeToRemove(overflowingClips)
+        removableClips
             .filter { !$0.isInvalidated && !$0.thumbnailPath.isEmpty }
             .map { $0.thumbnailPath }
             .forEach { PINCache.shared.removeObject(forKey: $0) }
+        let dataPaths = removableClips.filter { !$0.isInvalidated }.map(\.dataPath)
+        let identifiers = removableClips.filter { !$0.isInvalidated }.map(\.dataHash)
 
         realm.transaction {
-            realm.delete(overflowingClips.filter { !$0.isInvalidated })
+            realm.delete(removableClips.filter { !$0.isInvalidated })
         }
+        HistoryDisplayNameStore.shared.remove(identifiers)
+        dataPaths.filter { !$0.isEmpty }.forEach { CPYUtilities.deleteData(at: $0) }
     }
 
     private func types(with pasteboard: NSPasteboard) -> [NSPasteboard.PasteboardType] {

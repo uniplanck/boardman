@@ -78,7 +78,7 @@ extension PasteService {
         }
         // Paste history
         if isPastePlainText {
-            copyToPasteboard(with: data.stringValue)
+            copyToPasteboard(with: data.boardManTextValue)
             didPaste = paste()
         } else if isPasteAndDeleteHistory {
             copyToPasteboard(with: clip)
@@ -110,6 +110,25 @@ extension PasteService {
             return
         }
 
+        // For text-only history, replay the exact captured plain string instead of RTF/RTFD.
+        // Some target apps interpret rich-text paragraph attributes as extra visual blank lines.
+        // The captured string preserves intentional newlines (including real blank lines) exactly.
+        let textOnlyTypes: Set<NSPasteboard.PasteboardType> = [
+            Self.legacyStringPasteboardType,
+            .deprecatedString,
+            .string,
+            .deprecatedRTF,
+            .deprecatedRTFD
+        ]
+        let hasTextRepresentation = data.types.contains(Self.legacyStringPasteboardType)
+            || data.types.contains(.deprecatedString)
+            || data.types.contains(.string)
+        let hasNonTextRepresentation = data.types.contains { !textOnlyTypes.contains($0) }
+        if hasTextRepresentation && !hasNonTextRepresentation {
+            copyToPasteboard(with: data.boardManTextValue)
+            return
+        }
+
         let pasteboard = NSPasteboard.general
         let types = data.types
         let declaredTypes = types.map { $0 == Self.legacyStringPasteboardType ? NSPasteboard.PasteboardType.string : $0 }
@@ -117,8 +136,7 @@ extension PasteService {
         types.forEach { type in
             switch type {
             case Self.legacyStringPasteboardType:
-                let pbString = data.stringValue
-                pasteboard.setString(pbString, forType: .string)
+                pasteboard.setString(data.boardManTextValue, forType: .string)
             case .deprecatedRTFD:
                 guard let rtfData = data.RTFData else { return }
                 pasteboard.setData(rtfData, forType: .deprecatedRTFD)

@@ -14,9 +14,14 @@ final class PasteCountStore {
 
     private let defaults: UserDefaults
     private let lock = NSRecursiveLock(name: "com.uniplanck.BoardMan.PasteCountStore")
+    private let persistenceQueue = DispatchQueue(label: "com.uniplanck.BoardMan.PasteCountStore.persistence", qos: .utility)
+    private let persistenceDelay: TimeInterval = 0.45
+    private var cachedCounts: [String: NSNumber]
+    private var pendingPersistence: DispatchWorkItem?
 
     init(defaults: UserDefaults = AppEnvironment.current.defaults) {
         self.defaults = defaults
+        self.cachedCounts = defaults.dictionary(forKey: Constants.UserDefaults.pasteCounts) as? [String: NSNumber] ?? [:]
     }
 
     func key(for clip: CPYClip) -> String {
@@ -48,7 +53,7 @@ final class PasteCountStore {
 
     func countsSnapshot() -> [String: NSNumber] {
         lock.lock(); defer { lock.unlock() }
-        return counts()
+        return cachedCounts
     }
 
     func label(for clip: CPYClip) -> String {
@@ -104,7 +109,8 @@ final class PasteCountStore {
                 guard !clip.isInvalidated else { return }
                 clip.updateTime = unixTime
             }
-            postPasteCountDidChange()
+            // Realm observation already marks the panel data stale. The count-change
+            // notification is reserved for actual count mutations to avoid duplicate UI work.
             return true
         } catch {
             return false
@@ -118,25 +124,47 @@ final class PasteCountStore {
 
     @discardableResult
     func increment(forKey key: String) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-
-        var pasteCounts = counts()
-        let nextCount = (pasteCounts[key]?.intValue ?? 0) + 1
-        pasteCounts[key] = NSNumber(value: nextCount)
-        defaults.set(pasteCounts, forKey: Constants.UserDefaults.pasteCounts)
-        defaults.synchronize()
+        lock.lock()
+        let nextCount = (cachedCounts[key]?.intValue ?? 0) + 1
+        cachedCounts[key] = NSNumber(value: nextCount)
+        schedulePersistenceLocked()
+        lock.unlock()
 
         postPasteCountDidChange()
         return true
     }
 
-    private func count(forKey key: String) -> Int {
-        lock.lock(); defer { lock.unlock() }
-        return counts()[key]?.intValue ?? 0
+    func flushPendingPersistence() {
+        lock.lock()
+        pendingPersistence?.cancel()
+        pendingPersistence = nil
+        let snapshot = cachedCounts
+        lock.unlock()
+
+        defaults.set(snapshot, forKey: Constants.UserDefaults.pasteCounts)
+        defaults.synchronize()
     }
 
-    private func counts() -> [String: NSNumber] {
-        return defaults.dictionary(forKey: Constants.UserDefaults.pasteCounts) as? [String: NSNumber] ?? [:]
+    private func count(forKey key: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return cachedCounts[key]?.intValue ?? 0
+    }
+
+    private func schedulePersistenceLocked() {
+        pendingPersistence?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.persistCachedCounts()
+        }
+        pendingPersistence = workItem
+        persistenceQueue.asyncAfter(deadline: .now() + persistenceDelay, execute: workItem)
+    }
+
+    private func persistCachedCounts() {
+        lock.lock()
+        let snapshot = cachedCounts
+        pendingPersistence = nil
+        lock.unlock()
+        defaults.set(snapshot, forKey: Constants.UserDefaults.pasteCounts)
     }
 
     private func markUsedAndReturnKey(for clip: CPYClip, in realm: Realm) -> String? {

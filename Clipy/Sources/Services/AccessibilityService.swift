@@ -48,6 +48,10 @@ extension AccessibilityService {
     }
 
     func showAccessibilityAuthenticationAlert() {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+            NSLog("Board-Man permission alert suppressed reason=test_process")
+            return
+        }
         logPermissionStatus(context: "permission-alert-check")
         guard !isAccessibilityEnabled(isPrompt: false) || !isListenEventAccessEnabled() else { return }
         guard !hasShownBoardManPermissionAlertThisLaunch else {
@@ -65,8 +69,9 @@ extension AccessibilityService {
 
         if alert.runModal() == NSApplication.ModalResponse.alertFirstButtonReturn {
             if !isAccessibilityEnabled(isPrompt: false) {
-                guard !openAccessibilitySettingWindow() else { return }
-                isAccessibilityEnabled(isPrompt: true)
+                // Register this exact signed app with TCC first, then open the matching settings pane.
+                _ = isAccessibilityEnabled(isPrompt: true)
+                _ = openAccessibilitySettingWindow()
                 return
             }
             if !isListenEventAccessEnabled() {

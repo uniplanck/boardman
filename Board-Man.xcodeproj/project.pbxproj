@@ -559,6 +559,7 @@
 			buildConfigurationList = FAC43DE21B35D8B100C06102 /* Build configuration list for PBXNativeTarget "Clipy" */;
 			buildPhases = (
 				FAC43DC21B35D8B100C06102 /* Sources */,
+				C5B0A0012FE0000000B04D1E /* SwiftLint */,
 				FAC43DC31B35D8B100C06102 /* Frameworks */,
 				FAC43DC41B35D8B100C06102 /* Resources */,
 				FAC43E1D1B35DF4A00C06102 /* Embed Frameworks */,
@@ -566,7 +567,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				C5A4B2022FC9D76000B71510 /* PBXTargetDependency */,
 			);
 			name = Clipy;
 			productName = Clipy;
@@ -584,7 +584,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				C5A4B2032FC9D76000B71510 /* PBXTargetDependency */,
 				FAC43DDA1B35D8B100C06102 /* PBXTargetDependency */,
 			);
 			name = ClipyTests;
@@ -686,6 +685,30 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		C5B0A0012FE0000000B04D1E /* SwiftLint */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.swiftlint.yml",
+			);
+			name = SwiftLint;
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "SWIFT_PACKAGE_DIR=\"${SWIFT_PACKAGE_DIR:-${BUILD_DIR%Build/*}SourcePackages}\"\nSWIFTLINT_CMD=\"$SWIFT_PACKAGE_DIR/artifacts/swiftlintplugins/SwiftLintBinary/SwiftLintBinary.artifactbundle/macos/swiftlint\"\nif [ -x \"$SWIFTLINT_CMD\" ]; then\n  \"$SWIFTLINT_CMD\" lint --config \"$SRCROOT/.swiftlint.yml\" --cache-path \"$DERIVED_FILE_DIR/swiftlint-cache\"\nelse\n  echo \"warning: SwiftLint binary not found at $SWIFTLINT_CMD\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		FAC43DC21B35D8B100C06102 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -761,14 +784,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		C5A4B2022FC9D76000B71510 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = C5A4B2012FC9D76000B71510 /* plugin:SwiftLintBuildToolPlugin */;
-		};
-		C5A4B2032FC9D76000B71510 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = C5A4B2012FC9D76000B71510 /* plugin:SwiftLintBuildToolPlugin */;
-		};
 		FAC43DDA1B35D8B100C06102 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = FAC43DC51B35D8B100C06102 /* Clipy */;
