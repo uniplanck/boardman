@@ -63,7 +63,7 @@ struct PlanLimits: Equatable {
         maxHistoryItems: 100,
         maxPinnedItems: 3,
         maxSnippetItems: 5,
-        maxSnippetFolders: 1
+        maxSnippetFolders: 0
     )
 
     static let proDefault = PlanLimits(

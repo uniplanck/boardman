@@ -258,6 +258,11 @@ final class CPYClipData: NSObject {
         }
     }
 
+    init(string: String, type: NSPasteboard.PasteboardType = .deprecatedString) {
+        self.types = [type]
+        self.stringValue = string
+    }
+
     init(image: NSImage) {
         self.types = [.deprecatedTIFF]
         self.image = image

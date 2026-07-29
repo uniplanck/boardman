@@ -3,6 +3,7 @@
 import Cocoa
 import CryptoKit
 import Foundation
+import Magnet
 import RealmSwift
 import Testing
 @testable import Board_Man
@@ -21,7 +22,7 @@ final class EntitlementGateTests {
         #expect(entitlement.limits.maxHistoryItems == 100)
         #expect(entitlement.limits.maxPinnedItems == 3)
         #expect(entitlement.limits.maxSnippetItems == 5)
-        #expect(entitlement.limits.maxSnippetFolders == 1)
+        #expect(entitlement.limits.maxSnippetFolders == 0)
         #expect(!EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
     }
 
@@ -106,9 +107,9 @@ final class EntitlementGateTests {
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
-        let store = PinnedSnippetStore(defaults: defaults)
+        let store = PinnedSnippetStore(defaults: defaults, timedPinIdentifiers: { [] })
         #expect(store.add("pinned-history"))
-        #expect(PinnedSnippetStore(defaults: defaults).isPinned("pinned-history"))
+        #expect(PinnedSnippetStore(defaults: defaults, timedPinIdentifiers: { [] }).isPinned("pinned-history"))
 
         let removable = store.oldestUnpinnedIdentifiers(
             in: ["newest", "pinned-history", "oldest"],
@@ -193,10 +194,10 @@ final class EntitlementGateTests {
     }
 
     @Test
-    func freeSnippetFolderLimitIsOne() {
+    func freeCannotCreateSnippetFolders() {
         let service = EntitlementService(snapshot: .freeDefault)
 
-        #expect(EntitlementGate.canCreateSnippetFolder(currentFolderCount: 0, service: service))
+        #expect(!EntitlementGate.canCreateSnippetFolder(currentFolderCount: 0, service: service))
         #expect(!EntitlementGate.canCreateSnippetFolder(currentFolderCount: 1, service: service))
     }
 
@@ -230,14 +231,18 @@ final class EntitlementGateTests {
         var currentDate = Date(timeIntervalSince1970: 1_700_000_000)
         let store = BoardManTimedPinStore(defaults: defaults, now: { currentDate })
 
-        #expect(store.setPin("first", durationValue: 1, unit: .hours, maximumActiveCount: 1))
-        #expect(!store.setPin("second", durationValue: 1, unit: .hours, maximumActiveCount: 1))
+        #expect(store.setPin("first", durationValue: 1, unit: .hours, maximumActiveCount: 3))
+        #expect(store.setPin("second", durationValue: 1, unit: .hours, maximumActiveCount: 3))
+        #expect(store.setPin("third", durationValue: 1, unit: .weeks, maximumActiveCount: 3))
+        #expect(!store.setPin("fourth", durationValue: 1, unit: .days, maximumActiveCount: 3))
         #expect(store.isPinned("first"))
 
         currentDate = currentDate.addingTimeInterval(3_601)
         #expect(store.removeExpired())
         #expect(!store.isPinned("first"))
-        #expect(store.setPin("second", durationValue: 1, unit: .days, maximumActiveCount: 1))
+        #expect(!store.isPinned("second"))
+        #expect(store.isPinned("third"))
+        #expect(store.setPin("fourth", durationValue: 1, unit: .days, maximumActiveCount: 3))
     }
 
     @Test
@@ -541,6 +546,76 @@ final class LegacySnippetMigrationTests {
     }
 }
 
+@Suite(.serialized)
+final class LegacyHistoryRecoveryTests {
+
+    @Test
+    func restoresMissingTextHistoryAndPreservesCurrentData() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let destinationURL = root.appendingPathComponent("current/default.realm")
+        let sourceURL = root.appendingPathComponent("legacy/default.realm")
+        let backupURL = root.appendingPathComponent("backups", isDirectory: true)
+        let dataURL = root.appendingPathComponent("data", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let destination = try makeRealm(at: destinationURL)
+        try destination.write {
+            let current = CPYClip()
+            current.dataHash = "current"
+            current.title = "Keep current"
+            destination.add(current)
+        }
+
+        let source = try makeRealm(at: sourceURL)
+        try source.write {
+            let text = CPYClip()
+            text.dataHash = "legacy-text"
+            text.title = "git status --short"
+            text.primaryType = NSPasteboard.PasteboardType.deprecatedString.rawValue
+            text.createdTime = 1_700_000_000_000
+            text.updateTime = 1_700_000_000
+            text.dataPath = root.appendingPathComponent("missing-text.data").path
+            source.add(text)
+
+            let image = CPYClip()
+            image.dataHash = "legacy-image"
+            image.title = "PNG image"
+            image.primaryType = NSPasteboard.PasteboardType.png.rawValue
+            image.dataPath = root.appendingPathComponent("missing-image.data").path
+            source.add(image)
+        }
+        source.invalidate()
+
+        let result = LegacyHistoryRecoveryService.migrateIfNeeded(
+            into: destination,
+            candidateURLs: [sourceURL],
+            backupDirectoryURL: backupURL,
+            dataDirectoryURL: dataURL
+        )
+
+        #expect(result == .restored(sourceDirectory: "legacy", historyCount: 1, skippedCount: 1))
+        #expect(destination.objects(CPYClip.self).count == 2)
+        #expect(destination.object(ofType: CPYClip.self, forPrimaryKey: "current")?.title == "Keep current")
+        let restored = try #require(destination.object(ofType: CPYClip.self, forPrimaryKey: "legacy-text"))
+        #expect(restored.title == "git status --short")
+        #expect(restored.createdTime == 1_700_000_000_000)
+        #expect(FileManager.default.fileExists(atPath: restored.dataPath))
+        #expect(destination.object(ofType: CPYClip.self, forPrimaryKey: "legacy-image") == nil)
+        #expect((try FileManager.default.contentsOfDirectory(at: backupURL, includingPropertiesForKeys: nil)).count == 1)
+    }
+
+    private func makeRealm(at url: URL) throws -> Realm {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        var configuration = Realm.Configuration(fileURL: url)
+        configuration.schemaVersion = LegacySnippetMigrationService.schemaVersion
+        configuration.objectTypes = [CPYClip.self, CPYFolder.self, CPYSnippet.self]
+        return try Realm(configuration: configuration)
+    }
+}
+
 @Suite
 struct PasteCountInputServiceTests {
     @Test
@@ -755,6 +830,161 @@ struct PasteCountInputServiceTests {
 }
 
 @MainActor @Suite(.serialized)
+final class BoardManInteractionRuleTests {
+
+    @Test
+    func previewScaleAndHorizontalNavigationRulesAreBounded() {
+        #expect(BoardManPanel.clampedPreviewScale(0) == 100)
+        #expect(BoardManPanel.clampedPreviewScale(20) == 50)
+        #expect(BoardManPanel.clampedPreviewScale(250) == 200)
+        #expect(BoardManPanel.effectivePreviewScale(storedValue: 50, isPro: false) == 100)
+        #expect(BoardManPanel.effectivePreviewScale(storedValue: 50, isPro: true) == 50)
+        #expect(BoardManPanel.effectivePreviewScale(storedValue: 200, isPro: true) == 200)
+
+        #expect(BoardManPanel.tabDelta(horizontalDelta: -30, verticalDelta: 3) == 1)
+        #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 3) == -1)
+        #expect(BoardManPanel.tabDelta(horizontalDelta: 10, verticalDelta: 0) == nil)
+        #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 28) == nil)
+
+        #expect(BoardManPanel.shouldBeginEditorContainerClick(
+            isSnippetTab: true,
+            isEditing: false,
+            hasSelection: true
+        ))
+        #expect(!BoardManPanel.shouldBeginEditorContainerClick(
+            isSnippetTab: true,
+            isEditing: true,
+            hasSelection: true
+        ))
+    }
+
+    @Test
+    func snippetDraftPersistenceUpdatesTitleContentAndEnabledStates() throws {
+        let configuration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        let realm = try Realm(configuration: configuration)
+        let snippet = CPYSnippet()
+        snippet.title = "Before"
+        snippet.content = "old"
+        snippet.enable = false
+        let folder = CPYFolder()
+        folder.title = "Commands"
+        folder.enable = false
+        folder.snippets.append(snippet)
+        try realm.write { realm.add(folder) }
+
+        BoardManPanel.persistSnippetDraft(
+            title: "tmux",
+            content: "tmux new -A -s",
+            snippetEnabled: true,
+            folderEnabled: true,
+            canEditFolder: true,
+            snippet: snippet,
+            folder: folder,
+            realm: realm
+        )
+        #expect(snippet.title == "tmux")
+        #expect(snippet.content == "tmux new -A -s")
+        #expect(snippet.enable)
+        #expect(folder.enable)
+
+        BoardManPanel.persistSnippetDraft(
+            title: "free edit",
+            content: "echo free",
+            snippetEnabled: false,
+            folderEnabled: false,
+            canEditFolder: false,
+            snippet: snippet,
+            folder: folder,
+            realm: realm
+        )
+        #expect(snippet.title == "free edit")
+        #expect(!snippet.enable)
+        #expect(folder.enable, "Free editing must not mutate Pro-only folder state.")
+    }
+
+    @Test
+    func timedPinWeeksAndLocalizedThemeTitlesAreSupported() {
+        #expect(BoardManTimedPinUnit.weeks.interval(value: 2) == 1_209_600)
+        #expect(BoardManTimedPinUnit.weeks.summary(value: 2).contains("2"))
+
+        let defaults = AppEnvironment.current.defaults
+        let originalLanguage = defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
+        defaults.set("日本語", forKey: Constants.UserDefaults.boardManLanguage)
+        defer { defaults.set(originalLanguage, forKey: Constants.UserDefaults.boardManLanguage) }
+        #expect(BoardManThemePreset.graphite.title == "グラファイト")
+        #expect(BoardManThemePreset.ocean.title == "オーシャン")
+    }
+
+    @Test
+    func hoverPopupTracksPointerStateWithoutOpeningDuringTests() {
+        let popup = BoardManHoverPopUpButton(frame: NSRect(x: 0, y: 0, width: 180, height: 30), pullsDown: false)
+        #expect(!popup.isHovering)
+        popup.setHoveringForTesting(true)
+        #expect(popup.isHovering)
+        popup.setHoveringForTesting(false)
+        #expect(!popup.isHovering)
+    }
+
+    @Test
+    func relativeTimestampTemplatesAreCompactAndBounded() {
+        let now = Date(timeIntervalSince1970: 100_000)
+        let updateTime = 96_339
+        #expect(BoardManPanel.allowedRelativeTimestampTemplate(nil) == "xh")
+        #expect(BoardManPanel.allowedRelativeTimestampTemplate("xm") == "xm")
+        #expect(BoardManPanel.allowedRelativeTimestampTemplate("x h ago") == "x h ago")
+        #expect(BoardManPanel.allowedRelativeTimestampTemplate("xxxxxxxxh") == "xh")
+        #expect(BoardManPanel.allowedRelativeTimestampTemplate("xxh") == "xh")
+        #expect(BoardManPanel.allowedRelativeTimestampTemplate("xhm") == "xh")
+        #expect(BoardManPanel.timestampText(
+            for: updateTime,
+            format: "relative",
+            relativeTemplate: "xm",
+            now: now
+        ) == "61m")
+        #expect(BoardManPanel.timestampText(
+            for: updateTime,
+            format: "relative",
+            relativeTemplate: "xh",
+            now: now
+        ) == "1h")
+        #expect(BoardManPanel.timestampText(
+            for: updateTime,
+            format: "relative",
+            relativeTemplate: "xd",
+            now: now
+        ) == "0d")
+        #expect(BoardManPanel.timestampText(
+            for: updateTime,
+            format: "relative",
+            relativeTemplate: "x h ago",
+            now: now
+        ) == "1 h ago")
+    }
+
+    @Test
+    func timestampShortcutDefaultsToCommandVAndPersistsCustomValue() throws {
+        let suiteName = "BoardManTimestampShortcutTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let defaultShortcut = BoardManTimestampShortcutStore.keyCombo(defaults: defaults)
+        #expect(defaultShortcut.QWERTYKeyCode == 9)
+        #expect(defaultShortcut.keyEquivalentModifierMask.contains(.command))
+        #expect(defaultShortcut.keyEquivalent.uppercased() == "V")
+        #expect(BoardManTimestampInteraction.allowed(nil) == .click)
+        #expect(BoardManTimestampInteraction.allowed("longPress") == .longPress)
+
+        let customShortcut = KeyCombo(QWERTYKeyCode: 11, cocoaModifiers: [.command, .shift])
+        BoardManTimestampShortcutStore.save(try #require(customShortcut), defaults: defaults)
+        let restored = BoardManTimestampShortcutStore.keyCombo(defaults: defaults)
+        #expect(restored.QWERTYKeyCode == 11)
+        #expect(restored.keyEquivalentModifierMask.contains(.command))
+        #expect(restored.keyEquivalentModifierMask.contains(.shift))
+    }
+
+}
+
+@MainActor @Suite(.serialized)
 final class BoardManPanelLayoutTests {
 
     @Test
@@ -792,6 +1022,21 @@ final class BoardManPanelLayoutTests {
         assertHeaderChrome(panel, expectsSearch: true)
         assertHistoryToolbar(panel, expectsVisible: false)
         assertHistoryRowGeometry(panel)
+        if let root = panel.contentView {
+            let descendants = allSubviews(of: root)
+            let titleField = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorTitleField" } as? NSTextField
+            let saveButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetSaveButton" } as? NSButton
+            let cancelButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetCancelButton" } as? NSButton
+            let hoverGroupPopup = descendants.compactMap { $0 as? BoardManHoverPopUpButton }.first { !$0.isHidden }
+            #expect(titleField != nil, "Snippet title editor was not created.")
+            #expect(saveButton?.target != nil && saveButton?.action != nil,
+                    "Snippet Save button is missing its action wiring.")
+            #expect(cancelButton?.target != nil && cancelButton?.action != nil,
+                    "Snippet Cancel button is missing its action wiring.")
+            #expect(hoverGroupPopup != nil, "Snippet group selector is not hover-aware.")
+            #expect((titleField?.frame.width ?? 0) >= 250,
+                    "Snippet title editor is still cramped.")
+        }
 
         panel.selectSettingsTab()
         await settlePanelLayout(panel)
@@ -846,6 +1091,40 @@ final class BoardManPanelLayoutTests {
                     "Expanded theme colors are missing.")
             #expect(popupTitles.contains { $0.contains("Teal") && $0.contains("Green") && $0.contains("Purple") && $0.contains("Indigo") },
                     "Expanded Used colors are missing.")
+
+            let visiblePopups = allSubviews(of: root)
+                .compactMap { $0 as? NSPopUpButton }
+                .filter { !$0.isHidden }
+            let themePopup = visiblePopups.first { Set(["Graphite", "Ocean", "Rose"]).isSubset(of: Set($0.itemTitles)) }
+            let modePopup = visiblePopups.first { Set(["System", "Light", "Dark"]).isSubset(of: Set($0.itemTitles)) }
+            let uiPopup = visiblePopups.first { Set(["Default", "Simple", "Monochrome"]).isSubset(of: Set($0.itemTitles)) }
+            let fontPopup = visiblePopups.first { Set(["System", "Rounded", "Serif", "Monospaced"]).isSubset(of: Set($0.itemTitles)) }
+            let timestampPopup = visiblePopups.first { Set(["Relative", "24-hour", "12-hour"]).isSubset(of: Set($0.itemTitles)) }
+            let positionPopup = visiblePopups.first { Set(["Hidden", "Below", "Left", "Right"]).isSubset(of: Set($0.itemTitles)) }
+            let alignedPopups = [themePopup, modePopup, uiPopup, fontPopup, timestampPopup, positionPopup].compactMap { $0 }
+            #expect(alignedPopups.count == 6, "Appearance form popups could not be identified.")
+            for popup in alignedPopups {
+                #expect(abs(popup.frame.height - 30) <= 0.5,
+                        "Appearance popup height is not aligned to the 30pt form grid.")
+            }
+            if let themePopup, let uiPopup {
+                #expect(abs(themePopup.frame.minX - uiPopup.frame.minX) <= 0.5)
+                #expect(abs(themePopup.frame.width - uiPopup.frame.width) <= 0.5)
+            }
+            if let modePopup, let fontPopup {
+                #expect(abs(modePopup.frame.minX - fontPopup.frame.minX) <= 0.5)
+                #expect(abs(modePopup.frame.width - fontPopup.frame.width) <= 0.5)
+            }
+            if let timestampPopup, let positionPopup {
+                #expect(abs(timestampPopup.frame.width - positionPopup.frame.width) <= 0.5)
+                #expect(abs(timestampPopup.frame.minY - positionPopup.frame.minY) <= 0.5)
+            }
+
+            let textScale = allSubviews(of: root).first { $0.identifier?.rawValue == "BoardManTextPreviewScaleSlider" }
+            let imageScale = allSubviews(of: root).first { $0.identifier?.rawValue == "BoardManImagePreviewScaleSlider" }
+            #expect(textScale is NSSlider)
+            #expect(imageScale is NSSlider)
+            #expect(abs((textScale?.frame.width ?? 0) - (imageScale?.frame.width ?? 0)) <= 0.5)
         }
 
         for category in categories {
