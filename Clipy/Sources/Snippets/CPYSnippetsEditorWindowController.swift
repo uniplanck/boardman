@@ -97,7 +97,7 @@ extension CPYSnippetsEditorWindowController {
             return
         }
         guard canAddSnippet() else {
-            showProLockedAlert(message: "Free plan includes 5 snippets. Upgrade or activate Founder Lifetime to add more.")
+            showProLockedAlert(message: boardManText("Free plan includes 5 snippets. Upgrade or activate Founder Lifetime to add more."))
             return
         }
         let snippet = folder.createSnippet()
@@ -111,7 +111,7 @@ extension CPYSnippetsEditorWindowController {
 
     @IBAction private func addFolderButtonTapped(_ sender: AnyObject) {
         guard canAddSnippetFolder() else {
-            showProLockedAlert(message: "Free plan includes 1 snippet folder. Upgrade to Pro to add more.")
+            showProLockedAlert(message: boardManText("Snippet groups are available with Pro. Free snippets are saved as Uncategorized."))
             return
         }
         let folder = CPYFolder.create()

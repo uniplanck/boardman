@@ -12,6 +12,7 @@
 
 import Foundation
 import Cocoa
+import Magnet
 import Sauce
 
 final class PasteService {
@@ -57,6 +58,14 @@ final class PasteService {
 
 // MARK: - Copy
 extension PasteService {
+    @discardableResult
+    func paste(with clip: CPYClip, shortcut: KeyCombo) -> Bool {
+        guard !clip.isInvalidated,
+              NSKeyedUnarchiver.unarchiveObject(withFile: clip.dataPath) is CPYClipData else { return false }
+        copyToPasteboard(with: clip)
+        return sendShortcut(shortcut)
+    }
+
     @discardableResult
     func paste(with clip: CPYClip) -> Bool {
         guard !clip.isInvalidated else { return false }
@@ -176,31 +185,50 @@ extension PasteService {
     @discardableResult
     func paste() -> Bool {
         guard AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.inputPasteCommand) else { return false }
-        // Check Accessibility Permission
+        return sendShortcut(KeyCombo(key: .v, cocoaModifiers: .command))
+    }
+
+    @discardableResult
+    func sendShortcut(_ keyCombo: KeyCombo) -> Bool {
+        guard !keyCombo.doubledModifiers else { return false }
         let accessibilityService = AppEnvironment.current.accessibilityService
         guard accessibilityService.isAccessibilityEnabled(isPrompt: false) else {
-            if !accessibilityService.isAccessibilityEnabled(isPrompt: false) {
-                accessibilityService.showAccessibilityAuthenticationAlert()
-            }
+            accessibilityService.showAccessibilityAuthenticationAlert()
             return false
         }
 
-        let vKeyCode = Sauce.shared.keyCode(for: .v, cocoaModifiers: .command)
-        PasteCountInputService.shared.suppressNextGlobalPaste()
+        let modifiers = keyCombo.keyEquivalentModifierMask
+        if modifiers.contains(.command), keyCombo.keyEquivalent.uppercased() == "V" {
+            PasteCountInputService.shared.suppressNextGlobalPaste()
+        }
+        let keyCode = keyCombo.currentKeyCode
+        let eventFlags = Self.eventFlags(from: modifiers)
         DispatchQueue.main.async {
             let source = CGEventSource(stateID: .combinedSessionState)
-            // Disable local keyboard events while pasting
-            source?.setLocalEventsFilterDuringSuppressionState([.permitLocalMouseEvents, .permitSystemDefinedEvents], state: .eventSuppressionStateSuppressionInterval)
-            // Press Command + V
-            let keyVDown = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: true)
-            keyVDown?.flags = .maskCommand
-            // Release Command + V
-            let keyVUp = CGEvent(keyboardEventSource: source, virtualKey: vKeyCode, keyDown: false)
-            keyVUp?.flags = .maskCommand
-            // Post Paste Command
-            keyVDown?.post(tap: .cgAnnotatedSessionEventTap)
-            keyVUp?.post(tap: .cgAnnotatedSessionEventTap)
+            source?.setLocalEventsFilterDuringSuppressionState(
+                [.permitLocalMouseEvents, .permitSystemDefinedEvents],
+                state: .eventSuppressionStateSuppressionInterval
+            )
+            let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true)
+            keyDown?.flags = eventFlags
+            let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
+            keyUp?.flags = eventFlags
+            keyDown?.post(tap: .cgAnnotatedSessionEventTap)
+            keyUp?.post(tap: .cgAnnotatedSessionEventTap)
         }
         return true
+    }
+
+    private static func eventFlags(from modifiers: NSEvent.ModifierFlags) -> CGEventFlags {
+        var flags: CGEventFlags = []
+        if modifiers.contains(.command) { flags.insert(.maskCommand) }
+        if modifiers.contains(.control) { flags.insert(.maskControl) }
+        if modifiers.contains(.option) { flags.insert(.maskAlternate) }
+        if modifiers.contains(.shift) { flags.insert(.maskShift) }
+        if modifiers.contains(.function) { flags.insert(.maskSecondaryFn) }
+        if modifiers.contains(.capsLock) { flags.insert(.maskAlphaShift) }
+        if modifiers.contains(.numericPad) { flags.insert(.maskNumericPad) }
+        if modifiers.contains(.help) { flags.insert(.maskHelp) }
+        return flags
     }
 }

@@ -10,71 +10,148 @@
 //  Copyright © 2015-2018 Clipy Project.
 //
 
+import Cocoa
 import Foundation
 import RealmSwift
 
+private var isRunningBoardManTests: Bool {
+    let processInfo = ProcessInfo.processInfo
+    let environment = processInfo.environment
+    if environment.keys.contains(where: {
+        $0.localizedCaseInsensitiveContains("xctest")
+            || $0.localizedCaseInsensitiveContains("xcinject")
+    }) {
+        return true
+    }
+    if environment["DYLD_INSERT_LIBRARIES"]?.localizedCaseInsensitiveContains("xctest") == true {
+        return true
+    }
+    if processInfo.arguments.contains(where: {
+        $0.localizedCaseInsensitiveContains(".xctest")
+            || $0.localizedCaseInsensitiveContains("xctestconfiguration")
+    }) {
+        return true
+    }
+    return NSClassFromString("XCTestCase") != nil
+        || Bundle.allBundles.contains { $0.bundlePath.hasSuffix(".xctest") }
+}
+
+private func applyBoardManMigration(_ migration: Migration, oldSchemaVersion: UInt64) {
+    if oldSchemaVersion <= 2 {
+        migration.enumerateObjects(ofType: CPYSnippet.className()) { _, newObject in
+            newObject?["identifier"] = NSUUID().uuidString
+        }
+    }
+    if oldSchemaVersion <= 4 {
+        migration.enumerateObjects(ofType: CPYFolder.className()) { _, newObject in
+            newObject?["identifier"] = NSUUID().uuidString
+        }
+    }
+    if oldSchemaVersion <= 5 {
+        migration.enumerateObjects(ofType: CPYClip.className()) { oldObject, newObject in
+            newObject?["dataPath"] = oldObject?["dataPath"]
+            newObject?["title"] = oldObject?["title"]
+            newObject?["dataHash"] = oldObject?["dataHash"]
+            newObject?["primaryType"] = oldObject?["primaryType"]
+            newObject?["updateTime"] = oldObject?["updateTime"]
+            newObject?["thumbnailPath"] = oldObject?["thumbnailPath"]
+        }
+        migration.enumerateObjects(ofType: CPYSnippet.className()) { oldObject, newObject in
+            newObject?["index"] = oldObject?["index"]
+            newObject?["enable"] = oldObject?["enable"]
+            newObject?["title"] = oldObject?["title"]
+            newObject?["content"] = oldObject?["content"]
+            if oldSchemaVersion >= 3 {
+                newObject?["identifier"] = oldObject?["identifier"]
+            }
+        }
+        migration.enumerateObjects(ofType: CPYFolder.className()) { oldObject, newObject in
+            newObject?["index"] = oldObject?["index"]
+            newObject?["enable"] = oldObject?["enable"]
+            newObject?["title"] = oldObject?["title"]
+            if oldSchemaVersion >= 5 {
+                newObject?["identifier"] = oldObject?["identifier"]
+            }
+        }
+    }
+    if oldSchemaVersion < 8 {
+        migration.enumerateObjects(ofType: CPYClip.className()) { oldObject, newObject in
+            let updateTime = oldObject?["updateTime"] as? Int ?? 0
+            var createdTime = updateTime * 1000
+            if let dataPath = oldObject?["dataPath"] as? String,
+               !dataPath.isEmpty,
+               let attributes = try? FileManager.default.attributesOfItem(atPath: dataPath),
+               let fileDate = (attributes[.creationDate] as? Date) ?? (attributes[.modificationDate] as? Date) {
+                createdTime = Int(fileDate.timeIntervalSince1970 * 1000)
+            }
+            newObject?["createdTime"] = createdTime
+        }
+    }
+}
+
 extension Realm {
     static func migration() {
-        let config = Realm.Configuration(schemaVersion: LegacySnippetMigrationService.schemaVersion, migrationBlock: { migration, oldSchemaVersion in
-            if oldSchemaVersion <= 2 {
-                migration.enumerateObjects(ofType: CPYSnippet.className()) { _, newObject in
-                    newObject?["identifier"] = NSUUID().uuidString
-                }
-            }
-            if oldSchemaVersion <= 4 {
-                migration.enumerateObjects(ofType: CPYFolder.className()) { _, newObject in
-                    newObject?["identifier"] = NSUUID().uuidString
-                }
-            }
-            if oldSchemaVersion <= 5 {
-                migration.enumerateObjects(ofType: CPYClip.className()) { oldObject, newObject in
-                    newObject?["dataPath"] = oldObject?["dataPath"]
-                    newObject?["title"] = oldObject?["title"]
-                    newObject?["dataHash"] = oldObject?["dataHash"]
-                    newObject?["primaryType"] = oldObject?["primaryType"]
-                    newObject?["updateTime"] = oldObject?["updateTime"]
-                    newObject?["thumbnailPath"] = oldObject?["thumbnailPath"]
-                }
-                migration.enumerateObjects(ofType: CPYSnippet.className()) { oldObject, newObject in
-                    newObject?["index"] = oldObject?["index"]
-                    newObject?["enable"] = oldObject?["enable"]
-                    newObject?["title"] = oldObject?["title"]
-                    newObject?["content"] = oldObject?["content"]
-                    if oldSchemaVersion >= 3 {
-                        newObject?["identifier"] = oldObject?["identifier"]
-                    }
-                }
-                migration.enumerateObjects(ofType: CPYFolder.className()) { oldObject, newObject in
-                    newObject?["index"] = oldObject?["index"]
-                    newObject?["enable"] = oldObject?["enable"]
-                    newObject?["title"] = oldObject?["title"]
-                    if oldSchemaVersion >= 5 {
-                        newObject?["identifier"] = oldObject?["identifier"]
-                    }
-                }
-            }
-            if oldSchemaVersion < 8 {
-                migration.enumerateObjects(ofType: CPYClip.className()) { oldObject, newObject in
-                    let updateTime = oldObject?["updateTime"] as? Int ?? 0
-                    var createdTime = updateTime * 1000
-                    if let dataPath = oldObject?["dataPath"] as? String,
-                       !dataPath.isEmpty,
-                       let attributes = try? FileManager.default.attributesOfItem(atPath: dataPath),
-                       let fileDate = (attributes[.creationDate] as? Date) ?? (attributes[.modificationDate] as? Date) {
-                        createdTime = Int(fileDate.timeIntervalSince1970 * 1000)
-                    }
-                    newObject?["createdTime"] = createdTime
-                }
-            }
-        })
+        if isRunningBoardManTests {
+            Realm.Configuration.defaultConfiguration = Realm.Configuration(
+                inMemoryIdentifier: "BoardManTests-\(ProcessInfo.processInfo.processIdentifier)"
+            )
+            return
+        }
+
+        let config = Realm.Configuration(
+            schemaVersion: LegacySnippetMigrationService.schemaVersion,
+            migrationBlock: applyBoardManMigration
+        )
         Realm.Configuration.defaultConfiguration = config
 
         let realm = try! Realm()
-        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
-            return
+        let snippetResult = LegacySnippetMigrationService.migrateIfNeeded(into: realm)
+        LegacySnippetMigrationService.publishDiagnostic(snippetResult)
+        let historyResult = LegacyHistoryRecoveryService.migrateIfNeeded(into: realm)
+        LegacyHistoryRecoveryService.publishDiagnostic(historyResult, destination: realm)
+    }
+}
+
+enum LegacyRecoverySupport {
+    static func withMigratedRealm<T>(at sourceURL: URL, body: (Realm) throws -> T) throws -> T {
+        let fileManager = FileManager.default
+        let temporaryDirectory = fileManager.temporaryDirectory
+            .appendingPathComponent("BoardMan-LegacyRecovery-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+        let temporaryURL = temporaryDirectory.appendingPathComponent("default.realm")
+        try fileManager.copyItem(at: sourceURL, to: temporaryURL)
+
+        var configuration = Realm.Configuration(fileURL: temporaryURL)
+        configuration.schemaVersion = LegacySnippetMigrationService.schemaVersion
+        configuration.migrationBlock = applyBoardManMigration
+        let realm = try Realm(configuration: configuration)
+        defer {
+            realm.invalidate()
+            _ = try? Realm.deleteFiles(for: configuration)
+            try? fileManager.removeItem(at: temporaryDirectory)
         }
-        let result = LegacySnippetMigrationService.migrateIfNeeded(into: realm)
-        LegacySnippetMigrationService.publishDiagnostic(result)
+        return try body(realm)
+    }
+
+    static func modificationDate(of url: URL) -> Date {
+        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
+        return values?.contentModificationDate ?? .distantPast
+    }
+
+    static func createBackup(of realm: Realm, in directoryURL: URL, prefix: String) throws {
+        try FileManager.default.createDirectory(
+            at: directoryURL,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let backupURL = directoryURL.appendingPathComponent(
+            "\(prefix)-\(formatter.string(from: Date()))-\(UUID().uuidString).realm"
+        )
+        try realm.writeCopy(toFile: backupURL)
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
     }
 }
 
@@ -155,7 +232,11 @@ enum LegacySnippetMigrationService {
         }
 
         do {
-            try createBackup(of: destination, in: backupDirectoryURL)
+            try LegacyRecoverySupport.createBackup(
+                of: destination,
+                in: backupDirectoryURL,
+                prefix: "before-snippet-recovery"
+            )
             try destination.write {
                 for snapshot in missingSnippetSnapshots {
                     let snippet = CPYSnippet()
@@ -205,33 +286,32 @@ enum LegacySnippetMigrationService {
     }
 
     private static func sourceSnapshot(at sourceURL: URL) throws -> SourceSnapshot {
-        var configuration = Realm.Configuration(fileURL: sourceURL, readOnly: true)
-        configuration.schemaVersion = schemaVersion
-        let source = try Realm(configuration: configuration)
-        let snippets = Array(source.objects(CPYSnippet.self).map {
-            SnippetSnapshot(
-                index: $0.index,
-                enable: $0.enable,
-                title: $0.title,
-                content: $0.content,
-                identifier: $0.identifier
+        return try LegacyRecoverySupport.withMigratedRealm(at: sourceURL) { source in
+            let snippets = Array(source.objects(CPYSnippet.self).map {
+                SnippetSnapshot(
+                    index: $0.index,
+                    enable: $0.enable,
+                    title: $0.title,
+                    content: $0.content,
+                    identifier: $0.identifier
+                )
+            })
+            let folders = Array(source.objects(CPYFolder.self).map {
+                FolderSnapshot(
+                    index: $0.index,
+                    enable: $0.enable,
+                    title: $0.title,
+                    identifier: $0.identifier,
+                    snippetIdentifiers: $0.snippets.map(\.identifier)
+                )
+            })
+            return SourceSnapshot(
+                url: sourceURL,
+                modificationDate: LegacyRecoverySupport.modificationDate(of: sourceURL),
+                snippets: snippets,
+                folders: folders
             )
-        })
-        let folders = Array(source.objects(CPYFolder.self).map {
-            FolderSnapshot(
-                index: $0.index,
-                enable: $0.enable,
-                title: $0.title,
-                identifier: $0.identifier,
-                snippetIdentifiers: $0.snippets.map(\.identifier)
-            )
-        })
-        return SourceSnapshot(
-            url: sourceURL,
-            modificationDate: modificationDate(of: sourceURL),
-            snippets: snippets,
-            folders: folders
-        )
+        }
     }
 
     static func defaultCandidateURLs(fileManager: FileManager = .default) -> [URL] {
@@ -270,23 +350,215 @@ enum LegacySnippetMigrationService {
             defaults.set("failed", forKey: "BoardManLegacySnippetMigrationStatus")
         }
     }
+}
 
-    private static func modificationDate(of url: URL) -> Date {
-        let values = try? url.resourceValues(forKeys: [.contentModificationDateKey])
-        return values?.contentModificationDate ?? .distantPast
+enum LegacyHistoryRecoveryResult: Equatable {
+    case skippedExistingData
+    case noRecoverableSource
+    case unsupportedOnly(sourceDirectory: String, skippedCount: Int)
+    case restored(sourceDirectory: String, historyCount: Int, skippedCount: Int)
+    case failed
+}
+
+enum LegacyHistoryRecoveryService {
+    private struct HistorySnapshot {
+        let dataPath: String
+        let title: String
+        let dataHash: String
+        let primaryType: String
+        let createdTime: Int
+        let updateTime: Int
+        let isColorCode: Bool
     }
 
-    private static func createBackup(of realm: Realm, in directoryURL: URL) throws {
-        try FileManager.default.createDirectory(
-            at: directoryURL,
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
-        )
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyyMMdd_HHmmss"
-        let backupURL = directoryURL.appendingPathComponent("before-snippet-recovery-\(formatter.string(from: Date())).realm")
-        try realm.writeCopy(toFile: backupURL)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backupURL.path)
+    private struct SourceSnapshot {
+        let url: URL
+        let modificationDate: Date
+        let clips: [HistorySnapshot]
+    }
+
+    static func migrateIfNeeded(
+        into destination: Realm,
+        candidateURLs: [URL] = LegacySnippetMigrationService.defaultCandidateURLs(),
+        backupDirectoryURL: URL = LegacySnippetMigrationService.defaultBackupDirectoryURL(),
+        dataDirectoryURL: URL = URL(fileURLWithPath: CPYUtilities.applicationSupportFolder(), isDirectory: true)
+    ) -> LegacyHistoryRecoveryResult {
+        let destinationURL = destination.configuration.fileURL?.standardizedFileURL
+        let snapshots = candidateURLs
+            .filter { $0.standardizedFileURL != destinationURL }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .compactMap { try? sourceSnapshot(at: $0) }
+            .filter { !$0.clips.isEmpty }
+        guard let source = snapshots.max(by: { lhs, rhs in
+            if lhs.clips.count == rhs.clips.count {
+                return lhs.modificationDate < rhs.modificationDate
+            }
+            return lhs.clips.count < rhs.clips.count
+        }) else {
+            return .noRecoverableSource
+        }
+
+        let existingIdentifiers = Set(destination.objects(CPYClip.self).map(\.dataHash))
+        let missing = source.clips.filter { !existingIdentifiers.contains($0.dataHash) }
+        guard !missing.isEmpty else { return .skippedExistingData }
+
+        let recoverable = missing.filter { snapshot in
+            FileManager.default.fileExists(atPath: snapshot.dataPath) || isRecoverableText(snapshot)
+        }
+        let unsupportedCount = missing.count - recoverable.count
+        guard !recoverable.isEmpty else {
+            return .unsupportedOnly(
+                sourceDirectory: source.url.deletingLastPathComponent().lastPathComponent,
+                skippedCount: unsupportedCount
+            )
+        }
+
+        do {
+            try FileManager.default.createDirectory(
+                at: dataDirectoryURL,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+            var prepared: [(snapshot: HistorySnapshot, path: String)] = []
+            var didCommit = false
+            defer {
+                if !didCommit {
+                    prepared.forEach { try? FileManager.default.removeItem(atPath: $0.path) }
+                }
+            }
+            for snapshot in recoverable {
+                let destinationPath = dataDirectoryURL
+                    .appendingPathComponent("\(UUID().uuidString).data")
+                    .path
+                if prepareArchive(for: snapshot, destinationPath: destinationPath) {
+                    try? FileManager.default.setAttributes(
+                        [.posixPermissions: 0o600],
+                        ofItemAtPath: destinationPath
+                    )
+                    prepared.append((snapshot, destinationPath))
+                }
+            }
+            guard !prepared.isEmpty else {
+                return .unsupportedOnly(
+                    sourceDirectory: source.url.deletingLastPathComponent().lastPathComponent,
+                    skippedCount: missing.count
+                )
+            }
+
+            try LegacyRecoverySupport.createBackup(
+                of: destination,
+                in: backupDirectoryURL,
+                prefix: "before-history-recovery"
+            )
+            try destination.write {
+                for preparedClip in prepared {
+                    let snapshot = preparedClip.snapshot
+                    let clip = CPYClip()
+                    clip.dataPath = preparedClip.path
+                    clip.title = snapshot.title
+                    clip.dataHash = snapshot.dataHash.isEmpty ? UUID().uuidString : snapshot.dataHash
+                    clip.primaryType = snapshot.primaryType
+                    clip.createdTime = snapshot.createdTime > 0
+                        ? snapshot.createdTime
+                        : snapshot.updateTime * 1000
+                    clip.updateTime = snapshot.updateTime
+                    clip.thumbnailPath = ""
+                    clip.isColorCode = snapshot.isColorCode
+                    destination.add(clip)
+                }
+            }
+            didCommit = true
+
+            return .restored(
+                sourceDirectory: source.url.deletingLastPathComponent().lastPathComponent,
+                historyCount: prepared.count,
+                skippedCount: unsupportedCount + recoverable.count - prepared.count
+            )
+        } catch {
+            return .failed
+        }
+    }
+
+    static func publishDiagnostic(
+        _ result: LegacyHistoryRecoveryResult,
+        destination: Realm,
+        defaults: UserDefaults = .standard
+    ) {
+        switch result {
+        case .skippedExistingData:
+            if defaults.string(forKey: "BoardManLegacyHistoryRecoveryStatus") == nil {
+                defaults.set("skippedExistingData", forKey: "BoardManLegacyHistoryRecoveryStatus")
+            }
+        case .noRecoverableSource:
+            if defaults.string(forKey: "BoardManLegacyHistoryRecoveryStatus") == nil {
+                defaults.set("noRecoverableSource", forKey: "BoardManLegacyHistoryRecoveryStatus")
+            }
+        case let .unsupportedOnly(sourceDirectory, skippedCount):
+            if defaults.string(forKey: "BoardManLegacyHistoryRecoveryStatus") != "restored" {
+                defaults.set("unsupportedOnly", forKey: "BoardManLegacyHistoryRecoveryStatus")
+                defaults.set(sourceDirectory, forKey: "BoardManLegacyHistoryRecoverySource")
+                defaults.set(skippedCount, forKey: "BoardManLegacyHistoryRecoverySkippedCount")
+            }
+        case let .restored(sourceDirectory, historyCount, skippedCount):
+            defaults.set("restored", forKey: "BoardManLegacyHistoryRecoveryStatus")
+            defaults.set(sourceDirectory, forKey: "BoardManLegacyHistoryRecoverySource")
+            defaults.set(historyCount, forKey: "BoardManLegacyHistoryRecoveryCount")
+            defaults.set(skippedCount, forKey: "BoardManLegacyHistoryRecoverySkippedCount")
+            defaults.set(Date(), forKey: "BoardManLegacyHistoryRecoveryDate")
+        case .failed:
+            defaults.set("failed", forKey: "BoardManLegacyHistoryRecoveryStatus")
+        }
+        defaults.set(destination.objects(CPYClip.self).count, forKey: "BoardManRecoveryDestinationClipCount")
+        defaults.set(destination.objects(CPYSnippet.self).count, forKey: "BoardManRecoveryDestinationSnippetCount")
+        defaults.set(destination.objects(CPYFolder.self).count, forKey: "BoardManRecoveryDestinationFolderCount")
+    }
+
+    private static func sourceSnapshot(at sourceURL: URL) throws -> SourceSnapshot {
+        return try LegacyRecoverySupport.withMigratedRealm(at: sourceURL) { source in
+            let clips = source.objects(CPYClip.self).map {
+                HistorySnapshot(
+                    dataPath: $0.dataPath,
+                    title: $0.title,
+                    dataHash: $0.dataHash,
+                    primaryType: $0.primaryType,
+                    createdTime: $0.createdTime,
+                    updateTime: $0.updateTime,
+                    isColorCode: $0.isColorCode
+                )
+            }
+            return SourceSnapshot(
+                url: sourceURL,
+                modificationDate: LegacyRecoverySupport.modificationDate(of: sourceURL),
+                clips: Array(clips)
+            )
+        }
+    }
+
+    private static func isRecoverableText(_ snapshot: HistorySnapshot) -> Bool {
+        let stringTypes: Set<String> = [
+            NSPasteboard.PasteboardType.string.rawValue,
+            NSPasteboard.PasteboardType.deprecatedString.rawValue,
+            "NSStringPboardType"
+        ]
+        return stringTypes.contains(snapshot.primaryType) && !snapshot.title.isEmpty
+    }
+
+    private static func prepareArchive(for snapshot: HistorySnapshot, destinationPath: String) -> Bool {
+        if !snapshot.dataPath.isEmpty,
+           FileManager.default.fileExists(atPath: snapshot.dataPath) {
+            do {
+                try FileManager.default.copyItem(
+                    atPath: snapshot.dataPath,
+                    toPath: destinationPath
+                )
+                return true
+            } catch {
+                return false
+            }
+        }
+        guard isRecoverableText(snapshot) else { return false }
+        let pasteboardType = NSPasteboard.PasteboardType(rawValue: snapshot.primaryType)
+        let data = CPYClipData(string: snapshot.title, type: pasteboardType)
+        return NSKeyedArchiver.archiveRootObject(data, toFile: destinationPath)
     }
 }
