@@ -880,6 +880,20 @@ final class BoardManInteractionRuleTests {
             isEditing: true,
             hasSelection: true
         ))
+        #expect(BoardManPanel.usesStackedHistorySettingsLayout(width: 519))
+        #expect(!BoardManPanel.usesStackedHistorySettingsLayout(width: 520))
+        #expect(BoardManHistoryRowView.backgroundKind(
+            isSelected: true,
+            isHovered: false,
+            hasHighlight: true,
+            hasUsedAppearance: true
+        ) == .highlight)
+        #expect(BoardManHistoryRowView.backgroundKind(
+            isSelected: true,
+            isHovered: false,
+            hasHighlight: false,
+            hasUsedAppearance: true
+        ) == .selected)
     }
 
     @Test
@@ -924,6 +938,29 @@ final class BoardManInteractionRuleTests {
         #expect(snippet.title == "free edit")
         #expect(!snippet.enable)
         #expect(folder.enable, "Free editing must not mutate Pro-only folder state.")
+
+        BoardManPanel.persistSnippetTitle("Renamed", snippet: snippet, realm: realm)
+        #expect(snippet.title == "Renamed")
+        #expect(snippet.content == "echo free")
+    }
+
+    @Test
+    func snippetReorderingMovesIdentifiersWithoutLosingItems() {
+        #expect(BoardManPanel.reorderedSnippetIdentifiers(
+            ["a", "b", "c"],
+            moving: "a",
+            to: 3
+        ) == ["b", "c", "a"])
+        #expect(BoardManPanel.reorderedSnippetIdentifiers(
+            ["a", "b", "c"],
+            moving: "c",
+            to: 0
+        ) == ["c", "a", "b"])
+        #expect(BoardManPanel.reorderedSnippetIdentifiers(
+            ["a", "b", "c"],
+            moving: "missing",
+            to: 1
+        ) == ["a", "b", "c"])
     }
 
     @Test
@@ -986,6 +1023,20 @@ final class BoardManInteractionRuleTests {
         #expect(!pin.isHidden)
         #expect(pin.frame.maxX < primary.frame.minX, "Pin must be positioned on the left side of the row.")
         #expect(primary.frame.maxX < count.frame.minX, "Usage count must remain on the right side.")
+
+        let unselectedFrames = [primary.frame, pin.frame, count.frame]
+        cell.configure(
+            item: item,
+            isSelected: true,
+            usageStyle: "badge",
+            useLiquidGlass: false,
+            lightenTheme: false,
+            themePreset: .defaultPreset,
+            timestampPosition: .below
+        )
+        cell.layoutSubtreeIfNeeded()
+        #expect([primary.frame, pin.frame, count.frame] == unselectedFrames,
+                "Selection must not shift history or snippet row contents horizontally.")
     }
 
     @Test
@@ -1149,8 +1200,11 @@ final class BoardManPanelLayoutTests {
         if let root = panel.contentView {
             let descendants = allSubviews(of: root)
             let titleField = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorTitleField" } as? NSTextField
+            let statusLabel = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorStatusLabel" } as? NSTextField
             let saveButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetSaveButton" } as? NSButton
             let cancelButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetCancelButton" } as? NSButton
+            let folderToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Group Enabled" }
+            let snippetToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Snippet Enabled" }
             let hoverGroupPopup = descendants.compactMap { $0 as? BoardManHoverPopUpButton }.first { !$0.isHidden }
             #expect(titleField != nil, "Snippet title editor was not created.")
             #expect(saveButton?.target != nil && saveButton?.action != nil,
@@ -1160,6 +1214,15 @@ final class BoardManPanelLayoutTests {
             #expect(hoverGroupPopup != nil, "Snippet group selector is not hover-aware.")
             #expect((titleField?.frame.width ?? 0) >= 250,
                     "Snippet title editor is still cramped.")
+            if let titleField, let statusLabel, let folderToggle, let snippetToggle {
+                #expect(titleField.frame.minY > statusLabel.frame.maxY,
+                        "Snippet title belongs at the top of the editor, above status chrome.")
+                #expect(statusLabel.frame.minY > folderToggle.frame.maxY,
+                        "Snippet editor status should have balanced spacing above the enable controls.")
+                #expect(abs(folderToggle.frame.midY - snippetToggle.frame.midY) <= 0.5)
+                #expect(titleField.frame.maxY <= (titleField.superview?.bounds.maxY ?? titleField.frame.maxY) - 12,
+                        "Snippet title needs deliberate top padding.")
+            }
         }
 
         panel.selectSettingsTab()
@@ -1489,6 +1552,9 @@ private func assertSettingsCategoryControls(title: String, descendants: [NSView]
         }
     } else if title == "History" {
         let toggle = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutEnabledButton" } as? NSButton
+        let shortcutLabel = descendants.compactMap { $0 as? NSTextField }.first {
+            $0.stringValue == "Shortcut for time action"
+        }
         let delay = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayField" } as? NSTextField
         let delayStepper = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayStepper" } as? NSStepper
         let shortcutRecord = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutRecordView" }
@@ -1499,10 +1565,20 @@ private func assertSettingsCategoryControls(title: String, descendants: [NSView]
         let preset = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetPopup" } as? NSPopUpButton
         let add = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetAddButton" } as? NSButton
         let remove = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetRemoveButton" } as? NSButton
+        let pinLabel = descendants.compactMap { $0 as? NSTextField }.first { $0.stringValue == "Pin duration" }
         let field = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationField" } as? NSTextField
         let stepper = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationStepper" } as? NSStepper
+        let unit = descendants.compactMap { $0 as? NSPopUpButton }.first {
+            Set(["Minutes", "Hours", "Days", "Weeks"]).isSubset(of: Set($0.itemTitles))
+        }
         #expect(toggle?.isHidden == false && toggle?.target != nil && toggle?.action != nil)
         #expect(delay?.isHidden == false)
+        if let shortcutLabel, let shortcutRecord {
+            #expect(shortcutLabel.frame.minY > shortcutRecord.frame.maxY,
+                    "Narrow History settings should stack the shortcut label above its recorder.")
+            #expect(shortcutLabel.frame.width >= shortcutRecord.frame.width,
+                    "The shortcut label must not be squeezed into a truncated side column.")
+        }
         #expect(interaction?.itemTitles.contains("Long Press: Run Shortcut Below") == true)
         #expect(interaction?.itemTitles.contains("Click: Hide / Show Content") == true)
         #expect(interaction?.itemTitles.contains("Long Press: Hide / Show Content") == true)
@@ -1528,10 +1604,19 @@ private func assertSettingsCategoryControls(title: String, descendants: [NSView]
         #expect(remove?.target != nil && remove?.action != nil)
         #expect(field?.isEditable == true && field?.isSelectable == true && field?.isEnabled == true)
         #expect(field?.target != nil && field?.action != nil)
-        if let field, let stepper {
+        if let pinLabel, let preset, let add, let remove, let field, let stepper, let unit {
+            #expect(pinLabel.frame.minY > preset.frame.maxY,
+                    "Pin duration label should sit above the preset control row.")
+            #expect(abs(preset.frame.midY - add.frame.midY) <= 0.5)
+            #expect(abs(preset.frame.midY - remove.frame.midY) <= 0.5)
+            #expect(preset.frame.minY > field.frame.maxY,
+                    "Preset selection should be separated from the value and unit row.")
             #expect(field.frame.minX < stepper.frame.minX,
                     "Pin duration input should remain on the left of its stepper.")
+            #expect(stepper.frame.maxX < unit.frame.minX,
+                    "Pin duration unit should follow the numeric field and stepper.")
             #expect(abs(field.frame.midY - stepper.frame.midY) <= 0.5)
+            #expect(abs(field.frame.midY - unit.frame.midY) <= 0.5)
         }
     } else if title == "Snippets" {
         let manage = descendants.first { $0.identifier?.rawValue == "BoardManManageSnippetsButton" } as? NSButton
