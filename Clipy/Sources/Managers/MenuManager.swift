@@ -4310,13 +4310,28 @@ class BoardManPanel: NSPanel {
         maxHistoryStepper.integerValue = max(1, AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.maxHistorySize))
         maxHistoryStepper.target = self
         maxHistoryStepper.action = #selector(maxHistorySizeChanged(_:))
+        maxHistoryStepper.identifier = NSUserInterfaceItemIdentifier("BoardManVisibleHistoryStepper")
         contentView.addSubview(maxHistoryStepper)
         maxHistorySizeStepper = maxHistoryStepper
 
-        let maxHistoryValue = NSTextField(labelWithString: "\(maxHistoryStepper.integerValue)")
+        let maxHistoryValue = NSTextField(frame: .zero)
+        maxHistoryValue.cell = BoardManCenteredTextFieldCell(textCell: "\(maxHistoryStepper.integerValue)")
         maxHistoryValue.alignment = .right
-        maxHistoryValue.font = NSFont.systemFont(ofSize: 11)
+        maxHistoryValue.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         maxHistoryValue.textColor = .labelColor
+        maxHistoryValue.isEditable = true
+        maxHistoryValue.isSelectable = true
+        maxHistoryValue.isEnabled = true
+        maxHistoryValue.target = self
+        maxHistoryValue.action = #selector(maxHistorySizeFieldChanged(_:))
+        maxHistoryValue.delegate = self
+        let maxHistoryFormatter = NumberFormatter()
+        maxHistoryFormatter.numberStyle = .none
+        maxHistoryFormatter.minimum = 1
+        maxHistoryFormatter.maximum = 1000
+        maxHistoryFormatter.allowsFloats = false
+        maxHistoryValue.formatter = maxHistoryFormatter
+        maxHistoryValue.identifier = NSUserInterfaceItemIdentifier("BoardManVisibleHistoryField")
         contentView.addSubview(maxHistoryValue)
         maxHistorySizeValueLabel = maxHistoryValue
 
@@ -5030,6 +5045,7 @@ class BoardManPanel: NSPanel {
         durationStepper.integerValue = selectedTimedPinPreset.value
         durationStepper.target = self
         durationStepper.action = #selector(timedPinDurationChanged(_:))
+        durationStepper.identifier = NSUserInterfaceItemIdentifier("BoardManTimedPinDurationStepper")
         contentView.addSubview(durationStepper)
         timedPinDurationStepper = durationStepper
 
@@ -6381,8 +6397,9 @@ class BoardManPanel: NSPanel {
             inputPasteCommandButton?.frame = NSRect(x: originX, y: originY - 70, width: width, height: 20)
             placeLabeledRow(label: languageLabel, control: languagePopup, originX: originX, originY: originY - 112, width: width)
             maxHistorySizeLabel?.frame = NSRect(x: originX, y: originY - 157, width: fieldLabelWidth, height: 16)
-            maxHistorySizeStepper?.frame = NSRect(x: originX + fieldLabelWidth + 12, y: originY - 164, width: 24, height: rowH)
-            maxHistorySizeValueLabel?.frame = NSRect(x: originX + fieldLabelWidth + 48, y: originY - 164, width: 82, height: rowH)
+            let visibleHistoryX = originX + fieldLabelWidth + 12
+            maxHistorySizeValueLabel?.frame = NSRect(x: visibleHistoryX, y: originY - 164, width: 82, height: rowH)
+            maxHistorySizeStepper?.frame = NSRect(x: visibleHistoryX + 90, y: originY - 164, width: 24, height: rowH)
             placeLabeledRow(label: statusItemLabel, control: statusItemPopup, originX: originX, originY: originY - 204, width: width)
         }
 
@@ -7882,14 +7899,22 @@ class BoardManPanel: NSPanel {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.inputPasteCommand)
     }
 
-    @objc private func maxHistorySizeChanged(_ sender: NSStepper) {
-        let value = max(1, sender.integerValue)
-        sender.integerValue = value
-        maxHistorySizeValueLabel?.stringValue = "\(value)"
+    private func applyMaxHistorySize(_ rawValue: Int) {
+        let value = min(1000, max(1, rawValue))
+        maxHistorySizeStepper?.integerValue = value
+        maxHistorySizeValueLabel?.integerValue = value
         AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.maxHistorySize)
         AppEnvironment.current.defaults.synchronize()
         AppEnvironment.current.dataCleanService.cleanDatas()
         onRefreshRequested?()
+    }
+
+    @objc private func maxHistorySizeChanged(_ sender: NSStepper) {
+        applyMaxHistorySize(sender.integerValue)
+    }
+
+    @objc private func maxHistorySizeFieldChanged(_ sender: NSTextField) {
+        applyMaxHistorySize(sender.integerValue)
     }
 
     @objc private func statusItemChanged(_ sender: NSPopUpButton) {
@@ -9596,7 +9621,9 @@ extension BoardManPanel: RecordViewDelegate {
 extension BoardManPanel: NSTextFieldDelegate {
     func controlTextDidEndEditing(_ notification: Notification) {
         guard let field = notification.object as? NSTextField else { return }
-        if field === timedPinDurationValueLabel {
+        if field === maxHistorySizeValueLabel {
+            maxHistorySizeFieldChanged(field)
+        } else if field === timedPinDurationValueLabel {
             timedPinDurationFieldChanged(field)
         } else if field === timestampShortcutDelayField {
             timestampShortcutDelayFieldChanged(field)
