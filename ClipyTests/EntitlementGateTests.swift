@@ -259,6 +259,27 @@ final class EntitlementGateTests {
     }
 
     @Test
+    func maskedItemStoreTogglesPersistsAndRemovesIdentifiers() throws {
+        let suiteName = "BoardManMaskedItemStoreTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = BoardManMaskedItemStore(defaults: defaults)
+
+        #expect(!store.isMasked("history-item"))
+        #expect(store.toggle("history-item"))
+        #expect(store.isMasked("history-item"))
+        #expect(BoardManMaskedItemStore(defaults: defaults).isMasked("history-item"))
+        #expect(!store.toggle("history-item"))
+        #expect(!store.isMasked("history-item"))
+
+        store.setMasked(true, for: "first")
+        store.setMasked(true, for: "second")
+        store.remove(["first"])
+        #expect(!store.isMasked("first"))
+        #expect(store.isMasked("second"))
+    }
+
+    @Test
     func historyCSVExporterEscapesCommasQuotesAndNewlines() {
         let row = BoardManHistoryCSVRow(
             copiedAt: Date(timeIntervalSince1970: 0),
@@ -919,6 +940,55 @@ final class BoardManInteractionRuleTests {
     }
 
     @Test
+    func historyCellMasksContentAndKeepsPinOnTheLeft() throws {
+        let cell = BoardManHistoryCellView(frame: NSRect(x: 0, y: 0, width: 760, height: 62))
+        let item = BoardManHistoryItem(
+            title: "secret content",
+            primaryTitle: "secret content",
+            compactTitle: "secret content",
+            metadataText: "now",
+            timestampText: "now",
+            countText: "12",
+            previewTitle: "secret content",
+            dataHash: "masked-item",
+            imageDataPath: "",
+            inlineThumbnail: nil,
+            pasteCount: 12,
+            isPinned: true,
+            isMasked: true,
+            isEnabled: true,
+            source: .clip,
+            categoryIdentifier: nil,
+            categoryTitle: nil
+        )
+        cell.configure(
+            item: item,
+            isSelected: false,
+            usageStyle: "badge",
+            useLiquidGlass: false,
+            lightenTheme: false,
+            themePreset: .defaultPreset,
+            timestampPosition: .below
+        )
+        cell.layoutSubtreeIfNeeded()
+
+        let descendants = cell.subviews
+        let primary = try #require(descendants.first {
+            $0.identifier?.rawValue == "BoardManHistoryPrimaryLabel"
+        } as? NSTextField)
+        let pin = try #require(descendants.first {
+            $0.identifier?.rawValue == "BoardManHistoryPinBadge"
+        } as? NSTextField)
+        let count = try #require(descendants.first {
+            $0.identifier?.rawValue == "BoardManHistoryCountBadge"
+        } as? NSTextField)
+        #expect(primary.stringValue == "＊＊＊＊＊")
+        #expect(!pin.isHidden)
+        #expect(pin.frame.maxX < primary.frame.minX, "Pin must be positioned on the left side of the row.")
+        #expect(primary.frame.maxX < count.frame.minX, "Usage count must remain on the right side.")
+    }
+
+    @Test
     func hoverPopupTracksPointerStateWithoutOpeningDuringTests() {
         let popup = BoardManHoverPopUpButton(frame: NSRect(x: 0, y: 0, width: 180, height: 30), pullsDown: false)
         #expect(!popup.isHovering)
@@ -987,6 +1057,13 @@ final class BoardManInteractionRuleTests {
         #expect(defaultShortcut.keyEquivalent.uppercased() == "V")
         #expect(BoardManTimestampInteraction.allowed(nil) == .click)
         #expect(BoardManTimestampInteraction.allowed("longPress") == .longPress)
+        #expect(BoardManTimestampInteraction.allowed("clickMask") == .clickMask)
+        #expect(BoardManTimestampInteraction.allowed("longPressMask") == .longPressMask)
+        #expect(BoardManTimestampInteraction.click.runsShortcutOnClick)
+        #expect(BoardManTimestampInteraction.longPress.runsShortcutOnLongPress)
+        #expect(BoardManTimestampInteraction.clickMask.togglesMaskOnClick)
+        #expect(BoardManTimestampInteraction.longPressMask.togglesMaskOnLongPress)
+        #expect(BoardManLongPressAction.allowed("toggleMask") == .toggleMask)
 
         let customShortcut = KeyCombo(QWERTYKeyCode: 11, cocoaModifiers: [.command, .shift])
         BoardManTimestampShortcutStore.save(try #require(customShortcut), defaults: defaults)
@@ -1230,62 +1307,6 @@ final class BoardManPanelLayoutTests {
         #expect((historyTable?.enclosingScrollView?.frame.height ?? 999) < 190)
     }
 
-    private func assertSettingsCategoryControls(title: String, descendants: [NSView]) {
-        if title == "General" {
-            let field = descendants.first { $0.identifier?.rawValue == "BoardManVisibleHistoryField" } as? NSTextField
-            let stepper = descendants.first { $0.identifier?.rawValue == "BoardManVisibleHistoryStepper" } as? NSStepper
-            #expect(field?.isHidden == false && field?.isEditable == true)
-            #expect(field?.target != nil && field?.action != nil)
-            #expect(stepper?.target != nil && stepper?.action != nil)
-            if let field, let stepper {
-                #expect(field.frame.minX < stepper.frame.minX,
-                        "Visible history input should sit to the left of its stepper, matching Pin duration.")
-                #expect(abs(field.frame.midY - stepper.frame.midY) <= 0.5,
-                        "Visible history input and stepper are vertically misaligned.")
-                field.integerValue = 250
-                _ = field.sendAction(field.action, to: field.target)
-                #expect(AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.maxHistorySize) == 250)
-                #expect(stepper.integerValue == 250)
-            }
-        } else if title == "Appearance" {
-            let identifiers = ["BoardManRelativeNumberStylePopup", "BoardManRelativeUnitStylePopup",
-                               "BoardManRelativeSuffixStylePopup", "BoardManRelativeNowStylePopup"]
-            for identifier in identifiers {
-                let popup = descendants.first { $0.identifier?.rawValue == identifier } as? NSPopUpButton
-                #expect(popup?.isHidden == false, "Missing visible relative timestamp popup: \(identifier)")
-                #expect(abs((popup?.frame.height ?? 0) - 30) <= 0.5)
-            }
-        } else if title == "History" {
-            let toggle = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutEnabledButton" } as? NSButton
-            let delay = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayField" } as? NSTextField
-            let preset = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetPopup" } as? NSPopUpButton
-            let add = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetAddButton" } as? NSButton
-            let remove = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetRemoveButton" } as? NSButton
-            let field = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationField" } as? NSTextField
-            let stepper = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationStepper" } as? NSStepper
-            #expect(toggle?.isHidden == false && toggle?.target != nil && toggle?.action != nil)
-            #expect(delay?.isHidden == false)
-            #expect(preset?.isHidden == false && (preset?.numberOfItems ?? 0) >= 1)
-            #expect(add?.target != nil && add?.action != nil)
-            #expect(remove?.target != nil && remove?.action != nil)
-            if let field, let stepper {
-                #expect(field.frame.minX < stepper.frame.minX,
-                        "Pin duration input should remain on the left of its stepper.")
-                #expect(abs(field.frame.midY - stepper.frame.midY) <= 0.5)
-            }
-        } else if title == "Snippets" {
-            let manage = descendants.first { $0.identifier?.rawValue == "BoardManManageSnippetsButton" } as? NSButton
-            let scroll = descendants.first { $0.identifier?.rawValue == "BoardManSnippetShortcutScrollView" } as? NSScrollView
-            #expect(manage?.isHidden == false && scroll?.isHidden == false)
-            if let manage, let scroll {
-                let gap = scroll.frame.minY - manage.frame.maxY
-                #expect(gap >= 10 && gap <= 18,
-                        "Manage Snippets should sit directly below the shortcut list with deliberate spacing.")
-                #expect(manage.frame.minY >= 20, "Manage Snippets is still pinned against the bottom edge.")
-            }
-        }
-    }
-
     private func settlePanelLayout(_ panel: BoardManPanel) async {
         await withCheckedContinuation { continuation in
             DispatchQueue.main.async {
@@ -1430,6 +1451,98 @@ final class BoardManPanelLayoutTests {
         let visibleSearchFields = visible.compactMap { $0 as? NSSearchField }
         #expect((visibleSearchFields.count == 1) == expectsSearch,
                 "\(mode): unexpected search field visibility.")
+    }
+}
+
+@MainActor
+private func assertSettingsCategoryControls(title: String, descendants: [NSView]) {
+    if title == "General" {
+        let field = descendants.first { $0.identifier?.rawValue == "BoardManVisibleHistoryField" } as? NSTextField
+        let stepper = descendants.first { $0.identifier?.rawValue == "BoardManVisibleHistoryStepper" } as? NSStepper
+        #expect(field?.isHidden == false && field?.isEditable == true)
+        #expect(field?.target != nil && field?.action != nil)
+        #expect(stepper?.target != nil && stepper?.action != nil)
+        if let field, let stepper {
+            #expect(field.frame.minX < stepper.frame.minX,
+                    "Visible history input should sit to the left of its stepper, matching Pin duration.")
+            #expect(abs(field.frame.midY - stepper.frame.midY) <= 0.5,
+                    "Visible history input and stepper are vertically misaligned.")
+            field.integerValue = 250
+            _ = field.sendAction(field.action, to: field.target)
+            #expect(AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.maxHistorySize) == 250)
+            #expect(stepper.integerValue == 250)
+        }
+    } else if title == "Appearance" {
+        let identifiers = ["BoardManRelativeNumberStylePopup", "BoardManRelativeUnitStylePopup",
+                           "BoardManRelativeSuffixStylePopup", "BoardManRelativeNowStylePopup"]
+        let popups = identifiers.compactMap { identifier in
+            descendants.first { $0.identifier?.rawValue == identifier } as? NSPopUpButton
+        }
+        #expect(popups.count == identifiers.count)
+        for popup in popups {
+            #expect(popup.isHidden == false)
+            #expect(abs(popup.frame.height - 30) <= 0.5)
+        }
+        if let referenceWidth = popups.first?.frame.width {
+            #expect(popups.allSatisfy { abs($0.frame.width - referenceWidth) <= 0.5 },
+                    "The Under 1 minute popup is shorter than the other relative-time controls.")
+        }
+    } else if title == "History" {
+        let toggle = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutEnabledButton" } as? NSButton
+        let delay = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayField" } as? NSTextField
+        let delayStepper = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayStepper" } as? NSStepper
+        let shortcutRecord = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutRecordView" }
+        let interaction = descendants.first { view in
+            guard let popup = view as? NSPopUpButton else { return false }
+            return popup.itemTitles.contains("Click: Run Shortcut Below")
+        } as? NSPopUpButton
+        let preset = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetPopup" } as? NSPopUpButton
+        let add = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetAddButton" } as? NSButton
+        let remove = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinPresetRemoveButton" } as? NSButton
+        let field = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationField" } as? NSTextField
+        let stepper = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationStepper" } as? NSStepper
+        #expect(toggle?.isHidden == false && toggle?.target != nil && toggle?.action != nil)
+        #expect(delay?.isHidden == false)
+        #expect(interaction?.itemTitles.contains("Long Press: Run Shortcut Below") == true)
+        #expect(interaction?.itemTitles.contains("Click: Hide / Show Content") == true)
+        #expect(interaction?.itemTitles.contains("Long Press: Hide / Show Content") == true)
+        if let toggle {
+            let originalEnabled = AppEnvironment.current.defaults.bool(
+                forKey: Constants.UserDefaults.boardManTimestampShortcutEnabled
+            )
+            defer {
+                AppEnvironment.current.defaults.set(
+                    originalEnabled,
+                    forKey: Constants.UserDefaults.boardManTimestampShortcutEnabled
+                )
+            }
+            toggle.state = .off
+            _ = toggle.sendAction(toggle.action, to: toggle.target)
+            #expect(delay?.isEnabled == true)
+            #expect(delayStepper?.isEnabled == true)
+            #expect(abs((shortcutRecord?.alphaValue ?? 0) - 1) <= 0.01,
+                    "The timestamp shortcut must remain editable and undimmed while disabled.")
+        }
+        #expect(preset?.isHidden == false && (preset?.numberOfItems ?? 0) >= 1)
+        #expect(add?.target != nil && add?.action != nil)
+        #expect(remove?.target != nil && remove?.action != nil)
+        #expect(field?.isEditable == true && field?.isSelectable == true && field?.isEnabled == true)
+        #expect(field?.target != nil && field?.action != nil)
+        if let field, let stepper {
+            #expect(field.frame.minX < stepper.frame.minX,
+                    "Pin duration input should remain on the left of its stepper.")
+            #expect(abs(field.frame.midY - stepper.frame.midY) <= 0.5)
+        }
+    } else if title == "Snippets" {
+        let manage = descendants.first { $0.identifier?.rawValue == "BoardManManageSnippetsButton" } as? NSButton
+        let scroll = descendants.first { $0.identifier?.rawValue == "BoardManSnippetShortcutScrollView" } as? NSScrollView
+        #expect(manage?.isHidden == false && scroll?.isHidden == false)
+        if let manage, let scroll {
+            let gap = scroll.frame.minY - manage.frame.maxY
+            #expect(gap >= 10 && gap <= 18,
+                    "Manage Snippets should sit directly below the shortcut list with deliberate spacing.")
+            #expect(manage.frame.minY >= 20, "Manage Snippets is still pinned against the bottom edge.")
+        }
     }
 }
 
