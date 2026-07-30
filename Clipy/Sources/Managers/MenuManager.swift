@@ -144,25 +144,12 @@ extension MenuManager {
                 NSSound.beep()
             }
         }
-        panel.onTimestampActionRequested = { [weak self] item, postShortcut, postShortcutDelay, clickStartedAt in
-            switch item.source {
-            case .clip:
-                self?.handlePanelPaste(
-                    dataHash: item.dataHash,
-                    clickStartedAt: clickStartedAt,
-                    postShortcut: postShortcut,
-                    postShortcutDelay: postShortcutDelay
-                )
-            case .snippet:
-                self?.handlePanelSnippetPaste(
-                    identifier: item.dataHash,
-                    clickStartedAt: clickStartedAt,
-                    postShortcut: postShortcut,
-                    postShortcutDelay: postShortcutDelay
-                )
-            case .favorite:
-                NSSound.beep()
-            }
+        panel.onTimestampActionRequested = { [weak self] shortcut, delay, clickStartedAt in
+            self?.handlePanelTimestampShortcut(
+                shortcut,
+                delay: delay,
+                clickStartedAt: clickStartedAt
+            )
         }
         panel.onRefreshRequested = { [weak self] in
             guard let self, let panel = self.boardManPanel else { return }
@@ -194,9 +181,7 @@ extension MenuManager {
 
     fileprivate func handlePanelPaste(
         dataHash: String,
-        clickStartedAt: CFAbsoluteTime?,
-        postShortcut: KeyCombo? = nil,
-        postShortcutDelay: TimeInterval = 0
+        clickStartedAt: CFAbsoluteTime?
     ) {
         guard let panel = boardManPanel else { return }
         let targetApplication = previousFrontmostApplication
@@ -231,12 +216,6 @@ extension MenuManager {
                 return
             }
 
-            if let postShortcut {
-                DispatchQueue.main.asyncAfter(deadline: .now() + BoardManPanel.clampedTimestampShortcutDelay(postShortcutDelay)) {
-                    _ = AppEnvironment.current.pasteService.sendShortcut(postShortcut)
-                }
-            }
-
             if let targetSnapshot {
                 PasteCountInputService.shared.confirmPasteChange(from: targetSnapshot) { confirmed in
                     guard confirmed else { return }
@@ -254,9 +233,7 @@ extension MenuManager {
 
     fileprivate func handlePanelSnippetPaste(
         identifier: String,
-        clickStartedAt: CFAbsoluteTime?,
-        postShortcut: KeyCombo? = nil,
-        postShortcutDelay: TimeInterval = 0
+        clickStartedAt: CFAbsoluteTime?
     ) {
         guard let panel = boardManPanel else { return }
         panel.orderOut(nil)
@@ -294,11 +271,31 @@ extension MenuManager {
                 self.previousPasteTargetSnapshot = nil
                 return
             }
-            if let postShortcut {
-                DispatchQueue.main.asyncAfter(deadline: .now() + BoardManPanel.clampedTimestampShortcutDelay(postShortcutDelay)) {
-                    _ = AppEnvironment.current.pasteService.sendShortcut(postShortcut)
-                }
+            self.previousFrontmostApplication = nil
+            self.previousPasteTargetSnapshot = nil
+        }
+    }
+
+    private func handlePanelTimestampShortcut(
+        _ shortcut: KeyCombo,
+        delay: TimeInterval,
+        clickStartedAt: CFAbsoluteTime?
+    ) {
+        guard let panel = boardManPanel else { return }
+        let targetApplication = previousFrontmostApplication
+        panel.orderOut(nil)
+        targetApplication?.activate(options: [.activateIgnoringOtherApps])
+
+        let executionDelay = 0.08 + BoardManPanel.clampedTimestampShortcutDelay(delay)
+        DispatchQueue.main.asyncAfter(deadline: .now() + executionDelay) { [weak self] in
+            guard let self else { return }
+            if let clickStartedAt {
+                PasteCountInputService.shared.logBoardManPerformance(
+                    "panel_timestamp_shortcut_dispatch",
+                    startedAt: clickStartedAt
+                )
             }
+            _ = AppEnvironment.current.pasteService.sendShortcut(shortcut)
             self.previousFrontmostApplication = nil
             self.previousPasteTargetSnapshot = nil
         }
@@ -336,6 +333,7 @@ extension MenuManager {
         let pinStore = PinnedSnippetStore.shared
         let timedPinStore = BoardManTimedPinStore.shared
         let displayNameStore = HistoryDisplayNameStore.shared
+        let maskedItemStore = BoardManMaskedItemStore.shared
         let pasteCounts = PasteCountStore.shared.countsSnapshot()
         let items = Array(clipResults.prefix(maxHistory)).enumerated().map { index, clip in
             let rawTitle = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -348,6 +346,7 @@ extension MenuManager {
             let visibleTitle = customName ?? clipped
             let pasteCount = PasteCountStore.shared.count(for: clip, in: pasteCounts)
             let isPinned = pinStore.isPinned(clip.dataHash) || timedPinStore.isPinned(clip.dataHash)
+            let isMasked = maskedItemStore.isMasked(clip.dataHash)
             var contextParts: [String] = []
             if showRowNumbers {
                 contextParts.append("\(index + 1).")
@@ -362,7 +361,7 @@ extension MenuManager {
                 now: timestampReferenceDate
             )
             var belowParts = contextParts + (timestamp.isEmpty ? [] : [timestamp])
-            if customName != nil && !nameOnly {
+            if !isMasked, customName != nil && !nameOnly {
                 belowParts.append(clipped)
             }
             let compactTitle = (contextParts + [visibleTitle]).joined(separator: " ")
@@ -380,6 +379,7 @@ extension MenuManager {
                                        inlineThumbnail: isImageClip ? PINCache.shared.object(forKey: clip.thumbnailPath) as? NSImage : nil,
                                        pasteCount: pasteCount,
                                        isPinned: isPinned,
+                                       isMasked: isMasked,
                                        isEnabled: true,
                                        source: .clip,
                                        categoryIdentifier: nil,
@@ -394,6 +394,7 @@ extension MenuManager {
     fileprivate func boardManSnippetItems() -> [BoardManHistoryItem] {
         let pinStore = PinnedSnippetStore.shared
         let timedPinStore = BoardManTimedPinStore.shared
+        let maskedItemStore = BoardManMaskedItemStore.shared
         let folderResults = realm.objects(CPYFolder.self).sorted(byKeyPath: #keyPath(CPYFolder.index), ascending: true)
         let folderItems = Array(folderResults
             .flatMap { folder -> [BoardManHistoryItem] in
@@ -418,6 +419,7 @@ extension MenuManager {
                                                    inlineThumbnail: nil,
                                                    pasteCount: 0,
                                                    isPinned: isPinned,
+                                                   isMasked: maskedItemStore.isMasked(snippet.identifier),
                                                    isEnabled: folder.enable && snippet.enable,
                                                    source: .snippet,
                                                    categoryIdentifier: folder.identifier,
@@ -450,6 +452,7 @@ extension MenuManager {
                                            inlineThumbnail: nil,
                                            pasteCount: 0,
                                            isPinned: isPinned,
+                                           isMasked: maskedItemStore.isMasked(snippet.identifier),
                                            isEnabled: snippet.enable,
                                            source: .snippet,
                                            categoryIdentifier: BoardManPanel.uncategorizedCategoryIdentifier,
@@ -983,6 +986,7 @@ final class PinnedSnippetStore {
 enum BoardManLongPressAction: String, CaseIterable {
     case togglePin
     case timedPin
+    case toggleMask
     case none
 
     static func allowed(_ value: String?) -> BoardManLongPressAction {
@@ -993,6 +997,7 @@ enum BoardManLongPressAction: String, CaseIterable {
         switch self {
         case .togglePin: return boardManText("Pin / Unpin")
         case .timedPin: return boardManText("Timed Pin")
+        case .toggleMask: return boardManText("Hide / Show Content")
         case .none: return boardManText("Do Nothing")
         }
     }
@@ -1001,6 +1006,8 @@ enum BoardManLongPressAction: String, CaseIterable {
 enum BoardManTimestampInteraction: String, CaseIterable {
     case click
     case longPress
+    case clickMask
+    case longPressMask
     case none
 
     static func allowed(_ value: String?) -> BoardManTimestampInteraction {
@@ -1009,11 +1016,18 @@ enum BoardManTimestampInteraction: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .click: return boardManText("Click: Paste and Send")
-        case .longPress: return boardManText("Long Press: Paste and Send")
+        case .click: return boardManText("Click: Run Shortcut Below")
+        case .longPress: return boardManText("Long Press: Run Shortcut Below")
+        case .clickMask: return boardManText("Click: Hide / Show Content")
+        case .longPressMask: return boardManText("Long Press: Hide / Show Content")
         case .none: return boardManText("Do Nothing")
         }
     }
+
+    var runsShortcutOnClick: Bool { self == .click }
+    var runsShortcutOnLongPress: Bool { self == .longPress }
+    var togglesMaskOnClick: Bool { self == .clickMask }
+    var togglesMaskOnLongPress: Bool { self == .longPressMask }
 }
 
 enum BoardManTimestampShortcutStore {
@@ -1360,6 +1374,55 @@ final class BoardManItemHighlightStore {
     }
 }
 
+final class BoardManMaskedItemStore {
+    static let shared = BoardManMaskedItemStore()
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = AppEnvironment.current.defaults) {
+        self.defaults = defaults
+    }
+
+    func isMasked(_ identifier: String) -> Bool {
+        return identifiers.contains(identifier)
+    }
+
+    @discardableResult
+    func toggle(_ identifier: String) -> Bool {
+        let next = !isMasked(identifier)
+        setMasked(next, for: identifier)
+        return next
+    }
+
+    func setMasked(_ masked: Bool, for identifier: String) {
+        var next = identifiers
+        if masked {
+            next.insert(identifier)
+        } else {
+            next.remove(identifier)
+        }
+        save(next)
+    }
+
+    func remove(_ identifiersToRemove: [String]) {
+        guard !identifiersToRemove.isEmpty else { return }
+        save(identifiers.subtracting(identifiersToRemove))
+    }
+
+    private var identifiers: Set<String> {
+        return Set(defaults.stringArray(forKey: Constants.UserDefaults.boardManMaskedItemIdentifiers) ?? [])
+    }
+
+    private func save(_ values: Set<String>) {
+        defaults.set(Array(values).sorted(), forKey: Constants.UserDefaults.boardManMaskedItemIdentifiers)
+        defaults.synchronize()
+        NotificationCenter.default.post(
+            name: Notification.Name(rawValue: Constants.Notification.closeSnippetEditor),
+            object: nil
+        )
+    }
+}
+
 struct BoardManHistoryCSVRow: Equatable {
     let copiedAt: Date
     let updatedAt: Date
@@ -1681,8 +1744,17 @@ func boardManText(_ english: String) -> String {
         "Time": "時刻", "Position": "位置", "Relative format": "相対時刻形式",
         "Number": "数値", "Unit": "単位", "Suffix": "表記", "Under 1 minute": "1分以内",
         "Time action": "時刻操作", "Shortcut after send": "送信後ショートカット",
-        "Enable shortcut after send": "送信後ショートカットを有効化", "Delay": "遅延", "Seconds": "秒",
-        "Click": "クリック", "Long Press": "長押し", "Click: Paste and Send": "クリック：ペーストして送信", "Long Press: Paste and Send": "長押し：ペーストして送信", "Count": "使用回数", "Style": "表示形式",
+        "Enable shortcut after send": "送信後ショートカットを有効化",
+        "Shortcut for time action": "時刻操作ショートカット",
+        "Enable shortcut for time action": "時刻操作でショートカットを実行",
+        "Delay": "遅延", "Seconds": "秒",
+        "Click": "クリック", "Long Press": "長押し",
+        "Click: Paste and Send": "クリック：ペーストして送信", "Long Press: Paste and Send": "長押し：ペーストして送信",
+        "Click: Run Shortcut Below": "クリック：下のショートカットを実行",
+        "Long Press: Run Shortcut Below": "長押し：下のショートカットを実行",
+        "Click: Hide / Show Content": "クリック：内容を非表示／表示",
+        "Long Press: Hide / Show Content": "長押し：内容を非表示／表示",
+        "Count": "使用回数", "Style": "表示形式",
         "Used": "使用済み", "Theme": "テーマ", "Mode": "表示モード", "UI": "UI",
         "Font": "フォント", "Lighten": "明るくする", "Height": "高さ",
         "Accent": "アクセント", "Panel": "パネル", "Used color": "使用済み色",
@@ -1717,7 +1789,9 @@ func boardManText(_ english: String) -> String {
         "Hover a snippet, then click the preview to edit • ⌘C Copy • ⌘P Pin": "スニペットにカーソルを合わせ、右側をクリックして編集 • ⌘C コピー • ⌘P Pin",
         "Skip pinned items with arrow keys": "上下キーではPin項目を飛ばす",
         "Long press": "長押し動作", "Pin duration": "期限Pinの期間", "Add duration": "期間を追加", "Remove duration": "期間を削除",
-        "Pin / Unpin": "Pin切替", "Timed Pin": "期限付きPin", "Remove Timed Pin": "期限付きPinを解除", "Do Nothing": "何もしない", "None": "なし", "Localized": "言語連動",
+        "Pin / Unpin": "Pin切替", "Timed Pin": "期限付きPin", "Remove Timed Pin": "期限付きPinを解除",
+        "Hide / Show Content": "内容を非表示／表示", "Hide Content": "内容を非表示", "Show Content": "内容を表示",
+        "Do Nothing": "何もしない", "None": "なし", "Localized": "言語連動",
         "Minutes": "分", "Hours": "時間", "Days": "日", "Weeks": "週", "%d min": "%d分", "%d hr": "%d時間", "%d day": "%d日", "%d wk": "%d週",
         "Highlight": "色で目立たせる", "Remove Highlight": "色付けを解除",
         "Red": "赤", "Orange": "オレンジ", "Yellow": "黄", "Green": "緑", "Blue": "青", "Purple": "紫", "Gray": "グレー",
@@ -1741,6 +1815,9 @@ func boardManText(_ english: String) -> String {
         "Untitled folder": "名称未設定のグループ", "Untitled snippet": "名称未設定のスニペット",
         "Enabled": "有効", "Disabled": "無効", "snippets": "スニペット",
         "Click a shortcut field, then press the new key combination. Changes apply immediately.": "ショートカット欄をクリックし、新しいキーの組み合わせを押してください。変更は即時反映されます。",
+        "Choose what clicking or holding the timestamp does.": "時刻部分をクリックまたは長押ししたときの動作を選びます。",
+        "Shortcut executed by the selected timestamp action. It can be edited while disabled.": "選択した時刻操作で実行するショートカットです。無効中でも編集できます。",
+        "Enter the timed Pin duration directly.": "期限付きPinの時間を直接入力できます。",
         "word or phrase": "単語またはフレーズ",
         "Hidden only in Board-Man, data is not deleted.": "Board-Manの一覧から隠すだけで、データは削除されません。",
         "Secure local license": "安全なローカルライセンス", "Activate": "認証",
@@ -1788,8 +1865,13 @@ func boardManText(_ english: String) -> String {
         "Select a group to reorder": "请选择要排序的分组", "Check for Updates": "立即检查",
         "Automatically check for updates": "自动检查更新", "Daily": "每天", "Weekly": "每周", "Monthly": "每月",
         "Search clipboard history and snippets": "搜索历史和片段", "Condition": "条件",
-        "Time action": "时间操作", "Shortcut after send": "发送后快捷键", "Enable shortcut after send": "启用发送后快捷键", "Delay": "延迟", "Seconds": "秒",
-        "Click: Paste and Send": "点击：粘贴并发送", "Long Press: Paste and Send": "长按：粘贴并发送", "Pin duration": "限时置顶时长", "Add duration": "添加时长", "Remove duration": "删除时长", "None": "无", "Localized": "跟随语言"
+        "Time action": "时间操作", "Shortcut after send": "发送后快捷键", "Enable shortcut after send": "启用发送后快捷键",
+        "Shortcut for time action": "时间操作快捷键", "Enable shortcut for time action": "为时间操作启用快捷键", "Delay": "延迟", "Seconds": "秒",
+        "Click: Paste and Send": "点击：粘贴并发送", "Long Press: Paste and Send": "长按：粘贴并发送",
+        "Click: Run Shortcut Below": "点击：执行下方快捷键", "Long Press: Run Shortcut Below": "长按：执行下方快捷键",
+        "Click: Hide / Show Content": "点击：隐藏／显示内容", "Long Press: Hide / Show Content": "长按：隐藏／显示内容",
+        "Hide / Show Content": "隐藏／显示内容", "Hide Content": "隐藏内容", "Show Content": "显示内容",
+        "Pin duration": "限时置顶时长", "Add duration": "添加时长", "Remove duration": "删除时长", "None": "无", "Localized": "跟随语言"
     ]
     let korean: [String: String] = [
         "History": "기록", "Snippets": "스니펫", "Settings": "설정", "General": "일반",
@@ -1805,8 +1887,13 @@ func boardManText(_ english: String) -> String {
         "Select a group to reorder": "순서를 변경할 그룹을 선택하세요", "Check for Updates": "지금 확인",
         "Automatically check for updates": "업데이트 자동 확인", "Daily": "매일", "Weekly": "매주", "Monthly": "매월",
         "Search clipboard history and snippets": "기록 및 스니펫 검색", "Condition": "조건",
-        "Time action": "시간 동작", "Shortcut after send": "전송 후 단축키", "Enable shortcut after send": "전송 후 단축키 사용", "Delay": "지연", "Seconds": "초",
-        "Click: Paste and Send": "클릭: 붙여넣고 전송", "Long Press: Paste and Send": "길게 누르기: 붙여넣고 전송", "Pin duration": "기간 Pin 시간", "Add duration": "기간 추가", "Remove duration": "기간 삭제", "None": "없음", "Localized": "언어 연동"
+        "Time action": "시간 동작", "Shortcut after send": "전송 후 단축키", "Enable shortcut after send": "전송 후 단축키 사용",
+        "Shortcut for time action": "시간 동작 단축키", "Enable shortcut for time action": "시간 동작 단축키 사용", "Delay": "지연", "Seconds": "초",
+        "Click: Paste and Send": "클릭: 붙여넣고 전송", "Long Press: Paste and Send": "길게 누르기: 붙여넣고 전송",
+        "Click: Run Shortcut Below": "클릭: 아래 단축키 실행", "Long Press: Run Shortcut Below": "길게 누르기: 아래 단축키 실행",
+        "Click: Hide / Show Content": "클릭: 내용 숨기기／표시", "Long Press: Hide / Show Content": "길게 누르기: 내용 숨기기／표시",
+        "Hide / Show Content": "내용 숨기기／표시", "Hide Content": "내용 숨기기", "Show Content": "내용 표시",
+        "Pin duration": "기간 Pin 시간", "Add duration": "기간 추가", "Remove duration": "기간 삭제", "None": "없음", "Localized": "언어 연동"
     ]
     switch language {
     case .japanese: return japanese[english] ?? english
@@ -2036,7 +2123,7 @@ fileprivate enum BoardManHistoryUsageFilter: String, CaseIterable {
     }
 }
 
-fileprivate enum BoardManTimestampPosition: String, CaseIterable {
+enum BoardManTimestampPosition: String, CaseIterable {
     case hidden = "Hidden"
     case below = "Below"
     case left = "Left"
@@ -2219,7 +2306,7 @@ enum BoardManThemePreset: String, CaseIterable {
     }
 }
 
-fileprivate enum BoardManPanelItemSource {
+enum BoardManPanelItemSource {
     case clip
     case snippet
     case favorite
@@ -2536,7 +2623,7 @@ fileprivate final class BoardManProLockedControlView: NSView {
     }
 }
 
-fileprivate struct BoardManHistoryItem {
+struct BoardManHistoryItem {
     let title: String
     let primaryTitle: String
     let compactTitle: String
@@ -2549,6 +2636,7 @@ fileprivate struct BoardManHistoryItem {
     let inlineThumbnail: NSImage?
     let pasteCount: Int
     let isPinned: Bool
+    let isMasked: Bool
     let isEnabled: Bool
     let source: BoardManPanelItemSource
     let categoryIdentifier: String?
@@ -2947,6 +3035,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         primaryLabel.backgroundColor = .clear
         primaryLabel.drawsBackground = false
         primaryLabel.font = NSFont.systemFont(ofSize: 13.5, weight: .medium)
+        primaryLabel.identifier = NSUserInterfaceItemIdentifier("BoardManHistoryPrimaryLabel")
 
         metadataLabel.lineBreakMode = .byTruncatingTail
         metadataLabel.maximumNumberOfLines = 1
@@ -2980,6 +3069,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         countBadge.layer?.cornerRadius = 8
         countBadge.layer?.masksToBounds = true
         countBadge.font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .medium)
+        countBadge.identifier = NSUserInterfaceItemIdentifier("BoardManHistoryCountBadge")
 
         let pinBadgeCell = BoardManCenteredTextFieldCell(textCell: "PIN")
         pinBadgeCell.opticalYOffset = 2
@@ -2992,6 +3082,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         pinBadge.layer?.masksToBounds = true
         pinBadge.font = NSFont.systemFont(ofSize: 9.5, weight: .bold)
         pinBadge.toolTip = "Pinned • Hold the row or press ⌘P to unpin"
+        pinBadge.identifier = NSUserInterfaceItemIdentifier("BoardManHistoryPinBadge")
         pinBadge.isHidden = true
 
         inlineImageView.imageScaling = .scaleProportionallyUpOrDown
@@ -3022,7 +3113,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         addSubview(dragHandleLabel)
     }
 
-    fileprivate func configure(item: BoardManHistoryItem,
+    func configure(item: BoardManHistoryItem,
                    isSelected: Bool,
                    usageStyle: String,
                    useLiquidGlass: Bool,
@@ -3040,7 +3131,9 @@ final class BoardManHistoryCellView: NSTableCellView {
         timestampPosition = requestedTimestampPosition
         configuredTimestampText = item.timestampText
         let usesCompactRow = timestampPosition != .below
-        primaryLabel.stringValue = usesCompactRow ? item.compactTitle : item.primaryTitle
+        primaryLabel.stringValue = item.isMasked
+            ? "＊＊＊＊＊"
+            : (usesCompactRow ? item.compactTitle : item.primaryTitle)
         metadataLabel.stringValue = item.metadataText
         metadataLabel.isHidden = usesCompactRow
         timestampAccessoryLabel.stringValue = item.timestampText
@@ -3051,8 +3144,8 @@ final class BoardManHistoryCellView: NSTableCellView {
         countBadge.stringValue = shouldShowCount ? "\(badgePrefix)\(item.countText)" : ""
         countBadge.isHidden = !shouldShowCount
         pinBadge.isHidden = !item.isPinned
-        inlineImageView.image = item.inlineThumbnail
-        inlineImageView.isHidden = item.inlineThumbnail == nil
+        inlineImageView.image = item.isMasked ? nil : item.inlineThumbnail
+        inlineImageView.isHidden = item.isMasked || item.inlineThumbnail == nil
 
         if isSelected {
             primaryLabel.textColor = .selectedMenuItemTextColor
@@ -3160,6 +3253,16 @@ final class BoardManHistoryCellView: NSTableCellView {
         pinBadge.frame = .zero
         inlineImageView.frame = .zero
 
+        if !pinBadge.isHidden {
+            pinBadge.frame = NSIntegralRect(NSRect(
+                x: textLeft,
+                y: floor(bounds.midY - accessoryHeight / 2),
+                width: min(pinWidth, max(0, textRight - textLeft)),
+                height: accessoryHeight
+            ))
+            textLeft = pinBadge.frame.maxX + accessoryGap
+        }
+
         if !timestampAccessoryLabel.isHidden, timestampPosition == .left {
             timestampAccessoryLabel.frame = NSIntegralRect(NSRect(
                 x: textLeft,
@@ -3188,16 +3291,6 @@ final class BoardManHistoryCellView: NSTableCellView {
                 height: accessoryHeight
             ))
             textRight = countBadge.frame.minX - accessoryGap
-        }
-
-        if !pinBadge.isHidden {
-            pinBadge.frame = NSIntegralRect(NSRect(
-                x: max(textLeft, textRight - pinWidth),
-                y: floor(bounds.midY - accessoryHeight / 2),
-                width: min(pinWidth, max(0, textRight - textLeft)),
-                height: accessoryHeight
-            ))
-            textRight = pinBadge.frame.minX - accessoryGap
         }
 
         if !inlineImageView.isHidden {
@@ -3449,7 +3542,7 @@ class BoardManPanel: NSPanel {
     private var activeSettingsCategory: BoardManInlineSettingsCategory = .general
     private var activeSnippetCategoryIdentifier: String = BoardManPanel.allCategoriesIdentifier
     fileprivate var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
-    fileprivate var onTimestampActionRequested: ((BoardManHistoryItem, KeyCombo?, TimeInterval, CFAbsoluteTime?) -> Void)?
+    fileprivate var onTimestampActionRequested: ((KeyCombo, TimeInterval, CFAbsoluteTime?) -> Void)?
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
         return historyItems.count
@@ -4592,12 +4685,12 @@ class BoardManPanel: NSPanel {
         interactionPopup.font = NSFont.systemFont(ofSize: 11)
         interactionPopup.target = self
         interactionPopup.action = #selector(timestampInteractionChanged(_:))
-        interactionPopup.toolTip = "時刻部分でショートカット送信を実行する操作を選びます。"
+        interactionPopup.toolTip = boardManText("Choose what clicking or holding the timestamp does.")
         contentView.addSubview(interactionPopup)
         timestampInteractionPopup = interactionPopup
 
         let timestampShortcutToggle = NSButton(
-            checkboxWithTitle: boardManText("Enable shortcut after send"),
+            checkboxWithTitle: boardManText("Enable shortcut for time action"),
             target: self,
             action: #selector(timestampShortcutEnabledChanged(_:))
         )
@@ -4609,7 +4702,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(timestampShortcutToggle)
         timestampShortcutEnabledButton = timestampShortcutToggle
 
-        let timestampShortcutText = NSTextField(labelWithString: boardManText("Shortcut after send"))
+        let timestampShortcutText = NSTextField(labelWithString: boardManText("Shortcut for time action"))
         timestampShortcutText.font = NSFont.systemFont(ofSize: 11)
         timestampShortcutText.textColor = .labelColor
         contentView.addSubview(timestampShortcutText)
@@ -4619,7 +4712,7 @@ class BoardManPanel: NSPanel {
         timestampShortcut.keyCombo = BoardManTimestampShortcutStore.keyCombo()
         timestampShortcut.delegate = self
         timestampShortcut.identifier = NSUserInterfaceItemIdentifier("BoardManTimestampShortcutRecordView")
-        timestampShortcut.toolTip = "時刻操作で通常のペースト送信を行った後に入力するショートカットです。"
+        timestampShortcut.toolTip = boardManText("Shortcut executed by the selected timestamp action. It can be edited while disabled.")
         contentView.addSubview(timestampShortcut)
         timestampShortcutRecordView = timestampShortcut
 
@@ -5052,6 +5145,9 @@ class BoardManPanel: NSPanel {
         let durationValue = NSTextField(frame: .zero)
         durationValue.cell = BoardManCenteredTextFieldCell(textCell: "\(durationStepper.integerValue)")
         durationValue.alignment = .right
+        durationValue.isEditable = true
+        durationValue.isSelectable = true
+        durationValue.isEnabled = true
         durationValue.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         durationValue.textColor = .labelColor
         durationValue.target = self
@@ -5064,6 +5160,7 @@ class BoardManPanel: NSPanel {
         durationFormatter.allowsFloats = false
         durationValue.formatter = durationFormatter
         durationValue.identifier = NSUserInterfaceItemIdentifier("BoardManTimedPinDurationField")
+        durationValue.toolTip = boardManText("Enter the timed Pin duration directly.")
         contentView.addSubview(durationValue)
         timedPinDurationValueLabel = durationValue
 
@@ -5640,8 +5737,8 @@ class BoardManPanel: NSPanel {
         relativeSuffixLabel?.stringValue = boardManText("Suffix")
         relativeNowLabel?.stringValue = boardManText("Under 1 minute")
         timestampInteractionLabel?.stringValue = boardManText("Time action")
-        timestampShortcutEnabledButton?.title = boardManText("Enable shortcut after send")
-        timestampShortcutLabel?.stringValue = boardManText("Shortcut after send")
+        timestampShortcutEnabledButton?.title = boardManText("Enable shortcut for time action")
+        timestampShortcutLabel?.stringValue = boardManText("Shortcut for time action")
         timestampShortcutDelayLabel?.stringValue = boardManText("Delay")
         timestampShortcutSecondsLabel?.stringValue = boardManText("Seconds")
         usageCountButton?.title = boardManText("Count")
@@ -6387,8 +6484,13 @@ class BoardManPanel: NSPanel {
         }
 
         func placeLabeledRow(label: NSTextField?, control: NSView?, originX: CGFloat, originY: CGFloat, width: CGFloat, labelWidth: CGFloat = fieldLabelWidth) {
-            label?.frame = NSRect(x: originX, y: originY + 5, width: labelWidth, height: 14)
-            control?.frame = NSRect(x: originX + labelWidth + 12, y: originY, width: popupWidth(in: width, labelWidth: labelWidth), height: rowH)
+            label?.frame = NSIntegralRect(NSRect(x: originX, y: originY + 7, width: labelWidth, height: 16))
+            control?.frame = NSIntegralRect(NSRect(
+                x: originX + labelWidth + 12,
+                y: originY,
+                width: popupWidth(in: width, labelWidth: labelWidth),
+                height: rowH
+            ))
         }
 
         func placeGeneralSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -6436,7 +6538,7 @@ class BoardManPanel: NSPanel {
             placeLabeledRow(label: relativeNumberLabel, control: relativeNumberPopup, originX: originX, originY: originY - 122, width: halfWidth, labelWidth: compactLabelWidth)
             placeLabeledRow(label: relativeUnitLabel, control: relativeUnitPopup, originX: rightX, originY: originY - 122, width: halfWidth, labelWidth: compactLabelWidth)
             placeLabeledRow(label: relativeSuffixLabel, control: relativeSuffixPopup, originX: originX, originY: originY - 160, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeNowLabel, control: relativeNowPopup, originX: rightX, originY: originY - 160, width: halfWidth, labelWidth: 104)
+            placeLabeledRow(label: relativeNowLabel, control: relativeNowPopup, originX: rightX, originY: originY - 160, width: halfWidth, labelWidth: compactLabelWidth)
 
             placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX, originY: originY - 198, width: halfWidth, labelWidth: compactLabelWidth)
             placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: rightX, originY: originY - 198, width: halfWidth, labelWidth: compactLabelWidth)
@@ -6491,34 +6593,34 @@ class BoardManPanel: NSPanel {
                             originX: originX, originY: originY - 240, width: width,
                             labelWidth: compactLabelWidth)
             timestampShortcutEnabledButton?.frame = NSRect(x: originX, y: originY - 282, width: width, height: 20)
-            timestampShortcutLabel?.frame = NSRect(x: originX, y: originY - 324, width: compactLabelWidth, height: 16)
-            timestampShortcutRecordView?.frame = NSRect(
+            timestampShortcutLabel?.frame = NSIntegralRect(NSRect(x: originX, y: originY - 324, width: compactLabelWidth, height: 16))
+            timestampShortcutRecordView?.frame = NSIntegralRect(NSRect(
                 x: originX + compactLabelWidth + 12,
                 y: originY - 331,
                 width: max(128, width - compactLabelWidth - 12),
                 height: rowH
-            )
+            ))
 
-            timestampShortcutDelayLabel?.frame = NSRect(x: originX, y: originY - 366, width: compactLabelWidth, height: 16)
+            timestampShortcutDelayLabel?.frame = NSIntegralRect(NSRect(x: originX, y: originY - 366, width: compactLabelWidth, height: 16))
             let shortcutDelayX = originX + compactLabelWidth + 12
-            timestampShortcutDelayField?.frame = NSRect(x: shortcutDelayX, y: originY - 373, width: 82, height: rowH)
-            timestampShortcutDelayStepper?.frame = NSRect(x: shortcutDelayX + 90, y: originY - 373, width: 24, height: rowH)
-            timestampShortcutSecondsLabel?.frame = NSRect(x: shortcutDelayX + 124, y: originY - 366, width: 72, height: 16)
+            timestampShortcutDelayField?.frame = NSIntegralRect(NSRect(x: shortcutDelayX, y: originY - 373, width: 82, height: rowH))
+            timestampShortcutDelayStepper?.frame = NSIntegralRect(NSRect(x: shortcutDelayX + 90, y: originY - 373, width: 24, height: rowH))
+            timestampShortcutSecondsLabel?.frame = NSIntegralRect(NSRect(x: shortcutDelayX + 124, y: originY - 366, width: 72, height: 16))
 
-            timedPinDurationLabel?.frame = NSRect(x: originX, y: originY - 414, width: compactLabelWidth, height: 16)
+            timedPinDurationLabel?.frame = NSIntegralRect(NSRect(x: originX, y: originY - 414, width: compactLabelWidth, height: 16))
             let durationX = originX + compactLabelWidth + 12
             let presetButtonWidth: CGFloat = 34
             let presetGap: CGFloat = 6
             let presetWidth = max(112, width - compactLabelWidth - 12 - (presetButtonWidth * 2) - (presetGap * 2))
-            timedPinPresetPopup?.frame = NSRect(x: durationX, y: originY - 421, width: presetWidth, height: rowH)
-            timedPinPresetAddButton?.frame = NSRect(x: durationX + presetWidth + presetGap, y: originY - 421, width: presetButtonWidth, height: rowH)
-            timedPinPresetRemoveButton?.frame = NSRect(x: durationX + presetWidth + presetGap + presetButtonWidth + presetGap, y: originY - 421, width: presetButtonWidth, height: rowH)
+            timedPinPresetPopup?.frame = NSIntegralRect(NSRect(x: durationX, y: originY - 421, width: presetWidth, height: rowH))
+            timedPinPresetAddButton?.frame = NSIntegralRect(NSRect(x: durationX + presetWidth + presetGap, y: originY - 421, width: presetButtonWidth, height: rowH))
+            timedPinPresetRemoveButton?.frame = NSIntegralRect(NSRect(x: durationX + presetWidth + presetGap + presetButtonWidth + presetGap, y: originY - 421, width: presetButtonWidth, height: rowH))
 
-            timedPinDurationValueLabel?.frame = NSRect(x: durationX, y: originY - 463, width: 86, height: rowH)
-            timedPinDurationStepper?.frame = NSRect(x: durationX + 94, y: originY - 463, width: 24, height: rowH)
-            timedPinDurationUnitPopup?.frame = NSRect(x: durationX + 130, y: originY - 463,
+            timedPinDurationValueLabel?.frame = NSIntegralRect(NSRect(x: durationX, y: originY - 463, width: 86, height: rowH))
+            timedPinDurationStepper?.frame = NSIntegralRect(NSRect(x: durationX + 94, y: originY - 463, width: 24, height: rowH))
+            timedPinDurationUnitPopup?.frame = NSIntegralRect(NSRect(x: durationX + 130, y: originY - 463,
                                                      width: max(92, width - compactLabelWidth - 142),
-                                                     height: rowH)
+                                                     height: rowH))
 
             exportHistoryCSVButton?.frame = NSRect(x: originX, y: originY - 518,
                                                    width: min(176, max(132, floor(width * 0.34))),
@@ -6776,12 +6878,12 @@ class BoardManPanel: NSPanel {
         let delay = configuredTimestampShortcutDelay
         timestampShortcutDelayField?.doubleValue = delay
         timestampShortcutDelayStepper?.doubleValue = delay
-        timestampShortcutRecordView?.alphaValue = enabled ? 1 : 0.50
-        timestampShortcutLabel?.textColor = enabled ? .labelColor : .tertiaryLabelColor
-        timestampShortcutDelayLabel?.textColor = enabled ? .labelColor : .tertiaryLabelColor
-        timestampShortcutSecondsLabel?.textColor = enabled ? .secondaryLabelColor : .tertiaryLabelColor
-        timestampShortcutDelayField?.isEnabled = enabled
-        timestampShortcutDelayStepper?.isEnabled = enabled
+        timestampShortcutRecordView?.alphaValue = 1
+        timestampShortcutLabel?.textColor = .labelColor
+        timestampShortcutDelayLabel?.textColor = .labelColor
+        timestampShortcutSecondsLabel?.textColor = .secondaryLabelColor
+        timestampShortcutDelayField?.isEnabled = true
+        timestampShortcutDelayStepper?.isEnabled = true
     }
 
     @objc private func skipPinnedNavigationChanged(_ sender: NSButton) {
@@ -7631,6 +7733,7 @@ class BoardManPanel: NSPanel {
             realm.delete(snippet)
         }
         PinnedSnippetStore.shared.remove(identifier)
+        BoardManMaskedItemStore.shared.remove([identifier])
         selectedIndex = -1
         onRefreshRequested?()
         refreshSnippetEditor()
@@ -7945,7 +8048,10 @@ class BoardManPanel: NSPanel {
         alert.addButton(withTitle: boardManText("Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let realm = try! Realm()
+        let removedIdentifiers = Array(realm.objects(CPYClip.self).map(\.dataHash))
         AppEnvironment.current.clipService.clearAll()
+        BoardManMaskedItemStore.shared.remove(removedIdentifiers)
         onRefreshRequested?()
     }
 
@@ -8447,14 +8553,17 @@ class BoardManPanel: NSPanel {
         return cell.containsTimestamp(at: cell.convert(tablePoint, from: table))
     }
 
-    private func performTimestampAction(_ item: BoardManHistoryItem, startedAt: CFAbsoluteTime?) {
-        guard item.isEnabled else {
+    private func performTimestampShortcut(startedAt: CFAbsoluteTime?) {
+        guard configuredTimestampShortcutEnabled else {
             NSSound.beep()
             return
         }
         hidePreviewBubble()
-        let postShortcut = configuredTimestampShortcutEnabled ? configuredTimestampShortcut : nil
-        onTimestampActionRequested?(item, postShortcut, configuredTimestampShortcutDelay, startedAt)
+        onTimestampActionRequested?(
+            configuredTimestampShortcut,
+            configuredTimestampShortcutDelay,
+            startedAt
+        )
     }
 
     // Use NSTableView's native target/action path for reliable single-click delivery.
@@ -8482,11 +8591,16 @@ class BoardManPanel: NSPanel {
         if activeTab == .snippets && (isSnippetReorderMode || wasEditing) {
             return
         }
-        if configuredTimestampInteraction == .click,
-           let tablePoint,
+        if let tablePoint,
            isTimestampHit(row: row, tablePoint: tablePoint, table: sender) {
-            performTimestampAction(item, startedAt: startedAt)
-            return
+            if configuredTimestampInteraction.runsShortcutOnClick {
+                performTimestampShortcut(startedAt: startedAt)
+                return
+            }
+            if configuredTimestampInteraction.togglesMaskOnClick {
+                _ = toggleMask(identifier: item.dataHash)
+                return
+            }
         }
         guard item.isEnabled else {
             NSSound.beep()
@@ -8506,16 +8620,23 @@ class BoardManPanel: NSPanel {
         guard row >= 0, let item = historyItems[safe: row] else { return }
         suppressSingleClickUntil = CFAbsoluteTimeGetCurrent() + 1.0
         setSelectedIndex(row)
-        if configuredTimestampInteraction == .longPress,
-           isTimestampHit(row: row, tablePoint: tablePoint, table: table) {
-            performTimestampAction(item, startedAt: CFAbsoluteTimeGetCurrent())
-            return
+        if isTimestampHit(row: row, tablePoint: tablePoint, table: table) {
+            if configuredTimestampInteraction.runsShortcutOnLongPress {
+                performTimestampShortcut(startedAt: CFAbsoluteTimeGetCurrent())
+                return
+            }
+            if configuredTimestampInteraction.togglesMaskOnLongPress {
+                _ = toggleMask(identifier: item.dataHash)
+                return
+            }
         }
         switch configuredLongPressAction {
         case .togglePin:
             _ = togglePin(identifier: item.dataHash)
         case .timedPin:
             _ = toggleTimedPin(identifier: item.dataHash)
+        case .toggleMask:
+            _ = toggleMask(identifier: item.dataHash)
         case .none:
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         }
@@ -8567,6 +8688,12 @@ class BoardManPanel: NSPanel {
                 timedPinItem.submenu = presetMenu
                 menu.addItem(timedPinItem)
             }
+
+            let maskTitle = item.isMasked ? boardManText("Show Content") : boardManText("Hide Content")
+            let maskItem = NSMenuItem(title: maskTitle, action: #selector(toggleMaskFromMenu(_:)), keyEquivalent: "")
+            maskItem.target = self
+            maskItem.representedObject = item.dataHash
+            menu.addItem(maskItem)
 
             let highlightItem = NSMenuItem(title: boardManText("Highlight"), action: nil, keyEquivalent: "")
             if EntitlementGate.canUse(.advancedAppearance) {
@@ -8692,6 +8819,11 @@ class BoardManPanel: NSPanel {
     @objc private func toggleTimedPinFromMenu(_ sender: NSMenuItem) {
         guard let dataHash = sender.representedObject as? String else { return }
         _ = toggleTimedPin(identifier: dataHash)
+    }
+
+    @objc private func toggleMaskFromMenu(_ sender: NSMenuItem) {
+        guard let dataHash = sender.representedObject as? String else { return }
+        _ = toggleMask(identifier: dataHash)
     }
 
     @objc private func applyTimedPinPresetFromMenu(_ sender: NSMenuItem) {
@@ -9169,6 +9301,16 @@ class BoardManPanel: NSPanel {
     }
 
     @discardableResult
+    private func toggleMask(identifier: String) -> Bool {
+        _ = BoardManMaskedItemStore.shared.toggle(identifier)
+        hidePreviewBubble()
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        onRefreshRequested?()
+        selectItemInCurrentList(identifier: identifier)
+        return true
+    }
+
+    @discardableResult
     private func togglePinForSelectedItem() -> Bool {
         let row = rowForCurrentSelection()
         guard let item = historyItems[safe: row] else { return false }
@@ -9422,13 +9564,14 @@ class BoardManPanel: NSPanel {
         imageView.isHidden = true
         imageView.image = nil
         label.isHidden = false
-        label.stringValue = item.previewTitle
+        let previewText = item.isMasked ? "＊＊＊＊＊" : item.previewTitle
+        label.stringValue = previewText
         let previewScale = effectiveTextPreviewScale
         label.font = fontChoice.font(ofSize: 12 * previewScale)
         let maxWidth: CGFloat = 340 * previewScale
         let padding: CGFloat = 12 * previewScale
         let maxLabelSize = NSSize(width: maxWidth - (padding * 2), height: 150 * previewScale)
-        let textSize = (item.previewTitle as NSString).boundingRect(
+        let textSize = (previewText as NSString).boundingRect(
             with: maxLabelSize,
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: label.font ?? NSFont.systemFont(ofSize: 12)]
@@ -9456,7 +9599,7 @@ class BoardManPanel: NSPanel {
     }
 
     private func previewImage(for item: BoardManHistoryItem) -> NSImage? {
-        guard item.source == .clip, !item.imageDataPath.isEmpty,
+        guard !item.isMasked, item.source == .clip, !item.imageDataPath.isEmpty,
               let data = NSKeyedUnarchiver.unarchiveObject(withFile: item.imageDataPath) as? CPYClipData else {
             return nil
         }
