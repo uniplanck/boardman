@@ -1802,7 +1802,8 @@ func boardManText(_ english: String) -> String {
         "Icon": "アイコン", "Black": "黒", "White": "白", "Hidden": "非表示",
         "All": "すべて", "Unused": "未使用",
         "Paste": "貼り付け", "Pin": "Pin", "Unpin": "Pin解除", "Copy": "コピー",
-        "Add to Snippets": "スニペットへ追加", "Add Snippet": "スニペットを追加", "Edit Snippet": "スニペットを編集", "Delete Snippet": "スニペットを削除",
+        "Add to Snippets": "スニペットへ追加", "Add Snippet": "スニペットを追加", "Rename Snippet…": "表示名を変更…", "Edit Snippet": "スニペットを編集", "Delete Snippet": "スニペットを削除",
+        "This changes the name shown in the snippet list.": "スニペット一覧に表示する名前を変更します。",
         "Uncategorized": "未分類", "Row Actions": "項目操作",
         "Advanced appearance": "高度な外観設定", "Unlock Pro to customize advanced visual presets.": "Proで高度な外観プリセットを利用できます。",
         "System": "システム", "Light": "ライト", "Dark": "ダーク", "Default": "標準", "Simple": "シンプル", "Monochrome": "モノクロ",
@@ -2665,9 +2666,28 @@ private final class BoardManHistoryTableView: NSTableView {
     }
 }
 
-private final class BoardManHistoryRowView: NSTableRowView {
+final class BoardManHistoryRowView: NSTableRowView {
+    enum BackgroundKind: Equatable {
+        case highlight
+        case selected
+        case hovered
+        case used
+        case plain
+    }
+
     weak var previewOwner: BoardManPanel?
     private var hoverTrackingArea: NSTrackingArea?
+
+    static func backgroundKind(isSelected: Bool,
+                               isHovered: Bool,
+                               hasHighlight: Bool,
+                               hasUsedAppearance: Bool) -> BackgroundKind {
+        if hasHighlight { return .highlight }
+        if isSelected { return .selected }
+        if isHovered { return .hovered }
+        if hasUsedAppearance { return .used }
+        return .plain
+    }
 
     override func updateTrackingAreas() {
         if let hoverTrackingArea {
@@ -2697,40 +2717,68 @@ private final class BoardManHistoryRowView: NSTableRowView {
         let lightenTheme = previewOwner?.isThemeLightenEnabled == true
         let preset = previewOwner?.themePreset ?? .defaultPreset
         let accentColor = previewOwner?.themeAccentColor ?? preset.accentColor
+        let isSelected = previewOwner?.isSelectedRow(row) == true
+        let isHovered = previewOwner?.isHoveredRow(row) == true
+        let highlightAppearance = previewOwner?.itemHighlightAppearance(for: row)
+        let usedAppearance = previewOwner?.usedItemAppearance(for: row)
+        let kind = Self.backgroundKind(
+            isSelected: isSelected,
+            isHovered: isHovered,
+            hasHighlight: highlightAppearance != nil,
+            hasUsedAppearance: usedAppearance != nil
+        )
         let path = NSBezierPath(roundedRect: rowRect, xRadius: 9, yRadius: 9)
-        if previewOwner?.isSelectedRow(row) == true {
+
+        switch kind {
+        case .highlight:
+            if let appearance = highlightAppearance {
+                appearance.background.setFill()
+                path.fill()
+                appearance.border.setStroke()
+                path.lineWidth = appearance.borderWidth
+                path.stroke()
+            }
+            if isSelected {
+                let selectionPath = NSBezierPath(
+                    roundedRect: rowRect.insetBy(dx: 1, dy: 1),
+                    xRadius: 8,
+                    yRadius: 8
+                )
+                accentColor.withAlphaComponent(lightenTheme ? 0.48 : 0.78).setStroke()
+                selectionPath.lineWidth = 2
+                selectionPath.stroke()
+            }
+        case .selected:
             accentColor.withAlphaComponent(lightenTheme ? 0.12 : (useLiquidGlass ? 0.34 : 0.28)).setFill()
             path.fill()
             accentColor.withAlphaComponent(lightenTheme ? 0.30 : (useLiquidGlass ? 0.54 : 0.46)).setStroke()
             path.lineWidth = 1
             path.stroke()
-        } else if previewOwner?.isHoveredRow(row) == true {
+        case .hovered:
             accentColor.withAlphaComponent(lightenTheme ? 0.07 : (useLiquidGlass ? 0.18 : 0.16)).setFill()
             path.fill()
             preset.edgeColor(useLiquidGlass: useLiquidGlass, lighten: lightenTheme).setStroke()
             path.lineWidth = 1
             path.stroke()
-        } else if let appearance = previewOwner?.itemHighlightAppearance(for: row) {
-            appearance.background.setFill()
-            path.fill()
-            appearance.border.setStroke()
-            path.lineWidth = appearance.borderWidth
-            path.stroke()
-        } else if let appearance = previewOwner?.usedItemAppearance(for: row) {
-            appearance.background.setFill()
-            path.fill()
-            appearance.border.setStroke()
-            path.lineWidth = appearance.borderWidth
-            path.stroke()
-        } else if row >= 0 {
-            let separator = NSBezierPath()
-            separator.move(to: NSPoint(x: 18, y: 0.5))
-            separator.line(to: NSPoint(x: max(18, bounds.maxX - 18), y: 0.5))
-            NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.22 : 0.34).setStroke()
-            separator.lineWidth = 0.5
-            separator.stroke()
-        } else {
-            super.drawBackground(in: dirtyRect)
+        case .used:
+            if let appearance = usedAppearance {
+                appearance.background.setFill()
+                path.fill()
+                appearance.border.setStroke()
+                path.lineWidth = appearance.borderWidth
+                path.stroke()
+            }
+        case .plain:
+            if row >= 0 {
+                let separator = NSBezierPath()
+                separator.move(to: NSPoint(x: 18, y: 0.5))
+                separator.line(to: NSPoint(x: max(18, bounds.maxX - 18), y: 0.5))
+                NSColor.separatorColor.withAlphaComponent(useLiquidGlass ? 0.22 : 0.34).setStroke()
+                separator.lineWidth = 0.5
+                separator.stroke()
+            } else {
+                super.drawBackground(in: dirtyRect)
+            }
         }
     }
 
@@ -3519,6 +3567,7 @@ class BoardManPanel: NSPanel {
     private var snippetCancelEditButton: NSButton?
     private var snippetEditorStatusLabel: NSTextField?
     private var snippetEditorClickGesture: NSClickGestureRecognizer?
+    private var itemLongPressGesture: NSPressGestureRecognizer?
     private var horizontalScrollAccumulator: CGFloat = 0
     private var horizontalScrollResetWorkItem: DispatchWorkItem?
     private var previewBubblePanel: NSPanel?
@@ -3736,6 +3785,10 @@ class BoardManPanel: NSPanel {
         return min(60, max(0, value))
     }
 
+    static func usesStackedHistorySettingsLayout(width: CGFloat) -> Bool {
+        return width < 520
+    }
+
     static func restoredSnippetSelectionIndex(origin: Int?, itemCount: Int) -> Int {
         guard let origin, origin >= 0, origin < itemCount else { return -1 }
         return origin
@@ -3773,6 +3826,27 @@ class BoardManPanel: NSPanel {
                 folder.enable = folderEnabled
             }
         }
+    }
+
+    static func persistSnippetTitle(_ title: String, snippet: CPYSnippet, realm: Realm) {
+        guard snippet.title != title else { return }
+        realm.transaction {
+            snippet.title = title
+        }
+    }
+
+    static func reorderedSnippetIdentifiers(_ identifiers: [String],
+                                            moving identifier: String,
+                                            to destinationRow: Int) -> [String] {
+        guard let sourceIndex = identifiers.firstIndex(of: identifier) else { return identifiers }
+        var reordered = identifiers
+        let moved = reordered.remove(at: sourceIndex)
+        var targetIndex = max(0, min(destinationRow, reordered.count))
+        if destinationRow > sourceIndex {
+            targetIndex = max(0, min(destinationRow - 1, reordered.count))
+        }
+        reordered.insert(moved, at: targetIndex)
+        return reordered
     }
 
     static func quickPanelSize() -> NSSize {
@@ -5467,6 +5541,7 @@ class BoardManPanel: NSPanel {
         longPress.delaysPrimaryMouseButtonEvents = true
         longPress.delegate = self
         table.addGestureRecognizer(longPress)
+        itemLongPressGesture = longPress
 
         scroll.documentView = table
         contentView.addSubview(scroll)
@@ -5581,6 +5656,9 @@ class BoardManPanel: NSPanel {
         editorTitle.font = NSFont.systemFont(ofSize: 12)
         editorTitle.placeholderString = boardManText("Untitled snippet")
         editorTitle.identifier = NSUserInterfaceItemIdentifier("BoardManSnippetEditorTitleField")
+        editorTitle.target = self
+        editorTitle.action = #selector(snippetTitleFieldChanged(_:))
+        editorTitle.delegate = self
         editorView.addSubview(editorTitle)
         snippetEditorTitleField = editorTitle
 
@@ -5638,6 +5716,7 @@ class BoardManPanel: NSPanel {
         editorStatus.wantsLayer = true
         editorStatus.layer?.cornerRadius = 7
         editorStatus.layer?.masksToBounds = true
+        editorStatus.identifier = NSUserInterfaceItemIdentifier("BoardManSnippetEditorStatusLabel")
         editorView.addSubview(editorStatus)
         snippetEditorStatusLabel = editorStatus
 
@@ -6257,22 +6336,59 @@ class BoardManPanel: NSPanel {
     }
 
     private func layoutSnippetEditorControls(width: CGFloat, height: CGFloat) {
-        let inset: CGFloat = 20
+        let inset: CGFloat = width < 330 ? 14 : 18
         let contentWidth = max(120, width - (inset * 2))
         let topY = height - inset
-        snippetEditorStatusLabel?.frame = NSRect(x: inset, y: topY - 46, width: contentWidth, height: 42)
 
-        let toggleGap: CGFloat = 12
-        let toggleWidth = max(110, floor((contentWidth - toggleGap) / 2))
-        snippetFolderEnableButton?.frame = NSRect(x: inset, y: topY - 82, width: toggleWidth, height: 22)
-        snippetEnableButton?.frame = NSRect(x: inset + toggleWidth + toggleGap, y: topY - 82, width: toggleWidth, height: 22)
+        snippetEditorTitleLabel?.frame = NSIntegralRect(NSRect(
+            x: inset,
+            y: topY - 17,
+            width: contentWidth,
+            height: 17
+        ))
+        snippetEditorTitleField?.frame = NSIntegralRect(NSRect(
+            x: inset,
+            y: topY - 53,
+            width: contentWidth,
+            height: LayoutMetrics.controlHeight
+        ))
+        snippetEditorStatusLabel?.frame = NSIntegralRect(NSRect(
+            x: inset,
+            y: topY - 93,
+            width: contentWidth,
+            height: 32
+        ))
 
-        snippetEditorTitleLabel?.frame = NSRect(x: inset, y: topY - 120, width: contentWidth, height: 17)
-        snippetEditorTitleField?.frame = NSRect(x: inset, y: topY - 158, width: contentWidth, height: LayoutMetrics.controlHeight)
-        snippetEditorContentLabel?.frame = NSRect(x: inset, y: topY - 194, width: contentWidth, height: 17)
-        let contentBottom = inset + LayoutMetrics.actionButtonHeight + 16
-        let contentHeight = max(90, topY - 208 - contentBottom)
-        snippetEditorScrollView?.frame = NSRect(x: inset, y: contentBottom, width: contentWidth, height: contentHeight)
+        let toggleGap: CGFloat = 8
+        let toggleWidth = max(104, floor((contentWidth - toggleGap) / 2))
+        snippetFolderEnableButton?.frame = NSIntegralRect(NSRect(
+            x: inset,
+            y: topY - 125,
+            width: toggleWidth,
+            height: 22
+        ))
+        snippetEnableButton?.frame = NSIntegralRect(NSRect(
+            x: inset + toggleWidth + toggleGap,
+            y: topY - 125,
+            width: toggleWidth,
+            height: 22
+        ))
+
+        snippetEditorContentLabel?.frame = NSIntegralRect(NSRect(
+            x: inset,
+            y: topY - 158,
+            width: contentWidth,
+            height: 17
+        ))
+        let contentBottom = inset + LayoutMetrics.actionButtonHeight + 14
+        let contentTop = topY - 168
+        let contentHeight = max(90, contentTop - contentBottom)
+        snippetEditorScrollView?.frame = NSIntegralRect(NSRect(
+            x: inset,
+            y: contentBottom,
+            width: contentWidth,
+            height: contentHeight
+        ))
         snippetEditorTextView?.minSize = NSSize(width: 0, height: contentHeight)
         snippetEditorTextView?.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         snippetEditorTextView?.isVerticallyResizable = true
@@ -6281,8 +6397,18 @@ class BoardManPanel: NSPanel {
         snippetEditorTextView?.textContainer?.widthTracksTextView = true
         let actionGap: CGFloat = 10
         let actionWidth = max(80, floor((contentWidth - actionGap) / 2))
-        snippetSaveButton?.frame = NSRect(x: inset, y: inset, width: actionWidth, height: LayoutMetrics.actionButtonHeight)
-        snippetCancelEditButton?.frame = NSRect(x: inset + actionWidth + actionGap, y: inset, width: actionWidth, height: LayoutMetrics.actionButtonHeight)
+        snippetSaveButton?.frame = NSIntegralRect(NSRect(
+            x: inset,
+            y: inset,
+            width: actionWidth,
+            height: LayoutMetrics.actionButtonHeight
+        ))
+        snippetCancelEditButton?.frame = NSIntegralRect(NSRect(
+            x: inset + actionWidth + actionGap,
+            y: inset,
+            width: actionWidth,
+            height: LayoutMetrics.actionButtonHeight
+        ))
     }
 
     fileprivate func synchronizeListGeometry(frameWidth: CGFloat? = nil, height: CGFloat? = nil) {
@@ -6585,49 +6711,164 @@ class BoardManPanel: NSPanel {
             skipPinnedNavigationButton?.frame = NSRect(x: originX, y: originY - 150, width: width, height: 20)
 
             let compactLabelWidth: CGFloat = min(104, max(78, floor(width * 0.24)))
-            placeLabeledRow(label: longPressActionLabel, control: longPressActionPopup,
-                            originX: originX, originY: originY - 198, width: width,
-                            labelWidth: compactLabelWidth)
+            placeLabeledRow(
+                label: longPressActionLabel,
+                control: longPressActionPopup,
+                originX: originX,
+                originY: originY - 198,
+                width: width,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: timestampInteractionLabel,
+                control: timestampInteractionPopup,
+                originX: originX,
+                originY: originY - 240,
+                width: width,
+                labelWidth: compactLabelWidth
+            )
+            timestampShortcutEnabledButton?.frame = NSRect(
+                x: originX,
+                y: originY - 282,
+                width: width,
+                height: 20
+            )
 
-            placeLabeledRow(label: timestampInteractionLabel, control: timestampInteractionPopup,
-                            originX: originX, originY: originY - 240, width: width,
-                            labelWidth: compactLabelWidth)
-            timestampShortcutEnabledButton?.frame = NSRect(x: originX, y: originY - 282, width: width, height: 20)
-            timestampShortcutLabel?.frame = NSIntegralRect(NSRect(x: originX, y: originY - 324, width: compactLabelWidth, height: 16))
-            timestampShortcutRecordView?.frame = NSIntegralRect(NSRect(
-                x: originX + compactLabelWidth + 12,
-                y: originY - 331,
-                width: max(128, width - compactLabelWidth - 12),
+            let stacksShortcut = Self.usesStackedHistorySettingsLayout(width: width)
+            let shortcutRecordY: CGFloat
+            let delayRowY: CGFloat
+            let pinLabelY: CGFloat
+            if stacksShortcut {
+                timestampShortcutLabel?.frame = NSIntegralRect(NSRect(
+                    x: originX,
+                    y: originY - 302,
+                    width: width,
+                    height: 16
+                ))
+                shortcutRecordY = originY - 336
+                timestampShortcutRecordView?.frame = NSIntegralRect(NSRect(
+                    x: originX,
+                    y: shortcutRecordY,
+                    width: width,
+                    height: rowH
+                ))
+                delayRowY = originY - 370
+                pinLabelY = originY - 392
+            } else {
+                timestampShortcutLabel?.frame = NSIntegralRect(NSRect(
+                    x: originX,
+                    y: originY - 324,
+                    width: compactLabelWidth,
+                    height: 16
+                ))
+                shortcutRecordY = originY - 331
+                timestampShortcutRecordView?.frame = NSIntegralRect(NSRect(
+                    x: originX + compactLabelWidth + 12,
+                    y: shortcutRecordY,
+                    width: max(128, width - compactLabelWidth - 12),
+                    height: rowH
+                ))
+                delayRowY = originY - 373
+                pinLabelY = originY - 396
+            }
+
+            let delayLabelWidth: CGFloat = stacksShortcut ? 48 : compactLabelWidth
+            timestampShortcutDelayLabel?.frame = NSIntegralRect(NSRect(
+                x: originX,
+                y: delayRowY + 7,
+                width: delayLabelWidth,
+                height: 16
+            ))
+            let shortcutDelayX = originX + delayLabelWidth + 12
+            let secondsWidth: CGFloat = 44
+            let delayFieldWidth: CGFloat = min(82, max(58, floor(width * 0.18)))
+            timestampShortcutDelayField?.frame = NSIntegralRect(NSRect(
+                x: shortcutDelayX,
+                y: delayRowY,
+                width: delayFieldWidth,
+                height: rowH
+            ))
+            timestampShortcutDelayStepper?.frame = NSIntegralRect(NSRect(
+                x: shortcutDelayX + delayFieldWidth + 8,
+                y: delayRowY,
+                width: 24,
+                height: rowH
+            ))
+            timestampShortcutSecondsLabel?.frame = NSIntegralRect(NSRect(
+                x: shortcutDelayX + delayFieldWidth + 42,
+                y: delayRowY + 7,
+                width: secondsWidth,
+                height: 16
+            ))
+
+            timedPinDurationLabel?.frame = NSIntegralRect(NSRect(
+                x: originX,
+                y: pinLabelY,
+                width: width,
+                height: 16
+            ))
+            let presetRowY = pinLabelY - 34
+            let presetButtonWidth: CGFloat = 34
+            let presetGap: CGFloat = 6
+            let presetWidth = max(
+                112,
+                width - (presetButtonWidth * 2) - (presetGap * 2)
+            )
+            timedPinPresetPopup?.frame = NSIntegralRect(NSRect(
+                x: originX,
+                y: presetRowY,
+                width: presetWidth,
+                height: rowH
+            ))
+            timedPinPresetAddButton?.frame = NSIntegralRect(NSRect(
+                x: originX + presetWidth + presetGap,
+                y: presetRowY,
+                width: presetButtonWidth,
+                height: rowH
+            ))
+            timedPinPresetRemoveButton?.frame = NSIntegralRect(NSRect(
+                x: originX + presetWidth + presetGap + presetButtonWidth + presetGap,
+                y: presetRowY,
+                width: presetButtonWidth,
                 height: rowH
             ))
 
-            timestampShortcutDelayLabel?.frame = NSIntegralRect(NSRect(x: originX, y: originY - 366, width: compactLabelWidth, height: 16))
-            let shortcutDelayX = originX + compactLabelWidth + 12
-            timestampShortcutDelayField?.frame = NSIntegralRect(NSRect(x: shortcutDelayX, y: originY - 373, width: 82, height: rowH))
-            timestampShortcutDelayStepper?.frame = NSIntegralRect(NSRect(x: shortcutDelayX + 90, y: originY - 373, width: 24, height: rowH))
-            timestampShortcutSecondsLabel?.frame = NSIntegralRect(NSRect(x: shortcutDelayX + 124, y: originY - 366, width: 72, height: 16))
+            let durationRowY = presetRowY - 36
+            let durationValueWidth: CGFloat = min(96, max(72, floor(width * 0.22)))
+            timedPinDurationValueLabel?.frame = NSIntegralRect(NSRect(
+                x: originX,
+                y: durationRowY,
+                width: durationValueWidth,
+                height: rowH
+            ))
+            timedPinDurationStepper?.frame = NSIntegralRect(NSRect(
+                x: originX + durationValueWidth + 8,
+                y: durationRowY,
+                width: 24,
+                height: rowH
+            ))
+            let unitX = originX + durationValueWidth + 44
+            timedPinDurationUnitPopup?.frame = NSIntegralRect(NSRect(
+                x: unitX,
+                y: durationRowY,
+                width: max(92, width - (unitX - originX)),
+                height: rowH
+            ))
 
-            timedPinDurationLabel?.frame = NSIntegralRect(NSRect(x: originX, y: originY - 414, width: compactLabelWidth, height: 16))
-            let durationX = originX + compactLabelWidth + 12
-            let presetButtonWidth: CGFloat = 34
-            let presetGap: CGFloat = 6
-            let presetWidth = max(112, width - compactLabelWidth - 12 - (presetButtonWidth * 2) - (presetGap * 2))
-            timedPinPresetPopup?.frame = NSIntegralRect(NSRect(x: durationX, y: originY - 421, width: presetWidth, height: rowH))
-            timedPinPresetAddButton?.frame = NSIntegralRect(NSRect(x: durationX + presetWidth + presetGap, y: originY - 421, width: presetButtonWidth, height: rowH))
-            timedPinPresetRemoveButton?.frame = NSIntegralRect(NSRect(x: durationX + presetWidth + presetGap + presetButtonWidth + presetGap, y: originY - 421, width: presetButtonWidth, height: rowH))
-
-            timedPinDurationValueLabel?.frame = NSIntegralRect(NSRect(x: durationX, y: originY - 463, width: 86, height: rowH))
-            timedPinDurationStepper?.frame = NSIntegralRect(NSRect(x: durationX + 94, y: originY - 463, width: 24, height: rowH))
-            timedPinDurationUnitPopup?.frame = NSIntegralRect(NSRect(x: durationX + 130, y: originY - 463,
-                                                     width: max(92, width - compactLabelWidth - 142),
-                                                     height: rowH))
-
-            exportHistoryCSVButton?.frame = NSRect(x: originX, y: originY - 518,
-                                                   width: min(176, max(132, floor(width * 0.34))),
-                                                   height: LayoutMetrics.actionButtonHeight)
-            clearHistoryButton?.frame = NSRect(x: originX + min(188, max(144, floor(width * 0.36))),
-                                               y: originY - 518, width: 104,
-                                               height: LayoutMetrics.actionButtonHeight)
+            let actionY = durationRowY - 50
+            let exportWidth = min(176, max(132, floor(width * 0.42)))
+            exportHistoryCSVButton?.frame = NSRect(
+                x: originX,
+                y: actionY,
+                width: exportWidth,
+                height: LayoutMetrics.actionButtonHeight
+            )
+            clearHistoryButton?.frame = NSRect(
+                x: originX + exportWidth + 10,
+                y: actionY,
+                width: min(104, max(84, width - exportWidth - 10)),
+                height: LayoutMetrics.actionButtonHeight
+            )
         }
 
         func layoutSnippetShortcutRows(width: CGFloat) {
@@ -7319,23 +7560,25 @@ class BoardManPanel: NSPanel {
 
     private func updateSnippetModeUI() {
         guard activeTab == .snippets else { return }
-        let hasConcreteGroup = selectedCategoryFolder() != nil
+        let hasReorderableCategory = activeSnippetCategoryIdentifier != BoardManPanel.allCategoriesIdentifier
         let snippetCount = historyItems.filter { $0.source == .snippet }.count
-        let canReorder = isProEntitled && hasConcreteGroup && snippetCount > 1 && !isSnippetEditing
+        let canReorder = isProEntitled && hasReorderableCategory && snippetCount > 1 && !isSnippetEditing
         if !canReorder {
             isSnippetReorderMode = false
         }
+        itemLongPressGesture?.isEnabled = !isSnippetReorderMode
+        itemLongPressGesture?.delaysPrimaryMouseButtonEvents = !isSnippetReorderMode
         snippetReorderModeButton?.isEnabled = canReorder || isSnippetReorderMode
         snippetReorderModeButton?.state = isSnippetReorderMode ? .on : .off
         snippetReorderModeButton?.title = boardManText(isSnippetReorderMode ? "Reordering" : "Reorder")
-        snippetReorderModeButton?.toolTip = hasConcreteGroup
+        snippetReorderModeButton?.toolTip = hasReorderableCategory
             ? boardManText("Reorder mode: drag the handle on the left")
             : boardManText("Select a group to reorder")
         if isSnippetReorderMode {
             snippetInteractionHintLabel?.stringValue = boardManText("Reorder mode: drag the handle on the left")
             snippetInteractionHintLabel?.textColor = themeAccentColor
             snippetInteractionHintLabel?.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        } else if !hasConcreteGroup {
+        } else if !hasReorderableCategory {
             snippetInteractionHintLabel?.stringValue = boardManText("Select a group to reorder")
             snippetInteractionHintLabel?.textColor = .secondaryLabelColor
         } else {
@@ -7345,7 +7588,13 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func toggleSnippetReorderMode(_ sender: NSButton) {
-        guard selectedCategoryFolder() != nil else {
+        if activeSnippetCategoryIdentifier == BoardManPanel.allCategoriesIdentifier,
+           let categoryIdentifier = selectedSnippetItem?.categoryIdentifier {
+            activeSnippetCategoryIdentifier = categoryIdentifier
+            reloadSnippetCategoryPopup()
+            applyCurrentFilter()
+        }
+        guard activeSnippetCategoryIdentifier != BoardManPanel.allCategoriesIdentifier else {
             NSSound.beep()
             sender.state = .off
             return
@@ -7353,6 +7602,8 @@ class BoardManPanel: NSPanel {
         isSnippetEditing = false
         editingSnippetIdentifier = nil
         isSnippetReorderMode = sender.state == .on
+        itemLongPressGesture?.isEnabled = !isSnippetReorderMode
+        itemLongPressGesture?.delaysPrimaryMouseButtonEvents = !isSnippetReorderMode
         makeFirstResponder(placeholderList)
         updateSnippetActionButtons()
         placeholderList?.reloadData()
@@ -7389,6 +7640,8 @@ class BoardManPanel: NSPanel {
             snippetEditorTextView?.string = ""
             snippetEnableButton?.state = .off
             snippetEditorTitleField?.isEnabled = false
+            snippetEditorTitleField?.isEditable = false
+            snippetEditorTitleField?.isSelectable = false
             snippetEditorTextView?.isEditable = false
             snippetEditorTextView?.isSelectable = false
             return
@@ -7406,7 +7659,10 @@ class BoardManPanel: NSPanel {
             snippetEnableButton?.state = snippet.enable ? .on : .off
             snippetFolderEnableButton?.state = (folder?.enable ?? false) ? .on : .off
         }
-        snippetEditorTitleField?.isEnabled = isEditingSelection
+        let canEditTitleDirectly = !isSnippetReorderMode
+        snippetEditorTitleField?.isEnabled = canEditTitleDirectly
+        snippetEditorTitleField?.isEditable = canEditTitleDirectly
+        snippetEditorTitleField?.isSelectable = canEditTitleDirectly
         snippetEditorTextView?.isEditable = isEditingSelection
         snippetEditorTextView?.isSelectable = true
 
@@ -7610,6 +7866,21 @@ class BoardManPanel: NSPanel {
 
     @objc private func editSelectedSnippetFromPanel(_ sender: Any?) {
         beginSnippetEditing()
+    }
+
+    @objc private func snippetTitleFieldChanged(_ sender: NSTextField) {
+        guard activeTab == .snippets,
+              !isSnippetReorderMode,
+              !isSnippetEditing,
+              let item = selectedSnippetItem else { return }
+        let realm = try! Realm()
+        guard let snippet = realm.object(ofType: CPYSnippet.self, forPrimaryKey: item.dataHash) else { return }
+        let title = normalizedSnippetTitle(sender.stringValue)
+        sender.stringValue = title
+        Self.persistSnippetTitle(title, snippet: snippet, realm: realm)
+        onRefreshRequested?()
+        selectSnippetInCurrentList(identifier: snippet.identifier)
+        snippetEditorStatusLabel?.stringValue = boardManText("Saved")
     }
 
     @objc private func snippetEditorClicked(_ gesture: NSClickGestureRecognizer) {
@@ -7939,6 +8210,8 @@ class BoardManPanel: NSPanel {
             isSnippetEditing = false
             editingSnippetIdentifier = nil
             isSnippetReorderMode = false
+            itemLongPressGesture?.isEnabled = true
+            itemLongPressGesture?.delaysPrimaryMouseButtonEvents = true
             _ = makeFirstResponder(nil)
         }
         activeTab = tab
@@ -8767,6 +9040,11 @@ class BoardManPanel: NSPanel {
             }
 
             if item.source == .snippet {
+                let renameSnippetItem = NSMenuItem(title: boardManText("Rename Snippet…"), action: #selector(renameSnippetFromMenu(_:)), keyEquivalent: "")
+                renameSnippetItem.target = self
+                renameSnippetItem.representedObject = item.dataHash
+                menu.addItem(renameSnippetItem)
+
                 let editSnippetItem = NSMenuItem(title: boardManText("Edit Snippet"), action: #selector(editSnippetFromMenu(_:)), keyEquivalent: "")
                 editSnippetItem.target = self
                 editSnippetItem.representedObject = item.dataHash
@@ -8930,6 +9208,29 @@ class BoardManPanel: NSPanel {
             activeSnippetCategoryIdentifier = BoardManPanel.uncategorizedCategoryIdentifier
         }
         onRefreshRequested?()
+    }
+
+    @objc private func renameSnippetFromMenu(_ sender: NSMenuItem) {
+        guard let identifier = sender.representedObject as? String else { return }
+        let realm = try! Realm()
+        guard let snippet = realm.object(ofType: CPYSnippet.self, forPrimaryKey: identifier) else {
+            NSSound.beep()
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = boardManText("Rename Snippet…")
+        alert.informativeText = boardManText("This changes the name shown in the snippet list.")
+        alert.addButton(withTitle: boardManText("Save Changes"))
+        alert.addButton(withTitle: boardManText("Cancel"))
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.stringValue = snippet.title
+        field.placeholderString = boardManText("Untitled snippet")
+        alert.accessoryView = field
+        guard runSnippetPanelAlert(alert, initialFirstResponder: field) == .alertFirstButtonReturn else { return }
+        let title = normalizedSnippetTitle(field.stringValue)
+        Self.persistSnippetTitle(title, snippet: snippet, realm: realm)
+        onRefreshRequested?()
+        selectSnippetInCurrentList(identifier: identifier)
     }
 
     @objc private func editSnippetFromMenu(_ sender: NSMenuItem) {
@@ -9208,16 +9509,51 @@ class BoardManPanel: NSPanel {
         return true
     }
 
+    private func configureHistoryCell(_ cell: BoardManHistoryCellView,
+                                      item: BoardManHistoryItem,
+                                      row: Int) {
+        cell.toolTip = item.isPinned
+            ? "Pinned • Hold or ⌥-click to unpin • ⌘C Copy • Space Preview"
+            : "Hold or ⌥-click to pin • ⌘C Copy • ⌘P Pin • Space Preview"
+        cell.configure(
+            item: item,
+            isSelected: selectedIndex == row,
+            usageStyle: BoardManPanel.allowedUsageCountStyle(
+                AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)
+            ),
+            useLiquidGlass: isLiquidGlassEnabled,
+            lightenTheme: isThemeLightenEnabled,
+            themePreset: themePreset,
+            timestampPosition: activeTab == .history ? timestampPosition : .below
+        )
+        cell.setSnippetInteractionMode(
+            reorderMode: activeTab == .snippets && isSnippetReorderMode,
+            accentColor: themeAccentColor
+        )
+    }
+
+    private func refreshRowsInPlace(_ rows: IndexSet) {
+        guard let table = placeholderList, !rows.isEmpty else { return }
+        for row in rows where row >= 0 && row < historyItems.count {
+            table.rowView(atRow: row, makeIfNecessary: false)?.needsDisplay = true
+            guard let item = historyItems[safe: row],
+                  let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? BoardManHistoryCellView else {
+                continue
+            }
+            configureHistoryCell(cell, item: item, row: row)
+            cell.needsLayout = true
+            cell.needsDisplay = true
+        }
+        table.needsDisplay = true
+    }
+
     private func refreshSelectionRows(oldIndex: Int, newIndex: Int) {
-        guard let table = placeholderList else { return }
         var rows = IndexSet()
         [oldIndex, newIndex].forEach { row in
             guard row >= 0, row < historyItems.count else { return }
             rows.insert(row)
-            table.rowView(atRow: row, makeIfNecessary: false)?.needsDisplay = true
         }
-        guard !rows.isEmpty else { return }
-        table.reloadData(forRowIndexes: rows, columnIndexes: IndexSet(integer: 0))
+        refreshRowsInPlace(rows)
     }
 
     private func installLocalKeyMonitorIfNeeded() {
@@ -9388,9 +9724,7 @@ class BoardManPanel: NSPanel {
             setSelectedIndex(row, preservesSnippetHoverOrigin: true)
             refreshSnippetEditor()
         }
-        placeholderList?.rowView(atRow: row, makeIfNecessary: false)?.needsDisplay = true
-        placeholderList?.reloadData(forRowIndexes: IndexSet(integer: row),
-                                    columnIndexes: IndexSet(integer: 0))
+        refreshRowsInPlace(IndexSet(integer: row))
         if CFAbsoluteTimeGetCurrent() >= keyboardPreviewLockUntil {
             showPreviewBubble(for: row)
         }
@@ -9423,9 +9757,7 @@ class BoardManPanel: NSPanel {
             hidePreviewBubble()
         }
         if row >= 0 {
-            placeholderList?.rowView(atRow: row, makeIfNecessary: false)?.needsDisplay = true
-            placeholderList?.reloadData(forRowIndexes: IndexSet(integer: row),
-                                        columnIndexes: IndexSet(integer: 0))
+            refreshRowsInPlace(IndexSet(integer: row))
         }
     }
 
@@ -9770,6 +10102,8 @@ extension BoardManPanel: NSTextFieldDelegate {
             timedPinDurationFieldChanged(field)
         } else if field === timestampShortcutDelayField {
             timestampShortcutDelayFieldChanged(field)
+        } else if field === snippetEditorTitleField, !isSnippetEditing {
+            snippetTitleFieldChanged(field)
         }
     }
 }
@@ -9777,6 +10111,11 @@ extension BoardManPanel: NSTextFieldDelegate {
 extension BoardManPanel: NSGestureRecognizerDelegate {
     func gestureRecognizerShouldBegin(_ gestureRecognizer: NSGestureRecognizer) -> Bool {
         if gestureRecognizer === snippetEditorClickGesture {
+            if let editorView = snippetEditorView,
+               let titleField = snippetEditorTitleField,
+               titleField.frame.insetBy(dx: -4, dy: -4).contains(gestureRecognizer.location(in: editorView)) {
+                return false
+            }
             return Self.shouldBeginEditorContainerClick(
                 isSnippetTab: activeTab == .snippets,
                 isEditing: isSnippetEditing,
@@ -9829,7 +10168,6 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
         guard activeTab == .snippets,
               isSnippetReorderMode,
               activeSnippetCategoryIdentifier != BoardManPanel.allCategoriesIdentifier,
-              selectedCategoryFolder() != nil,
               info.draggingPasteboard.string(forType: BoardManPanel.snippetDragType) != nil else { return [] }
         tableView.setDropRow(max(0, min(row, historyItems.count)), dropOperation: .above)
         return .move
@@ -9841,21 +10179,39 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
                    dropOperation: NSTableView.DropOperation) -> Bool {
         guard activeTab == .snippets,
               isSnippetReorderMode,
-              let identifier = info.draggingPasteboard.string(forType: BoardManPanel.snippetDragType),
-              let folder = selectedCategoryFolder() else { return false }
-        let realm = try! Realm()
-        guard let savedFolder = realm.object(ofType: CPYFolder.self, forPrimaryKey: folder.identifier) else { return false }
-        var ordered = Array(savedFolder.snippets.sorted(byKeyPath: #keyPath(CPYSnippet.index), ascending: true))
-        guard let sourceIndex = ordered.firstIndex(where: { $0.identifier == identifier }) else { return false }
-        let moved = ordered.remove(at: sourceIndex)
-        var targetIndex = max(0, min(destinationRow, ordered.count))
-        if destinationRow > sourceIndex {
-            targetIndex = max(0, min(destinationRow - 1, ordered.count))
+              activeSnippetCategoryIdentifier != BoardManPanel.allCategoriesIdentifier,
+              let identifier = info.draggingPasteboard.string(forType: BoardManPanel.snippetDragType) else { return false }
+        let visibleIdentifiers = historyItems.compactMap { item -> String? in
+            guard item.source == .snippet,
+                  item.categoryIdentifier == activeSnippetCategoryIdentifier else { return nil }
+            return item.dataHash
         }
-        ordered.insert(moved, at: targetIndex)
-        realm.transaction {
-            for (index, snippet) in ordered.enumerated() {
-                snippet.index = index
+        let reorderedIdentifiers = Self.reorderedSnippetIdentifiers(
+            visibleIdentifiers,
+            moving: identifier,
+            to: destinationRow
+        )
+        guard reorderedIdentifiers != visibleIdentifiers else { return false }
+
+        let realm = try! Realm()
+        if activeSnippetCategoryIdentifier == BoardManPanel.uncategorizedCategoryIdentifier {
+            realm.transaction {
+                for (index, snippetIdentifier) in reorderedIdentifiers.enumerated() {
+                    realm.object(ofType: CPYSnippet.self, forPrimaryKey: snippetIdentifier)?.index = index
+                }
+            }
+        } else {
+            guard let savedFolder = realm.object(
+                ofType: CPYFolder.self,
+                forPrimaryKey: activeSnippetCategoryIdentifier
+            ) else { return false }
+            let snippetsByIdentifier = Dictionary(
+                uniqueKeysWithValues: savedFolder.snippets.map { ($0.identifier, $0) }
+            )
+            realm.transaction {
+                for (index, snippetIdentifier) in reorderedIdentifiers.enumerated() {
+                    snippetsByIdentifier[snippetIdentifier]?.index = index
+                }
             }
         }
         onRefreshRequested?()
@@ -9890,20 +10246,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
         let identifier = NSUserInterfaceItemIdentifier("BoardManHistoryCell")
         let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? BoardManHistoryCellView ?? BoardManHistoryCellView(frame: .zero)
         cell.identifier = identifier
-        cell.toolTip = item.isPinned
-            ? "Pinned • Hold or ⌥-click to unpin • ⌘C Copy • Space Preview"
-            : "Hold or ⌥-click to pin • ⌘C Copy • ⌘P Pin • Space Preview"
-        cell.configure(item: item,
-                       isSelected: selectedIndex == row,
-                       usageStyle: BoardManPanel.allowedUsageCountStyle(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)),
-                       useLiquidGlass: isLiquidGlassEnabled,
-                       lightenTheme: isThemeLightenEnabled,
-                       themePreset: themePreset,
-                       timestampPosition: activeTab == .history ? timestampPosition : .below)
-        cell.setSnippetInteractionMode(
-            reorderMode: activeTab == .snippets && isSnippetReorderMode,
-            accentColor: themeAccentColor
-        )
+        configureHistoryCell(cell, item: item, row: row)
         return cell
     }
 
