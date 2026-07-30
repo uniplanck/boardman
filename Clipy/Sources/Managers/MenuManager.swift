@@ -9540,7 +9540,9 @@ class BoardManPanel: NSPanel {
                   let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? BoardManHistoryCellView else {
                 continue
             }
+            let existingFrame = cell.frame
             configureHistoryCell(cell, item: item, row: row)
+            cell.frame = existingFrame
             cell.needsLayout = true
             cell.needsDisplay = true
         }
@@ -10276,6 +10278,5 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
             refreshSnippetEditor()
         }
         updateSnippetActionButtons()
-        synchronizeListGeometry()
     }
 }

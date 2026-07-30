@@ -1024,6 +1024,7 @@ final class BoardManInteractionRuleTests {
         #expect(pin.frame.maxX < primary.frame.minX, "Pin must be positioned on the left side of the row.")
         #expect(primary.frame.maxX < count.frame.minX, "Usage count must remain on the right side.")
 
+        let unselectedCellFrame = cell.frame
         let unselectedFrames = [primary.frame, pin.frame, count.frame]
         cell.configure(
             item: item,
@@ -1035,6 +1036,8 @@ final class BoardManInteractionRuleTests {
             timestampPosition: .below
         )
         cell.layoutSubtreeIfNeeded()
+        #expect(cell.frame == unselectedCellFrame,
+                "Selection must not resize the history or snippet cell.")
         #expect([primary.frame, pin.frame, count.frame] == unselectedFrames,
                 "Selection must not shift history or snippet row contents horizontally.")
     }
