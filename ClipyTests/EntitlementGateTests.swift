@@ -845,6 +845,9 @@ final class BoardManInteractionRuleTests {
         #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 3) == -1)
         #expect(BoardManPanel.tabDelta(horizontalDelta: 10, verticalDelta: 0) == nil)
         #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 28) == nil)
+        #expect(BoardManPanel.restoredSnippetSelectionIndex(origin: 2, itemCount: 4) == 2)
+        #expect(BoardManPanel.restoredSnippetSelectionIndex(origin: -1, itemCount: 4) == -1)
+        #expect(BoardManPanel.restoredSnippetSelectionIndex(origin: 4, itemCount: 4) == -1)
 
         #expect(BoardManPanel.shouldBeginEditorContainerClick(
             isSnippetTab: true,
@@ -926,39 +929,50 @@ final class BoardManInteractionRuleTests {
     }
 
     @Test
-    func relativeTimestampTemplatesAreCompactAndBounded() {
+    func relativeTimestampDropdownStylesCoverPaddingUnitsSuffixAndNow() {
+        let defaults = AppEnvironment.current.defaults
+        let originalLanguage = defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
+        defaults.set(BoardManLanguage.english.rawValue, forKey: Constants.UserDefaults.boardManLanguage)
+        defer { defaults.set(originalLanguage, forKey: Constants.UserDefaults.boardManLanguage) }
+
+        let singleSymbol = BoardManRelativeTimestampStyle(
+            number: .single,
+            unit: .symbol,
+            suffix: .none,
+            now: .localized
+        )
+        #expect(singleSymbol.text(seconds: 30, language: .japanese) == "今")
+        #expect(singleSymbol.text(seconds: 61, language: .english) == "1m")
+        #expect(singleSymbol.text(seconds: 3_661, language: .english) == "1h")
+        #expect(singleSymbol.text(seconds: 90_000, language: .english) == "1d")
+
+        let paddedFull = BoardManRelativeTimestampStyle(
+            number: .twoDigits,
+            unit: .full,
+            suffix: .ago,
+            now: .now
+        )
+        #expect(paddedFull.text(seconds: 61, language: .english) == "01 min ago")
+        #expect(paddedFull.text(seconds: 3_661, language: .english) == "01 hour ago")
+        #expect(BoardManRelativeNumberStyle.twoDigits.text(123) == "123")
+
+        let localized = BoardManRelativeTimestampStyle(
+            number: .single,
+            unit: .localized,
+            suffix: .localized,
+            now: .localized
+        )
+        #expect(localized.text(seconds: 61, language: .japanese) == "1分前")
+        #expect(localized.text(seconds: 3_661, language: .simplifiedChinese) == "1小时前")
+        #expect(localized.text(seconds: 90_000, language: .korean) == "1 일 전")
+
         let now = Date(timeIntervalSince1970: 100_000)
-        let updateTime = 96_339
-        #expect(BoardManPanel.allowedRelativeTimestampTemplate(nil) == "xh")
-        #expect(BoardManPanel.allowedRelativeTimestampTemplate("xm") == "xm")
-        #expect(BoardManPanel.allowedRelativeTimestampTemplate("x h ago") == "x h ago")
-        #expect(BoardManPanel.allowedRelativeTimestampTemplate("xxxxxxxxh") == "xh")
-        #expect(BoardManPanel.allowedRelativeTimestampTemplate("xxh") == "xh")
-        #expect(BoardManPanel.allowedRelativeTimestampTemplate("xhm") == "xh")
         #expect(BoardManPanel.timestampText(
-            for: updateTime,
+            for: 99_939,
             format: "relative",
-            relativeTemplate: "xm",
+            relativeStyle: singleSymbol,
             now: now
-        ) == "61m")
-        #expect(BoardManPanel.timestampText(
-            for: updateTime,
-            format: "relative",
-            relativeTemplate: "xh",
-            now: now
-        ) == "1h")
-        #expect(BoardManPanel.timestampText(
-            for: updateTime,
-            format: "relative",
-            relativeTemplate: "xd",
-            now: now
-        ) == "0d")
-        #expect(BoardManPanel.timestampText(
-            for: updateTime,
-            format: "relative",
-            relativeTemplate: "x h ago",
-            now: now
-        ) == "1 h ago")
+        ) == "1m")
     }
 
     @Test
@@ -980,6 +994,32 @@ final class BoardManInteractionRuleTests {
         #expect(restored.QWERTYKeyCode == 11)
         #expect(restored.keyEquivalentModifierMask.contains(.command))
         #expect(restored.keyEquivalentModifierMask.contains(.shift))
+        #expect(BoardManPanel.clampedTimestampShortcutDelay(-1) == 0)
+        #expect(BoardManPanel.clampedTimestampShortcutDelay(0.1) == 0.1)
+        #expect(BoardManPanel.clampedTimestampShortcutDelay(120) == 60)
+    }
+
+    @Test
+    func timedPinPresetsCanBeAddedEditedSelectedRemovedAndPersisted() throws {
+        let suiteName = "BoardManTimedPinPresetTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(2, forKey: Constants.UserDefaults.boardManTimedPinDurationValue)
+        defaults.set(BoardManTimedPinUnit.hours.rawValue, forKey: Constants.UserDefaults.boardManTimedPinDurationUnit)
+
+        let initial = BoardManTimedPinPresetStore.presets(defaults: defaults)
+        #expect(initial.count >= 3)
+        #expect(initial[0].value == 2)
+        #expect(initial[0].unit == .hours)
+
+        let added = BoardManTimedPinPresetStore.add(defaults: defaults)
+        #expect(BoardManTimedPinPresetStore.selectedPreset(defaults: defaults).id == added.id)
+        let edited = BoardManTimedPinPresetStore.updateSelected(value: 15, unit: .minutes, defaults: defaults)
+        #expect(edited.value == 15)
+        #expect(edited.unit == .minutes)
+        #expect(BoardManTimedPinPresetStore.presets(defaults: defaults).contains(edited))
+        #expect(BoardManTimedPinPresetStore.removeSelected(defaults: defaults))
+        #expect(!BoardManTimedPinPresetStore.presets(defaults: defaults).contains(where: { $0.id == added.id }))
     }
 
 }
@@ -1131,6 +1171,60 @@ final class BoardManPanelLayoutTests {
             _ = category.sendAction(category.action, to: category.target)
             await settlePanelLayout(panel)
             assertTopLevelLayout(panel, mode: "Settings category \(category.tag)", expectsSearch: false)
+
+            let descendants = allSubviews(of: root)
+            if category.title == "Appearance" {
+                let relativePopupIDs = [
+                    "BoardManRelativeNumberStylePopup",
+                    "BoardManRelativeUnitStylePopup",
+                    "BoardManRelativeSuffixStylePopup",
+                    "BoardManRelativeNowStylePopup"
+                ]
+                for identifier in relativePopupIDs {
+                    let popup = descendants.first { $0.identifier?.rawValue == identifier } as? NSPopUpButton
+                    #expect(popup?.isHidden == false, "Missing visible relative timestamp popup: \(identifier)")
+                    #expect(abs((popup?.frame.height ?? 0) - 30) <= 0.5)
+                }
+            } else if category.title == "History" {
+                let shortcutToggle = descendants.first {
+                    $0.identifier?.rawValue == "BoardManTimestampShortcutEnabledButton"
+                } as? NSButton
+                let shortcutDelay = descendants.first {
+                    $0.identifier?.rawValue == "BoardManTimestampShortcutDelayField"
+                } as? NSTextField
+                let presetPopup = descendants.first {
+                    $0.identifier?.rawValue == "BoardManTimedPinPresetPopup"
+                } as? NSPopUpButton
+                let addPreset = descendants.first {
+                    $0.identifier?.rawValue == "BoardManTimedPinPresetAddButton"
+                } as? NSButton
+                let removePreset = descendants.first {
+                    $0.identifier?.rawValue == "BoardManTimedPinPresetRemoveButton"
+                } as? NSButton
+                #expect(shortcutToggle?.isHidden == false)
+                #expect(shortcutToggle?.target != nil && shortcutToggle?.action != nil)
+                #expect(shortcutDelay?.isHidden == false)
+                #expect(presetPopup?.isHidden == false)
+                #expect((presetPopup?.numberOfItems ?? 0) >= 1)
+                #expect(addPreset?.target != nil && addPreset?.action != nil)
+                #expect(removePreset?.target != nil && removePreset?.action != nil)
+            } else if category.title == "Snippets" {
+                let manage = descendants.first {
+                    $0.identifier?.rawValue == "BoardManManageSnippetsButton"
+                } as? NSButton
+                let shortcutScroll = descendants.first {
+                    $0.identifier?.rawValue == "BoardManSnippetShortcutScrollView"
+                } as? NSScrollView
+                #expect(manage?.isHidden == false)
+                #expect(shortcutScroll?.isHidden == false)
+                if let manage, let shortcutScroll {
+                    let gap = shortcutScroll.frame.minY - manage.frame.maxY
+                    #expect(gap >= 10 && gap <= 18,
+                            "Manage Snippets should sit directly below the shortcut list with deliberate spacing.")
+                    #expect(manage.frame.minY >= 20,
+                            "Manage Snippets is still pinned against the bottom edge.")
+                }
+            }
         }
     }
 
@@ -1230,8 +1324,10 @@ final class BoardManPanelLayoutTests {
                         "Search optical correction must stay at the requested 2pt downward offset.")
                 #expect(abs((textRect.midY - search.bounds.midY) - cell.opticalYOffset) <= 0.5,
                         "Search text does not match its optical vertical offset.")
-                #expect(abs((iconRect.midY - search.bounds.midY) - cell.opticalYOffset) <= 0.5,
-                        "Search icon does not match its optical vertical offset.")
+                #expect(cell.searchButtonOpticalYOffset == 1,
+                        "Search icon requires a separate 1pt upward optical correction.")
+                #expect(abs((iconRect.midY - search.bounds.midY) - (cell.opticalYOffset + cell.searchButtonOpticalYOffset)) <= 0.5,
+                        "Search icon does not include its optical vertical correction.")
             }
         }
     }
