@@ -128,10 +128,10 @@ capture_scene() {
   sleep 1
 }
 
-capture_scene english-history English history board-man-history-en.png 800 820
-capture_scene english-compact English history board-man-history-compact-en.png 700 820
+capture_scene english-history English history board-man-history-en.png 800 560
+capture_scene english-compact English history board-man-history-compact-en.png 700 560
 capture_scene english-settings English settings board-man-settings-en.png 800 820
-capture_scene japanese-history 日本語 history board-man-history-ja.png 800 820
+capture_scene japanese-history 日本語 history board-man-history-ja.png 800 560
 
 cp "$OUTPUT_DIR/board-man-history-en.png" "$REPO_ROOT/docs/assets/board-man-main-screenshot.png"
 cp "$OUTPUT_DIR/board-man-history-en.png" "$REPO_ROOT/assets/readme/board-man-screenshot.png"

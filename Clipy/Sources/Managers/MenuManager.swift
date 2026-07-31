@@ -131,6 +131,11 @@ extension MenuManager {
         let requestedHeight = environment["BOARDMAN_SCREENSHOT_HEIGHT"]
             .flatMap(Double.init)
             .map { CGFloat($0) }
+
+        // Prewarming can occur before all deterministic clipboard samples are seeded. Reload the
+        // isolated profile immediately before capture so every README scene reflects the complete
+        // demo history rather than the first item observed during prewarm.
+        reloadBoardManPanelItems(panel)
         panel.prepareReadmeScreenshot(scene: scene, width: requestedWidth, height: requestedHeight)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak panel] in
