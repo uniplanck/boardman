@@ -223,11 +223,14 @@ final class HotKeyServiceTests {
     }
 
     @Test
-    func systemHotKeyRegistrationIsDisabledDuringXCTest() {
-        #expect(!HotKeyService.shouldRegisterSystemHotKeys(environment: [
+    func systemRuntimeSideEffectsAreDisabledDuringXCTest() {
+        let testEnvironment = [
             "XCTestConfigurationFilePath": "/tmp/Board-Man.xctestconfiguration"
-        ]))
+        ]
+        #expect(!HotKeyService.shouldRegisterSystemHotKeys(environment: testEnvironment))
+        #expect(!AppDelegate.shouldStartRuntimeServices(environment: testEnvironment))
         #expect(HotKeyService.shouldRegisterSystemHotKeys(environment: [:]))
+        #expect(AppDelegate.shouldStartRuntimeServices(environment: [:]))
     }
 
     @Test

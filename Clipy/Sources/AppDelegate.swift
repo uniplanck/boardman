@@ -28,6 +28,12 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     private var screenshotObserverThread: Thread?
     private let disposeBag = DisposeBag()
 
+    static func shouldStartRuntimeServices(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        return environment["XCTestConfigurationFilePath"] == nil
+    }
+
     // MARK: - Init
     override func awakeFromNib() {
         super.awakeFromNib()
@@ -231,6 +237,13 @@ extension AppDelegate: NSApplicationDelegate {
         AppEnvironment.replaceCurrent(environment: AppEnvironment.fromStorage())
         // UserDefaults
         CPYUtilities.registerUserDefaultKeys()
+
+        // Unit tests use Board-Man as their host application. Starting clipboard monitors,
+        // LoginServiceKit, Sparkle, global shortcuts, and background observers inside XCTest can
+        // block or relaunch the test host. Keep the storage environment available to tests while
+        // skipping normal application runtime services.
+        guard Self.shouldStartRuntimeServices() else { return }
+
         // Restore a locally verified signed entitlement before gated services/UI are created.
         LicenseBootstrapService.shared.restoreEntitlement()
         // SDKs
