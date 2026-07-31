@@ -1725,10 +1725,12 @@ func boardManText(_ english: String) -> String {
     let language = BoardManLanguage.allowed(
         AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
     ).resolved
-    guard language != .english else { return english }
+    guard language != .english else {
+        return english == "Snippets" ? "Templates" : english
+    }
 
     let japanese: [String: String] = [
-        "History": "履歴", "Snippets": "スニペット", "Settings": "設定",
+        "History": "履歴", "Snippets": "定型文", "Settings": "設定",
         "General": "一般", "Appearance": "外観", "Privacy": "プライバシー",
         "Updates": "アップデート", "License": "ライセンス",
         "Startup, menu bar, and keyboard shortcuts": "起動、メニューバー、キーボードショートカット",
@@ -1853,7 +1855,7 @@ func boardManText(_ english: String) -> String {
         "Add Rule": "追加", "Remove Last": "最後を削除", "Free plan": "無料プラン", "Upgrade to Pro": "Proへアップグレード"
     ]
     let chinese: [String: String] = [
-        "History": "历史", "Snippets": "片段", "Settings": "设置", "General": "常规",
+        "History": "历史", "Snippets": "模板", "Settings": "设置", "General": "常规",
         "Appearance": "外观", "Privacy": "隐私", "Updates": "更新", "License": "许可证",
         "Language": "语言", "Window mode": "窗口模式", "Show in Dock": "在 Dock 中显示",
         "Rows": "行号", "Time": "时间", "Position": "位置", "Relative format": "相对时间格式", "Number": "数字", "Unit": "单位", "Suffix": "后缀", "Under 1 minute": "1分钟以内", "Count": "使用次数",
@@ -1875,7 +1877,7 @@ func boardManText(_ english: String) -> String {
         "Pin duration": "限时置顶时长", "Add duration": "添加时长", "Remove duration": "删除时长", "None": "无", "Localized": "跟随语言"
     ]
     let korean: [String: String] = [
-        "History": "기록", "Snippets": "스니펫", "Settings": "설정", "General": "일반",
+        "History": "기록", "Snippets": "문구", "Settings": "설정", "General": "일반",
         "Appearance": "모양", "Privacy": "개인정보", "Updates": "업데이트", "License": "라이선스",
         "Language": "언어", "Window mode": "윈도우 모드", "Show in Dock": "Dock에 표시",
         "Rows": "행 번호", "Time": "시간", "Position": "위치", "Relative format": "상대 시간 형식", "Number": "숫자", "Unit": "단위", "Suffix": "표기", "Under 1 minute": "1분 이내", "Count": "사용 횟수",
@@ -1909,11 +1911,25 @@ fileprivate enum BoardManPanelTab: Int, CaseIterable {
     case snippets
     case settings
 
-    var title: String {
+    var title: String { title(compact: false) }
+
+    func title(compact: Bool) -> String {
         switch self {
-        case .history: return boardManText("History")
-        case .snippets: return boardManText("Snippets")
-        case .settings: return boardManText("Settings")
+        case .history:
+            return boardManText("History")
+        case .snippets:
+            guard compact else { return boardManText("Snippets") }
+            let language = BoardManLanguage.allowed(
+                AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
+            ).resolved
+            switch language {
+            case .japanese: return "定型"
+            case .simplifiedChinese: return "模板"
+            case .korean: return "문구"
+            case .system, .english: return "Text"
+            }
+        case .settings:
+            return boardManText("Settings")
         }
     }
 
@@ -3102,6 +3118,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         timestampAccessoryLabel.isEditable = false
         timestampAccessoryLabel.backgroundColor = .clear
         timestampAccessoryLabel.drawsBackground = false
+        timestampAccessoryLabel.identifier = NSUserInterfaceItemIdentifier("BoardManHistoryTimestampLabel")
 
         let countBadgeCell = BoardManCenteredTextFieldCell(textCell: "")
         countBadgeCell.opticalYOffset = 2
@@ -3171,10 +3188,11 @@ final class BoardManHistoryCellView: NSTableCellView {
         let fontChoice = BoardManFontChoice.allowed(
             AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice)
         )
-        primaryLabel.font = fontChoice.font(ofSize: 13.5, weight: .medium)
-        metadataLabel.font = fontChoice.font(ofSize: 11.5, weight: .regular)
-        timestampAccessoryLabel.font = fontChoice.font(ofSize: 10.5, weight: .medium)
-        countBadge.font = fontChoice.font(ofSize: 10.5, weight: .medium)
+        let isNarrowRow = bounds.width < 640
+        primaryLabel.font = fontChoice.font(ofSize: isNarrowRow ? 12.75 : 13.5, weight: .medium)
+        metadataLabel.font = fontChoice.font(ofSize: isNarrowRow ? 11 : 11.5, weight: .regular)
+        timestampAccessoryLabel.font = fontChoice.font(ofSize: isNarrowRow ? 10 : 10.5, weight: .medium)
+        countBadge.font = fontChoice.font(ofSize: isNarrowRow ? 10 : 10.5, weight: .medium)
         pinBadge.font = fontChoice.font(ofSize: 9.5, weight: .bold)
         timestampPosition = requestedTimestampPosition
         configuredTimestampText = item.timestampText
@@ -3274,13 +3292,13 @@ final class BoardManHistoryCellView: NSTableCellView {
         super.layout()
         let horizontalInset: CGFloat = 10
         let trailingInset: CGFloat = 24
-        let accessoryGap: CGFloat = 10
+        let accessoryGap: CGFloat = 12
         let titleHeight: CGFloat = 18
         let metadataHeight: CGFloat = 15
         let textGap: CGFloat = 4
         let timeWidth: CGFloat = 72
         let countWidth: CGFloat = 64
-        let pinWidth: CGFloat = 42
+        let pinWidth: CGFloat = 44
         let accessoryHeight: CGFloat = 20
         var textLeft = horizontalInset
         var textRight = bounds.width - trailingInset
@@ -3305,7 +3323,7 @@ final class BoardManHistoryCellView: NSTableCellView {
             pinBadge.frame = NSIntegralRect(NSRect(
                 x: textLeft,
                 y: floor(bounds.midY - accessoryHeight / 2),
-                width: min(pinWidth, max(0, textRight - textLeft)),
+                width: pinWidth,
                 height: accessoryHeight
             ))
             textLeft = pinBadge.frame.maxX + accessoryGap
@@ -3335,7 +3353,7 @@ final class BoardManHistoryCellView: NSTableCellView {
             countBadge.frame = NSIntegralRect(NSRect(
                 x: max(textLeft, textRight - countWidth),
                 y: floor(bounds.midY - accessoryHeight / 2),
-                width: min(countWidth, max(0, textRight - textLeft)),
+                width: countWidth,
                 height: accessoryHeight
             ))
             textRight = countBadge.frame.minX - accessoryGap
@@ -3346,7 +3364,7 @@ final class BoardManHistoryCellView: NSTableCellView {
             inlineImageView.frame = NSIntegralRect(NSRect(
                 x: max(textLeft, textRight - imageSize),
                 y: floor((bounds.height - imageSize) / 2),
-                width: min(imageSize, max(0, textRight - textLeft)),
+                width: imageSize,
                 height: imageSize
             ))
             textRight = inlineImageView.frame.minX - accessoryGap
@@ -5788,9 +5806,9 @@ class BoardManPanel: NSPanel {
             }
         }
 
-        BoardManPanelTab.allCases.forEach { tab in
-            segmentedControl?.setLabel(tab.title, forSegment: tab.rawValue)
-        }
+        applyResponsiveTabPresentation(
+            isCompact: (contentView?.bounds.width ?? LayoutMetrics.preferredWidth) < 720
+        )
         searchField?.placeholderString = boardManText("Search clipboard history and snippets")
         for (button, category) in zip(settingsCategoryButtons, BoardManInlineSettingsCategory.allCases) {
             button.title = category.title
@@ -6212,6 +6230,7 @@ class BoardManPanel: NSPanel {
         segmentedControl?.frame = tabsFrame
         segmentedControl?.isHidden = isQuickMode
         updateTabWidths(totalWidth: tabsWidth)
+        applyResponsiveTabPresentation(isCompact: isCompact)
 
         searchField?.isHidden = isSettings || isQuickMode
         let showsSnippetButtons = activeTab == .snippets && !isSettings && !isQuickMode
@@ -6465,6 +6484,18 @@ class BoardManPanel: NSPanel {
                 cellView.needsLayout = true
                 cellView.needsDisplay = true
             }
+        }
+    }
+
+    private func applyResponsiveTabPresentation(isCompact: Bool) {
+        guard let segmentedControl else { return }
+        segmentedControl.font = NSFont.systemFont(
+            ofSize: isCompact ? 11.25 : 12.5,
+            weight: .medium
+        )
+        for tab in BoardManPanelTab.allCases {
+            segmentedControl.setLabel(tab.title(compact: isCompact), forSegment: tab.rawValue)
+            segmentedControl.setToolTip(tab.title, forSegment: tab.rawValue)
         }
     }
 

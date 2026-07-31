@@ -1040,6 +1040,54 @@ final class BoardManInteractionRuleTests {
                 "Selection must not resize the history or snippet cell.")
         #expect([primary.frame, pin.frame, count.frame] == unselectedFrames,
                 "Selection must not shift history or snippet row contents horizontally.")
+
+        let narrowCell = BoardManHistoryCellView(frame: NSRect(x: 0, y: 0, width: 600, height: 46))
+        let narrowItem = BoardManHistoryItem(
+            title: "A long reusable template title that must absorb narrow-width compression",
+            primaryTitle: "A long reusable template title that must absorb narrow-width compression",
+            compactTitle: "A long reusable template title that must absorb narrow-width compression",
+            metadataText: "22h",
+            timestampText: "22h",
+            countText: "",
+            previewTitle: "A long reusable template title that must absorb narrow-width compression",
+            dataHash: "narrow-pinned-item",
+            imageDataPath: "",
+            inlineThumbnail: nil,
+            pasteCount: 0,
+            isPinned: true,
+            isMasked: false,
+            isEnabled: true,
+            source: .clip,
+            categoryIdentifier: nil,
+            categoryTitle: nil
+        )
+        narrowCell.configure(
+            item: narrowItem,
+            isSelected: false,
+            usageStyle: "badge",
+            useLiquidGlass: false,
+            lightenTheme: false,
+            themePreset: .defaultPreset,
+            timestampPosition: .right
+        )
+        narrowCell.layoutSubtreeIfNeeded()
+        let narrowPrimary = try #require(narrowCell.subviews.first {
+            $0.identifier?.rawValue == "BoardManHistoryPrimaryLabel"
+        } as? NSTextField)
+        let narrowPin = try #require(narrowCell.subviews.first {
+            $0.identifier?.rawValue == "BoardManHistoryPinBadge"
+        } as? NSTextField)
+        let narrowTimestamp = try #require(narrowCell.subviews.first {
+            $0.identifier?.rawValue == "BoardManHistoryTimestampLabel"
+        } as? NSTextField)
+        #expect(narrowPin.frame.width == 44, "Narrow rows must not squeeze the Pin badge.")
+        #expect(narrowTimestamp.frame.width == 72, "Narrow rows must not squeeze the timestamp.")
+        #expect(narrowPrimary.frame.minX - narrowPin.frame.maxX >= 12,
+                "Narrow rows need stable breathing room after the Pin badge.")
+        #expect(narrowPrimary.frame.maxX <= narrowTimestamp.frame.minX - 12,
+                "Only the center title may compress between fixed accessories.")
+        #expect((narrowPrimary.font?.pointSize ?? 99) <= 12.75,
+                "Narrow rows should use the compact title font instead of squeezing accessories.")
     }
 
     @Test
@@ -1234,7 +1282,7 @@ final class BoardManPanelLayoutTests {
             Issue.record("Settings content view was not created.")
             return
         }
-        let expectedTitles = Set(["General", "Appearance", "History", "Snippets", "Privacy", "Updates", "License"])
+        let expectedTitles = Set(["General", "Appearance", "History", "Templates", "Privacy", "Updates", "License"])
         let categories = root.subviews
             .flatMap { $0.subviews }
             .compactMap { $0 as? NSButton }
@@ -1323,6 +1371,43 @@ final class BoardManPanelLayoutTests {
             assertTopLevelLayout(panel, mode: "Settings category \(category.tag)", expectsSearch: false)
 
             assertSettingsCategoryControls(title: category.title, descendants: allSubviews(of: root))
+        }
+    }
+
+    @Test
+    func responsiveTemplateTabLabelsStayReadableAcrossLanguages() async throws {
+        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
+        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let defaults = AppEnvironment.current.defaults
+        let originalLanguage = defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
+        defer { defaults.set(originalLanguage, forKey: Constants.UserDefaults.boardManLanguage) }
+
+        let expectations: [(BoardManLanguage, String, String)] = [
+            (.english, "Templates", "Text"),
+            (.japanese, "定型文", "定型"),
+            (.simplifiedChinese, "模板", "模板"),
+            (.korean, "문구", "문구")
+        ]
+
+        for (language, regularTitle, compactTitle) in expectations {
+            defaults.set(language.rawValue, forKey: Constants.UserDefaults.boardManLanguage)
+            let panel = BoardManPanel()
+            panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
+            await settlePanelLayout(panel)
+            let root = try #require(panel.contentView)
+            let regularTabs = try #require(allSubviews(of: root)
+                .compactMap { $0 as? BoardManHeaderSegmentedControl }.first)
+            #expect(regularTabs.label(forSegment: 1) == regularTitle)
+            #expect(regularTabs.toolTip(forSegment: 1) == regularTitle)
+            #expect((regularTabs.font?.pointSize ?? 0) >= 12.5)
+
+            panel.setFrame(NSRect(x: 0, y: 0, width: 640, height: 760), display: false)
+            await settlePanelLayout(panel)
+            #expect(regularTabs.label(forSegment: 1) == compactTitle)
+            #expect(regularTabs.toolTip(forSegment: 1) == regularTitle)
+            #expect((regularTabs.font?.pointSize ?? 99) <= 11.25)
         }
     }
 
