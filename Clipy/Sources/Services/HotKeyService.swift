@@ -38,7 +38,14 @@ final class HotKeyService: NSObject {
     private var globalMainHotKeyMonitor: Any?
     private var globalMainHotKeyActivationObserver: NSObjectProtocol?
     private var didRequestListenEventAccess = false
+    private var mainCarbonHotKeyRegistered = false
     private var lastMainHotKeyInvocation: CFAbsoluteTime = 0
+
+    static let mainHotKeyInvocationDebounce: TimeInterval = 0.75
+
+    static func shouldAcceptMainHotKeyInvocation(now: CFAbsoluteTime, last: CFAbsoluteTime) -> Bool {
+        return last == 0 || now - last > mainHotKeyInvocationDebounce
+    }
 
     deinit {
         if let monitor = globalMainHotKeyMonitor {
@@ -62,7 +69,7 @@ final class HotKeyService: NSObject {
 extension HotKeyService {
     @objc func popupMainMenu() {
         let now = CFAbsoluteTimeGetCurrent()
-        guard now - lastMainHotKeyInvocation > 0.18 else { return }
+        guard Self.shouldAcceptMainHotKeyInvocation(now: now, last: lastMainHotKeyInvocation) else { return }
         lastMainHotKeyInvocation = now
         AppEnvironment.current.menuManager.popUpMenu(.main)
     }
@@ -109,7 +116,6 @@ extension HotKeyService {
         changeClearHistoryKeyCombo(savedKeyCombo(forKey: Constants.HotKey.clearHistoryKeyCombo))
         // Quick Mode
         changeQuickModeKeyCombo(savedKeyCombo(forKey: Constants.HotKey.quickModeKeyCombo))
-        setupGlobalMainHotKeyFallback()
     }
 
     func change(with type: MenuType, keyCombo: KeyCombo?) {
@@ -121,7 +127,11 @@ extension HotKeyService {
         case .snippet:
             snippetKeyCombo = keyCombo
         }
-        register(with: type, keyCombo: keyCombo)
+        let registered = register(with: type, keyCombo: keyCombo)
+        if type == .main {
+            mainCarbonHotKeyRegistered = registered
+            setupGlobalMainHotKeyFallback()
+        }
     }
 
     func changeClearHistoryKeyCombo(_ keyCombo: KeyCombo?) {
@@ -175,9 +185,17 @@ extension HotKeyService {
 private extension HotKeyService {
     func setupGlobalMainHotKeyFallback() {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        guard mainKeyCombo != nil, !mainCarbonHotKeyRegistered else {
+            stopGlobalMainHotKeyFallback()
+            return
+        }
         if globalMainHotKeyMonitor == nil {
             globalMainHotKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                guard let self, self.shouldHandleGlobalMainHotKey(event) else { return }
+                guard let self else { return }
+                if let tap = self.globalMainHotKeyEventTap, CGEvent.tapIsEnabled(tap: tap) {
+                    return
+                }
+                guard self.shouldHandleGlobalMainHotKey(event) else { return }
                 DispatchQueue.main.async { [weak self] in
                     self?.invokeGlobalMainHotKeyFallback()
                 }
@@ -195,8 +213,28 @@ private extension HotKeyService {
         setupGlobalMainHotKeyEventTapIfPossible()
     }
 
+    func stopGlobalMainHotKeyFallback() {
+        if let monitor = globalMainHotKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMainHotKeyMonitor = nil
+        }
+        if let observer = globalMainHotKeyActivationObserver {
+            NotificationCenter.default.removeObserver(observer)
+            globalMainHotKeyActivationObserver = nil
+        }
+        if let source = globalMainHotKeyRunLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+            globalMainHotKeyRunLoopSource = nil
+        }
+        if let tap = globalMainHotKeyEventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+            globalMainHotKeyEventTap = nil
+        }
+    }
+
     func setupGlobalMainHotKeyEventTapIfPossible() {
-        guard globalMainHotKeyEventTap == nil else { return }
+        guard !mainCarbonHotKeyRegistered, globalMainHotKeyEventTap == nil else { return }
 
         if #available(macOS 10.15, *) {
             guard CGPreflightListenEventAccess() else {
@@ -297,17 +335,19 @@ private extension HotKeyService {
 
 // MARK: - Register
 private extension HotKeyService {
-    func register(with type: MenuType, keyCombo: KeyCombo?) {
+    @discardableResult
+    func register(with type: MenuType, keyCombo: KeyCombo?) -> Bool {
         save(with: type, keyCombo: keyCombo)
         // Reset hotkey
         HotKeyCenter.shared.unregisterHotKey(with: type.rawValue)
         // Register new hotkey
-        guard let keyCombo = keyCombo else { return }
+        guard let keyCombo = keyCombo else { return false }
         let hotKey = HotKey(identifier: type.rawValue, keyCombo: keyCombo, target: self, action: type.hotKeySelector)
         let registered = hotKey.register()
         if type == .main {
-            NSLog("Board-Man main hotkey Carbon registration=%@", registered.description)
+            NSLog("Board-Man main hotkey Carbon registration=%@ fallback=%@", registered.description, (!registered).description)
         }
+        return registered
     }
 
     func save(with type: MenuType, keyCombo: KeyCombo?) {
