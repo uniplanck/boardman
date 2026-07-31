@@ -6354,7 +6354,7 @@ class BoardManPanel: NSPanel {
         ))
         snippetEditorStatusLabel?.frame = NSIntegralRect(NSRect(
             x: inset,
-            y: topY - 93,
+            y: topY - 101,
             width: contentWidth,
             height: 32
         ))
@@ -6363,25 +6363,25 @@ class BoardManPanel: NSPanel {
         let toggleWidth = max(104, floor((contentWidth - toggleGap) / 2))
         snippetFolderEnableButton?.frame = NSIntegralRect(NSRect(
             x: inset,
-            y: topY - 125,
+            y: topY - 133,
             width: toggleWidth,
             height: 22
         ))
         snippetEnableButton?.frame = NSIntegralRect(NSRect(
             x: inset + toggleWidth + toggleGap,
-            y: topY - 125,
+            y: topY - 133,
             width: toggleWidth,
             height: 22
         ))
 
         snippetEditorContentLabel?.frame = NSIntegralRect(NSRect(
             x: inset,
-            y: topY - 158,
+            y: topY - 166,
             width: contentWidth,
             height: 17
         ))
         let contentBottom = inset + LayoutMetrics.actionButtonHeight + 14
-        let contentTop = topY - 168
+        let contentTop = topY - 176
         let contentHeight = max(90, contentTop - contentBottom)
         snippetEditorScrollView?.frame = NSIntegralRect(NSRect(
             x: inset,
