@@ -1218,10 +1218,10 @@ final class BoardManPanelLayoutTests {
             #expect((titleField?.frame.width ?? 0) >= 250,
                     "Snippet title editor is still cramped.")
             if let titleField, let statusLabel, let folderToggle, let snippetToggle {
-                #expect(titleField.frame.minY - statusLabel.frame.maxY >= 16,
-                        "Snippet editor status needs deliberate breathing room below the title field.")
-                #expect(statusLabel.frame.minY - folderToggle.frame.maxY >= 10,
-                        "Snippet editor status should have balanced spacing above the enable controls.")
+                #expect(titleField.frame.minY - statusLabel.frame.maxY >= 24,
+                        "Snippet editor status needs a full spacing step below the title field.")
+                #expect(statusLabel.frame.minY - folderToggle.frame.maxY >= 14,
+                        "Snippet editor status should keep visible breathing room above the enable controls.")
                 #expect(abs(folderToggle.frame.midY - snippetToggle.frame.midY) <= 0.5)
                 #expect(titleField.frame.maxY <= (titleField.superview?.bounds.maxY ?? titleField.frame.maxY) - 12,
                         "Snippet title needs deliberate top padding.")

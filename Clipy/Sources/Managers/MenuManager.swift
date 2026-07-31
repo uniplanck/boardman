@@ -6340,48 +6340,65 @@ class BoardManPanel: NSPanel {
         let contentWidth = max(120, width - (inset * 2))
         let topY = height - inset
 
+        let titleLabelHeight: CGFloat = 17
+        let titleFieldHeight = LayoutMetrics.controlHeight
+        let titleLabelToFieldGap: CGFloat = 4
+        let titleFieldToStatusGap: CGFloat = 24
+        let statusHeight: CGFloat = 32
+        let statusToToggleGap: CGFloat = 14
+        let toggleHeight: CGFloat = 22
+        let toggleToContentLabelGap: CGFloat = 16
+        let contentLabelHeight: CGFloat = 17
+        let contentLabelToEditorGap: CGFloat = 10
+
+        let titleLabelY = topY - titleLabelHeight
+        let titleFieldY = titleLabelY - titleLabelToFieldGap - titleFieldHeight
+        let statusY = titleFieldY - titleFieldToStatusGap - statusHeight
+        let toggleY = statusY - statusToToggleGap - toggleHeight
+        let contentLabelY = toggleY - toggleToContentLabelGap - contentLabelHeight
+        let contentTop = contentLabelY - contentLabelToEditorGap
+
         snippetEditorTitleLabel?.frame = NSIntegralRect(NSRect(
             x: inset,
-            y: topY - 17,
+            y: titleLabelY,
             width: contentWidth,
-            height: 17
+            height: titleLabelHeight
         ))
         snippetEditorTitleField?.frame = NSIntegralRect(NSRect(
             x: inset,
-            y: topY - 53,
+            y: titleFieldY,
             width: contentWidth,
-            height: LayoutMetrics.controlHeight
+            height: titleFieldHeight
         ))
         snippetEditorStatusLabel?.frame = NSIntegralRect(NSRect(
             x: inset,
-            y: topY - 101,
+            y: statusY,
             width: contentWidth,
-            height: 32
+            height: statusHeight
         ))
 
         let toggleGap: CGFloat = 8
         let toggleWidth = max(104, floor((contentWidth - toggleGap) / 2))
         snippetFolderEnableButton?.frame = NSIntegralRect(NSRect(
             x: inset,
-            y: topY - 133,
+            y: toggleY,
             width: toggleWidth,
-            height: 22
+            height: toggleHeight
         ))
         snippetEnableButton?.frame = NSIntegralRect(NSRect(
             x: inset + toggleWidth + toggleGap,
-            y: topY - 133,
+            y: toggleY,
             width: toggleWidth,
-            height: 22
+            height: toggleHeight
         ))
 
         snippetEditorContentLabel?.frame = NSIntegralRect(NSRect(
             x: inset,
-            y: topY - 166,
+            y: contentLabelY,
             width: contentWidth,
-            height: 17
+            height: contentLabelHeight
         ))
         let contentBottom = inset + LayoutMetrics.actionButtonHeight + 14
-        let contentTop = topY - 176
         let contentHeight = max(90, contentTop - contentBottom)
         snippetEditorScrollView?.frame = NSIntegralRect(NSRect(
             x: inset,
