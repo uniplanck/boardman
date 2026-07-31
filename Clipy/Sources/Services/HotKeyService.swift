@@ -47,6 +47,12 @@ final class HotKeyService: NSObject {
         return last == 0 || now - last > mainHotKeyInvocationDebounce
     }
 
+    static func shouldRegisterSystemHotKeys(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        return environment["XCTestConfigurationFilePath"] == nil
+    }
+
     deinit {
         if let monitor = globalMainHotKeyMonitor {
             NSEvent.removeMonitor(monitor)
@@ -138,6 +144,7 @@ extension HotKeyService {
         clearHistoryKeyCombo = keyCombo
         AppEnvironment.current.defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.clearHistoryKeyCombo)
         AppEnvironment.current.defaults.synchronize()
+        guard Self.shouldRegisterSystemHotKeys() else { return }
         // Reset hotkey
         HotKeyCenter.shared.unregisterHotKey(with: "ClearHistory")
         // Register new hotkey
@@ -150,6 +157,7 @@ extension HotKeyService {
         quickModeKeyCombo = keyCombo
         AppEnvironment.current.defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.quickModeKeyCombo)
         AppEnvironment.current.defaults.synchronize()
+        guard Self.shouldRegisterSystemHotKeys() else { return }
         HotKeyCenter.shared.unregisterHotKey(with: "QuickMode")
         guard let keyCombo else { return }
         let hotkey = HotKey(
@@ -338,6 +346,9 @@ private extension HotKeyService {
     @discardableResult
     func register(with type: MenuType, keyCombo: KeyCombo?) -> Bool {
         save(with: type, keyCombo: keyCombo)
+        // Tests verify persistence and migration only. Registering real Carbon hotkeys inside
+        // XCTest can terminate and relaunch the test host, producing a false test failure.
+        guard Self.shouldRegisterSystemHotKeys() else { return keyCombo != nil }
         // Reset hotkey
         HotKeyCenter.shared.unregisterHotKey(with: type.rawValue)
         // Register new hotkey
@@ -453,9 +464,11 @@ extension HotKeyService {
     func registerSnippetHotKey(with identifier: String, keyCombo: KeyCombo) {
         // Reset hotkey
         unregisterSnippetHotKey(with: identifier)
-        // Register new hotkey
-        let hotKey = HotKey(identifier: identifier, keyCombo: keyCombo, target: self, action: #selector(HotKeyService.popupSnippetFolder(_:)))
-        hotKey.register()
+        // Register new hotkey outside XCTest only.
+        if Self.shouldRegisterSystemHotKeys() {
+            let hotKey = HotKey(identifier: identifier, keyCombo: keyCombo, target: self, action: #selector(HotKeyService.popupSnippetFolder(_:)))
+            hotKey.register()
+        }
         // Save key combos
         var keyCombos = folderKeyCombos ?? [String: KeyCombo]()
         keyCombos[identifier] = keyCombo
@@ -463,8 +476,10 @@ extension HotKeyService {
     }
 
     func unregisterSnippetHotKey(with identifier: String) {
-        // Unregister
-        HotKeyCenter.shared.unregisterHotKey(with: identifier)
+        // Unregister from the OS only outside XCTest.
+        if Self.shouldRegisterSystemHotKeys() {
+            HotKeyCenter.shared.unregisterHotKey(with: identifier)
+        }
         // Save key combos
         var keyCombos = folderKeyCombos ?? [String: KeyCombo]()
         keyCombos.removeValue(forKey: identifier)
@@ -485,6 +500,7 @@ extension HotKeyService {
     }
 
     fileprivate func setupSnippetHotKeys() {
+        guard Self.shouldRegisterSystemHotKeys() else { return }
         folderKeyCombos?.forEach {
             let hotKey = HotKey(identifier: $0, keyCombo: $1, target: self, action: #selector(HotKeyService.popupSnippetFolder(_:)))
             hotKey.register()

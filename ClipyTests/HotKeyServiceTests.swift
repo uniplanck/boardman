@@ -223,6 +223,14 @@ final class HotKeyServiceTests {
     }
 
     @Test
+    func systemHotKeyRegistrationIsDisabledDuringXCTest() {
+        #expect(!HotKeyService.shouldRegisterSystemHotKeys(environment: [
+            "XCTestConfigurationFilePath": "/tmp/Board-Man.xctestconfiguration"
+        ]))
+        #expect(HotKeyService.shouldRegisterSystemHotKeys(environment: [:]))
+    }
+
+    @Test
     func defaultKeyCombos() {
         let keyCombos = HotKeyService.defaultKeyCombos
         let mainCombos = keyCombos[Constants.Menu.clip] as? [String: Int]
