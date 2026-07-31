@@ -2,14 +2,20 @@ name: Board-Man CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: board-man-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   repo-checks:
     name: repository checks
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
 
     steps:
       - name: Checkout
@@ -23,14 +29,37 @@ jobs:
           test -f Board-Man.xcodeproj/xcshareddata/xcschemes/Board-Man.xcscheme
           test -d Clipy/Sources
           test -d scripts/boardman
+          test -f scripts/boardman/capture-readme-screenshots.sh
+          test -f docs/readme-screenshots.md
+          test -f CHANGELOG.md
+          test -f .github/CONTRIBUTING.md
+          test -f .github/SECURITY.md
+          test -f .github/SUPPORT.md
+          test -f .github/CODE_OF_CONDUCT.md
+          test -f .github/CODEOWNERS
+          test -f .github/PULL_REQUEST_TEMPLATE.md
+          test -f .github/dependabot.yml
+          test -f .github/ISSUE_TEMPLATE/bug_report.yml
+          test -f .github/ISSUE_TEMPLATE/feature_request.yml
+          test -f .github/ISSUE_TEMPLATE/config.yml
+
+      - name: README assets
+        run: |
+          test -s docs/assets/screenshots/board-man-history-en.png
+          test -s docs/assets/screenshots/board-man-history-compact-en.png
+          test -s docs/assets/screenshots/board-man-settings-en.png
+          test -s docs/assets/screenshots/board-man-history-ja.png
+          test -s docs/assets/board-man-main-screenshot.png
 
       - name: YAML syntax
-        run: ruby -e 'require "yaml"; YAML.load_file(".github/workflows/board-man-ci.yml")'
+        run: |
+          ruby -e 'require "yaml"; Dir[".github/**/*.yml"].sort.each { |path| YAML.load_file(path); puts path }'
 
       - name: Shell syntax
         run: |
           bash -n scripts/boardman/install-dev-stable.sh
           bash -n scripts/boardman/status-tcc-friendly.sh
+          bash -n scripts/boardman/capture-readme-screenshots.sh
           bash -n scripts/boardman_digest.sh
 
       - name: Whitespace check
@@ -42,3 +71,55 @@ jobs:
           else
             git diff --check HEAD~1..HEAD
           fi
+
+  macos-tests:
+    name: macOS build and tests
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+          swift --version
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: .spm-cache
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Resolve packages
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project Board-Man.xcodeproj \
+            -scheme Board-Man \
+            -clonedSourcePackagesDirPath .spm-cache \
+            -skipPackagePluginValidation \
+            -skipMacroValidation
+
+      - name: Build and test
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Board-Man.xcodeproj \
+            -scheme Board-Man \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath DerivedData \
+            -clonedSourcePackagesDirPath .spm-cache \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            -parallel-testing-enabled NO \
+            -maximum-parallel-testing-workers 1 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            test

@@ -28,6 +28,12 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     private var screenshotObserverThread: Thread?
     private let disposeBag = DisposeBag()
 
+    static func shouldStartRuntimeServices(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        return environment["XCTestConfigurationFilePath"] == nil
+    }
+
     // MARK: - Init
     override func awakeFromNib() {
         super.awakeFromNib()
@@ -231,6 +237,13 @@ extension AppDelegate: NSApplicationDelegate {
         AppEnvironment.replaceCurrent(environment: AppEnvironment.fromStorage())
         // UserDefaults
         CPYUtilities.registerUserDefaultKeys()
+
+        // Unit tests use Board-Man as their host application. Starting clipboard monitors,
+        // LoginServiceKit, Sparkle, global shortcuts, and background observers inside XCTest can
+        // block or relaunch the test host. Keep the storage environment available to tests while
+        // skipping normal application runtime services.
+        guard Self.shouldStartRuntimeServices() else { return }
+
         // Restore a locally verified signed entitlement before gated services/UI are created.
         LicenseBootstrapService.shared.restoreEntitlement()
         // SDKs
@@ -265,15 +278,33 @@ extension AppDelegate: NSApplicationDelegate {
 
         // Managers
         AppEnvironment.current.menuManager.setup()
+
         // Build the hidden panel during idle launch time so the first global shortcut does not
         // pay the full AppKit construction + initial history load cost.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             AppEnvironment.current.menuManager.prewarmBoardManPanel()
         }
+
+#if DEBUG
+        let screenshotEnvironment = ProcessInfo.processInfo.environment
+        if screenshotEnvironment["BOARDMAN_SCREENSHOT_OUTPUT"]?.isEmpty == false {
+            let requestedDelay = screenshotEnvironment["BOARDMAN_SCREENSHOT_DELAY"]
+                .flatMap(Double.init) ?? 4.5
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(0.5, requestedDelay)) {
+                AppEnvironment.current.menuManager.popUpMenu(.main)
+            }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                guard !AppEnvironment.current.accessibilityService.isAccessibilityEnabled(isPrompt: false) else { return }
+                AppEnvironment.current.accessibilityService.showAccessibilityAuthenticationAlert()
+            }
+        }
+#else
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             guard !AppEnvironment.current.accessibilityService.isAccessibilityEnabled(isPrompt: false) else { return }
             AppEnvironment.current.accessibilityService.showAccessibilityAuthenticationAlert()
         }
+#endif
     }
 
 }

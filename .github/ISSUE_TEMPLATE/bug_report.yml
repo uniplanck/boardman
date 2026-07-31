@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible Board-Man defect
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Do not paste private clipboard contents, passwords, tokens, customer data, local Realm files, signing material, or macOS permission databases.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the visible behavior and what you were doing when it occurred.
+      placeholder: Board-Man opened, but the selected row...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use safe demo content and list the smallest reliable sequence.
+      placeholder: |
+        1. Copy safe sample text
+        2. Open Board-Man with ⌘⌥V
+        3. Resize the panel to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Board-Man version or commit, macOS version, Mac architecture, and relevant settings.
+      placeholder: |
+        Board-Man: v1.2.3 / commit ...
+        macOS: ...
+        Mac: Apple Silicon / Intel
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or logs
+      description: Redact private content. Attach only the smallest evidence needed to show the defect.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I removed private clipboard contents, credentials, tokens, customer data, and local database files.
+          required: true
+        - label: I searched existing issues and did not find the same report.
+          required: true

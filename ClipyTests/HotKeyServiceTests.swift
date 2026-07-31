@@ -223,6 +223,17 @@ final class HotKeyServiceTests {
     }
 
     @Test
+    func systemRuntimeSideEffectsAreDisabledDuringXCTest() {
+        let testEnvironment = [
+            "XCTestConfigurationFilePath": "/tmp/Board-Man.xctestconfiguration"
+        ]
+        #expect(!HotKeyService.shouldRegisterSystemHotKeys(environment: testEnvironment))
+        #expect(!AppDelegate.shouldStartRuntimeServices(environment: testEnvironment))
+        #expect(HotKeyService.shouldRegisterSystemHotKeys(environment: [:]))
+        #expect(AppDelegate.shouldStartRuntimeServices(environment: [:]))
+    }
+
+    @Test
     func defaultKeyCombos() {
         let keyCombos = HotKeyService.defaultKeyCombos
         let mainCombos = keyCombos[Constants.Menu.clip] as? [String: Int]

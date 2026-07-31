@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Support and troubleshooting
+    url: https://github.com/uniplanck/boardman/blob/main/.github/SUPPORT.md
+    about: Check setup, permissions, known limitations, and safe diagnostic guidance before opening an issue.
+  - name: Security vulnerability
+    url: https://github.com/uniplanck/boardman/security/advisories/new
+    about: Report clipboard disclosure, update verification, permission bypass, or other security-sensitive issues privately.

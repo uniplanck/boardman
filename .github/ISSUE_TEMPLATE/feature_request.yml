@@ -1,0 +1,60 @@
+name: Feature request
+description: Propose a focused Board-Man workflow improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the workflow problem before prescribing an implementation. Board-Man prioritizes local-first behavior, keyboard operation, and preservation of existing clipboard data.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Workflow problem
+      description: What task is difficult or repetitive today?
+      placeholder: When I reuse several related pieces of text...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest user-visible behavior that would solve the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include current workarounds or smaller options.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Clipboard history
+        - Templates
+        - Search and keyboard navigation
+        - Pins, timestamps, or usage signals
+        - Images and previews
+        - Settings and appearance
+        - Privacy or local data
+        - Build, release, or documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Scope checks
+      options:
+        - label: This request does not require uploading clipboard contents to an external service by default.
+          required: true
+        - label: I searched existing issues and did not find the same request.
+          required: true
