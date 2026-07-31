@@ -1,118 +1,187 @@
+<div align="center">
+
 # Board-Man
 
-[English](../../README.md) / [ja](README.ja.md) / [zh-CN](README.zh-CN.md) / [es](README.es.md) / [pt-BR](README.pt-BR.md) / [ko](README.ko.md) / [de](README.de.md) / [fr](README.fr.md)
+**macOSのクリップボードを、履歴から作業面へ。**
 
-Board-Man は、Clipy から派生した macOS 向けのクリップボード生産性アプリです。
+履歴、定型文、Pin、検索、使用回数、画像プレビューを1つのパネルにまとめたローカルファーストのメニューバーアプリです。
 
-メニューバーからクリップボード履歴をすぐに使えるようにし、テキスト、URL、コマンド、画像をアプリ間で何度もコピー、貼り付け、編集、移動する作業の流れを見えやすくします。
+[![Board-Man CI](https://github.com/uniplanck/boardman/actions/workflows/board-man-ci.yml/badge.svg)](https://github.com/uniplanck/boardman/actions/workflows/board-man-ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/uniplanck/boardman?display_name=tag&sort=semver)](https://github.com/uniplanck/boardman/releases/latest)
+[![macOS 13+](https://img.shields.io/badge/macOS-13%2B-111111?logo=apple)](https://github.com/uniplanck/boardman/releases/latest)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](../../LICENSE)
 
-> ステータス: 公開候補。このリポジトリは、現在も開発中のプライベートビルドから公開用に整理したオープンソース版です。
+[ダウンロード](#ダウンロード) · [機能](#主な機能) · [変更履歴](../../CHANGELOG.md) · [ビルド](#ソースからビルド) · [コントリビュート](../../.github/CONTRIBUTING.md) · [English](../../README.md)
 
-## スクリーンショット
+</div>
 
-![Board-Man main screenshot](../assets/board-man-main-screenshot.png)
+![安全なデモデータを表示したBoard-Man](../assets/screenshots/board-man-history-ja.png)
 
-## Board-Man でできること
+Board-Manは、[Clipy](https://github.com/Clipy/Clipy)から派生したmacOS向けクリップボード生産性アプリです。テキスト、URL、コマンド、定型文、画像をアプリ間で繰り返し扱う作業を、メニューバーからすぐ再開できます。
 
-- 最近のクリップボード履歴をメニューバーから使えます。
-- 再利用するスニペットを保存して貼り付けられます。
-- よく使う項目に貼り付け回数バッジを表示します。
-- スクリーンショットのような画像のみの内容を含む、画像クリップボード項目を扱えます。
-- クリップボード履歴を検索できます。
-- パネルをキーボード操作で移動できます。
-- 重要な項目をピン留めできます。
-- ショートカット、履歴の上限、メニューの動作、表示テーマの設定を調整できます。
-- クリップボード内容を外部サービスへ送信せず、macOS 上でローカルに動作します。
+クリップボード履歴はMac内で扱われ、クラウド同期サービスを必須としません。
+
+> **リリース状況:** 現在ダウンロードできる最新版は **v1.2.3** です。`main`ブランチは継続開発中で、タグ付きリリースには未収録の機能を含む場合があります。
+
+## Board-Manを使う理由
+
+一般的なクリップボード管理は「何をコピーしたか」を残します。Board-Manはさらに「何を繰り返し使っているか」「何を定型文にすべきか」を見つけやすくします。
+
+- `⌘⌥V`で履歴を即座に開く
+- 重要な項目をPinして整理対象から保護する
+- 再利用する文章を**定型文**として保存する
+- 使用回数から頻繁に使う項目を把握する
+- 検索とキーボード操作で作業から離れず貼り付ける
+- テキスト、URL、コマンド、画像を同じ履歴で扱う
+- 時刻表示、密度、外観、ショートカット、保持件数を調整する
+- データを削除せず、パネル上の機密項目をマスクする
+
+## 画面
+
+<table>
+  <tr>
+    <td width="50%"><img src="../assets/screenshots/board-man-history-ja.png" alt="Board-Manの日本語履歴画面"></td>
+    <td width="50%"><img src="../assets/screenshots/board-man-history-compact-en.png" alt="Board-Manの狭幅表示"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>履歴</strong><br>検索、Pin、時刻、使用回数を一覧表示。</td>
+    <td align="center"><strong>レスポンシブ表示</strong><br>横幅を狭めてもアクセサリの余白を維持。</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="../assets/screenshots/board-man-settings-en.png" alt="Board-Manの設定画面"></td>
+  </tr>
+</table>
+
+## 主な機能
+
+### クリップボード履歴
+
+- メニューバーからテキスト、リンク、コマンド、画像の履歴を表示
+- 検索、上下キー移動、直接貼り付け
+- Pin済み項目を保護する保持件数設定
+- 数値、単位、接尾辞、`now`表示を選べる相対時刻
+- 項目ごとの表示名、ハイライト、マスク、期限付きPin
+
+### 定型文
+
+- 再利用する文章をグループで整理
+- 表示名と内容を編集
+- ドラッグ＆ドロップで並び替え
+- グループショートカットと有効・無効状態
+
+コード内部と上流由来の文脈では`snippet`という名称を残していますが、製品UIでは日本語を**定型文**、英語を**Templates**としています。
+
+### 使用状況の可視化
+
+- 貼り付け回数バッジ
+- 使用済み項目の表示スタイル
+- 一般的な画像名同士で使用回数が衝突しない画像識別
+
+### ローカルファーストのプライバシー
+
+- 履歴と定型文をローカルに保存
+- 外部クリップボード同期を必須としない
+- マスクはパネル表示を隠す機能であり、元データを削除したと偽装しない
+- リポジトリ掲載スクリーンショットは、一時プロファイルと決め打ちのデモデータから自動生成し、実際の履歴を使用しない
 
 ## ダウンロード
 
-- [Board-Man v1.2.3 をダウンロード](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
-- macOS アプリアーカイブ: `Board-Man-v1.2.3.zip`
+現在の公開版は[Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)です。
 
-## インストールと初回起動
+1. `Board-Man-v1.2.3.zip`をダウンロード
+2. ZIPを展開
+3. `Board-Man.app`を`/Applications`へ移動
+4. Board-Manを開く
 
-1. リリースページから `Board-Man-v1.2.3.zip` をダウンロードします。
-2. アーカイブを展開します。
-3. `Board-Man.app` を `/Applications` に移動します。
-4. Board-Man を開きます。
+初回起動をmacOSに止められた場合は、Control-clickして**開く**を選ぶか、**システム設定 → プライバシーとセキュリティ**から許可してください。
 
-macOS Gatekeeper によって初回起動がブロックされた場合は、**System Settings > Privacy & Security** を開いて Board-Man を許可するか、アプリを Control-click して **Open** を選択してください。
+グローバルショートカットと安定した貼り付けには、アクセシビリティと入力監視の権限が必要です。macOSの案内に従って手動で許可してください。本プロジェクトはTCC保護を迂回しません。
 
-## 基本的な使い方
+## 基本操作
 
-1. 通常どおり、テキスト、URL、コマンド、画像をコピーします。
-2. メニューバーから Board-Man を開きます。
-3. 検索するか、クリップボード履歴を移動します。
-4. 項目を選択して、アクティブなアプリへ貼り付けます。
-5. 繰り返し貼り付けるテキストにはスニペットを使います。
+1. テキスト、URL、コマンド、画像をコピー
+2. `⌘⌥V`またはメニューバーからBoard-Manを開く
+3. 検索または上下キーで選択
+4. Returnで貼り付け
+5. 残したい項目をPinし、繰り返す文章を定型文へ保存
 
-## クリップボード履歴
+| 操作 | ショートカット |
+|---|---|
+| Board-Manを開く | `⌘⌥V` |
+| 履歴 / 定型文 / 設定 | `⌘1` / `⌘2` / `⌘3` |
+| 検索へ移動 | `⌘F` |
+| 選択移動 | `↑` / `↓` |
+| 選択項目を貼り付け | `Return` |
+| 選択項目をコピー | `⌘C` |
+| Pin切替 | `⌘P` |
+| プレビュー | `Space` |
 
-Board-Man は最近のクリップボード項目を保存するため、テキスト、URL、コマンド、画像クリップボード項目をコピーし直さずに呼び戻せます。
+## 動作要件
 
-次のような場面で便利です。
+- macOS 13以降
+- Apple Silicon / Intel Mac
+- 全機能にはアクセシビリティと入力監視の権限が必要
 
-- 以前コピーした内容を再利用したい
-- 同じテキストをもう一度コピーするためだけにドキュメント間を行き来したくない
-- 最近使ったコマンドやURLをすぐ手元に置きたい
-- コピー/貼り付けが多い作業の流れを確認したい
+## ソースからビルド
 
-## スニペット
+現在のXcode、Git、Swift Package Managerへの接続が必要です。
 
-スニペットは、よく貼り付けるフレーズ、テンプレート、URL、コマンド、その他の内容を再利用するためのテキスト項目です。
+```bash
+git clone https://github.com/uniplanck/boardman.git
+cd boardman
+xcodebuild \
+  -project Board-Man.xcodeproj \
+  -scheme Board-Man \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -skipPackagePluginValidation \
+  -skipMacroValidation \
+  build
+```
 
-よくある用途:
+テスト:
 
-- 繰り返し使う返信文
-- コマンドのテンプレート
-- マーケティングやSNS向けの定型文
-- サポートメッセージ
-- URLや短い定型文
+```bash
+xcodebuild \
+  -project Board-Man.xcodeproj \
+  -scheme Board-Man \
+  -configuration Debug \
+  -destination 'platform=macOS' \
+  -parallel-testing-enabled NO \
+  -maximum-parallel-testing-workers 1 \
+  test
+```
 
-## 貼り付け回数バッジ
+ローカル版の安定したインストールには[`scripts/boardman/install-dev-stable.sh`](../../scripts/boardman/install-dev-stable.sh)を使用し、[`docs/boardman-dev-install.md`](../boardman-dev-install.md)を確認してください。
 
-貼り付け回数バッジは、項目が何回貼り付けられたかを表示します。
+## ドキュメント
 
-これにより、次のことに気づきやすくなります。
+- [変更履歴](../../CHANGELOG.md)
+- [開発版インストール](../boardman-dev-install.md)
+- [QAチェックリスト](../BOARDMAN_QA_CHECKLIST.md)
+- [READMEスクリーンショット生成](../readme-screenshots.md)
+- [リリース・更新設計](../boardman-release-update-spec.md)
+- [Sparkle更新基盤](../sparkle-updates.md)
+- [UIデザインシステム](../boardman-ui-design-system.md)
 
-- よく再利用しているテキスト
-- 繰り返し実行しているコマンド
-- 作業の中心になっている素材やスニペット
-- スニペット化や自動化を検討できるコピー/貼り付けのパターン
+## コントリビュートとサポート
 
-## 画像クリップボード対応
+- [コントリビューションガイド](../../.github/CONTRIBUTING.md)
+- [セキュリティポリシー](../../.github/SECURITY.md)
+- [サポートガイド](../../.github/SUPPORT.md)
+- [コミュニティ行動規範](../../.github/CODE_OF_CONDUCT.md)
+- [Issueを開く](https://github.com/uniplanck/boardman/issues)
 
-Board-Man は画像クリップボード項目に対応し、画像のみのクリップボード内容も履歴リストに表示できます。
-
-次のようなものをコピーするときに便利です。
-
-- スクリーンショット
-- グラフィック
-- デザイン参考資料
-- アプリ間で扱う視覚的なクリップボード内容
-
-画像項目はタイムスタンプに基づく識別を使うため、`TIFF image` や `PNG image` のような一般的な名前でも、貼り付け回数が衝突しません。
-
-## 検索とキーボード操作
-
-検索を使うとクリップボード履歴を絞り込めます。パネルはキーボード中心で使えるように設計されているため、現在の作業から離れずに検索、結果の移動、貼り付けができます。
-
-## 設定と表示
-
-Board-Man には、メニューの動作、ショートカット、履歴の上限、表示に関する設定があります。現在のビルドによっては、テーマや明るめの表示オプションを使ってパネルを読みやすくできます。
-
-## プライバシー
-
-Board-Man はローカルで動作する macOS ユーティリティです。クリップボード内容はアプリ内でローカルに扱われます。リスクを理解していない場合は、シークレット、トークン、パスワード、顧客の個人情報をクリップボード履歴に保存しないでください。
+UI変更では、通常幅と狭幅の実画面を確認し、スクリーンショットを添えてください。既存のローカルデータを破壊しないことを最優先します。
 
 ## ライセンスと帰属
 
-Board-Man は Clipy をベースに大きく変更した派生著作物です。
+Board-ManはClipyを大きく変更した派生著作物で、上流プロジェクトの帰属表示とライセンスを保持します。
 
-このリポジトリでは、上流プロジェクトの帰属表示とライセンス表記を保持しています。
+- [`ATTRIBUTION.md`](../../ATTRIBUTION.md)
+- [`LICENSE`](../../LICENSE)
+- [`LICENSE_CLIPMENU`](../../LICENSE_CLIPMENU)
 
-- `ATTRIBUTION.md`
-- `LICENSE`
-- `LICENSE_CLIPMENU`
+Board-ManはClipyから継承したMITライセンス条件で配布されます。上流のClipyまたはClipMenuメンテナーによる承認を受けたものではありません。
 
-Board-Man は Clipy から継承した MIT ライセンス条件のもとで配布されています。上流の Clipy または ClipMenu メンテナーによる承認を受けたものではありません。
+リポジトリのFundingリンクは上流Clipyプロジェクトを支援するもので、Board-Man独自の支援先は現在掲載していません。

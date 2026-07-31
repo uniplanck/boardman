@@ -116,6 +116,27 @@ extension MenuManager {
             self.reloadBoardManPanelItems(panel)
             panel.focusTableForKeyboard()
         }
+        scheduleReadmeScreenshotIfRequested(panel)
+    }
+
+    private func scheduleReadmeScreenshotIfRequested(_ panel: BoardManPanel) {
+#if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        guard let outputPath = environment["BOARDMAN_SCREENSHOT_OUTPUT"], !outputPath.isEmpty else { return }
+
+        let scene = environment["BOARDMAN_SCREENSHOT_SCENE"]?.lowercased() ?? "history"
+        let requestedWidth = environment["BOARDMAN_SCREENSHOT_WIDTH"]
+            .flatMap(Double.init)
+            .map { CGFloat($0) }
+        let requestedHeight = environment["BOARDMAN_SCREENSHOT_HEIGHT"]
+            .flatMap(Double.init)
+            .map { CGFloat($0) }
+        panel.prepareReadmeScreenshot(scene: scene, width: requestedWidth, height: requestedHeight)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak panel] in
+            panel?.writeReadmeScreenshot(to: outputPath)
+        }
+#endif
     }
 
     func prewarmBoardManPanel() {
@@ -7110,6 +7131,58 @@ class BoardManPanel: NSPanel {
         setFrame(finalFrame, display: false, animate: false)
         layoutPanelSubviews()
     }
+
+#if DEBUG
+    fileprivate func prepareReadmeScreenshot(scene: String, width: CGFloat?, height: CGFloat?) {
+        var targetFrame = frame
+        if let width {
+            targetFrame.size.width = max(600, width)
+        }
+        if let height {
+            targetFrame.size.height = max(500, height)
+        }
+        if targetFrame.size != frame.size {
+            setFrame(targetFrame, display: false, animate: false)
+        }
+
+        switch scene {
+        case "settings":
+            selectSettingsTab()
+        case "templates", "snippets":
+            openSnippetsManagerMode(categoryIdentifier: nil)
+        default:
+            selectHistoryTab()
+        }
+        layoutPanelSubviews()
+        contentView?.layoutSubtreeIfNeeded()
+    }
+
+    fileprivate func writeReadmeScreenshot(to path: String) {
+        guard let contentView else { return }
+        contentView.layoutSubtreeIfNeeded()
+        displayIfNeeded()
+
+        let captureBounds = contentView.bounds
+        guard captureBounds.width > 0,
+              captureBounds.height > 0,
+              let representation = contentView.bitmapImageRepForCachingDisplay(in: captureBounds) else {
+            return
+        }
+        contentView.cacheDisplay(in: captureBounds, to: representation)
+        guard let pngData = representation.representation(using: .png, properties: [:]) else { return }
+
+        let outputURL = URL(fileURLWithPath: path)
+        do {
+            try FileManager.default.createDirectory(
+                at: outputURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try pngData.write(to: outputURL, options: .atomic)
+        } catch {
+            NSLog("Board-Man README screenshot export failed: %@", error.localizedDescription)
+        }
+    }
+#endif
 
     private var configuredTimestampInteraction: BoardManTimestampInteraction {
         return BoardManTimestampInteraction.allowed(

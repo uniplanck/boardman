@@ -265,15 +265,33 @@ extension AppDelegate: NSApplicationDelegate {
 
         // Managers
         AppEnvironment.current.menuManager.setup()
+
         // Build the hidden panel during idle launch time so the first global shortcut does not
         // pay the full AppKit construction + initial history load cost.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             AppEnvironment.current.menuManager.prewarmBoardManPanel()
         }
+
+#if DEBUG
+        let screenshotEnvironment = ProcessInfo.processInfo.environment
+        if screenshotEnvironment["BOARDMAN_SCREENSHOT_OUTPUT"]?.isEmpty == false {
+            let requestedDelay = screenshotEnvironment["BOARDMAN_SCREENSHOT_DELAY"]
+                .flatMap(Double.init) ?? 4.5
+            DispatchQueue.main.asyncAfter(deadline: .now() + max(0.5, requestedDelay)) {
+                AppEnvironment.current.menuManager.popUpMenu(.main)
+            }
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                guard !AppEnvironment.current.accessibilityService.isAccessibilityEnabled(isPrompt: false) else { return }
+                AppEnvironment.current.accessibilityService.showAccessibilityAuthenticationAlert()
+            }
+        }
+#else
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             guard !AppEnvironment.current.accessibilityService.isAccessibilityEnabled(isPrompt: false) else { return }
             AppEnvironment.current.accessibilityService.showAccessibilityAuthenticationAlert()
         }
+#endif
     }
 
 }

@@ -6,7 +6,7 @@ Board-Man est une app de productivité pour le presse-papiers macOS dérivée de
 
 Elle garde l'historique du presse-papiers accessible depuis la barre de menus et ajoute une visibilité orientée flux de travail pour les personnes qui copient, collent, modifient et déplacent régulièrement du texte, des URL, des commandes et des images entre plusieurs apps.
 
-> Statut : candidat public. Ce dépôt est une édition open source assainie, préparée à partir d'une build privée en développement actif.
+> État de la version : la dernière version téléchargeable est **v1.2.3**. La branche `main` reste en développement actif. Cette traduction peut être en retard sur le README anglais.
 
 ## Capture d'écran
 
@@ -15,7 +15,7 @@ Elle garde l'historique du presse-papiers accessible depuis la barre de menus et
 ## Ce que Board-Man peut faire
 
 - Garder l'historique récent du presse-papiers accessible depuis la barre de menus.
-- Enregistrer et coller des snippets réutilisables.
+- Enregistrer et coller des modèles réutilisables.
 - Afficher des badges de nombre de collages pour les éléments souvent utilisés.
 - Gérer les entrées d'image du presse-papiers, y compris le contenu uniquement composé d'une image, comme une capture d'écran.
 - Rechercher dans l'historique du presse-papiers.
@@ -44,7 +44,7 @@ Si macOS Gatekeeper bloque le premier lancement, ouvrez **System Settings > Priv
 2. Ouvrez Board-Man depuis la barre de menus.
 3. Recherchez ou parcourez l'historique du presse-papiers.
 4. Sélectionnez un élément pour le coller dans l'app active.
-5. Utilisez les snippets pour le texte que vous collez souvent.
+5. Utilisez des modèles pour le texte que vous collez souvent.
 
 ## Historique du presse-papiers
 
@@ -57,9 +57,9 @@ Utilisez-le lorsque vous voulez :
 - garder des commandes ou URL récentes à portée de main
 - revoir le déroulé d'un travail intensif en copier-coller
 
-## Snippets
+## Modèles
 
-Les snippets sont des entrées de texte réutilisables pour les phrases, modèles, URL, commandes et autres contenus que vous collez souvent.
+Les modèles sont des entrées de texte réutilisables pour les phrases, URL, commandes et autres contenus que vous collez souvent.
 
 Usages typiques :
 
@@ -77,8 +77,8 @@ Cela vous aide à repérer :
 
 - le texte que vous réutilisez souvent
 - les commandes que vous exécutez régulièrement
-- les ressources ou snippets centraux dans votre flux de travail
-- les schémas de copier-coller qui pourraient mériter de devenir des snippets ou des automatisations
+- les ressources ou modèles centraux dans votre flux de travail
+- les schémas de copier-coller qui pourraient mériter de devenir des modèles ou des automatisations
 
 ## Prise en charge des images du presse-papiers
 

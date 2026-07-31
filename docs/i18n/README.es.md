@@ -6,7 +6,7 @@ Board-Man es una app de productividad para el portapapeles de macOS derivada de 
 
 Mantiene el historial del portapapeles disponible desde la barra de menús y añade visibilidad orientada al flujo de trabajo para quienes copian, pegan, editan y mueven con frecuencia texto, URL, comandos e imágenes entre apps.
 
-> Estado: candidato público. Este repositorio es una edición de código abierto saneada a partir de una compilación privada en desarrollo activo.
+> Estado de la versión: la descarga más reciente es **v1.2.3**. La rama `main` sigue en desarrollo activo. Esta traducción puede ir por detrás de la README en inglés.
 
 ## Captura de pantalla
 
@@ -15,7 +15,7 @@ Mantiene el historial del portapapeles disponible desde la barra de menús y añ
 ## Qué puede hacer Board-Man
 
 - Mantener el historial reciente del portapapeles disponible desde la barra de menús.
-- Guardar y pegar snippets reutilizables.
+- Guardar y pegar plantillas reutilizables.
 - Mostrar insignias de recuento de pegados para los elementos usados con frecuencia.
 - Gestionar entradas de imagen del portapapeles, incluido contenido solo de imagen similar a capturas de pantalla.
 - Buscar en el historial del portapapeles.
@@ -44,7 +44,7 @@ Si macOS Gatekeeper bloquea el primer inicio, abre **System Settings > Privacy &
 2. Abre Board-Man desde la barra de menús.
 3. Busca o desplázate por el historial del portapapeles.
 4. Selecciona un elemento para pegarlo en la app activa.
-5. Usa snippets para el texto que pegas repetidamente.
+5. Usa plantillas para el texto que pegas repetidamente.
 
 ## Historial del portapapeles
 
@@ -57,9 +57,9 @@ Board-Man guarda los elementos recientes del portapapeles para que puedas volver
 - tener a mano comandos o URL recientes
 - revisar el flujo de trabajo con mucho copiar y pegar
 
-## Snippets
+## Plantillas
 
-Los snippets son entradas de texto reutilizables para frases, plantillas, URL, comandos y otros contenidos que pegas a menudo.
+Las plantillas son entradas de texto reutilizables para frases, URL, comandos y otros contenidos que pegas a menudo.
 
 Usos habituales:
 
@@ -77,8 +77,8 @@ Esto ayuda a detectar:
 
 - texto que reutilizas a menudo
 - comandos que ejecutas repetidamente
-- recursos o snippets centrales en tu flujo de trabajo
-- patrones de copiar y pegar que quizá convenga convertir en snippets o automatización
+- recursos o plantillas centrales en tu flujo de trabajo
+- patrones de copiar y pegar que quizá convenga convertir en plantillas o automatización
 
 ## Soporte para imágenes del portapapeles
 

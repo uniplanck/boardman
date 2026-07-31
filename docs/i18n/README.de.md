@@ -6,7 +6,7 @@ Board-Man ist eine macOS-Produktivitätsapp für die Zwischenablage, abgeleitet 
 
 Sie hält den Verlauf der Zwischenablage über die Menüleiste verfügbar und bietet arbeitsablauforientierte Übersicht für Menschen, die häufig Text, URLs, Befehle und Bilder zwischen Apps kopieren, einfügen, bearbeiten und verschieben.
 
-> Status: öffentlicher Kandidat. Dieses Repository ist eine bereinigte Open-Source-Edition, die aus einem aktiv entwickelten privaten Build vorbereitet wurde.
+> Veröffentlichungsstatus: Die neueste herunterladbare Version ist **v1.2.3**. Der Branch `main` wird aktiv weiterentwickelt. Diese Übersetzung kann der englischen README zeitlich hinterherhinken.
 
 ## Screenshot
 
@@ -15,7 +15,7 @@ Sie hält den Verlauf der Zwischenablage über die Menüleiste verfügbar und bi
 ## Was Board-Man kann
 
 - Den aktuellen Verlauf der Zwischenablage über die Menüleiste verfügbar halten.
-- Wiederverwendbare Snippets speichern und einfügen.
+- Wiederverwendbare Vorlagen speichern und einfügen.
 - Einfügezähler-Badges für häufig verwendete Elemente anzeigen.
 - Bildeinträge der Zwischenablage verarbeiten, einschließlich bildreiner Inhalte wie Screenshots.
 - Den Verlauf der Zwischenablage durchsuchen.
@@ -44,7 +44,7 @@ Wenn macOS Gatekeeper den ersten Start blockiert, öffne **System Settings > Pri
 2. Öffne Board-Man über die Menüleiste.
 3. Suche oder bewege dich durch den Verlauf der Zwischenablage.
 4. Wähle ein Element aus, um es in die aktive App einzufügen.
-5. Verwende Snippets für Text, den du wiederholt einfügst.
+5. Verwende Vorlagen für Text, den du wiederholt einfügst.
 
 ## Verlauf der Zwischenablage
 
@@ -57,9 +57,9 @@ Nutze dies, wenn du:
 - aktuelle Befehle oder URLs griffbereit halten möchtest
 - den Ablauf kopier- und einfügeintensiver Arbeit nachvollziehen möchtest
 
-## Snippets
+## Vorlagen
 
-Snippets sind wiederverwendbare Texteinträge für Formulierungen, Vorlagen, URLs, Befehle und andere Inhalte, die du häufig einfügst.
+Vorlagen sind wiederverwendbare Texteinträge für Formulierungen, URLs, Befehle und andere Inhalte, die du häufig einfügst.
 
 Typische Verwendungen:
 
@@ -77,8 +77,8 @@ Das hilft dir zu erkennen:
 
 - Text, den du häufig wiederverwendest
 - Befehle, die du wiederholt ausführst
-- Assets oder Snippets, die für deinen Workflow zentral sind
-- Kopier-/Einfügemuster, die sich als Snippets oder Automatisierung lohnen könnten
+- Inhalte oder Vorlagen, die für deinen Workflow zentral sind
+- Kopier-/Einfügemuster, die sich als Vorlage oder Automatisierung lohnen könnten
 
 ## Unterstützung für Bilder in der Zwischenablage
 

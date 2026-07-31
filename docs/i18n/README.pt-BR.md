@@ -6,7 +6,7 @@ Board-Man é um app de produtividade para a área de transferência do macOS der
 
 Ele mantém o histórico da área de transferência disponível na barra de menus e adiciona visibilidade orientada ao fluxo de trabalho para quem copia, cola, edita e move textos, URLs, comandos e imagens entre apps com frequência.
 
-> Status: candidato público. Este repositório é uma edição open-source sanitizada, preparada a partir de uma build privada em desenvolvimento ativo.
+> Status da versão: a versão mais recente para download é a **v1.2.3**. A branch `main` continua em desenvolvimento ativo. Esta tradução pode estar atrás do README em inglês.
 
 ## Captura de tela
 
@@ -15,7 +15,7 @@ Ele mantém o histórico da área de transferência disponível na barra de menu
 ## O que o Board-Man pode fazer
 
 - Manter o histórico recente da área de transferência disponível na barra de menus.
-- Salvar e colar snippets reutilizáveis.
+- Salvar e colar modelos reutilizáveis.
 - Mostrar badges de contagem de colagens para itens usados com frequência.
 - Lidar com entradas de imagem da área de transferência, incluindo conteúdo apenas de imagem semelhante a capturas de tela.
 - Pesquisar no histórico da área de transferência.
@@ -44,7 +44,7 @@ Se o macOS Gatekeeper bloquear a primeira abertura, abra **System Settings > Pri
 2. Abra o Board-Man pela barra de menus.
 3. Pesquise ou navegue pelo histórico da área de transferência.
 4. Selecione um item para colá-lo no app ativo.
-5. Use snippets para textos que você cola repetidamente.
+5. Use modelos para textos que você cola repetidamente.
 
 ## Histórico da área de transferência
 
@@ -57,9 +57,9 @@ Use quando quiser:
 - manter comandos ou URLs recentes por perto
 - revisar o fluxo de trabalhos com muito copiar e colar
 
-## Snippets
+## Modelos
 
-Snippets são entradas de texto reutilizáveis para frases, modelos, URLs, comandos e outros conteúdos que você cola com frequência.
+Modelos são entradas de texto reutilizáveis para frases, URLs, comandos e outros conteúdos que você cola com frequência.
 
 Usos comuns:
 
@@ -77,8 +77,8 @@ Isso ajuda você a perceber:
 
 - textos que reutiliza com frequência
 - comandos que executa repetidamente
-- recursos ou snippets centrais para seu fluxo de trabalho
-- padrões de copiar e colar que talvez valham virar snippets ou automação
+- recursos ou modelos centrais para seu fluxo de trabalho
+- padrões de copiar e colar que talvez valham virar modelos ou automação
 
 ## Suporte a imagens da área de transferência
 
