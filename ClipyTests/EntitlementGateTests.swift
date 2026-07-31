@@ -1088,6 +1088,15 @@ final class BoardManInteractionRuleTests {
                 "Only the center title may compress between fixed accessories.")
         #expect((narrowPrimary.font?.pointSize ?? 99) <= 12.75,
                 "Narrow rows should use the compact title font instead of squeezing accessories.")
+
+        let resizedCellFrame = BoardManHistoryCellView.synchronizedCellFrame(
+            existingFrame: NSRect(x: 14, y: 0, width: 746, height: 46),
+            safeWidth: 600
+        )
+        #expect(resizedCellFrame.minX == 14,
+                "Responsive resizing must preserve the native table-cell leading inset.")
+        #expect(resizedCellFrame.maxX == 600,
+                "Responsive resizing must fill the remaining width without removing the leading inset.")
     }
 
     @Test

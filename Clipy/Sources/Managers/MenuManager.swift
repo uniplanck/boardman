@@ -3288,6 +3288,17 @@ final class BoardManHistoryCellView: NSTableCellView {
         ))
     }
 
+    static func synchronizedCellFrame(existingFrame: NSRect, safeWidth: CGFloat) -> NSRect {
+        let maximumOriginX = max(0, floor(safeWidth) - 1)
+        let preservedOriginX = min(max(0, floor(existingFrame.minX)), maximumOriginX)
+        return NSIntegralRect(NSRect(
+            x: preservedOriginX,
+            y: existingFrame.minY,
+            width: max(1, floor(safeWidth) - preservedOriginX),
+            height: existingFrame.height
+        ))
+    }
+
     override func layout() {
         super.layout()
         let horizontalInset: CGFloat = 10
@@ -6480,7 +6491,10 @@ class BoardManPanel: NSPanel {
             rowView.needsDisplay = true
 
             if let cellView = rowView.view(atColumn: 0) as? NSView {
-                cellView.frame = NSRect(x: 0, y: cellView.frame.origin.y, width: safeWidth, height: cellView.frame.height)
+                cellView.frame = BoardManHistoryCellView.synchronizedCellFrame(
+                    existingFrame: cellView.frame,
+                    safeWidth: safeWidth
+                )
                 cellView.needsLayout = true
                 cellView.needsDisplay = true
             }
