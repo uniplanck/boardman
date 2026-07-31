@@ -17,11 +17,53 @@ struct PasteTargetSnapshot {
     let childrenCount: Int?
 }
 
+struct PasteFocusTarget {
+    let processIdentifier: pid_t
+    let element: AXUIElement
+}
+
 enum PasteTargetVerifier {
     private static let verificationDelays: [TimeInterval] = [0.16, 0.38, 0.70]
 
+    static func focusTarget(for application: NSRunningApplication?) -> PasteFocusTarget? {
+        guard AXIsProcessTrusted(),
+              let application,
+              let focusedElement = focusedEditableElement(for: application) else {
+            return nil
+        }
+        return PasteFocusTarget(
+            processIdentifier: application.processIdentifier,
+            element: focusedElement
+        )
+    }
+
+    @discardableResult
+    static func restoreFocus(to target: PasteFocusTarget) -> Bool {
+        guard AXIsProcessTrusted(),
+              let application = NSRunningApplication(processIdentifier: target.processIdentifier),
+              !application.isTerminated else {
+            return false
+        }
+        let appElement = AXUIElementCreateApplication(target.processIdentifier)
+        let appResult = AXUIElementSetAttributeValue(
+            appElement,
+            kAXFocusedUIElementAttribute as CFString,
+            target.element
+        )
+        let elementResult = AXUIElementSetAttributeValue(
+            target.element,
+            kAXFocusedAttribute as CFString,
+            kCFBooleanTrue
+        )
+        return appResult == .success || elementResult == .success
+    }
+
     static func snapshot(for application: NSRunningApplication?) -> PasteTargetSnapshot? {
-        guard AXIsProcessTrusted(), let application else { return nil }
+        guard let target = focusTarget(for: application) else { return nil }
+        return snapshot(of: target.element, processIdentifier: target.processIdentifier)
+    }
+
+    private static func focusedEditableElement(for application: NSRunningApplication) -> AXUIElement? {
         let appElement = AXUIElementCreateApplication(application.processIdentifier)
         var focusedObject: CFTypeRef?
         guard AXUIElementCopyAttributeValue(
@@ -34,8 +76,7 @@ enum PasteTargetVerifier {
         }
 
         let focusedElement = focusedObject as! AXUIElement // swiftlint:disable:this force_cast
-        guard isEditable(element: focusedElement) else { return nil }
-        return snapshot(of: focusedElement, processIdentifier: application.processIdentifier)
+        return isEditable(element: focusedElement) ? focusedElement : nil
     }
 
     static func confirmChange(from snapshot: PasteTargetSnapshot,
