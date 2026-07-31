@@ -215,6 +215,14 @@ final class HotKeyServiceTests {
     }
 
     @Test
+    func duplicateMainHotKeyCallbacksAreDebounced() {
+        #expect(HotKeyService.shouldAcceptMainHotKeyInvocation(now: 10.0, last: 0))
+        #expect(!HotKeyService.shouldAcceptMainHotKeyInvocation(now: 10.20, last: 10.0))
+        #expect(!HotKeyService.shouldAcceptMainHotKeyInvocation(now: 10.75, last: 10.0))
+        #expect(HotKeyService.shouldAcceptMainHotKeyInvocation(now: 10.76, last: 10.0))
+    }
+
+    @Test
     func defaultKeyCombos() {
         let keyCombos = HotKeyService.defaultKeyCombos
         let mainCombos = keyCombos[Constants.Menu.clip] as? [String: Int]

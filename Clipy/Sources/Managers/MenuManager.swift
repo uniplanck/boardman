@@ -33,6 +33,7 @@ final class MenuManager: NSObject {
     fileprivate var boardManPanel: BoardManPanel?
     fileprivate var previousFrontmostApplication: NSRunningApplication?
     fileprivate var previousPasteTargetSnapshot: PasteTargetSnapshot?
+    fileprivate var previousPasteFocusTarget: PasteFocusTarget?
     fileprivate var panelItemsNeedRefresh = true
     // Icon Cache
     fileprivate let folderIcon = NSImage(resource: .iconFolder)
@@ -67,8 +68,7 @@ final class MenuManager: NSObject {
 
     func hideBoardManPanelForPreferences() {
         boardManPanel?.orderOut(nil)
-        previousFrontmostApplication = nil
-        previousPasteTargetSnapshot = nil
+        clearPreviousPasteTarget()
     }
 
 }
@@ -93,10 +93,28 @@ extension MenuManager {
 
     fileprivate func showBoardManPanel(anchorPoint: NSPoint? = nil, quickMode: Bool = false) {
         let startedAt = CFAbsoluteTimeGetCurrent()
-        previousFrontmostApplication = NSWorkspace.shared.frontmostApplication
-        previousPasteTargetSnapshot = PasteCountInputService.shared.editableTargetSnapshot(
-            for: previousFrontmostApplication
-        )
+        if let visiblePanel = boardManPanel, visiblePanel.isVisible {
+            visiblePanel.orderFrontRegardless()
+            visiblePanel.makeKeyAndOrderFront(nil)
+            visiblePanel.focusTableForKeyboard()
+            PasteCountInputService.shared.logBoardManPerformance(
+                "panel_duplicate_open_ignored",
+                startedAt: startedAt,
+                details: "preserved_target=true"
+            )
+            return
+        }
+
+        let frontmostApplication = NSWorkspace.shared.frontmostApplication
+        if frontmostApplication?.bundleIdentifier != Bundle.main.bundleIdentifier {
+            previousFrontmostApplication = frontmostApplication
+            previousPasteFocusTarget = PasteTargetVerifier.focusTarget(for: frontmostApplication)
+            previousPasteTargetSnapshot = PasteCountInputService.shared.editableTargetSnapshot(
+                for: frontmostApplication
+            )
+        } else {
+            clearPreviousPasteTarget()
+        }
         let panel = prepareBoardManPanelIfNeeded()
         panel.setQuickMode(quickMode)
         let panelSize = quickMode
@@ -205,6 +223,46 @@ extension MenuManager {
         panel.focusTableForKeyboard()
     }
 
+    private func restorePreviousPasteTarget(
+        attempt: Int = 0,
+        completion: @escaping () -> Void
+    ) {
+        guard let application = previousFrontmostApplication else {
+            completion()
+            return
+        }
+
+        application.activate(options: [.activateIgnoringOtherApps])
+        let isTargetFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier
+            == application.processIdentifier
+        if isTargetFrontmost {
+            if let focusTarget = previousPasteFocusTarget,
+               !PasteTargetVerifier.isFocused(focusTarget) {
+                _ = PasteTargetVerifier.restoreFocus(to: focusTarget)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: completion)
+            return
+        }
+
+        guard attempt < 12 else {
+            if let focusTarget = previousPasteFocusTarget {
+                _ = PasteTargetVerifier.restoreFocus(to: focusTarget)
+            }
+            completion()
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in
+            self?.restorePreviousPasteTarget(attempt: attempt + 1, completion: completion)
+        }
+    }
+
+    private func clearPreviousPasteTarget() {
+        previousFrontmostApplication = nil
+        previousPasteTargetSnapshot = nil
+        previousPasteFocusTarget = nil
+    }
+
     fileprivate func handlePanelPaste(
         dataHash: String,
         clickStartedAt: CFAbsoluteTime?
@@ -216,9 +274,7 @@ extension MenuManager {
 
         // Snapshot verification is only for reliable usage counting. It must never block paste itself.
         panel.orderOut(nil)
-        targetApplication?.activate(options: [.activateIgnoringOtherApps])
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+        restorePreviousPasteTarget { [weak self] in
             guard let self else { return }
 
             if let clickStartedAt {
@@ -229,16 +285,14 @@ extension MenuManager {
             guard let clip = realm.object(ofType: CPYClip.self, forPrimaryKey: dataHash) else {
                 CPYUtilities.sendCustomLog(with: "BoardMan direct paste: cannot fetch clip")
                 NSSound.beep()
-                self.previousFrontmostApplication = nil
-                self.previousPasteTargetSnapshot = nil
+                self.clearPreviousPasteTarget()
                 return
             }
 
             let pasteCountKey = PasteCountStore.shared.key(for: clip)
             let didSend = AppEnvironment.current.pasteService.paste(with: clip)
             guard didSend else {
-                self.previousFrontmostApplication = nil
-                self.previousPasteTargetSnapshot = nil
+                self.clearPreviousPasteTarget()
                 return
             }
 
@@ -252,8 +306,7 @@ extension MenuManager {
                     PasteCountStore.shared.increment(forKey: pasteCountKey)
                 }
             }
-            self.previousFrontmostApplication = nil
-            self.previousPasteTargetSnapshot = nil
+            self.clearPreviousPasteTarget()
         }
     }
 
@@ -264,11 +317,7 @@ extension MenuManager {
         guard let panel = boardManPanel else { return }
         panel.orderOut(nil)
 
-        if let previousApplication = previousFrontmostApplication {
-            previousApplication.activate(options: [.activateIgnoringOtherApps])
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+        restorePreviousPasteTarget { [weak self] in
             guard let self else { return }
 
             if let clickStartedAt {
@@ -279,26 +328,22 @@ extension MenuManager {
             guard let snippet = realm.object(ofType: CPYSnippet.self, forPrimaryKey: identifier) else {
                 CPYUtilities.sendCustomLog(with: "BoardMan direct paste: cannot fetch snippet")
                 NSSound.beep()
-                self.previousFrontmostApplication = nil
-                self.previousPasteTargetSnapshot = nil
+                self.clearPreviousPasteTarget()
                 return
             }
             guard snippet.enable, snippet.folder?.enable ?? true else {
                 NSSound.beep()
-                self.previousFrontmostApplication = nil
-                self.previousPasteTargetSnapshot = nil
+                self.clearPreviousPasteTarget()
                 return
             }
 
             AppEnvironment.current.pasteService.copyToPasteboard(with: snippet.content)
             let didSend = AppEnvironment.current.pasteService.paste()
             guard didSend else {
-                self.previousFrontmostApplication = nil
-                self.previousPasteTargetSnapshot = nil
+                self.clearPreviousPasteTarget()
                 return
             }
-            self.previousFrontmostApplication = nil
-            self.previousPasteTargetSnapshot = nil
+            self.clearPreviousPasteTarget()
         }
     }
 
@@ -308,22 +353,22 @@ extension MenuManager {
         clickStartedAt: CFAbsoluteTime?
     ) {
         guard let panel = boardManPanel else { return }
-        let targetApplication = previousFrontmostApplication
         panel.orderOut(nil)
-        targetApplication?.activate(options: [.activateIgnoringOtherApps])
 
-        let executionDelay = 0.08 + BoardManPanel.clampedTimestampShortcutDelay(delay)
-        DispatchQueue.main.asyncAfter(deadline: .now() + executionDelay) { [weak self] in
+        restorePreviousPasteTarget { [weak self] in
             guard let self else { return }
-            if let clickStartedAt {
-                PasteCountInputService.shared.logBoardManPerformance(
-                    "panel_timestamp_shortcut_dispatch",
-                    startedAt: clickStartedAt
-                )
+            let executionDelay = BoardManPanel.clampedTimestampShortcutDelay(delay)
+            DispatchQueue.main.asyncAfter(deadline: .now() + executionDelay) { [weak self] in
+                guard let self else { return }
+                if let clickStartedAt {
+                    PasteCountInputService.shared.logBoardManPerformance(
+                        "panel_timestamp_shortcut_dispatch",
+                        startedAt: clickStartedAt
+                    )
+                }
+                _ = AppEnvironment.current.pasteService.sendShortcut(shortcut)
+                self.clearPreviousPasteTarget()
             }
-            _ = AppEnvironment.current.pasteService.sendShortcut(shortcut)
-            self.previousFrontmostApplication = nil
-            self.previousPasteTargetSnapshot = nil
         }
     }
 
