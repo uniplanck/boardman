@@ -37,6 +37,10 @@ enum PasteTargetVerifier {
         )
     }
 
+    static func isFocused(_ target: PasteFocusTarget) -> Bool {
+        return boolAttribute(kAXFocusedAttribute, from: target.element) == true
+    }
+
     @discardableResult
     static func restoreFocus(to target: PasteFocusTarget) -> Bool {
         guard AXIsProcessTrusted(),
@@ -44,18 +48,23 @@ enum PasteTargetVerifier {
               !application.isTerminated else {
             return false
         }
-        let appElement = AXUIElementCreateApplication(target.processIdentifier)
-        let appResult = AXUIElementSetAttributeValue(
-            appElement,
-            kAXFocusedUIElementAttribute as CFString,
-            target.element
-        )
-        let elementResult = AXUIElementSetAttributeValue(
+        if isFocused(target) {
+            return true
+        }
+        var isSettable = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(
+            target.element,
+            kAXFocusedAttribute as CFString,
+            &isSettable
+        ) == .success,
+        isSettable.boolValue else {
+            return false
+        }
+        return AXUIElementSetAttributeValue(
             target.element,
             kAXFocusedAttribute as CFString,
             kCFBooleanTrue
-        )
-        return appResult == .success || elementResult == .success
+        ) == .success
     }
 
     static func snapshot(for application: NSRunningApplication?) -> PasteTargetSnapshot? {

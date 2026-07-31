@@ -93,11 +93,28 @@ extension MenuManager {
 
     fileprivate func showBoardManPanel(anchorPoint: NSPoint? = nil, quickMode: Bool = false) {
         let startedAt = CFAbsoluteTimeGetCurrent()
-        previousFrontmostApplication = NSWorkspace.shared.frontmostApplication
-        previousPasteFocusTarget = PasteTargetVerifier.focusTarget(for: previousFrontmostApplication)
-        previousPasteTargetSnapshot = PasteCountInputService.shared.editableTargetSnapshot(
-            for: previousFrontmostApplication
-        )
+        if let visiblePanel = boardManPanel, visiblePanel.isVisible {
+            visiblePanel.orderFrontRegardless()
+            visiblePanel.makeKeyAndOrderFront(nil)
+            visiblePanel.focusTableForKeyboard()
+            PasteCountInputService.shared.logBoardManPerformance(
+                "panel_duplicate_open_ignored",
+                startedAt: startedAt,
+                details: "preserved_target=true"
+            )
+            return
+        }
+
+        let frontmostApplication = NSWorkspace.shared.frontmostApplication
+        if frontmostApplication?.bundleIdentifier != Bundle.main.bundleIdentifier {
+            previousFrontmostApplication = frontmostApplication
+            previousPasteFocusTarget = PasteTargetVerifier.focusTarget(for: frontmostApplication)
+            previousPasteTargetSnapshot = PasteCountInputService.shared.editableTargetSnapshot(
+                for: frontmostApplication
+            )
+        } else {
+            clearPreviousPasteTarget()
+        }
         let panel = prepareBoardManPanelIfNeeded()
         panel.setQuickMode(quickMode)
         let panelSize = quickMode
@@ -193,10 +210,11 @@ extension MenuManager {
         let isTargetFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier
             == application.processIdentifier
         if isTargetFrontmost {
-            if let focusTarget = previousPasteFocusTarget {
+            if let focusTarget = previousPasteFocusTarget,
+               !PasteTargetVerifier.isFocused(focusTarget) {
                 _ = PasteTargetVerifier.restoreFocus(to: focusTarget)
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.04, execute: completion)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: completion)
             return
         }
 
