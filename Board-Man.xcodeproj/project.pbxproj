@@ -1185,7 +1185,7 @@
 			repositoryURL = "https://github.com/clipy/sauce";
 			requirement = {
 				kind = upToNextMinorVersion;
-				minimumVersion = 2.5.0;
+				minimumVersion = 2.5.2;
 			};
 		};
 		C5D3A75D2FB86A0200C9DCB6 /* XCRemoteSwiftPackageReference "Magnet" */ = {
