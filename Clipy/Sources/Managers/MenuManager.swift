@@ -1864,6 +1864,8 @@ func boardManText(_ english: String) -> String {
         "Long press": "長押し動作", "Pin duration": "期限Pinの期間", "Add duration": "期間を追加", "Remove duration": "期間を削除",
         "Pin / Unpin": "Pin切替", "Timed Pin": "期限付きPin", "Remove Timed Pin": "期限付きPinを解除",
         "Hide / Show Content": "内容を非表示／表示", "Hide Content": "内容を非表示", "Show Content": "内容を表示",
+        "Hide preview when content is hidden": "内容非表示時はプレビューを表示しない",
+        "Hide title when content is hidden": "内容非表示時はタイトルを表示しない",
         "Do Nothing": "何もしない", "None": "なし", "Localized": "言語連動",
         "Minutes": "分", "Hours": "時間", "Days": "日", "Weeks": "週", "%d min": "%d分", "%d hr": "%d時間", "%d day": "%d日", "%d wk": "%d週",
         "Highlight": "色で目立たせる", "Remove Highlight": "色付けを解除",
@@ -1876,6 +1878,8 @@ func boardManText(_ english: String) -> String {
         "All": "すべて", "Unused": "未使用",
         "Paste": "貼り付け", "Pin": "Pin", "Unpin": "Pin解除", "Copy": "コピー",
         "Add to Snippets": "スニペットへ追加", "Add Snippet": "スニペットを追加", "Rename Snippet…": "表示名を変更…", "Edit Snippet": "スニペットを編集", "Delete Snippet": "スニペットを削除",
+        "Delete History Item": "履歴項目を削除", "Delete this item from clipboard history?": "この項目をクリップボード履歴から削除しますか？",
+        "Pinned items must be unpinned before deletion.": "Pinを解除してから削除してください。",
         "This changes the name shown in the snippet list.": "スニペット一覧に表示する名前を変更します。",
         "Uncategorized": "未分類", "Row Actions": "項目操作",
         "Advanced appearance": "高度な外観設定", "Unlock Pro to customize advanced visual presets.": "Proで高度な外観プリセットを利用できます。",
@@ -3268,6 +3272,10 @@ final class BoardManHistoryCellView: NSTableCellView {
         timestampPosition = requestedTimestampPosition
         configuredTimestampText = item.timestampText
         let usesCompactRow = timestampPosition != .below
+        let hidesMaskedTitle = item.isMasked && AppEnvironment.current.defaults.bool(
+            forKey: Constants.UserDefaults.boardManHideTitleForMaskedItems
+        )
+        primaryLabel.isHidden = hidesMaskedTitle
         primaryLabel.stringValue = item.isMasked
             ? "＊＊＊＊＊"
             : (usesCompactRow ? item.compactTitle : item.primaryTitle)
@@ -3639,6 +3647,8 @@ class BoardManPanel: NSPanel {
     private var snippetGroupProNoteLabel: NSTextField?
     private var exportHistoryCSVButton: NSButton?
     private var privacySectionLabel: NSTextField?
+    private var hideMaskedPreviewButton: NSButton?
+    private var hideMaskedTitleButton: NSButton?
     private var labsSectionLabel: NSTextField?
     private var labsNoteLabel: NSTextField?
     private var heightControlLabel: NSTextField?
@@ -5364,6 +5374,32 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(privacyTitle)
         privacySectionLabel = privacyTitle
 
+        let hideMaskedPreview = NSButton(
+            checkboxWithTitle: boardManText("Hide preview when content is hidden"),
+            target: self,
+            action: #selector(maskedContentVisibilityChanged(_:))
+        )
+        hideMaskedPreview.state = AppEnvironment.current.defaults.bool(
+            forKey: Constants.UserDefaults.boardManHidePreviewForMaskedItems
+        ) ? .on : .off
+        hideMaskedPreview.font = NSFont.systemFont(ofSize: 11)
+        hideMaskedPreview.tag = 0
+        contentView.addSubview(hideMaskedPreview)
+        hideMaskedPreviewButton = hideMaskedPreview
+
+        let hideMaskedTitle = NSButton(
+            checkboxWithTitle: boardManText("Hide title when content is hidden"),
+            target: self,
+            action: #selector(maskedContentVisibilityChanged(_:))
+        )
+        hideMaskedTitle.state = AppEnvironment.current.defaults.bool(
+            forKey: Constants.UserDefaults.boardManHideTitleForMaskedItems
+        ) ? .on : .off
+        hideMaskedTitle.font = NSFont.systemFont(ofSize: 11)
+        hideMaskedTitle.tag = 1
+        contentView.addSubview(hideMaskedTitle)
+        hideMaskedTitleButton = hideMaskedTitle
+
         let typesTitle = BoardManPanel.makeSectionLabel("Stored Types")
         contentView.addSubview(typesTitle)
         storedTypesSectionLabel = typesTitle
@@ -5905,6 +5941,8 @@ class BoardManPanel: NSPanel {
         historySectionLabel?.stringValue = boardManText("History")
         snippetSettingsSectionLabel?.stringValue = boardManText("Snippets")
         privacySectionLabel?.stringValue = boardManText("Privacy")
+        hideMaskedPreviewButton?.title = boardManText("Hide preview when content is hidden")
+        hideMaskedTitleButton?.title = boardManText("Hide title when content is hidden")
         languageLabel?.stringValue = boardManText("Language")
         launchOnLoginButton?.title = boardManText("Launch on Login")
         inputPasteCommandButton?.title = boardManText("Send Command+V")
@@ -6653,7 +6691,8 @@ class BoardManPanel: NSPanel {
             timedPinDurationLabel, timedPinPresetPopup, timedPinPresetAddButton, timedPinPresetRemoveButton,
             timedPinDurationStepper, timedPinDurationValueLabel,
             timedPinDurationUnitPopup, exportHistoryCSVButton,
-            privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
+            privacySectionLabel, hideMaskedPreviewButton, hideMaskedTitleButton,
+            excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel, hideRulesNoteLabel,
             licenseSectionLabel, licensePlanLabel, licenseStateLabel, licenseLimitsLabel, licenseKeyField, licenseActivateButton, licenseActivationStatusLabel, licenseUpgradeButton, licenseProLockedControlView, licenseMockNoteLabel, licenseStateExamplesLabel,
             labsSectionLabel, labsNoteLabel,
@@ -6716,7 +6755,8 @@ class BoardManPanel: NSPanel {
         ]
         let snippetControls: [NSView?] = [snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetGroupProNoteLabel, snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton, snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton]
         let privacyControls: [NSView?] = [
-            privacySectionLabel, excludedAppsButton, excludedAppsSummaryLabel,
+            privacySectionLabel, hideMaskedPreviewButton, hideMaskedTitleButton,
+            excludedAppsButton, excludedAppsSummaryLabel,
             storedTypesSectionLabel, filterSectionLabel, hideRuleTextField,
             hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton,
             clearHideRulesButton, hideRulesSummaryLabel, hideRulesExamplesLabel,
@@ -7045,8 +7085,10 @@ class BoardManPanel: NSPanel {
 
         func placePrivacySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             placeHeader(privacySectionLabel, originX: originX, originY: originY, width: width)
-            excludedAppsSummaryLabel?.frame = NSRect(x: originX, y: originY - rowGap + 3, width: width, height: 18)
-            excludedAppsButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 6, width: min(178, width), height: rowH)
+            hideMaskedPreviewButton?.frame = NSRect(x: originX, y: originY - 38, width: width, height: 20)
+            hideMaskedTitleButton?.frame = NSRect(x: originX, y: originY - 68, width: width, height: 20)
+            excludedAppsSummaryLabel?.frame = NSRect(x: originX, y: originY - 104, width: width, height: 18)
+            excludedAppsButton?.frame = NSRect(x: originX, y: originY - 144, width: min(178, width), height: rowH)
         }
 
         func placeStoredTypesSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -7127,8 +7169,8 @@ class BoardManPanel: NSPanel {
             show(privacyControls)
             storedTypeButtons.forEach { $0.isHidden = false }
             placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
-            placeStoredTypesSection(originX: leftX, originY: firstY - 132, width: columnWidth)
-            placeFiltersSection(originX: leftX, originY: firstY - 306, width: columnWidth)
+            placeStoredTypesSection(originX: leftX, originY: firstY - 190, width: columnWidth)
+            placeFiltersSection(originX: leftX, originY: firstY - 364, width: columnWidth)
         case .updates:
             show(updatesControls)
             placeUpdatesSection(originX: leftX, originY: firstY, width: columnWidth)
@@ -8550,6 +8592,15 @@ class BoardManPanel: NSPanel {
         AppEnvironment.current.defaults.synchronize()
     }
 
+    @objc private func maskedContentVisibilityChanged(_ sender: NSButton) {
+        let key = sender.tag == 1
+            ? Constants.UserDefaults.boardManHideTitleForMaskedItems
+            : Constants.UserDefaults.boardManHidePreviewForMaskedItems
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: key)
+        hidePreviewBubble()
+        placeholderList?.reloadData()
+    }
+
     @objc private func addHideRuleRequested(_ sender: Any?) {
         let title = hideRuleModePopup?.titleOfSelectedItem ?? BoardManHideRuleMode.contains.title
         let mode = BoardManHideRuleMode.allCases.first { $0.title == title } ?? .contains
@@ -9100,7 +9151,7 @@ class BoardManPanel: NSPanel {
         }
     }
 
-    // Right click handler for row actions menu (spec #5, #6). Safe MVP: Paste, Pin/Unpin (reuses existing PinnedSnippetStore safely, no Realm migration), disabled placeholders. No destructive delete.
+    // Right-click row actions. History deletion requires confirmation and is disabled for pinned items.
     @objc private func handleRightClick(_ gesture: NSClickGestureRecognizer) {
         guard let table = placeholderList else { return }
         let location = gesture.location(in: table)
@@ -9222,6 +9273,20 @@ class BoardManPanel: NSPanel {
                 groupMenu.addItem(uncategorizedItem)
                 addToSnippetsItem.submenu = groupMenu
                 menu.addItem(addToSnippetsItem)
+
+                menu.addItem(NSMenuItem.separator())
+                let deleteHistoryItem = NSMenuItem(
+                    title: boardManText("Delete History Item"),
+                    action: #selector(deleteHistoryItemFromMenu(_:)),
+                    keyEquivalent: ""
+                )
+                deleteHistoryItem.target = self
+                deleteHistoryItem.representedObject = item.dataHash
+                deleteHistoryItem.isEnabled = !item.isPinned
+                deleteHistoryItem.toolTip = item.isPinned
+                    ? boardManText("Pinned items must be unpinned before deletion.")
+                    : nil
+                menu.addItem(deleteHistoryItem)
             }
 
             if item.source == .snippet {
@@ -9392,6 +9457,41 @@ class BoardManPanel: NSPanel {
             }
             activeSnippetCategoryIdentifier = BoardManPanel.uncategorizedCategoryIdentifier
         }
+        onRefreshRequested?()
+    }
+
+    @objc private func deleteHistoryItemFromMenu(_ sender: NSMenuItem) {
+        guard let identifier = sender.representedObject as? String else { return }
+        let realm = try! Realm()
+        guard realm.object(ofType: CPYClip.self, forPrimaryKey: identifier) != nil else {
+            onRefreshRequested?()
+            return
+        }
+        guard !PinnedSnippetStore.shared.isPinned(identifier),
+              !BoardManTimedPinStore.shared.isPinned(identifier) else {
+            NSSound.beep()
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = boardManText("Delete History Item")
+        alert.informativeText = boardManText("Delete this item from clipboard history?")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: boardManText("Delete"))
+        alert.addButton(withTitle: boardManText("Cancel"))
+        guard runSnippetPanelAlert(alert) == .alertFirstButtonReturn else { return }
+        guard let currentClip = realm.object(ofType: CPYClip.self, forPrimaryKey: identifier),
+              !currentClip.isInvalidated else {
+            onRefreshRequested?()
+            return
+        }
+
+        AppEnvironment.current.clipService.delete(with: currentClip)
+        BoardManMaskedItemStore.shared.remove([identifier])
+        BoardManItemHighlightStore.shared.remove([identifier])
+        HistoryDisplayNameStore.shared.remove([identifier])
+        selectedIndex = -1
+        hidePreviewBubble()
         onRefreshRequested?()
     }
 
@@ -10073,6 +10173,12 @@ class BoardManPanel: NSPanel {
               let bubble = previewBubblePanel,
               let label = previewBubbleLabel,
               let imageView = previewBubbleImageView else {
+            hidePreviewBubble()
+            return
+        }
+        if item.isMasked && AppEnvironment.current.defaults.bool(
+            forKey: Constants.UserDefaults.boardManHidePreviewForMaskedItems
+        ) {
             hidePreviewBubble()
             return
         }

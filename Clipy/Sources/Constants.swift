@@ -108,6 +108,8 @@ struct Constants {
         static let boardManImagePreviewScale = "BoardManImagePreviewScale"
         static let boardManItemHighlightsJSON = "BoardManItemHighlightsJSON"
         static let boardManMaskedItemIdentifiers = "BoardManMaskedItemIdentifiers"
+        static let boardManHidePreviewForMaskedItems = "BoardManHidePreviewForMaskedItems"
+        static let boardManHideTitleForMaskedItems = "BoardManHideTitleForMaskedItems"
         static let boardManCustomAccentColor = "BoardManCustomAccentColor"
         static let boardManCustomAccentOpacity = "BoardManCustomAccentOpacity"
         static let boardManCustomPanelColor = "BoardManCustomPanelColor"

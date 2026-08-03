@@ -94,6 +94,8 @@ final class CPYUtilities {
         defaultValues.updateValue(NSNumber(value: 100), forKey: Constants.UserDefaults.boardManTextPreviewScale)
         defaultValues.updateValue(NSNumber(value: 100), forKey: Constants.UserDefaults.boardManImagePreviewScale)
         defaultValues.updateValue([String](), forKey: Constants.UserDefaults.boardManMaskedItemIdentifiers)
+        defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManHidePreviewForMaskedItems)
+        defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManHideTitleForMaskedItems)
         defaultValues.updateValue(NSNumber(value: 1.0), forKey: Constants.UserDefaults.boardManCustomAccentOpacity)
         defaultValues.updateValue(NSNumber(value: 0.16), forKey: Constants.UserDefaults.boardManCustomPanelOpacity)
         defaultValues.updateValue(NSNumber(value: 0.18), forKey: Constants.UserDefaults.boardManCustomUsedOpacity)
