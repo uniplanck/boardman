@@ -3004,9 +3004,25 @@ final class BoardManHeaderSegmentedControl: NSSegmentedControl {
             setHoveredSegment(-1)
             return
         }
-        let segmentWidth = bounds.width / CGFloat(segmentCount)
-        let index = min(segmentCount - 1, max(0, Int(point.x / segmentWidth)))
+        let index = (0..<segmentCount).first { segmentFrame(for: $0)?.contains(point) == true } ?? -1
         setHoveredSegment(index)
+    }
+
+    func hoverBackgroundRect(forSegment segment: Int) -> NSRect? {
+        guard let segmentRect = segmentFrame(for: segment) else { return nil }
+        return NSIntegralRect(segmentRect.insetBy(dx: 2, dy: 3))
+    }
+
+    private func segmentFrame(for segment: Int) -> NSRect? {
+        guard segment >= 0, segment < segmentCount, bounds.width > 0 else { return nil }
+        let configuredWidths = (0..<segmentCount).map { max(0, width(forSegment: $0)) }
+        let configuredTotal = configuredWidths.reduce(0, +)
+        let widths = configuredTotal > 0
+            ? configuredWidths.map { bounds.width * ($0 / configuredTotal) }
+            : Array(repeating: bounds.width / CGFloat(segmentCount), count: segmentCount)
+        let minX = bounds.minX + widths.prefix(segment).reduce(0, +)
+        let maxX = segment == segmentCount - 1 ? bounds.maxX : minX + widths[segment]
+        return NSRect(x: minX, y: bounds.minY, width: max(0, maxX - minX), height: bounds.height)
     }
 
     private func setHoveredSegment(_ value: Int) {
@@ -3017,28 +3033,14 @@ final class BoardManHeaderSegmentedControl: NSSegmentedControl {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        guard hoveredSegment >= 0, hoveredSegment < segmentCount, segmentCount > 0 else { return }
+        guard let hoverRect = hoverBackgroundRect(forSegment: hoveredSegment) else { return }
 
-        let segmentWidth = bounds.width / CGFloat(segmentCount)
-        let minX = floor(CGFloat(hoveredSegment) * segmentWidth) + 2
-        let maxX = min(bounds.maxX - 2, floor(CGFloat(hoveredSegment + 1) * segmentWidth) - 2)
-        let hoverRect = NSRect(
-            x: minX,
-            y: 3,
-            width: max(0, maxX - minX),
-            height: max(0, bounds.height - 6)
-        )
         let isSelected = hoveredSegment == selectedSegment
         let path = NSBezierPath(roundedRect: hoverRect, xRadius: 8, yRadius: 8)
         (isSelected
-            ? NSColor.selectedControlTextColor.withAlphaComponent(0.12)
-            : NSColor.labelColor.withAlphaComponent(0.10)).setFill()
+            ? NSColor.selectedControlTextColor.withAlphaComponent(0.10)
+            : NSColor.labelColor.withAlphaComponent(0.08)).setFill()
         path.fill()
-        (isSelected
-            ? NSColor.selectedControlTextColor.withAlphaComponent(0.36)
-            : NSColor.labelColor.withAlphaComponent(0.28)).setStroke()
-        path.lineWidth = 1
-        path.stroke()
     }
 }
 
@@ -3118,31 +3120,6 @@ final class BoardManCenteredSearchFieldCell: NSSearchFieldCell {
         return verticallyCentered(original, height: original.height)
     }
 
-    override func edit(withFrame aRect: NSRect,
-                       in controlView: NSView,
-                       editor textObj: NSText,
-                       delegate: Any?,
-                       event: NSEvent?) {
-        super.edit(withFrame: searchTextRect(forBounds: aRect),
-                   in: controlView,
-                   editor: textObj,
-                   delegate: delegate,
-                   event: event)
-    }
-
-    override func select(withFrame aRect: NSRect,
-                         in controlView: NSView,
-                         editor textObj: NSText,
-                         delegate: Any?,
-                         start selStart: Int,
-                         length selLength: Int) {
-        super.select(withFrame: searchTextRect(forBounds: aRect),
-                     in: controlView,
-                     editor: textObj,
-                     delegate: delegate,
-                     start: selStart,
-                     length: selLength)
-    }
 }
 
 final class BoardManHistoryCellView: NSTableCellView {
@@ -5709,6 +5686,7 @@ class BoardManPanel: NSPanel {
         snippetAddButton = addSnippet
 
         let editSnippet = NSButton(title: boardManText("Edit Mode"), target: self, action: #selector(editSelectedSnippetFromPanel(_:)))
+        editSnippet.identifier = NSUserInterfaceItemIdentifier("BoardManSnippetEditButton")
         editSnippet.font = NSFont.systemFont(ofSize: 11)
         editSnippet.bezelStyle = .rounded
         editSnippet.isHidden = true
@@ -5790,6 +5768,9 @@ class BoardManPanel: NSPanel {
         let editorTitle = NSTextField(frame: .zero)
         editorTitle.cell = BoardManCenteredTextFieldCell(textCell: "")
         editorTitle.font = NSFont.systemFont(ofSize: 12)
+        editorTitle.textColor = .textColor
+        editorTitle.backgroundColor = .textBackgroundColor
+        editorTitle.drawsBackground = true
         editorTitle.placeholderString = boardManText("Untitled snippet")
         editorTitle.identifier = NSUserInterfaceItemIdentifier("BoardManSnippetEditorTitleField")
         editorTitle.target = self
@@ -5805,11 +5786,20 @@ class BoardManPanel: NSPanel {
         snippetEditorContentLabel = editorContentLabel
 
         let editorScroll = NSScrollView(frame: .zero)
+        editorScroll.identifier = NSUserInterfaceItemIdentifier("BoardManSnippetEditorScrollView")
         editorScroll.hasVerticalScroller = true
         editorScroll.borderType = .bezelBorder
         editorScroll.autohidesScrollers = true
+        editorScroll.drawsBackground = true
+        editorScroll.backgroundColor = .textBackgroundColor
         let editorText = NSTextView(frame: .zero)
+        editorText.identifier = NSUserInterfaceItemIdentifier("BoardManSnippetEditorTextView")
         editorText.font = NSFont.systemFont(ofSize: 12)
+        editorText.textColor = .textColor
+        editorText.backgroundColor = .textBackgroundColor
+        editorText.insertionPointColor = .textColor
+        editorText.drawsBackground = true
+        editorText.textContainerInset = NSSize(width: 8, height: 8)
         editorText.isRichText = false
         editorText.isAutomaticQuoteSubstitutionEnabled = false
         editorText.enabledTextCheckingTypes = 0
@@ -7225,6 +7215,14 @@ class BoardManPanel: NSPanel {
     }
 
 #if DEBUG
+    func loadItemsForTesting(_ items: [BoardManHistoryItem]) {
+        reloadHistoryItems(items)
+    }
+
+    func selectItemForTesting(at index: Int) {
+        setSelectedIndex(index)
+    }
+
     fileprivate func prepareReadmeScreenshot(scene: String, width: CGFloat?, height: CGFloat?) {
         var targetFrame = frame
         if let width {
@@ -7886,11 +7884,11 @@ class BoardManPanel: NSPanel {
             snippetEnableButton?.state = snippet.enable ? .on : .off
             snippetFolderEnableButton?.state = (folder?.enable ?? false) ? .on : .off
         }
-        let canEditTitleDirectly = !isSnippetReorderMode
-        snippetEditorTitleField?.isEnabled = canEditTitleDirectly
-        snippetEditorTitleField?.isEditable = canEditTitleDirectly
-        snippetEditorTitleField?.isSelectable = canEditTitleDirectly
-        snippetEditorTextView?.isEditable = isEditingSelection
+        let canEditSelection = isEditingSelection && !isSnippetReorderMode
+        snippetEditorTitleField?.isEnabled = !isSnippetReorderMode
+        snippetEditorTitleField?.isEditable = canEditSelection
+        snippetEditorTitleField?.isSelectable = canEditSelection
+        snippetEditorTextView?.isEditable = canEditSelection
         snippetEditorTextView?.isSelectable = true
 
         if isEditingSelection {
@@ -8128,8 +8126,6 @@ class BoardManPanel: NSPanel {
         editingSnippetIdentifier = item.dataHash
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         updateSnippetActionButtons()
-        makeFirstResponder(snippetEditorTitleField)
-        snippetEditorTitleField?.selectText(nil)
     }
 
     @objc private func cancelSnippetEditing(_ sender: Any?) {
@@ -8915,7 +8911,6 @@ class BoardManPanel: NSPanel {
             self.applyCurrentFilter()
         }
         DispatchQueue.main.async {
-            alert.window.level = .floating
             alert.window.makeFirstResponder(includedField)
         }
     }

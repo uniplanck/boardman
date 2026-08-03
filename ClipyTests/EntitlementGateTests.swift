@@ -1383,6 +1383,205 @@ final class BoardManPanelLayoutTests {
         }
     }
 
+}
+
+@MainActor @Suite(.serialized)
+final class BoardManUIRegressionTests {
+
+    @Test
+    func searchEditingHoverAndFilterPresentationStayStable() async throws {
+        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
+        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let panel = BoardManPanel()
+        panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
+        panel.makeKeyAndOrderFront(nil)
+        defer { panel.orderOut(nil) }
+        await settlePanelLayout(panel)
+
+        let root = try #require(panel.contentView)
+        let descendants = allSubviews(of: root)
+        let tabs = try #require(descendants.compactMap { $0 as? BoardManHeaderSegmentedControl }.first)
+        let tabFrameBeforeHover = tabs.frame
+        let tabWidthsBeforeHover = (0..<tabs.segmentCount).map { tabs.width(forSegment: $0) }
+        tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
+        let trailingHoverRect = try #require(tabs.hoverBackgroundRect(forSegment: 2))
+        #expect(tabs.hoveredSegment == 2)
+        #expect(trailingHoverRect.maxX <= tabs.bounds.maxX)
+        #expect(trailingHoverRect.minX >= tabs.bounds.minX)
+        #expect(tabs.frame == tabFrameBeforeHover, "Hover must not resize or move the tab control.")
+        #expect((0..<tabs.segmentCount).map { tabs.width(forSegment: $0) } == tabWidthsBeforeHover,
+                "Hover must not change any segment width.")
+
+        let search = try #require(descendants.compactMap { $0 as? NSSearchField }.first)
+        let searchCell = try #require(search.cell as? BoardManCenteredSearchFieldCell)
+        let searchFrameBeforeEditing = search.frame
+        search.stringValue = "layout"
+        #expect(panel.makeFirstResponder(search))
+        search.selectText(nil)
+        await settlePanelLayout(panel)
+        let editor = try #require(search.currentEditor() as? NSTextView)
+        let expectedTextRect = searchCell.searchTextRect(forBounds: search.bounds)
+        #expect(abs(editor.frame.midY - expectedTextRect.midY) <= 1,
+                "Search field editor moved away from the non-editing text rect.")
+        #expect(search.frame == searchFrameBeforeEditing,
+                "Starting search input must not move or resize the search control.")
+        search.stringValue = ""
+        search.abortEditing()
+
+        let conditionButton = try #require(allSubviews(of: root)
+            .compactMap { $0 as? NSButton }
+            .first { $0.identifier?.rawValue == "BoardManHistoryConditionButton" })
+        _ = conditionButton.sendAction(conditionButton.action, to: conditionButton.target)
+        await settlePanelLayout(panel)
+        await settlePanelLayout(panel)
+        let sheet = try #require(panel.attachedSheet)
+        #expect(sheet.sheetParent === panel,
+                "The history filter must remain an attached sheet above Board-Man.")
+        #expect(sheet.isVisible, "The history filter sheet was not visible after opening.")
+        panel.endSheet(sheet, returnCode: .cancel)
+        sheet.orderOut(nil)
+    }
+
+    @Test
+    func snippetEditModeWaitsForClickAndUsesReadableTextSurface() async throws {
+        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
+        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let realm = try Realm()
+        let folder = CPYFolder()
+        folder.title = "Test group"
+        folder.enable = true
+        let snippet = CPYSnippet()
+        snippet.title = "Deploy command"
+        snippet.content = "git status && git push"
+        snippet.enable = true
+        folder.snippets.append(snippet)
+        try realm.write {
+            realm.add(folder)
+        }
+
+        let panel = BoardManPanel()
+        panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
+        panel.makeKeyAndOrderFront(nil)
+        defer { panel.orderOut(nil) }
+        panel.openSnippetsManagerMode()
+        panel.loadItemsForTesting([
+            BoardManHistoryItem(
+                title: snippet.title,
+                primaryTitle: snippet.title,
+                compactTitle: snippet.title,
+                metadataText: folder.title,
+                timestampText: "",
+                countText: "",
+                previewTitle: snippet.content,
+                dataHash: snippet.identifier,
+                imageDataPath: "",
+                inlineThumbnail: nil,
+                pasteCount: 0,
+                isPinned: false,
+                isMasked: false,
+                isEnabled: true,
+                source: .snippet,
+                categoryIdentifier: folder.identifier,
+                categoryTitle: folder.title
+            )
+        ])
+        panel.selectItemForTesting(at: 0)
+        await settlePanelLayout(panel)
+
+        let root = try #require(panel.contentView)
+        let descendants = allSubviews(of: root)
+        let editButton = try #require(descendants.compactMap { $0 as? NSButton }.first {
+            $0.identifier?.rawValue == "BoardManSnippetEditButton"
+        })
+        let titleField = try #require(descendants.compactMap { $0 as? NSTextField }.first {
+            $0.identifier?.rawValue == "BoardManSnippetEditorTitleField"
+        })
+        let contentView = try #require(descendants.compactMap { $0 as? NSTextView }.first {
+            $0.identifier?.rawValue == "BoardManSnippetEditorTextView"
+        })
+        let contentScroll = try #require(descendants.compactMap { $0 as? NSScrollView }.first {
+            $0.identifier?.rawValue == "BoardManSnippetEditorScrollView"
+        })
+
+        #expect(!titleField.isEditable)
+        #expect(!contentView.isEditable)
+        _ = editButton.sendAction(editButton.action, to: editButton.target)
+        await settlePanelLayout(panel)
+        #expect(titleField.isEditable && titleField.isSelectable)
+        #expect(contentView.isEditable && contentView.isSelectable)
+        #expect(titleField.currentEditor() == nil,
+                "Entering edit mode must not automatically focus the title field.")
+        #expect(contentView.string == snippet.content)
+        #expect(titleField.textColor == .textColor)
+        #expect(titleField.backgroundColor == .textBackgroundColor)
+        #expect(contentView.textColor == .textColor)
+        #expect(contentView.backgroundColor == .textBackgroundColor)
+        #expect(contentScroll.backgroundColor == .textBackgroundColor)
+
+        #expect(panel.makeFirstResponder(titleField))
+        titleField.selectText(nil)
+        #expect(titleField.currentEditor() != nil,
+                "The title field must become editable after the user focuses it.")
+        titleField.abortEditing()
+        #expect(panel.makeFirstResponder(contentView),
+                "The content field must become editable after the user focuses it.")
+    }
+
+    @Test
+    func settingsUpdateTextUsesDynamicReadableColors() async throws {
+        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
+        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let panel = BoardManPanel()
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
+        panel.selectSettingsTab()
+        await settlePanelLayout(panel)
+        let root = try #require(panel.contentView)
+        let updatesButton = try #require(allSubviews(of: root)
+            .compactMap { $0 as? BoardManSettingsCategoryButton }
+            .first { $0.tag == 5 })
+        _ = updatesButton.sendAction(updatesButton.action, to: updatesButton.target)
+        await settlePanelLayout(panel)
+
+        let visibleTextFields = allSubviews(of: root).compactMap { $0 as? NSTextField }.filter { !$0.isHidden }
+        #expect(!visibleTextFields.isEmpty)
+        let darkAppearance = try #require(panel.appearance)
+        for field in visibleTextFields {
+            var resolvedColor: NSColor?
+            darkAppearance.performAsCurrentDrawingAppearance {
+                resolvedColor = (field.textColor ?? .textColor).usingColorSpace(.deviceRGB)
+            }
+            let color = try #require(resolvedColor)
+            let luminance = (0.2126 * color.redComponent)
+                + (0.7152 * color.greenComponent)
+                + (0.0722 * color.blueComponent)
+            #expect(luminance >= 0.35,
+                    "Settings contains low-contrast dark text: \(field.stringValue), luminance=\(luminance)")
+        }
+    }
+
+    private func settlePanelLayout(_ panel: BoardManPanel) async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                continuation.resume()
+            }
+        }
+        panel.contentView?.layoutSubtreeIfNeeded()
+    }
+
+    private func allSubviews(of view: NSView) -> [NSView] {
+        return view.subviews + view.subviews.flatMap(allSubviews(of:))
+    }
+}
+
+extension BoardManPanelLayoutTests {
+
     @Test
     func responsiveTemplateTabLabelsStayReadableAcrossLanguages() async throws {
         let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
