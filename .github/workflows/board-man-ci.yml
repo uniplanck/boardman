@@ -123,3 +123,17 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             test
+
+      - name: Package Board-Man app
+        run: |
+          APP_PATH="$(find DerivedData/Build/Products/Debug -maxdepth 2 -name 'Board-Man.app' -type d | head -n 1)"
+          test -n "$APP_PATH"
+          mkdir -p "$RUNNER_TEMP/board-man-artifact"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$RUNNER_TEMP/board-man-artifact/Board-Man.app.zip"
+
+      - name: Upload Board-Man app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Board-Man-pr-app
+          path: ${{ runner.temp }}/board-man-artifact/Board-Man.app.zip
+          retention-days: 1
