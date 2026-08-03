@@ -3089,7 +3089,7 @@ final class BoardManCenteredTextFieldCell: NSTextFieldCell {
 
 final class BoardManCenteredSearchFieldCell: NSSearchFieldCell {
     var opticalYOffset: CGFloat = 0
-    var searchButtonOpticalYOffset: CGFloat = 1
+    var searchButtonOpticalYOffset: CGFloat = -1
 
     private func verticallyCentered(_ rect: NSRect, height: CGFloat) -> NSRect {
         let targetHeight = min(rect.height, height)

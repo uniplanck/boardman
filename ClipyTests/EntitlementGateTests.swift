@@ -1721,8 +1721,8 @@ extension BoardManPanelLayoutTests {
                         "Search optical correction must stay at the requested 2pt downward offset.")
                 #expect(abs((textRect.midY - search.bounds.midY) - cell.opticalYOffset) <= 0.5,
                         "Search text does not match its optical vertical offset.")
-                #expect(cell.searchButtonOpticalYOffset == 1,
-                        "Search icon requires a separate 1pt upward optical correction.")
+                #expect(cell.searchButtonOpticalYOffset == -1,
+                        "Search icon requires a separate 1pt upward optical correction in flipped control coordinates.")
                 #expect(abs((iconRect.midY - search.bounds.midY) - (cell.opticalYOffset + cell.searchButtonOpticalYOffset)) <= 0.5,
                         "Search icon does not include its optical vertical correction.")
             }
