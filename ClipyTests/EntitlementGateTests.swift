@@ -1417,16 +1417,22 @@ final class BoardManUIRegressionTests {
         let search = try #require(descendants.compactMap { $0 as? NSSearchField }.first)
         let searchCell = try #require(search.cell as? BoardManCenteredSearchFieldCell)
         let searchFrameBeforeEditing = search.frame
-        search.stringValue = "layout"
+        search.stringValue = ""
         #expect(panel.makeFirstResponder(search))
         search.selectText(nil)
         await settlePanelLayout(panel)
         let editor = try #require(search.currentEditor() as? NSTextView)
-        let expectedTextRect = searchCell.searchTextRect(forBounds: search.bounds)
-        #expect(abs(editor.frame.midY - expectedTextRect.midY) <= 1,
-                "Search field editor moved away from the non-editing text rect.")
+        let editorFrameAtInputStart = editor.frame
+        search.stringValue = "layout"
+        await settlePanelLayout(panel)
+        #expect(editor.frame == editorFrameAtInputStart,
+                "Entering search text must not move the field editor.")
         #expect(search.frame == searchFrameBeforeEditing,
                 "Starting search input must not move or resize the search control.")
+        let textRect = searchCell.searchTextRect(forBounds: search.bounds)
+        let cancelRect = searchCell.cancelButtonRect(forBounds: search.bounds)
+        #expect(abs(cancelRect.midY - textRect.midY) <= 0.5,
+                "The search clear button must stay vertically aligned with the input text.")
         search.stringValue = ""
         search.abortEditing()
 
