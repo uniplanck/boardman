@@ -16,6 +16,33 @@ import Carbon
 import Magnet
 import RealmSwift
 
+enum BoardManRuntimeEnvironment {
+    static func isRunningTests(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        bundlePaths: [String] = Bundle.allBundles.map(\.bundlePath),
+        hasXCTestCase: Bool = NSClassFromString("XCTestCase") != nil
+    ) -> Bool {
+        let markers = ["xctest", "xcinject", "swift_testing"]
+        if environment.contains(where: { key, value in
+            markers.contains(where: {
+                key.localizedCaseInsensitiveContains($0)
+                    || value.localizedCaseInsensitiveContains($0)
+            })
+        }) {
+            return true
+        }
+        if arguments.contains(where: { argument in
+            markers.contains(where: { argument.localizedCaseInsensitiveContains($0) })
+        }) {
+            return true
+        }
+        return hasXCTestCase || bundlePaths.contains(where: {
+            $0.localizedCaseInsensitiveContains(".xctest")
+        })
+    }
+}
+
 final class HotKeyService: NSObject {
 
     // MARK: - Properties
@@ -33,6 +60,7 @@ final class HotKeyService: NSObject {
     fileprivate(set) var snippetKeyCombo: KeyCombo?
     fileprivate(set) var clearHistoryKeyCombo: KeyCombo?
     fileprivate(set) var quickModeKeyCombo: KeyCombo?
+    private let defaults: UserDefaults
     private var globalMainHotKeyEventTap: CFMachPort?
     private var globalMainHotKeyRunLoopSource: CFRunLoopSource?
     private var globalMainHotKeyMonitor: Any?
@@ -43,14 +71,27 @@ final class HotKeyService: NSObject {
 
     static let mainHotKeyInvocationDebounce: TimeInterval = 0.75
 
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        super.init()
+    }
+
     static func shouldAcceptMainHotKeyInvocation(now: CFAbsoluteTime, last: CFAbsoluteTime) -> Bool {
         return last == 0 || now - last > mainHotKeyInvocationDebounce
     }
 
     static func shouldRegisterSystemHotKeys(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        bundlePaths: [String] = Bundle.allBundles.map(\.bundlePath),
+        hasXCTestCase: Bool = NSClassFromString("XCTestCase") != nil
     ) -> Bool {
-        return environment["XCTestConfigurationFilePath"] == nil
+        return !BoardManRuntimeEnvironment.isRunningTests(
+            environment: environment,
+            arguments: arguments,
+            bundlePaths: bundlePaths,
+            hasXCTestCase: hasXCTestCase
+        )
     }
 
     deinit {
@@ -102,10 +143,10 @@ extension HotKeyService {
 extension HotKeyService {
     func setupDefaultHotKeys() {
         // Migration new framework
-        if !AppEnvironment.current.defaults.bool(forKey: Constants.HotKey.migrateNewKeyCombo) {
+        if !defaults.bool(forKey: Constants.HotKey.migrateNewKeyCombo) {
             migrationKeyCombos()
-            AppEnvironment.current.defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
-            AppEnvironment.current.defaults.synchronize()
+            defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
+            defaults.synchronize()
         }
         migrateLegacyMainShortcutIfNeeded()
         // Snippet hotkey
@@ -142,8 +183,8 @@ extension HotKeyService {
 
     func changeClearHistoryKeyCombo(_ keyCombo: KeyCombo?) {
         clearHistoryKeyCombo = keyCombo
-        AppEnvironment.current.defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.clearHistoryKeyCombo)
-        AppEnvironment.current.defaults.synchronize()
+        defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.clearHistoryKeyCombo)
+        defaults.synchronize()
         guard Self.shouldRegisterSystemHotKeys() else { return }
         // Reset hotkey
         HotKeyCenter.shared.unregisterHotKey(with: "ClearHistory")
@@ -155,8 +196,8 @@ extension HotKeyService {
 
     func changeQuickModeKeyCombo(_ keyCombo: KeyCombo?) {
         quickModeKeyCombo = keyCombo
-        AppEnvironment.current.defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.quickModeKeyCombo)
-        AppEnvironment.current.defaults.synchronize()
+        defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.quickModeKeyCombo)
+        defaults.synchronize()
         guard Self.shouldRegisterSystemHotKeys() else { return }
         HotKeyCenter.shared.unregisterHotKey(with: "QuickMode")
         guard let keyCombo else { return }
@@ -170,7 +211,7 @@ extension HotKeyService {
     }
 
     private func savedKeyCombo(forKey key: String) -> KeyCombo? {
-        guard let data = AppEnvironment.current.defaults.object(forKey: key) as? Data else { return nil }
+        guard let data = defaults.object(forKey: key) as? Data else { return nil }
         guard let keyCombo = NSKeyedUnarchiver.unarchiveObject(with: data) as? KeyCombo else { return nil }
         return keyCombo
     }
@@ -182,8 +223,8 @@ extension HotKeyService {
         ) else {
             return nil
         }
-        AppEnvironment.current.defaults.set(keyCombo.archive(), forKey: Constants.HotKey.mainKeyCombo)
-        AppEnvironment.current.defaults.synchronize()
+        defaults.set(keyCombo.archive(), forKey: Constants.HotKey.mainKeyCombo)
+        defaults.synchronize()
         NSLog("Board-Man main hotkey archive missing or invalid; restored default Command-Option-V")
         return keyCombo
     }
@@ -192,7 +233,7 @@ extension HotKeyService {
 // MARK: - Global Main HotKey Fallback
 private extension HotKeyService {
     func setupGlobalMainHotKeyFallback() {
-        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        guard Self.shouldRegisterSystemHotKeys() else { return }
         guard mainKeyCombo != nil, !mainCarbonHotKeyRegistered else {
             stopGlobalMainHotKeyFallback()
             return
@@ -362,8 +403,8 @@ private extension HotKeyService {
     }
 
     func save(with type: MenuType, keyCombo: KeyCombo?) {
-        AppEnvironment.current.defaults.set(keyCombo?.archive(), forKey: type.userDefaultsKey)
-        AppEnvironment.current.defaults.synchronize()
+        defaults.set(keyCombo?.archive(), forKey: type.userDefaultsKey)
+        defaults.synchronize()
     }
 }
 
@@ -374,24 +415,24 @@ private extension HotKeyService {
      *  Changed framework, PTHotKey to Magnet
      */
     func migrationKeyCombos() {
-        guard let keyCombos = AppEnvironment.current.defaults.object(forKey: Constants.UserDefaults.hotKeys) as? [String: Any] else { return }
+        guard let keyCombos = defaults.object(forKey: Constants.UserDefaults.hotKeys) as? [String: Any] else { return }
 
         // Main menu
         if let (keyCode, modifiers) = parse(with: keyCombos, forKey: Constants.Menu.clip) {
             if let keyCombo = KeyCombo(QWERTYKeyCode: keyCode, carbonModifiers: modifiers) {
-                AppEnvironment.current.defaults.set(keyCombo.archive(), forKey: Constants.HotKey.mainKeyCombo)
+                defaults.set(keyCombo.archive(), forKey: Constants.HotKey.mainKeyCombo)
             }
         }
         // History menu
         if let (keyCode, modifiers) = parse(with: keyCombos, forKey: Constants.Menu.history) {
             if let keyCombo = KeyCombo(QWERTYKeyCode: keyCode, carbonModifiers: modifiers) {
-                AppEnvironment.current.defaults.set(keyCombo.archive(), forKey: Constants.HotKey.historyKeyCombo)
+                defaults.set(keyCombo.archive(), forKey: Constants.HotKey.historyKeyCombo)
             }
         }
         // Snippet menu
         if let (keyCode, modifiers) = parse(with: keyCombos, forKey: Constants.Menu.snippet) {
             if let keyCombo = KeyCombo(QWERTYKeyCode: keyCode, carbonModifiers: modifiers) {
-                AppEnvironment.current.defaults.set(keyCombo.archive(), forKey: Constants.HotKey.snippetKeyCombo)
+                defaults.set(keyCombo.archive(), forKey: Constants.HotKey.snippetKeyCombo)
             }
         }
     }
@@ -403,7 +444,6 @@ private extension HotKeyService {
     }
 
     func migrateLegacyMainShortcutIfNeeded() {
-        let defaults = AppEnvironment.current.defaults
         guard !defaults.bool(forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV) else { return }
         defer {
             defaults.set(true, forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
@@ -428,16 +468,16 @@ private extension HotKeyService {
 extension HotKeyService {
     private var folderKeyCombos: [String: KeyCombo]? {
         get {
-            guard let data = AppEnvironment.current.defaults.object(forKey: Constants.HotKey.folderKeyCombos) as? Data else { return nil }
+            guard let data = defaults.object(forKey: Constants.HotKey.folderKeyCombos) as? Data else { return nil }
             return NSKeyedUnarchiver.unarchiveObject(with: data) as? [String: KeyCombo]
         }
         set {
             if let value = newValue {
-                AppEnvironment.current.defaults.set(NSKeyedArchiver.archivedData(withRootObject: value), forKey: Constants.HotKey.folderKeyCombos)
+                defaults.set(NSKeyedArchiver.archivedData(withRootObject: value), forKey: Constants.HotKey.folderKeyCombos)
             } else {
-                AppEnvironment.current.defaults.removeObject(forKey: Constants.HotKey.folderKeyCombos)
+                defaults.removeObject(forKey: Constants.HotKey.folderKeyCombos)
             }
-            AppEnvironment.current.defaults.synchronize()
+            defaults.synchronize()
         }
     }
 

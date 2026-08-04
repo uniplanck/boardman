@@ -74,6 +74,8 @@ struct Constants {
         static let boardManShowRowNumbers = "BoardManShowRowNumbers"
         static let boardManHistoryUsageFilter = "BoardManHistoryUsageFilter"
         static let boardManHistoryConditionsJSON = "BoardManHistoryConditionsJSON"
+        static let boardManSavedFiltersJSON = "BoardManSavedFiltersJSON"
+        static let boardManSelectedSavedFilterID = "BoardManSelectedSavedFilterID"
         static let boardManTimestampFormat = "BoardManTimestampFormat"
         static let boardManRelativeTimestampTemplate = "BoardManRelativeTimestampTemplate"
         static let boardManRelativeNumberStyle = "BoardManRelativeNumberStyle"
