@@ -1,44 +1,50 @@
 # README Screenshot Workflow
 
-Board-Man's repository screenshots are generated from isolated temporary profiles. The workflow exists to keep private clipboard history, customer information, tokens, local paths, and other maintainer data out of Git.
+Board-ManのREADME画像は、隔離した一時プロファイルと決め打ちのデモデータから自動生成します。通常利用中のクリップボード履歴、定型文、顧客情報、token、ローカルパス、認証情報をGitへ混入させないための手順です。
 
-## Generated assets
+## 生成する画像
 
-Running the workflow refreshes:
+実行すると次の画像を更新します。
 
 - `docs/assets/screenshots/board-man-history-en.png`
-- `docs/assets/screenshots/board-man-history-compact-en.png`
+- `docs/assets/screenshots/board-man-templates-en.png`
 - `docs/assets/screenshots/board-man-settings-en.png`
+- `docs/assets/screenshots/board-man-history-compact-en.png`
 - `docs/assets/screenshots/board-man-history-ja.png`
+- `docs/assets/screenshots/board-man-templates-ja.png`
+- `docs/assets/screenshots/board-man-settings-ja.png`
+- `docs/assets/screenshots/board-man-history-compact-ja.png`
 - `docs/assets/board-man-main-screenshot.png`
 - `assets/readme/board-man-screenshot.png`
 
-The last two files remain as compatibility aliases for older documentation links.
+末尾2ファイルは、既存ドキュメントとの互換性を保つ別名です。
 
-## Safety model
+## 安全設計
 
-The capture script:
+撮影スクリプトは次の順序で動きます。
 
-1. Records whether the canonical `/Applications/Board-Man.app` is running.
-2. Stops Board-Man before launching the capture build.
-3. Creates a temporary `HOME` and `CFFIXED_USER_HOME` for each scene.
-4. Seeds the macOS clipboard with deterministic demo text only.
-5. Launches Board-Man with an explicit screenshot-only environment contract.
-6. Exports the panel content view directly to PNG instead of taking a desktop screenshot.
-7. Deletes every temporary profile.
-8. Replaces the clipboard with a harmless completion message.
-9. Reopens the canonical app when it was running before capture.
+1. `/Applications/Board-Man.app`が起動中か記録する
+2. 撮影中の競合を避けるためBoard-Manを停止する
+3. 各シーン専用の一時`HOME`と`CFFIXED_USER_HOME`を作る
+4. クリップボードを英語または日本語の固定デモ内容へ差し替える
+5. 定型文シーンではDebug専用コードが固定デモグループと定型文を一時Realmへ追加する
+6. 明示的な撮影用環境変数を付けてDebug版Board-Manを起動する
+7. デスクトップ全体ではなく、Board-Manのパネル内容だけをPNGへ書き出す
+8. 画像の存在と寸法を確認する
+9. 一時プロファイルをすべて削除する
+10. クリップボードへ無害な完了メッセージを残す
+11. 撮影前に通常版が起動していた場合だけ再起動する
 
-The app-side export path is compiled only into Debug builds and remains inactive unless `BOARDMAN_SCREENSHOT_OUTPUT` is present. Release builds and normal launches do not open or export the panel automatically.
+アプリ側の書き出し処理はDebugビルドだけに含まれ、`BOARDMAN_SCREENSHOT_OUTPUT`が指定された時だけ動きます。Releaseビルドや通常起動では、パネルの自動表示・自動保存・デモデータ作成を行いません。
 
-## Prerequisites
+## 必要環境
 
-- macOS 13 or later
+- macOS 13以降
 - Xcode
-- a built Board-Man app
-- permission to stop and reopen the local Board-Man process
+- 現在のソースから作成したDebug版Board-Man
+- ローカルのBoard-Manを一時停止・再起動する許可
 
-Build a current Debug app:
+## Debug版をビルド
 
 ```bash
 xcodebuild \
@@ -51,9 +57,9 @@ xcodebuild \
   build
 ```
 
-## Generate screenshots
+## README画像を生成
 
-Point the script at the app produced by the current source tree:
+現在のcheckoutから生成されたアプリを明示して実行します。
 
 ```bash
 APP_PATH="$(find "$HOME/Library/Developer/Xcode/DerivedData" \
@@ -66,9 +72,9 @@ BOARDMAN_SCREENSHOT_APP="$APP_PATH" \
   ./scripts/boardman/capture-readme-screenshots.sh
 ```
 
-Verify that `APP_PATH` belongs to the current checkout before running the script. Do not silently fall back to an older installed build when documenting a new UI change.
+`APP_PATH`が現在のcheckoutから作成されたものか確認してください。新しいUIを説明する時に、古いインストール済みアプリへ黙ってフォールバックしてはいけません。
 
-The script accepts an optional output directory:
+出力先を変更する場合:
 
 ```bash
 BOARDMAN_SCREENSHOT_OUTPUT_DIR=/tmp/boardman-screenshots \
@@ -76,37 +82,36 @@ BOARDMAN_SCREENSHOT_OUTPUT_DIR=/tmp/boardman-screenshots \
   ./scripts/boardman/capture-readme-screenshots.sh
 ```
 
-## Demo clipboard content
+## デモ内容
 
-English and Japanese scenes use fixed examples covering:
+履歴シーンには、次の種類を含む英語・日本語の固定例を使います。
 
-- the default shortcut
-- a meeting note
-- local-first history and Templates terminology
-- a design-review checklist
-- the public repository URL
-- a harmless Git command
-- a reply template
-- a release checklist
+- 既定ショートカット
+- 打ち合わせメモ
+- ローカルファーストの説明
+- デザイン確認項目
+- 公開リポジトリURL
+- 無害なGitコマンド
+- 返信文
+- リリース確認
 
-Do not replace these with copied production data, private URLs, real customer messages, tokens, passwords, or local file paths.
+定型文シーンには、返信、開発、リンクのデモグループを使います。実際の顧客メッセージ、非公開URL、token、パスワード、秘密鍵、ローカルファイルパスへ置き換えないでください。
 
-## Verification
-
-After generation:
+## 検証
 
 ```bash
 bash -n scripts/boardman/capture-readme-screenshots.sh
-find docs/assets/screenshots -maxdepth 1 -name 'board-man-*.png' -type f -print
+find docs/assets/screenshots -maxdepth 1 -name 'board-man-*.png' -type f -print | sort
 ```
 
-Then inspect every image and confirm:
+生成後は8枚すべてを確認します。
 
-- only demo content is visible
-- History, compact width, Settings, and Japanese scenes are correct
-- no row, Pin badge, timestamp, border, or text is clipped
-- the compact screenshot preserves horizontal spacing
-- language labels match the current product UI
-- image dimensions are non-zero and consistent with the requested scene size
+- 固定デモ内容以外が表示されていない
+- 英語・日本語の履歴、定型文、設定、コンパクト表示が揃っている
+- Pin、時刻、本文、境界線、ボタン、タブが切れていない
+- コンパクト表示でもPinと時刻の左右余白が残っている
+- 日本語では「定型文」、英語では「Templates」と表示される
+- 定型文画面にデモグループと選択中の内容が表示される
+- 画像寸法が0ではなく、指定したシーンサイズと整合する
 
-A successful script exit proves that files were produced. It does not replace visual review; a technically valid PNG can still contain an obvious layout defect.
+スクリプトの終了コードが0でも、見た目が正しいとは限りません。PNG生成確認に加えて、実画像の目視確認を必須とします。

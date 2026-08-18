@@ -42,7 +42,7 @@ seed_clipboard() {
       'デザイン確認：階層・余白・コントラスト・狭幅表示'
       'https://github.com/uniplanck/boardman'
       'git status --short --branch'
-      '丁寧な返信テンプレート：確認して本日中にご連絡します'
+      '確認しました。本日中にご連絡します。'
       'リリース前にテスト・署名・更新内容を確認する'
     )
   else
@@ -53,7 +53,7 @@ seed_clipboard() {
       'Design checklist: hierarchy · spacing · contrast · narrow width'
       'https://github.com/uniplanck/boardman'
       'git status --short --branch'
-      'Reply template: Thanks — I’ll review this today.'
+      'Thanks — I’ll review this today.'
       'Review tests, signing, and release notes before shipping'
     )
   fi
@@ -129,9 +129,13 @@ capture_scene() {
 }
 
 capture_scene english-history English history board-man-history-en.png 800 560
-capture_scene english-compact English history board-man-history-compact-en.png 700 560
+capture_scene english-templates English templates board-man-templates-en.png 800 760
 capture_scene english-settings English settings board-man-settings-en.png 800 820
+capture_scene english-compact English history board-man-history-compact-en.png 640 560
 capture_scene japanese-history 日本語 history board-man-history-ja.png 800 560
+capture_scene japanese-templates 日本語 templates board-man-templates-ja.png 800 760
+capture_scene japanese-settings 日本語 settings board-man-settings-ja.png 800 820
+capture_scene japanese-compact 日本語 history board-man-history-compact-ja.png 640 560
 
 cp "$OUTPUT_DIR/board-man-history-en.png" "$REPO_ROOT/docs/assets/board-man-main-screenshot.png"
 cp "$OUTPUT_DIR/board-man-history-en.png" "$REPO_ROOT/assets/readme/board-man-screenshot.png"
