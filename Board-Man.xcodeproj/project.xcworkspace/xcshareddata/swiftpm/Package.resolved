@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/clipy/sauce",
       "state" : {
-        "revision" : "c9ebdcfddb4b94da5b9a6ebd113ab385edda88c1",
-        "version" : "2.5.0"
+        "revision" : "1fce89ccc9cbb091022c17ef8f9939901d4e951a",
+        "version" : "2.5.2"
       }
     },
     {
@@ -105,8 +105,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sparkle-project/Sparkle",
       "state" : {
-        "revision" : "6276ba2b404829d139c45ff98427cf90e2efc59b",
-        "version" : "2.9.2"
+        "revision" : "b6496a74a087257ef5e6da1c5b29a447a60f5bd7",
+        "version" : "2.9.4"
       }
     },
     {

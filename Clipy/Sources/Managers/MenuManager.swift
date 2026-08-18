@@ -153,6 +153,7 @@ extension MenuManager {
         // Prewarming can occur before all deterministic clipboard samples are seeded. Reload the
         // isolated profile immediately before capture so every README scene reflects the complete
         // demo history rather than the first item observed during prewarm.
+        seedReadmeScreenshotDataIfNeeded(for: scene)
         reloadBoardManPanelItems(panel)
         panel.prepareReadmeScreenshot(scene: scene, width: requestedWidth, height: requestedHeight)
 
@@ -161,6 +162,79 @@ extension MenuManager {
         }
 #endif
     }
+
+#if DEBUG
+    private func seedReadmeScreenshotDataIfNeeded(for scene: String) {
+        guard scene == "templates" || scene == "snippets" else { return }
+        guard realm.objects(CPYFolder.self).isEmpty else { return }
+
+        let language = BoardManLanguage.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
+        ).resolved
+        let groups: [(title: String, snippets: [(title: String, content: String)])]
+        if language == .japanese {
+            groups = [
+                (
+                    "返信",
+                    [
+                        ("確認返信", "確認しました。本日中にご連絡します。"),
+                        ("日程調整", "候補日時を3つお送りします。")
+                    ]
+                ),
+                (
+                    "開発",
+                    [
+                        ("Git状態", "git status --short --branch"),
+                        ("リリース確認", "テスト・署名・更新内容を確認する")
+                    ]
+                ),
+                (
+                    "リンク",
+                    [("Board-Man", "https://github.com/uniplanck/boardman")]
+                )
+            ]
+        } else {
+            groups = [
+                (
+                    "Replies",
+                    [
+                        ("Review reply", "Thanks — I’ll review this today."),
+                        ("Scheduling", "I’ll send three candidate times.")
+                    ]
+                ),
+                (
+                    "Development",
+                    [
+                        ("Git status", "git status --short --branch"),
+                        ("Release check", "Review tests, signing, and release notes")
+                    ]
+                ),
+                (
+                    "Links",
+                    [("Board-Man", "https://github.com/uniplanck/boardman")]
+                )
+            ]
+        }
+
+        realm.transaction {
+            for (folderIndex, group) in groups.enumerated() {
+                let folder = CPYFolder()
+                folder.index = folderIndex
+                folder.title = group.title
+                folder.enable = true
+                for (snippetIndex, value) in group.snippets.enumerated() {
+                    let snippet = CPYSnippet()
+                    snippet.index = snippetIndex
+                    snippet.title = value.title
+                    snippet.content = value.content
+                    snippet.enable = true
+                    folder.snippets.append(snippet)
+                }
+                realm.add(folder)
+            }
+        }
+    }
+#endif
 
     func prewarmBoardManPanel() {
         guard boardManPanel == nil else { return }
@@ -7650,6 +7724,9 @@ class BoardManPanel: NSPanel {
             selectSettingsTab()
         case "templates", "snippets":
             openSnippetsManagerMode(categoryIdentifier: nil)
+            if !historyItems.isEmpty {
+                setSelectedIndex(0)
+            }
         default:
             selectHistoryTab()
         }
