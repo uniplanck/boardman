@@ -909,6 +909,8 @@ final class BoardManInteractionRuleTests {
         ))
         #expect(BoardManPanel.usesStackedHistorySettingsLayout(width: 519))
         #expect(!BoardManPanel.usesStackedHistorySettingsLayout(width: 520))
+        #expect(BoardManPanel.usesStackedAppearanceSettingsLayout(width: 469))
+        #expect(!BoardManPanel.usesStackedAppearanceSettingsLayout(width: 470))
         #expect(BoardManHistoryRowView.backgroundKind(
             isSelected: true,
             isHovered: false,
@@ -1289,7 +1291,7 @@ final class BoardManFilterSettingsTests {
 final class BoardManPanelLayoutTests {
 
     @Test
-    func majorTabsAndSettingsCategoriesStayInsidePanel() async {
+    func majorTabsAndSettingsCategoriesStayInsidePanel() async throws {
         let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
         Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
         defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
@@ -1400,7 +1402,8 @@ final class BoardManPanelLayoutTests {
         if let appearanceCategory = categories.first(where: { $0.title == "Appearance" }) {
             _ = appearanceCategory.sendAction(appearanceCategory.action, to: appearanceCategory.target)
             await settlePanelLayout(panel)
-            let popupTitles = allSubviews(of: root)
+            let appearanceViews = allSubviews(of: root)
+            let popupTitles = appearanceViews
                 .compactMap { $0 as? NSPopUpButton }
                 .filter { !$0.isHidden }
                 .map { Set($0.itemTitles) }
@@ -1422,6 +1425,48 @@ final class BoardManPanelLayoutTests {
             #expect(popupTitles.contains { $0.contains("Teal") && $0.contains("Green") && $0.contains("Purple") && $0.contains("Indigo") },
                     "Expanded Used colors are missing.")
 
+            func view<T: NSView>(_ identifier: String, as type: T.Type = T.self) -> T? {
+                appearanceViews.first { $0.identifier?.rawValue == identifier } as? T
+            }
+            let previewCard = try #require(view("BoardManAppearancePreviewCard", as: BoardManSettingsCardView.self))
+            let preview = try #require(view("BoardManAppearanceLivePreview", as: BoardManAppearancePreviewView.self))
+            let layoutCard = try #require(view("BoardManAppearanceLayoutCard", as: BoardManSettingsCardView.self))
+            let timestampCard = try #require(view("BoardManAppearanceTimestampCard", as: BoardManSettingsCardView.self))
+            let usageCard = try #require(view("BoardManAppearanceUsageCard", as: BoardManSettingsCardView.self))
+            let themeCard = try #require(view("BoardManAppearanceThemeCard", as: BoardManSettingsCardView.self))
+            let advancedCard = try #require(view("BoardManAppearanceAdvancedCard", as: BoardManSettingsCardView.self))
+            let advancedToggle = try #require(view("BoardManAppearanceAdvancedToggle", as: NSButton.self))
+
+            #expect(previewCard.isHidden == false && preview.isHidden == false)
+            #expect(previewCard.frame.contains(preview.frame), "Live preview must remain inside the preview card.")
+            #expect(layoutCard.frame.minY > timestampCard.frame.maxY,
+                    "Narrow Appearance settings should stack Layout above Timestamp.")
+            #expect(timestampCard.frame.minY > usageCard.frame.maxY,
+                    "Narrow Appearance settings should stack Timestamp above Usage.")
+            #expect(usageCard.frame.minY > themeCard.frame.maxY,
+                    "Narrow Appearance settings should stack Usage above Theme.")
+            #expect(advancedToggle.isHidden == false)
+            #expect(advancedCard.isHidden, "Advanced appearance settings should start collapsed.")
+
+            let relativePopupIDs = [
+                "BoardManRelativeNumberStylePopup", "BoardManRelativeUnitStylePopup",
+                "BoardManRelativeSuffixStylePopup", "BoardManRelativeNowStylePopup"
+            ]
+            let relativePopups = relativePopupIDs.compactMap { identifier in
+                appearanceViews.first { $0.identifier?.rawValue == identifier } as? NSPopUpButton
+            }
+            #expect(relativePopups.count == relativePopupIDs.count)
+            #expect(relativePopups.allSatisfy { $0.isHidden },
+                    "Fine-grained relative-time controls should stay out of the default view.")
+
+            let collapsedDocumentHeight = settingsScroll?.documentView?.frame.height ?? 0
+            _ = advancedToggle.sendAction(advancedToggle.action, to: advancedToggle.target)
+            await settlePanelLayout(panel)
+            #expect(advancedCard.isHidden == false)
+            #expect(relativePopups.allSatisfy { !$0.isHidden })
+            #expect((settingsScroll?.documentView?.frame.height ?? 0) > collapsedDocumentHeight,
+                    "Expanding advanced appearance should grow the scroll document rather than cramming controls.")
+
             let visiblePopups = allSubviews(of: root)
                 .compactMap { $0 as? NSPopUpButton }
                 .filter { !$0.isHidden }
@@ -1432,28 +1477,17 @@ final class BoardManPanelLayoutTests {
             let timestampPopup = visiblePopups.first { Set(["Relative", "24-hour", "12-hour"]).isSubset(of: Set($0.itemTitles)) }
             let positionPopup = visiblePopups.first { Set(["Hidden", "Below", "Left", "Right"]).isSubset(of: Set($0.itemTitles)) }
             let alignedPopups = [themePopup, modePopup, uiPopup, fontPopup, timestampPopup, positionPopup].compactMap { $0 }
-            #expect(alignedPopups.count == 6, "Appearance form popups could not be identified.")
-            for popup in alignedPopups {
+            #expect(alignedPopups.count == 6, "Appearance core popups could not be identified.")
+            for popup in alignedPopups + relativePopups {
                 #expect(abs(popup.frame.height - 30) <= 0.5,
-                        "Appearance popup height is not aligned to the 30pt form grid.")
-            }
-            if let themePopup, let uiPopup {
-                #expect(abs(themePopup.frame.minX - uiPopup.frame.minX) <= 0.5)
-                #expect(abs(themePopup.frame.width - uiPopup.frame.width) <= 0.5)
-            }
-            if let modePopup, let fontPopup {
-                #expect(abs(modePopup.frame.minX - fontPopup.frame.minX) <= 0.5)
-                #expect(abs(modePopup.frame.width - fontPopup.frame.width) <= 0.5)
-            }
-            if let timestampPopup, let positionPopup {
-                #expect(abs(timestampPopup.frame.width - positionPopup.frame.width) <= 0.5)
-                #expect(abs(timestampPopup.frame.minY - positionPopup.frame.minY) <= 0.5)
+                        "Appearance popup height is not aligned to the 30pt control grid.")
             }
 
             let textScale = allSubviews(of: root).first { $0.identifier?.rawValue == "BoardManTextPreviewScaleSlider" }
             let imageScale = allSubviews(of: root).first { $0.identifier?.rawValue == "BoardManImagePreviewScaleSlider" }
             #expect(textScale is NSSlider)
             #expect(imageScale is NSSlider)
+            #expect(textScale?.isHidden == false && imageScale?.isHidden == false)
             #expect(abs((textScale?.frame.width ?? 0) - (imageScale?.frame.width ?? 0)) <= 0.5)
         }
 

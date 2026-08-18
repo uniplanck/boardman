@@ -1898,6 +1898,15 @@ func boardManText(_ english: String) -> String {
         "Updates": "アップデート", "License": "ライセンス",
         "Startup, menu bar, and keyboard shortcuts": "起動、メニューバー、キーボードショートカット",
         "Layout, timestamps, counts, and theme": "レイアウト、時刻、回数、テーマ",
+        "Preview": "プレビュー", "Layout": "レイアウト", "Timestamp": "時刻", "Usage": "使用状況", "Theme & Colors": "テーマと色",
+        "Advanced settings": "詳細設定", "Show advanced settings": "詳細設定を表示", "Hide advanced settings": "詳細設定を隠す",
+        "See changes instantly before returning to History.": "履歴へ戻る前に変更結果をその場で確認できます。",
+        "Panel size, row structure, and visual density.": "パネルサイズ、行構造、表示密度を調整します。",
+        "Choose how time is formatted and placed.": "時刻の形式と表示位置を調整します。",
+        "Paste counts and used-item treatment.": "使用回数と使用済み項目の見え方を調整します。",
+        "Theme, mode, typography, and surface style.": "テーマ、表示モード、フォント、表面スタイルを調整します。",
+        "Relative time details, custom colors, and preview scale.": "相対時刻の詳細、カスタム色、プレビュー倍率を調整します。",
+        "Design review notes": "デザインレビューのメモ", "Release checklist": "リリース確認リスト",
         "Retention, duplicate handling, and cleanup": "保存件数、重複処理、履歴削除",
         "Folders, snippets, and folder shortcuts": "グループ、スニペット、グループショートカット",
         "Excluded apps, stored data, and filters": "除外アプリ、保存データ、フィルター",
@@ -2029,6 +2038,8 @@ func boardManText(_ english: String) -> String {
     let chinese: [String: String] = [
         "History": "历史", "Snippets": "模板", "Settings": "设置", "General": "常规",
         "Appearance": "外观", "Privacy": "隐私", "Updates": "更新", "License": "许可证",
+        "Preview": "预览", "Layout": "布局", "Timestamp": "时间", "Usage": "使用情况", "Theme & Colors": "主题与颜色",
+        "Advanced settings": "高级设置", "Show advanced settings": "显示高级设置", "Hide advanced settings": "隐藏高级设置",
         "Language": "语言", "Window mode": "窗口模式", "Show in Dock": "在 Dock 中显示",
         "Rows": "行号", "Time": "时间", "Position": "位置", "Relative format": "相对时间格式", "Number": "数字", "Unit": "单位", "Suffix": "后缀", "Under 1 minute": "1分钟以内", "Count": "使用次数",
         "Style": "样式", "Used": "已使用", "Theme": "主题", "Mode": "模式", "Font": "字体",
@@ -2051,6 +2062,8 @@ func boardManText(_ english: String) -> String {
     let korean: [String: String] = [
         "History": "기록", "Snippets": "문구", "Settings": "설정", "General": "일반",
         "Appearance": "모양", "Privacy": "개인정보", "Updates": "업데이트", "License": "라이선스",
+        "Preview": "미리보기", "Layout": "레이아웃", "Timestamp": "시간", "Usage": "사용 현황", "Theme & Colors": "테마 및 색상",
+        "Advanced settings": "고급 설정", "Show advanced settings": "고급 설정 표시", "Hide advanced settings": "고급 설정 숨기기",
         "Language": "언어", "Window mode": "윈도우 모드", "Show in Dock": "Dock에 표시",
         "Rows": "행 번호", "Time": "시간", "Position": "위치", "Relative format": "상대 시간 형식", "Number": "숫자", "Unit": "단위", "Suffix": "표기", "Under 1 minute": "1분 이내", "Count": "사용 횟수",
         "Style": "스타일", "Used": "사용됨", "Theme": "테마", "Mode": "모드", "Font": "폰트",
@@ -3150,6 +3163,244 @@ final class BoardManSettingsCategoryButton: NSButton {
     }
 }
 
+final class BoardManSettingsCardView: NSView {
+    private let iconView = NSImageView(frame: .zero)
+    let titleLabel = NSTextField(labelWithString: "")
+    let detailLabel = NSTextField(labelWithString: "")
+
+    init(title: String, detail: String, symbolName: String) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 12
+        layer?.borderWidth = 1
+
+        iconView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title)
+        iconView.imageScaling = .scaleProportionallyDown
+        if #available(macOS 10.14, *) {
+            iconView.contentTintColor = .secondaryLabelColor
+        }
+        addSubview(iconView)
+
+        titleLabel.stringValue = title
+        titleLabel.font = NSFont.systemFont(ofSize: 12.5, weight: .semibold)
+        titleLabel.textColor = .labelColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+        addSubview(titleLabel)
+
+        detailLabel.stringValue = detail
+        detailLabel.font = NSFont.systemFont(ofSize: 10.5)
+        detailLabel.textColor = .secondaryLabelColor
+        detailLabel.lineBreakMode = .byTruncatingTail
+        addSubview(detailLabel)
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override func layout() {
+        super.layout()
+        let headerY = max(8, bounds.height - 34)
+        iconView.frame = NSIntegralRect(NSRect(x: 14, y: headerY + 1, width: 16, height: 16))
+        titleLabel.frame = NSIntegralRect(NSRect(x: 38, y: headerY + 1, width: max(80, bounds.width - 52), height: 17))
+        detailLabel.frame = NSIntegralRect(NSRect(x: 38, y: headerY - 15, width: max(80, bounds.width - 52), height: 14))
+    }
+
+    func updateText(title: String, detail: String) {
+        titleLabel.stringValue = title
+        detailLabel.stringValue = detail
+        iconView.image?.accessibilityDescription = title
+    }
+
+    func applyStyle(accentColor: NSColor, surfaceColor: NSColor, edgeColor: NSColor, simpleStyle: Bool) {
+        layer?.backgroundColor = surfaceColor.cgColor
+        layer?.borderColor = edgeColor.cgColor
+        layer?.cornerRadius = simpleStyle ? 9 : 12
+        titleLabel.textColor = .labelColor
+        detailLabel.textColor = .secondaryLabelColor
+        if #available(macOS 10.14, *) {
+            iconView.contentTintColor = accentColor
+        }
+    }
+}
+
+final class BoardManAppearancePreviewView: NSView {
+    struct Snapshot {
+        let accentColor: NSColor
+        let panelColor: NSColor
+        let usedColor: NSColor
+        let font: NSFont
+        let showRows: Bool
+        let showCount: Bool
+        let timestampPosition: BoardManTimestampPosition
+        let timestampText: String
+        let compactCount: Bool
+        let simpleStyle: Bool
+    }
+
+    private var snapshot = Snapshot(
+        accentColor: .controlAccentColor,
+        panelColor: .controlBackgroundColor,
+        usedColor: .systemGray,
+        font: .systemFont(ofSize: 11),
+        showRows: true,
+        showCount: true,
+        timestampPosition: .right,
+        timestampText: "now",
+        compactCount: false,
+        simpleStyle: false
+    )
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 10
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    func update(_ snapshot: Snapshot) {
+        self.snapshot = snapshot
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        guard bounds.width > 40, bounds.height > 40 else { return }
+
+        let outer = bounds.insetBy(dx: 1, dy: 1)
+        let outerPath = NSBezierPath(roundedRect: outer, xRadius: 10, yRadius: 10)
+        snapshot.panelColor.withAlphaComponent(0.72).setFill()
+        outerPath.fill()
+        snapshot.accentColor.withAlphaComponent(snapshot.simpleStyle ? 0.12 : 0.24).setStroke()
+        outerPath.lineWidth = 1
+        outerPath.stroke()
+
+        let headerHeight: CGFloat = 24
+        let headerRect = NSRect(x: outer.minX + 1, y: outer.maxY - headerHeight - 1, width: outer.width - 2, height: headerHeight)
+        let headerPath = NSBezierPath(roundedRect: headerRect, xRadius: 9, yRadius: 9)
+        snapshot.accentColor.withAlphaComponent(snapshot.simpleStyle ? 0.05 : 0.09).setFill()
+        headerPath.fill()
+
+        drawText(
+            boardManText("History"),
+            in: NSRect(x: headerRect.minX + 12, y: headerRect.minY + 5, width: 80, height: 14),
+            font: NSFont.systemFont(ofSize: 10.5, weight: .semibold),
+            color: .labelColor,
+            alignment: .left
+        )
+        drawText(
+            boardManText("Preview"),
+            in: NSRect(x: headerRect.maxX - 82, y: headerRect.minY + 5, width: 70, height: 14),
+            font: NSFont.systemFont(ofSize: 9.5, weight: .medium),
+            color: snapshot.accentColor,
+            alignment: .right
+        )
+
+        let rowsTop = headerRect.minY - 5
+        let rowsBottom = outer.minY + 7
+        let rowGap: CGFloat = 5
+        let rowHeight = max(26, floor((rowsTop - rowsBottom - rowGap) / 2))
+        let rowWidth = outer.width - 16
+        let firstFrame = NSRect(x: outer.minX + 8, y: rowsBottom + rowHeight + rowGap, width: rowWidth, height: rowHeight)
+        let secondFrame = NSRect(x: outer.minX + 8, y: rowsBottom, width: rowWidth, height: rowHeight)
+        drawPreviewRow(frame: firstFrame, index: 1, text: boardManText("Design review notes"), count: 3, used: false)
+        drawPreviewRow(frame: secondFrame, index: 2, text: boardManText("Release checklist"), count: 7, used: true)
+    }
+
+    private func drawPreviewRow(frame: NSRect, index: Int, text: String, count: Int, used: Bool) {
+        let rowPath = NSBezierPath(roundedRect: frame, xRadius: 7, yRadius: 7)
+        (used ? snapshot.usedColor.withAlphaComponent(0.15) : NSColor.labelColor.withAlphaComponent(0.035)).setFill()
+        rowPath.fill()
+        (used ? snapshot.usedColor.withAlphaComponent(0.28) : NSColor.separatorColor.withAlphaComponent(0.20)).setStroke()
+        rowPath.lineWidth = 0.8
+        rowPath.stroke()
+
+        var left = frame.minX + 10
+        let centerY = frame.midY
+        if snapshot.showRows {
+            drawText(
+                "\(index)",
+                in: NSRect(x: left, y: centerY - 7, width: 18, height: 14),
+                font: NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .medium),
+                color: .tertiaryLabelColor,
+                alignment: .center
+            )
+            left += 26
+        }
+
+        var right = frame.maxX - 10
+        if snapshot.showCount {
+            let countWidth: CGFloat = snapshot.compactCount ? 20 : 30
+            let countRect = NSRect(x: right - countWidth, y: centerY - 9, width: countWidth, height: 18)
+            let badgePath = NSBezierPath(roundedRect: countRect, xRadius: 9, yRadius: 9)
+            snapshot.accentColor.withAlphaComponent(0.16).setFill()
+            badgePath.fill()
+            drawText(
+                snapshot.compactCount ? "\(count)" : "×\(count)",
+                in: countRect.insetBy(dx: 3, dy: 2),
+                font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold),
+                color: snapshot.accentColor,
+                alignment: .center
+            )
+            right = countRect.minX - 8
+        }
+
+        let timestampWidth: CGFloat = 48
+        if snapshot.timestampPosition == .left {
+            drawText(snapshot.timestampText,
+                     in: NSRect(x: left, y: centerY - 7, width: timestampWidth, height: 14),
+                     font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium),
+                     color: .secondaryLabelColor,
+                     alignment: .center)
+            left += timestampWidth + 8
+        } else if snapshot.timestampPosition == .right {
+            drawText(snapshot.timestampText,
+                     in: NSRect(x: right - timestampWidth, y: centerY - 7, width: timestampWidth, height: 14),
+                     font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium),
+                     color: .secondaryLabelColor,
+                     alignment: .center)
+            right -= timestampWidth + 8
+        }
+
+        let titleY = snapshot.timestampPosition == .below ? centerY + 1 : centerY - 7
+        drawText(
+            text,
+            in: NSRect(x: left, y: titleY, width: max(30, right - left), height: 14),
+            font: snapshot.font,
+            color: .labelColor,
+            alignment: .left
+        )
+        if snapshot.timestampPosition == .below {
+            drawText(snapshot.timestampText,
+                     in: NSRect(x: left, y: centerY - 14, width: max(30, right - left), height: 12),
+                     font: NSFont.monospacedDigitSystemFont(ofSize: 8.5, weight: .regular),
+                     color: .secondaryLabelColor,
+                     alignment: .left)
+        }
+    }
+
+    private func drawText(_ text: String,
+                          in rect: NSRect,
+                          font: NSFont,
+                          color: NSColor,
+                          alignment: NSTextAlignment) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineBreakMode = .byTruncatingTail
+        (text as NSString).draw(
+            in: rect,
+            withAttributes: [
+                .font: font,
+                .foregroundColor: color,
+                .paragraphStyle: paragraph
+            ]
+        )
+    }
+}
+
 final class BoardManHeaderSegmentedControl: NSSegmentedControl {
     private var hoverTrackingArea: NSTrackingArea?
     private(set) var hoveredSegment = -1
@@ -3812,6 +4063,15 @@ class BoardManPanel: NSPanel {
     private var imagePreviewScaleSlider: NSSlider?
     private var imagePreviewScaleValueLabel: NSTextField?
     private var previewScaleProNoteLabel: NSTextField?
+    private var appearancePreviewCard: BoardManSettingsCardView?
+    private var appearanceLayoutCard: BoardManSettingsCardView?
+    private var appearanceTimestampCard: BoardManSettingsCardView?
+    private var appearanceUsageCard: BoardManSettingsCardView?
+    private var appearanceThemeCard: BoardManSettingsCardView?
+    private var appearanceAdvancedCard: BoardManSettingsCardView?
+    private var appearancePreviewView: BoardManAppearancePreviewView?
+    private var appearanceAdvancedButton: NSButton?
+    private var appearanceAdvancedExpanded = false
     private var snippetGroupProNoteLabel: NSTextField?
     private var exportHistoryCSVButton: NSButton?
     private var privacySectionLabel: NSTextField?
@@ -4074,6 +4334,10 @@ class BoardManPanel: NSPanel {
 
     static func usesStackedHistorySettingsLayout(width: CGFloat) -> Bool {
         return width < 520
+    }
+
+    static func usesStackedAppearanceSettingsLayout(width: CGFloat) -> Bool {
+        return width < 470
     }
 
     static func restoredSnippetSelectionIndex(origin: Int?, itemCount: Int) -> Int {
@@ -4958,6 +5222,78 @@ class BoardManPanel: NSPanel {
         manageSnippets.toolTip = "Opens the Board-Man Snippets tab. Existing snippet shortcuts are preserved."
         contentView.addSubview(manageSnippets)
         manageSnippetsButton = manageSnippets
+
+        let previewCard = BoardManSettingsCardView(
+            title: boardManText("Preview"),
+            detail: boardManText("See changes instantly before returning to History."),
+            symbolName: "rectangle.on.rectangle"
+        )
+        previewCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearancePreviewCard")
+        contentView.addSubview(previewCard)
+        appearancePreviewCard = previewCard
+
+        let previewSurface = BoardManAppearancePreviewView(frame: .zero)
+        previewSurface.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceLivePreview")
+        contentView.addSubview(previewSurface)
+        appearancePreviewView = previewSurface
+
+        let layoutCard = BoardManSettingsCardView(
+            title: boardManText("Layout"),
+            detail: boardManText("Panel size, row structure, and visual density."),
+            symbolName: "rectangle.3.group"
+        )
+        layoutCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceLayoutCard")
+        contentView.addSubview(layoutCard)
+        appearanceLayoutCard = layoutCard
+
+        let timestampCard = BoardManSettingsCardView(
+            title: boardManText("Timestamp"),
+            detail: boardManText("Choose how time is formatted and placed."),
+            symbolName: "clock"
+        )
+        timestampCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceTimestampCard")
+        contentView.addSubview(timestampCard)
+        appearanceTimestampCard = timestampCard
+
+        let usageCard = BoardManSettingsCardView(
+            title: boardManText("Usage"),
+            detail: boardManText("Paste counts and used-item treatment."),
+            symbolName: "chart.bar"
+        )
+        usageCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceUsageCard")
+        contentView.addSubview(usageCard)
+        appearanceUsageCard = usageCard
+
+        let themeCard = BoardManSettingsCardView(
+            title: boardManText("Theme & Colors"),
+            detail: boardManText("Theme, mode, typography, and surface style."),
+            symbolName: "paintpalette"
+        )
+        themeCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceThemeCard")
+        contentView.addSubview(themeCard)
+        appearanceThemeCard = themeCard
+
+        let advancedCard = BoardManSettingsCardView(
+            title: boardManText("Advanced settings"),
+            detail: boardManText("Relative time details, custom colors, and preview scale."),
+            symbolName: "slider.horizontal.3"
+        )
+        advancedCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceAdvancedCard")
+        contentView.addSubview(advancedCard)
+        appearanceAdvancedCard = advancedCard
+
+        let advancedButton = NSButton(
+            title: boardManText("Show advanced settings"),
+            target: self,
+            action: #selector(toggleAppearanceAdvancedSettings(_:))
+        )
+        advancedButton.bezelStyle = .inline
+        advancedButton.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        advancedButton.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)
+        advancedButton.imagePosition = .imageLeading
+        advancedButton.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceAdvancedToggle")
+        contentView.addSubview(advancedButton)
+        appearanceAdvancedButton = advancedButton
 
         let viewTitle = BoardManPanel.makeSectionLabel("Appearance")
         contentView.addSubview(viewTitle)
@@ -6216,6 +6552,8 @@ class BoardManPanel: NSPanel {
             snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetGroupProNoteLabel,
             snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton,
             snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton,
+            appearancePreviewCard, appearanceLayoutCard, appearanceTimestampCard, appearanceUsageCard, appearanceThemeCard,
+            appearanceAdvancedCard, appearancePreviewView, appearanceAdvancedButton,
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, timestampPositionLabel, timestampPositionPopup,
             relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
             relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
@@ -6314,6 +6652,42 @@ class BoardManPanel: NSPanel {
         previewBubblePanel?.appearance = appearanceMode.appearance
     }
 
+    private func refreshAppearancePreview() {
+        guard let preview = appearancePreviewView else { return }
+        let defaults = AppEnvironment.current.defaults
+        let showRows = defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true
+        let showCount = defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true
+        let format = BoardManPanel.allowedTimestampFormat(defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat))
+        let timestamp = BoardManPanel.timestampText(
+            for: Int(Date().addingTimeInterval(-4_200).timeIntervalSince1970),
+            format: format == "none" ? "relative" : format
+        )
+        let hasCustomPanelColor = defaults.string(forKey: Constants.UserDefaults.boardManCustomPanelColor) != nil
+        let panelColor = hasCustomPanelColor
+            ? customPanelTintColor
+            : themePreset.surfaceTintColor(
+                useLiquidGlass: isLiquidGlassEnabled && uiStyle != .simple,
+                lighten: isThemeLightenEnabled
+            )
+        let hasCustomUsedColor = defaults.string(forKey: Constants.UserDefaults.boardManCustomUsedColor) != nil
+        let usedColor = hasCustomUsedColor ? customUsedTintColor : NSColor.systemGray
+        let countStyle = BoardManPanel.allowedUsageCountStyle(
+            defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)
+        )
+        preview.update(.init(
+            accentColor: themeAccentColor,
+            panelColor: panelColor,
+            usedColor: usedColor,
+            font: fontChoice.font(ofSize: 10.5, weight: .medium),
+            showRows: showRows,
+            showCount: showCount,
+            timestampPosition: timestampPosition,
+            timestampText: timestamp,
+            compactCount: countStyle == "compact",
+            simpleStyle: uiStyle == .simple
+        ))
+    }
+
     private func applyLocalizedStrings() {
         func rebuildPopup(_ popup: NSPopUpButton?, entries: [(raw: String, title: String)], selectedRaw: String) {
             guard let popup else { return }
@@ -6341,6 +6715,33 @@ class BoardManPanel: NSPanel {
         generalSectionLabel?.stringValue = boardManText("General")
         shortcutSectionLabel?.stringValue = boardManText("Keyboard Shortcuts")
         viewSectionLabel?.stringValue = boardManText("Appearance")
+        appearancePreviewCard?.updateText(
+            title: boardManText("Preview"),
+            detail: boardManText("See changes instantly before returning to History.")
+        )
+        appearanceLayoutCard?.updateText(
+            title: boardManText("Layout"),
+            detail: boardManText("Panel size, row structure, and visual density.")
+        )
+        appearanceTimestampCard?.updateText(
+            title: boardManText("Timestamp"),
+            detail: boardManText("Choose how time is formatted and placed.")
+        )
+        appearanceUsageCard?.updateText(
+            title: boardManText("Usage"),
+            detail: boardManText("Paste counts and used-item treatment.")
+        )
+        appearanceThemeCard?.updateText(
+            title: boardManText("Theme & Colors"),
+            detail: boardManText("Theme, mode, typography, and surface style.")
+        )
+        appearanceAdvancedCard?.updateText(
+            title: boardManText("Advanced settings"),
+            detail: boardManText("Relative time details, custom colors, and preview scale.")
+        )
+        appearanceAdvancedButton?.title = boardManText(
+            appearanceAdvancedExpanded ? "Hide advanced settings" : "Show advanced settings"
+        )
         historySectionLabel?.stringValue = boardManText("History")
         snippetSettingsSectionLabel?.stringValue = boardManText("Snippets")
         privacySectionLabel?.stringValue = boardManText("Privacy")
@@ -6619,6 +7020,25 @@ class BoardManPanel: NSPanel {
         settingsBackgroundView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         settingsBackgroundView?.layer?.borderWidth = 1
         settingsBackgroundView?.layer?.shadowOpacity = 0
+        let cardSurface = useGlass
+            ? surfaceTint.withAlphaComponent(simpleStyle ? 0.22 : 0.34)
+            : NSColor.controlBackgroundColor.withAlphaComponent(simpleStyle ? 0.54 : 0.76)
+        let cardEdge = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme)
+            .withAlphaComponent(simpleStyle ? 0.22 : 0.48)
+        [appearancePreviewCard, appearanceLayoutCard, appearanceTimestampCard,
+         appearanceUsageCard, appearanceThemeCard, appearanceAdvancedCard].forEach { card in
+            card?.applyStyle(
+                accentColor: themePreset == .defaultPreset ? NSColor.secondaryLabelColor : accentColor,
+                surfaceColor: cardSurface,
+                edgeColor: cardEdge,
+                simpleStyle: simpleStyle
+            )
+        }
+        appearancePreviewView?.layer?.backgroundColor = NSColor.clear.cgColor
+        if #available(macOS 10.14, *) {
+            appearanceAdvancedButton?.contentTintColor = themePreset == .defaultPreset ? .secondaryLabelColor : accentColor
+        }
+        refreshAppearancePreview()
         scrollView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.30)
             : tintColor).cgColor
@@ -6844,7 +7264,10 @@ class BoardManPanel: NSPanel {
         settingsBackgroundView?.frame = settingsFrame
         settingsScrollView?.isHidden = !isSettings
         settingsScrollView?.frame = settingsFrame
-        let documentHeight = settingsDocumentHeight(viewportHeight: settingsViewportHeight)
+        let documentHeight = settingsDocumentHeight(
+            viewportHeight: settingsViewportHeight,
+            contentWidth: settingsContentWidth
+        )
         settingsDocumentView?.frame = NSRect(x: 0, y: 0, width: settingsContentWidth, height: documentHeight)
         layoutInlineSettingsControls(margin: 0, width: settingsContentWidth, topY: documentHeight, isVisible: isSettings)
         if isSettings, shouldScrollSettingsToTop, let scroll = settingsScrollView {
@@ -7062,11 +7485,18 @@ class BoardManPanel: NSPanel {
         }
     }
 
-    private func settingsDocumentHeight(viewportHeight: CGFloat) -> CGFloat {
+    private func settingsDocumentHeight(viewportHeight: CGFloat, contentWidth: CGFloat) -> CGFloat {
+        let appearanceContentWidth = max(240, contentWidth - (LayoutMetrics.settingsInset * 2))
+        let stacksAppearanceCards = Self.usesStackedAppearanceSettingsLayout(width: appearanceContentWidth)
         let requiredHeight: CGFloat
         switch activeSettingsCategory {
         case .general: requiredHeight = 790
-        case .view: requiredHeight = 760
+        case .view:
+            if stacksAppearanceCards {
+                requiredHeight = appearanceAdvancedExpanded ? 1_490 : 1_120
+            } else {
+                requiredHeight = appearanceAdvancedExpanded ? 1_070 : 820
+            }
         case .history: requiredHeight = 730
         case .snippets: requiredHeight = 640
         case .privacy: requiredHeight = 690
@@ -7122,6 +7552,8 @@ class BoardManPanel: NSPanel {
             snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetGroupProNoteLabel,
             snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton,
             snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton,
+            appearancePreviewCard, appearanceLayoutCard, appearanceTimestampCard, appearanceUsageCard, appearanceThemeCard,
+            appearanceAdvancedCard, appearancePreviewView, appearanceAdvancedButton,
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, timestampPositionLabel, timestampPositionPopup,
             relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
             relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
@@ -7184,6 +7616,8 @@ class BoardManPanel: NSPanel {
         ]
         generalControls.append(contentsOf: globalShortcutRows.flatMap { $0.views }.map { Optional($0) })
         let viewControls: [NSView?] = [
+            appearancePreviewCard, appearanceLayoutCard, appearanceTimestampCard, appearanceUsageCard, appearanceThemeCard,
+            appearanceAdvancedCard, appearancePreviewView, appearanceAdvancedButton,
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup,
             timestampPositionLabel, timestampPositionPopup,
             relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
@@ -7282,58 +7716,260 @@ class BoardManPanel: NSPanel {
         }
 
         func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(viewSectionLabel, originX: originX, originY: originY, width: width)
-            let columnGap = LayoutMetrics.settingsColumnGap
-            let halfWidth = max(180, floor((width - columnGap) / 2))
-            let rightX = originX + halfWidth + columnGap
-            let compactLabelWidth: CGFloat = 72
+            viewSectionLabel?.isHidden = true
+            let cardGap: CGFloat = 14
+            let columnGap: CGFloat = 14
+            let stacksCards = Self.usesStackedAppearanceSettingsLayout(width: width)
+            let halfWidth = stacksCards ? width : max(188, floor((width - columnGap) / 2))
+            let rightX = stacksCards ? originX : originX + halfWidth + columnGap
+            let compactLabelWidth: CGFloat = stacksCards ? 82 : 64
+            let cardInset: CGFloat = 16
 
-            rowNumbersButton?.frame = NSRect(x: originX, y: originY - 40, width: halfWidth, height: 20)
-            usageCountButton?.frame = NSRect(x: rightX, y: originY - 40, width: halfWidth, height: 20)
-            placeLabeledRow(label: timestampLabel, control: timestampPopup, originX: originX, originY: originY - 84, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: timestampPositionLabel, control: timestampPositionPopup, originX: rightX, originY: originY - 84, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeNumberLabel, control: relativeNumberPopup, originX: originX, originY: originY - 122, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeUnitLabel, control: relativeUnitPopup, originX: rightX, originY: originY - 122, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeSuffixLabel, control: relativeSuffixPopup, originX: originX, originY: originY - 160, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeNowLabel, control: relativeNowPopup, originX: rightX, originY: originY - 160, width: halfWidth, labelWidth: compactLabelWidth)
+            let advancedControls: [NSView?] = [
+                relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
+                relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
+                customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
+                customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
+                customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
+                textPreviewScaleLabel, textPreviewScaleSlider, textPreviewScaleValueLabel,
+                imagePreviewScaleLabel, imagePreviewScaleSlider, imagePreviewScaleValueLabel, previewScaleProNoteLabel
+            ]
 
-            placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX, originY: originY - 198, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: rightX, originY: originY - 198, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: themePresetLabel, control: themePresetPopup, originX: originX, originY: originY - 236, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: appearanceModeLabel, control: appearanceModePopup, originX: rightX, originY: originY - 236, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: uiStyleLabel, control: uiStylePopup, originX: originX, originY: originY - 274, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: fontChoiceLabel, control: fontChoicePopup, originX: rightX, originY: originY - 274, width: halfWidth, labelWidth: compactLabelWidth)
+            let previewHeight: CGFloat = 148
+            let previewY = originY - previewHeight
+            appearancePreviewCard?.frame = NSIntegralRect(NSRect(x: originX, y: previewY, width: width, height: previewHeight))
+            appearancePreviewCard?.needsLayout = true
+            appearancePreviewView?.frame = NSIntegralRect(NSRect(
+                x: originX + cardInset,
+                y: previewY + 12,
+                width: max(160, width - (cardInset * 2)),
+                height: previewHeight - 58
+            ))
 
-            themeLightenButton?.frame = NSRect(x: originX, y: originY - 312, width: 128, height: 20)
-            heightControlLabel?.frame = NSRect(x: originX + 144, y: originY - 312, width: fieldLabelWidth, height: 16)
-            let heightControlX = originX + 144 + fieldLabelWidth + 12
-            heightDecreaseButton?.frame = NSRect(x: heightControlX, y: originY - 319, width: 30, height: rowH)
-            heightLabel?.frame = NSRect(x: heightControlX + 36, y: originY - 319, width: 64, height: rowH)
-            heightIncreaseButton?.frame = NSRect(x: heightControlX + 106, y: originY - 319, width: 30, height: rowH)
+            let layoutCardHeight: CGFloat = stacksCards ? 158 : 178
+            let timestampCardHeight: CGFloat = stacksCards ? 148 : 178
+            let layoutCardY = previewY - cardGap - layoutCardHeight
+            let timestampCardY = stacksCards
+                ? layoutCardY - cardGap - timestampCardHeight
+                : layoutCardY
+            appearanceLayoutCard?.frame = NSIntegralRect(NSRect(
+                x: originX,
+                y: layoutCardY,
+                width: halfWidth,
+                height: layoutCardHeight
+            ))
+            appearanceTimestampCard?.frame = NSIntegralRect(NSRect(
+                x: rightX,
+                y: timestampCardY,
+                width: halfWidth,
+                height: timestampCardHeight
+            ))
+            appearanceLayoutCard?.needsLayout = true
+            appearanceTimestampCard?.needsLayout = true
+
+            let layoutX = originX + cardInset
+            let layoutWidth = halfWidth - (cardInset * 2)
+            rowNumbersButton?.frame = NSIntegralRect(NSRect(
+                x: layoutX,
+                y: layoutCardY + layoutCardHeight - 72,
+                width: layoutWidth,
+                height: 20
+            ))
+            placeLabeledRow(
+                label: uiStyleLabel,
+                control: uiStylePopup,
+                originX: layoutX,
+                originY: layoutCardY + layoutCardHeight - 112,
+                width: layoutWidth,
+                labelWidth: compactLabelWidth
+            )
+            heightControlLabel?.frame = NSIntegralRect(NSRect(
+                x: layoutX,
+                y: layoutCardY + 19,
+                width: compactLabelWidth,
+                height: 16
+            ))
+            let heightControlX = layoutX + compactLabelWidth + 12
+            let heightValueWidth: CGFloat = max(52, min(68, layoutWidth - compactLabelWidth - 94))
+            heightDecreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX, y: layoutCardY + 12, width: 28, height: rowH))
+            heightLabel?.frame = NSIntegralRect(NSRect(x: heightControlX + 34, y: layoutCardY + 12, width: heightValueWidth, height: rowH))
+            heightIncreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX + 40 + heightValueWidth, y: layoutCardY + 12, width: 28, height: rowH))
+
+            let timestampX = rightX + cardInset
+            let timestampWidth = halfWidth - (cardInset * 2)
+            placeLabeledRow(
+                label: timestampLabel,
+                control: timestampPopup,
+                originX: timestampX,
+                originY: timestampCardY + timestampCardHeight - 86,
+                width: timestampWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: timestampPositionLabel,
+                control: timestampPositionPopup,
+                originX: timestampX,
+                originY: timestampCardY + timestampCardHeight - 126,
+                width: timestampWidth,
+                labelWidth: compactLabelWidth
+            )
+
+            let usageCardHeight: CGFloat = stacksCards ? 178 : 196
+            let themeCardHeight: CGFloat = stacksCards ? 218 : 196
+            let usageCardY = (stacksCards ? timestampCardY : layoutCardY) - cardGap - usageCardHeight
+            let themeCardY = stacksCards
+                ? usageCardY - cardGap - themeCardHeight
+                : usageCardY
+            appearanceUsageCard?.frame = NSIntegralRect(NSRect(
+                x: originX,
+                y: usageCardY,
+                width: halfWidth,
+                height: usageCardHeight
+            ))
+            appearanceThemeCard?.frame = NSIntegralRect(NSRect(
+                x: rightX,
+                y: themeCardY,
+                width: halfWidth,
+                height: themeCardHeight
+            ))
+            appearanceUsageCard?.needsLayout = true
+            appearanceThemeCard?.needsLayout = true
+
+            let usageX = originX + cardInset
+            let usageWidth = halfWidth - (cardInset * 2)
+            usageCountButton?.frame = NSIntegralRect(NSRect(
+                x: usageX,
+                y: usageCardY + usageCardHeight - 74,
+                width: usageWidth,
+                height: 20
+            ))
+            placeLabeledRow(
+                label: usageStyleLabel,
+                control: usageStylePopup,
+                originX: usageX,
+                originY: usageCardY + usageCardHeight - 116,
+                width: usageWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: usedItemStyleLabel,
+                control: usedItemStylePopup,
+                originX: usageX,
+                originY: usageCardY + usageCardHeight - 156,
+                width: usageWidth,
+                labelWidth: compactLabelWidth
+            )
+
+            let themeX = rightX + cardInset
+            let themeWidth = halfWidth - (cardInset * 2)
+            placeLabeledRow(
+                label: themePresetLabel,
+                control: themePresetPopup,
+                originX: themeX,
+                originY: themeCardY + themeCardHeight - 78,
+                width: themeWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: appearanceModeLabel,
+                control: appearanceModePopup,
+                originX: themeX,
+                originY: themeCardY + themeCardHeight - 118,
+                width: themeWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: fontChoiceLabel,
+                control: fontChoicePopup,
+                originX: themeX,
+                originY: themeCardY + themeCardHeight - 158,
+                width: themeWidth,
+                labelWidth: compactLabelWidth
+            )
+            themeLightenButton?.frame = NSIntegralRect(NSRect(
+                x: themeX,
+                y: themeCardY + 15,
+                width: themeWidth,
+                height: 20
+            ))
+
+            let toggleY = (stacksCards ? themeCardY : usageCardY) - 36
+            appearanceAdvancedButton?.frame = NSIntegralRect(NSRect(x: originX, y: toggleY, width: min(210, width), height: 26))
+            appearanceAdvancedButton?.title = boardManText(
+                appearanceAdvancedExpanded ? "Hide advanced settings" : "Show advanced settings"
+            )
+            appearanceAdvancedButton?.image = NSImage(
+                systemSymbolName: appearanceAdvancedExpanded ? "chevron.down" : "chevron.right",
+                accessibilityDescription: nil
+            )
+
+            guard appearanceAdvancedExpanded else {
+                appearanceAdvancedCard?.isHidden = true
+                advancedControls.forEach { $0?.isHidden = true }
+                refreshAppearancePreview()
+                return
+            }
+
+            appearanceAdvancedCard?.isHidden = false
+            advancedControls.forEach { $0?.isHidden = false }
+            let advancedHeight: CGFloat = 350
+            let advancedY = toggleY - cardGap - advancedHeight
+            appearanceAdvancedCard?.frame = NSIntegralRect(NSRect(x: originX, y: advancedY, width: width, height: advancedHeight))
+            appearanceAdvancedCard?.needsLayout = true
+
+            let advancedX = originX + cardInset
+            let advancedWidth = width - (cardInset * 2)
+            let advancedHalfWidth = max(180, floor((advancedWidth - columnGap) / 2))
+            let advancedRightX = advancedX + advancedHalfWidth + columnGap
+            placeLabeledRow(label: relativeNumberLabel, control: relativeNumberPopup,
+                            originX: advancedX, originY: advancedY + advancedHeight - 92,
+                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: relativeUnitLabel, control: relativeUnitPopup,
+                            originX: advancedRightX, originY: advancedY + advancedHeight - 92,
+                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: relativeSuffixLabel, control: relativeSuffixPopup,
+                            originX: advancedX, originY: advancedY + advancedHeight - 132,
+                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: relativeNowLabel, control: relativeNowPopup,
+                            originX: advancedRightX, originY: advancedY + advancedHeight - 132,
+                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
 
             func placeColorRow(label: NSTextField?, well: NSColorWell?, slider: NSSlider?, originX: CGFloat, originY: CGFloat, rowWidth: CGFloat) {
-                let labelWidth: CGFloat = min(78, max(56, floor(rowWidth * 0.28)))
-                let wellWidth: CGFloat = 42
-                label?.frame = NSRect(x: originX, y: originY + 5, width: labelWidth, height: 16)
-                well?.frame = NSRect(x: originX + labelWidth + 8, y: originY, width: wellWidth, height: rowH)
-                slider?.frame = NSRect(x: originX + labelWidth + wellWidth + 18, y: originY + 2, width: max(44, rowWidth - labelWidth - wellWidth - 18), height: 24)
+                let labelWidth: CGFloat = min(78, max(58, floor(rowWidth * 0.27)))
+                let wellWidth: CGFloat = 40
+                label?.frame = NSIntegralRect(NSRect(x: originX, y: originY + 6, width: labelWidth, height: 16))
+                well?.frame = NSIntegralRect(NSRect(x: originX + labelWidth + 8, y: originY, width: wellWidth, height: rowH))
+                slider?.frame = NSIntegralRect(NSRect(
+                    x: originX + labelWidth + wellWidth + 18,
+                    y: originY + 3,
+                    width: max(42, rowWidth - labelWidth - wellWidth - 18),
+                    height: 24
+                ))
             }
             placeColorRow(label: customAccentLabel, well: customAccentColorWell, slider: customAccentOpacitySlider,
-                          originX: originX, originY: originY - 350, rowWidth: halfWidth)
+                          originX: advancedX, originY: advancedY + advancedHeight - 180, rowWidth: advancedHalfWidth)
             placeColorRow(label: customPanelLabel, well: customPanelColorWell, slider: customPanelOpacitySlider,
-                          originX: rightX, originY: originY - 350, rowWidth: halfWidth)
+                          originX: advancedRightX, originY: advancedY + advancedHeight - 180, rowWidth: advancedHalfWidth)
             placeColorRow(label: customUsedColorLabel, well: customUsedColorWell, slider: customUsedOpacitySlider,
-                          originX: originX, originY: originY - 390, rowWidth: halfWidth)
-            resetCustomColorsButton?.frame = NSRect(x: rightX, y: originY - 392, width: min(150, halfWidth), height: LayoutMetrics.actionButtonHeight)
+                          originX: advancedX, originY: advancedY + advancedHeight - 220, rowWidth: advancedHalfWidth)
+            resetCustomColorsButton?.frame = NSIntegralRect(NSRect(
+                x: advancedRightX,
+                y: advancedY + advancedHeight - 222,
+                width: min(150, advancedHalfWidth),
+                height: LayoutMetrics.actionButtonHeight
+            ))
 
             func placePreviewScaleRow(label: NSTextField?, slider: NSSlider?, value: NSTextField?, rowY: CGFloat) {
-                label?.frame = NSRect(x: originX, y: rowY + 7, width: 116, height: 16)
-                slider?.frame = NSRect(x: originX + 128, y: rowY + 2, width: max(120, width - 208), height: 24)
-                value?.frame = NSRect(x: originX + width - 68, y: rowY, width: 68, height: rowH)
+                label?.frame = NSIntegralRect(NSRect(x: advancedX, y: rowY + 7, width: 104, height: 16))
+                slider?.frame = NSIntegralRect(NSRect(x: advancedX + 116, y: rowY + 3, width: max(120, advancedWidth - 192), height: 24))
+                value?.frame = NSIntegralRect(NSRect(x: advancedX + advancedWidth - 64, y: rowY, width: 64, height: rowH))
             }
-            placePreviewScaleRow(label: textPreviewScaleLabel, slider: textPreviewScaleSlider, value: textPreviewScaleValueLabel, rowY: originY - 434)
-            placePreviewScaleRow(label: imagePreviewScaleLabel, slider: imagePreviewScaleSlider, value: imagePreviewScaleValueLabel, rowY: originY - 474)
-            previewScaleProNoteLabel?.frame = NSRect(x: originX, y: originY - 514, width: width, height: 34)
+            placePreviewScaleRow(label: textPreviewScaleLabel, slider: textPreviewScaleSlider,
+                                 value: textPreviewScaleValueLabel, rowY: advancedY + 74)
+            placePreviewScaleRow(label: imagePreviewScaleLabel, slider: imagePreviewScaleSlider,
+                                 value: imagePreviewScaleValueLabel, rowY: advancedY + 34)
+            previewScaleProNoteLabel?.frame = NSIntegralRect(NSRect(x: advancedX, y: advancedY + 4, width: advancedWidth, height: 28))
+            refreshAppearancePreview()
         }
 
         func placeHistorySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -7968,6 +8604,17 @@ class BoardManPanel: NSPanel {
         }
     }
 
+    @objc private func toggleAppearanceAdvancedSettings(_ sender: NSButton) {
+        appearanceAdvancedExpanded.toggle()
+        shouldScrollSettingsToTop = false
+        sender.title = boardManText(appearanceAdvancedExpanded ? "Hide advanced settings" : "Show advanced settings")
+        sender.image = NSImage(
+            systemSymbolName: appearanceAdvancedExpanded ? "chevron.down" : "chevron.right",
+            accessibilityDescription: nil
+        )
+        layoutPanelSubviews()
+    }
+
     @objc private func previewScaleChanged(_ sender: NSSlider) {
         guard isProEntitled else {
             sender.integerValue = 100
@@ -7986,11 +8633,13 @@ class BoardManPanel: NSPanel {
             textPreviewScaleValueLabel?.stringValue = "\(value)%"
         }
         hidePreviewBubble()
+        refreshAppearancePreview()
     }
 
     @objc private func rowNumbersChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowRowNumbers)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func timestampFormatChanged(_ sender: NSPopUpButton) {
@@ -7998,30 +8647,35 @@ class BoardManPanel: NSPanel {
         let value = BoardManPanel.timestampFormat(forMenuTitle: selectedRaw)
         AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.boardManTimestampFormat)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func relativeNumberStyleChanged(_ sender: NSPopUpButton) {
         let style = BoardManRelativeNumberStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeNumberStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func relativeUnitStyleChanged(_ sender: NSPopUpButton) {
         let style = BoardManRelativeUnitStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeUnitStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func relativeSuffixStyleChanged(_ sender: NSPopUpButton) {
         let style = BoardManRelativeSuffixStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeSuffixStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func relativeNowStyleChanged(_ sender: NSPopUpButton) {
         let style = BoardManRelativeNowStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeNowStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func timestampShortcutEnabledChanged(_ sender: NSButton) {
@@ -8075,11 +8729,13 @@ class BoardManPanel: NSPanel {
             }
         }
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func usageCountChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowUsageCount)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func usageStyleChanged(_ sender: NSPopUpButton) {
@@ -8087,6 +8743,7 @@ class BoardManPanel: NSPanel {
         AppEnvironment.current.defaults.set(BoardManPanel.allowedUsageCountStyle(selectedRaw),
                                             forKey: Constants.UserDefaults.boardManUsageCountStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func usedItemStyleChanged(_ sender: NSPopUpButton) {
@@ -8095,6 +8752,7 @@ class BoardManPanel: NSPanel {
                                             forKey: Constants.UserDefaults.boardManUsedItemStyle)
         placeholderList?.reloadData()
         synchronizeListGeometry()
+        refreshAppearancePreview()
     }
 
     @objc private func themePresetChanged(_ sender: NSPopUpButton) {
@@ -8254,7 +8912,7 @@ class BoardManPanel: NSPanel {
         imagePreviewScaleSlider?.integerValue = storedImageScale
         textPreviewScaleValueLabel?.stringValue = "\(storedTextScale)%"
         imagePreviewScaleValueLabel?.stringValue = "\(storedImageScale)%"
-        previewScaleProNoteLabel?.isHidden = pro || activeSettingsCategory != .view || activeTab != .settings
+        previewScaleProNoteLabel?.isHidden = pro || !appearanceAdvancedExpanded || activeSettingsCategory != .view || activeTab != .settings
 
         [snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton].forEach {
             setControlTree($0, enabled: pro, alpha: proAlpha)
