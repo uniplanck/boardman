@@ -151,6 +151,16 @@ extension CPYClip {
             || type == .tiff
             || type == .deprecatedTIFF
     }
+
+    var boardManRecoverableText: String? {
+        let stringTypes: Set<String> = [
+            NSPasteboard.PasteboardType.string.rawValue,
+            NSPasteboard.PasteboardType.deprecatedString.rawValue,
+            "NSStringPboardType"
+        ]
+        guard stringTypes.contains(primaryType), !title.isEmpty else { return nil }
+        return title
+    }
 }
 
 final class DataCleanService {
