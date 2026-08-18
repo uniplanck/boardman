@@ -48,7 +48,7 @@ extension AccessibilityService {
     }
 
     func showAccessibilityAuthenticationAlert() {
-        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+        guard !BoardManRuntimeEnvironment.isRunningTests() else {
             NSLog("Board-Man permission alert suppressed reason=test_process")
             return
         }

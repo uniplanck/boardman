@@ -5,30 +5,34 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_PATH="${BOARDMAN_SCREENSHOT_APP:-/Applications/Board-Man.app}"
 OUTPUT_DIR="${BOARDMAN_SCREENSHOT_OUTPUT_DIR:-$REPO_ROOT/docs/assets/screenshots}"
 TMP_ROOT="$(mktemp -d /tmp/boardman-readme-screenshots.XXXXXX)"
-CANONICAL_APP="/Applications/Board-Man.app"
+APP_EXECUTABLE="${BOARDMAN_SCREENSHOT_EXECUTABLE:-Board-Man}"
+PROCESS_NAME="${BOARDMAN_SCREENSHOT_PROCESS_NAME:-$APP_EXECUTABLE}"
+BUNDLE_ID="${BOARDMAN_SCREENSHOT_BUNDLE_ID:-com.uniplanck.BoardMan}"
+CANONICAL_APP="${BOARDMAN_SCREENSHOT_CANONICAL_APP:-/Applications/Board-Man.app}"
+RESTORE_CANONICAL="${BOARDMAN_SCREENSHOT_RESTORE_CANONICAL:-true}"
 WAS_RUNNING=false
 
-if [ ! -x "$APP_PATH/Contents/MacOS/Board-Man" ]; then
-  echo "Error: Board-Man executable not found at $APP_PATH"
+if [ ! -x "$APP_PATH/Contents/MacOS/$APP_EXECUTABLE" ]; then
+  echo "Error: $APP_EXECUTABLE executable not found at $APP_PATH"
   exit 1
 fi
 
-if pgrep -x Board-Man >/dev/null 2>&1; then
+if pgrep -x "$PROCESS_NAME" >/dev/null 2>&1; then
   WAS_RUNNING=true
 fi
 
 cleanup() {
-  pkill -x Board-Man >/dev/null 2>&1 || true
+  pkill -x "$PROCESS_NAME" >/dev/null 2>&1 || true
   rm -rf "$TMP_ROOT"
   printf '%s' 'Board-Man screenshots refreshed with safe demo content.' | pbcopy
-  if [ "$WAS_RUNNING" = true ] && [ -d "$CANONICAL_APP" ]; then
+  if [ "$RESTORE_CANONICAL" = true ] && [ "$WAS_RUNNING" = true ] && [ -d "$CANONICAL_APP" ]; then
     open "$CANONICAL_APP" >/dev/null 2>&1 || true
   fi
 }
 trap cleanup EXIT INT TERM
 
 mkdir -p "$OUTPUT_DIR"
-pkill -x Board-Man >/dev/null 2>&1 || true
+pkill -x "$PROCESS_NAME" >/dev/null 2>&1 || true
 sleep 2
 
 seed_clipboard() {
@@ -42,7 +46,7 @@ seed_clipboard() {
       'デザイン確認：階層・余白・コントラスト・狭幅表示'
       'https://github.com/uniplanck/boardman'
       'git status --short --branch'
-      '丁寧な返信テンプレート：確認して本日中にご連絡します'
+      '確認しました。本日中にご連絡します。'
       'リリース前にテスト・署名・更新内容を確認する'
     )
   else
@@ -53,7 +57,7 @@ seed_clipboard() {
       'Design checklist: hierarchy · spacing · contrast · narrow width'
       'https://github.com/uniplanck/boardman'
       'git status --short --branch'
-      'Reply template: Thanks — I’ll review this today.'
+      'Thanks — I’ll review this today.'
       'Review tests, signing, and release notes before shipping'
     )
   fi
@@ -75,17 +79,17 @@ start_isolated_app() {
   mkdir -p "$profile_root/Library/Application Support" "$profile_root/Library/Preferences"
 
   env HOME="$profile_root" CFFIXED_USER_HOME="$profile_root" \
-    defaults write com.uniplanck.BoardMan BoardManLanguage -string "$language"
+    defaults write "$BUNDLE_ID" BoardManLanguage -string "$language"
   env HOME="$profile_root" CFFIXED_USER_HOME="$profile_root" \
-    defaults write com.uniplanck.BoardMan BoardManPanelHeight -int 820
+    defaults write "$BUNDLE_ID" BoardManPanelHeight -int 820
   env HOME="$profile_root" CFFIXED_USER_HOME="$profile_root" \
-    defaults write com.uniplanck.BoardMan BoardManTimestampPosition -string right
+    defaults write "$BUNDLE_ID" BoardManTimestampPosition -string right
   env HOME="$profile_root" CFFIXED_USER_HOME="$profile_root" \
-    defaults write com.uniplanck.BoardMan BoardManShowUsageCount -bool true
+    defaults write "$BUNDLE_ID" BoardManShowUsageCount -bool true
   env HOME="$profile_root" CFFIXED_USER_HOME="$profile_root" \
-    defaults write com.uniplanck.BoardMan BoardManUsePanelUI -bool true
+    defaults write "$BUNDLE_ID" BoardManUsePanelUI -bool true
   env HOME="$profile_root" CFFIXED_USER_HOME="$profile_root" \
-    defaults write com.uniplanck.BoardMan suppressAlertForLoginItem -bool true
+    defaults write "$BUNDLE_ID" suppressAlertForLoginItem -bool true
 
   env HOME="$profile_root" CFFIXED_USER_HOME="$profile_root" \
     BOARDMAN_SCREENSHOT_OUTPUT="$output_path" \
@@ -93,7 +97,7 @@ start_isolated_app() {
     BOARDMAN_SCREENSHOT_WIDTH="$width" \
     BOARDMAN_SCREENSHOT_HEIGHT="$height" \
     BOARDMAN_SCREENSHOT_DELAY="4.5" \
-    "$APP_PATH/Contents/MacOS/Board-Man" &
+    "$APP_PATH/Contents/MacOS/$APP_EXECUTABLE" &
   SCREENSHOT_PID=$!
   sleep 1.2
   seed_clipboard "$language"
@@ -109,7 +113,7 @@ capture_scene() {
 
   local output_path="$OUTPUT_DIR/$output_name"
   rm -f "$output_path"
-  pkill -x Board-Man >/dev/null 2>&1 || true
+  pkill -x "$PROCESS_NAME" >/dev/null 2>&1 || true
   sleep 1
   start_isolated_app "$profile_name" "$language" "$scene" "$output_path" "$width" "$height"
 
@@ -129,9 +133,13 @@ capture_scene() {
 }
 
 capture_scene english-history English history board-man-history-en.png 800 560
-capture_scene english-compact English history board-man-history-compact-en.png 700 560
+capture_scene english-templates English templates board-man-templates-en.png 800 760
 capture_scene english-settings English settings board-man-settings-en.png 800 820
+capture_scene english-compact English history board-man-history-compact-en.png 640 560
 capture_scene japanese-history 日本語 history board-man-history-ja.png 800 560
+capture_scene japanese-templates 日本語 templates board-man-templates-ja.png 800 760
+capture_scene japanese-settings 日本語 settings board-man-settings-ja.png 800 820
+capture_scene japanese-compact 日本語 history board-man-history-compact-ja.png 640 560
 
 cp "$OUTPUT_DIR/board-man-history-en.png" "$REPO_ROOT/docs/assets/board-man-main-screenshot.png"
 cp "$OUTPUT_DIR/board-man-history-en.png" "$REPO_ROOT/assets/readme/board-man-screenshot.png"

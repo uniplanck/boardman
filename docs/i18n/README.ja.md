@@ -21,19 +21,21 @@ Board-Manは、クリップボード履歴、定型文、Pin、検索、使用�
 
 ### 定型文
 
+![Board-Manの定型文管理画面](../assets/screenshots/board-man-templates-ja.png)
+
 返信文、コマンドの雛形、URL、リリース確認など、繰り返し貼り付ける文章をグループで整理できます。表示名と内容の編集、並び替え、有効・無効の切り替え、グループショートカットに対応しています。
 
 上流由来のコード内部では`snippet`という名称を残していますが、製品UIでは日本語を**定型文**、英語を**Templates**としています。
 
 ### 設定と言語
 
-![Board-Manの設定画面](../assets/screenshots/board-man-settings-en.png)
+![Board-Manの設定画面](../assets/screenshots/board-man-settings-ja.png)
 
 一般設定、外観、履歴、定型文、プライバシー、更新、ライセンス、ショートカット、時刻表示、使用回数、パネルサイズを設定できます。製品UIは英語、日本語、簡体字中国語、韓国語に対応し、このリポジトリには追加のREADME翻訳もあります。
 
 ### コンパクト表示
 
-![横幅を狭めたBoard-Man](../assets/screenshots/board-man-history-compact-en.png)
+![横幅を狭めたBoard-Man](../assets/screenshots/board-man-history-compact-ja.png)
 
 横幅を狭めても、Pinと時刻の領域や左右の余白を優先して維持し、中央の本文だけを縮めます。タブ名は読めない省略表示にせず、言語ごとの短い表記へ切り替わります。
 
@@ -109,7 +111,7 @@ BOARDMAN_SCREENSHOT_APP=/path/to/Board-Man.app \
   ./scripts/boardman/capture-readme-screenshots.sh
 ```
 
-スクリプトは、隔離された一時プロファイルでBoard-Manを起動し、クリップボードを決め打ちの安全なデモ内容へ差し替え、英語の履歴・設定・コンパクト表示と日本語の履歴を自動生成して`docs/assets/screenshots/`へ保存します。終了時には一時プロファイルを削除し、クリップボードへ無害な完了メッセージを残します。通常利用中の履歴や定型文データベースは撮影に使いません。
+スクリプトは、隔離された一時プロファイルでBoard-Manを起動し、クリップボードを決め打ちの安全なデモ内容へ差し替え、英語と日本語の履歴、定型文、設定、コンパクト表示を自動生成して`docs/assets/screenshots/`へ保存します。終了時には一時プロファイルを削除し、クリップボードへ無害な完了メッセージを残します。通常利用中の履歴や定型文データベースは撮影に使いません。
 
 詳しい手順と確認項目は[`docs/readme-screenshots.md`](../readme-screenshots.md)にあります。
 

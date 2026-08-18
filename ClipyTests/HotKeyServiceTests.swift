@@ -4,42 +4,33 @@ import Magnet
 import Testing
 @testable import Board_Man
 
-@Suite(.serialized)
+@MainActor @Suite(.serialized)
 final class HotKeyServiceTests {
+    private let defaultsSuiteName = "BoardManHotKeyServiceTests"
+    private lazy var defaults = UserDefaults(suiteName: defaultsSuiteName) ?? .standard
+
     init() {
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: Constants.UserDefaults.hotKeys)
-        defaults.removeObject(forKey: Constants.HotKey.migrateNewKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
-        defaults.removeObject(forKey: Constants.HotKey.mainKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.historyKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.snippetKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.clearHistoryKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.folderKeyCombos)
-        defaults.synchronize()
+        resetDefaults()
     }
 
     deinit {
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: Constants.UserDefaults.hotKeys)
-        defaults.removeObject(forKey: Constants.HotKey.migrateNewKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
-        defaults.removeObject(forKey: Constants.HotKey.mainKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.historyKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.snippetKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.clearHistoryKeyCombo)
-        defaults.removeObject(forKey: Constants.HotKey.folderKeyCombos)
+        let cleanupDefaults = UserDefaults(suiteName: "BoardManHotKeyServiceTests") ?? .standard
+        cleanupDefaults.removePersistentDomain(forName: "BoardManHotKeyServiceTests")
+        cleanupDefaults.synchronize()
+    }
+
+    private func resetDefaults() {
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
         defaults.synchronize()
     }
 
     @Test
     func migrateDefaultSettings() throws {
-        let service = HotKeyService()
+        let service = HotKeyService(defaults: defaults)
         #expect(service.mainKeyCombo == nil)
         #expect(service.historyKeyCombo == nil)
         #expect(service.snippetKeyCombo == nil)
 
-        let defaults = UserDefaults.standard
         #expect(defaults.bool(forKey: Constants.HotKey.migrateNewKeyCombo) == false)
         service.setupDefaultHotKeys()
         #expect(defaults.bool(forKey: Constants.HotKey.migrateNewKeyCombo) == true)
@@ -65,12 +56,11 @@ final class HotKeyServiceTests {
 
     @Test
     func migrateCustomizeSettings() throws {
-        let service = HotKeyService()
+        let service = HotKeyService(defaults: defaults)
         #expect(service.mainKeyCombo == nil)
         #expect(service.historyKeyCombo == nil)
         #expect(service.snippetKeyCombo == nil)
 
-        let defaults = UserDefaults.standard
         let defaultKeyCombos: [String: Any] = [Constants.Menu.clip: ["keyCode": 0, "modifiers": 4352],
                                                Constants.Menu.history: ["keyCode": 9, "modifiers": 768],
                                                Constants.Menu.snippet: ["keyCode": 11, "modifiers": 4352]]
@@ -102,10 +92,9 @@ final class HotKeyServiceTests {
 
     @Test
     func saveKeyCombos() throws {
-        let defaults = UserDefaults.standard
         defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
 
-        let service = HotKeyService()
+        let service = HotKeyService(defaults: defaults)
         #expect(service.mainKeyCombo == nil)
         #expect(service.historyKeyCombo == nil)
         #expect(service.snippetKeyCombo == nil)
@@ -157,7 +146,6 @@ final class HotKeyServiceTests {
 
     @Test
     func unarchiveSavedKeyCombos() throws {
-        let defaults = UserDefaults.standard
         defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
         defaults.set(true, forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
 
@@ -169,7 +157,7 @@ final class HotKeyServiceTests {
         defaults.setArchiveData(historyKeyCombo, forKey: Constants.HotKey.historyKeyCombo)
         defaults.setArchiveData(snippetKeyCombo, forKey: Constants.HotKey.snippetKeyCombo)
 
-        let service = HotKeyService()
+        let service = HotKeyService(defaults: defaults)
         #expect(service.mainKeyCombo == nil)
         #expect(service.historyKeyCombo == nil)
         #expect(service.snippetKeyCombo == nil)
@@ -197,7 +185,6 @@ final class HotKeyServiceTests {
 
     @Test
     func migratesLegacyDefaultMainShortcutToCommandOptionV() throws {
-        let defaults = UserDefaults.standard
         defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
         let legacy = try #require(KeyCombo(
             QWERTYKeyCode: 9,
@@ -205,7 +192,7 @@ final class HotKeyServiceTests {
         ))
         defaults.setArchiveData(legacy, forKey: Constants.HotKey.mainKeyCombo)
 
-        let service = HotKeyService()
+        let service = HotKeyService(defaults: defaults)
         service.setupDefaultHotKeys()
 
         let migrated = try #require(service.mainKeyCombo)
@@ -229,8 +216,30 @@ final class HotKeyServiceTests {
         ]
         #expect(!HotKeyService.shouldRegisterSystemHotKeys(environment: testEnvironment))
         #expect(!AppDelegate.shouldStartRuntimeServices(environment: testEnvironment))
-        #expect(HotKeyService.shouldRegisterSystemHotKeys(environment: [:]))
-        #expect(AppDelegate.shouldStartRuntimeServices(environment: [:]))
+        #expect(!HotKeyService.shouldRegisterSystemHotKeys(
+            environment: ["SWIFT_TESTING_ENABLED": "1"],
+            arguments: [],
+            bundlePaths: [],
+            hasXCTestCase: false
+        ))
+        #expect(!HotKeyService.shouldRegisterSystemHotKeys(
+            environment: [:],
+            arguments: ["/tmp/Board-Man.xctest"],
+            bundlePaths: [],
+            hasXCTestCase: false
+        ))
+        #expect(HotKeyService.shouldRegisterSystemHotKeys(
+            environment: [:],
+            arguments: [],
+            bundlePaths: [],
+            hasXCTestCase: false
+        ))
+        #expect(AppDelegate.shouldStartRuntimeServices(
+            environment: [:],
+            arguments: [],
+            bundlePaths: [],
+            hasXCTestCase: false
+        ))
     }
 
     @Test
@@ -252,7 +261,7 @@ final class HotKeyServiceTests {
 
     @Test
     func addAndRemoveClearHistoryHotkey() throws {
-        let service = HotKeyService()
+        let service = HotKeyService(defaults: defaults)
 
         #expect(service.clearHistoryKeyCombo == nil)
 
@@ -262,7 +271,6 @@ final class HotKeyServiceTests {
         #expect(service.clearHistoryKeyCombo != nil)
         #expect(service.clearHistoryKeyCombo == keyCombo)
 
-        let defaults = UserDefaults.standard
         let savedData = try #require(defaults.object(forKey: Constants.HotKey.clearHistoryKeyCombo) as? Data)
         let savedKeyCombo = try #require(NSKeyedUnarchiver.unarchiveObject(with: savedData) as? KeyCombo)
         #expect(savedKeyCombo == keyCombo)
@@ -273,7 +281,7 @@ final class HotKeyServiceTests {
 
     @Test
     func setAndClearSnippetFolderHotkey() throws {
-        let service = HotKeyService()
+        let service = HotKeyService(defaults: defaults)
         let keyCombo = try #require(KeyCombo(QWERTYKeyCode: 1, carbonModifiers: cmdKey))
         let folderIdentifier = "folder-1"
 
@@ -282,7 +290,6 @@ final class HotKeyServiceTests {
         service.setSnippetKeyCombo(keyCombo, forFolder: folderIdentifier)
         #expect(service.keyComboForSnippetFolder(identifier: folderIdentifier) == keyCombo)
 
-        let defaults = UserDefaults.standard
         let savedData = try #require(defaults.object(forKey: Constants.HotKey.folderKeyCombos) as? Data)
         let savedCombos = try #require(NSKeyedUnarchiver.unarchiveObject(with: savedData) as? [String: KeyCombo])
         #expect(savedCombos[folderIdentifier] == keyCombo)

@@ -29,9 +29,17 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     private let disposeBag = DisposeBag()
 
     static func shouldStartRuntimeServices(
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        bundlePaths: [String] = Bundle.allBundles.map(\.bundlePath),
+        hasXCTestCase: Bool = NSClassFromString("XCTestCase") != nil
     ) -> Bool {
-        return environment["XCTestConfigurationFilePath"] == nil
+        return !BoardManRuntimeEnvironment.isRunningTests(
+            environment: environment,
+            arguments: arguments,
+            bundlePaths: bundlePaths,
+            hasXCTestCase: hasXCTestCase
+        )
     }
 
     // MARK: - Init

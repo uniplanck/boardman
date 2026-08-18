@@ -21,6 +21,8 @@ Board-Man is a local-first macOS clipboard workspace that brings history, reusab
 
 ### Templates
 
+![Board-Man Templates manager](docs/assets/screenshots/board-man-templates-en.png)
+
 Templates store text you paste repeatedly, such as replies, command patterns, URLs, and release checklists. They can be grouped, reordered, enabled or disabled, edited in place, and opened through group shortcuts.
 
 The upstream code still uses the internal term `snippet`; the product UI uses **Templates** in English and **定型文** in Japanese.
@@ -109,7 +111,7 @@ BOARDMAN_SCREENSHOT_APP=/path/to/Board-Man.app \
   ./scripts/boardman/capture-readme-screenshots.sh
 ```
 
-The script launches isolated temporary Board-Man profiles, replaces the clipboard with deterministic demo content, generates English History, Settings, compact-width, and Japanese History scenes, writes the PNG files under `docs/assets/screenshots/`, removes the temporary profiles, and leaves a harmless completion message on the clipboard. It never uses the maintainer's real clipboard history or Templates database.
+The script launches isolated temporary Board-Man profiles, replaces the clipboard with deterministic demo content, generates English and Japanese History, Templates, Settings, and compact-width scenes, writes the PNG files under `docs/assets/screenshots/`, removes the temporary profiles, and leaves a harmless completion message on the clipboard. It never uses the maintainer's real clipboard history or Templates database.
 
 See [`docs/readme-screenshots.md`](docs/readme-screenshots.md) for the full workflow and verification checklist.
 

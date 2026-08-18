@@ -1213,6 +1213,52 @@ final class BoardManInteractionRuleTests {
 }
 
 @MainActor @Suite(.serialized)
+final class BoardManFilterSettingsTests {
+
+    @Test
+    func savedFiltersPersistCriteriaSelectionAndValidGroups() throws {
+        let suiteName = "BoardManSavedFilterTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = BoardManSavedFilterStore(defaults: defaults)
+        let condition = BoardManHistoryCondition(
+            isEnabled: true,
+            minimumLength: 12,
+            includedTerms: ["deploy", "release"],
+            excludedTerms: ["draft"],
+            matchesAllIncludedTerms: false,
+            shellLikeOnly: true
+        )
+        let preset = BoardManSavedFilterPreset(
+            id: "release-filter",
+            name: "Release commands",
+            usageFilterRawValue: BoardManHistoryUsageFilter.used.rawValue,
+            condition: condition,
+            snippetGroupIdentifiers: ["group-a", "deleted-group"]
+        )
+
+        #expect(store.presets.isEmpty)
+        #expect(preset.hasCriteria)
+        _ = store.save(preset)
+        #expect(store.presets == [preset])
+        #expect(store.selectedPreset == preset)
+        #expect(store.selectedPreset?.usageFilter == .used)
+        #expect(preset.validSnippetGroupIdentifiers(availableIdentifiers: ["group-a", "group-b"]) == ["group-a"])
+
+        var renamed = preset
+        renamed.name = "Release only"
+        _ = store.save(renamed)
+        #expect(store.presets == [renamed])
+        #expect(store.selectedPreset?.name == "Release only")
+
+        store.delete(renamed.id)
+        #expect(store.presets.isEmpty)
+        #expect(store.selectedPresetID == nil)
+    }
+
+}
+
+@MainActor @Suite(.serialized)
 final class BoardManPanelLayoutTests {
 
     @Test
@@ -1275,11 +1321,11 @@ final class BoardManPanelLayoutTests {
             #expect((titleField?.frame.width ?? 0) >= 250,
                     "Snippet title editor is still cramped.")
             if let titleField, let statusLabel, let folderToggle, let snippetToggle {
-                #expect(titleField.frame.minY - statusLabel.frame.maxY >= 24,
-                        "Snippet editor status needs a full spacing step below the title field.")
-                #expect(statusLabel.frame.minY - folderToggle.frame.maxY >= 14,
-                        "Snippet editor status should keep visible breathing room above the enable controls.")
+                #expect(statusLabel.isHidden,
+                        "The redundant snippet editor status band should remain removed.")
                 #expect(abs(folderToggle.frame.midY - snippetToggle.frame.midY) <= 0.5)
+                #expect(folderToggle.frame.minY >= 12,
+                        "Snippet enable controls need deliberate bottom padding.")
                 #expect(titleField.frame.maxY <= (titleField.superview?.bounds.maxY ?? titleField.frame.maxY) - 12,
                         "Snippet title needs deliberate top padding.")
             }
@@ -1299,6 +1345,16 @@ final class BoardManPanelLayoutTests {
             .sorted { $0.tag < $1.tag }
         #expect(panel.presentationItemScope == .historyOnly)
         #expect(categories.count == expectedTitles.count, "Settings sidebar did not create all categories.")
+        let settingsScroll = allSubviews(of: root)
+            .compactMap { $0 as? NSScrollView }
+            .first { $0.identifier?.rawValue == "BoardManSettingsScrollView" }
+        #expect(settingsScroll?.isHidden == false, "Settings content scroll view is not visible.")
+        #expect((settingsScroll?.documentView?.frame.height ?? 0) >= (settingsScroll?.contentView.bounds.height ?? 0),
+                "Settings document is shorter than its viewport and cannot provide stable scrolling.")
+        if let documentView = settingsScroll?.documentView {
+            #expect(categories.allSatisfy { !$0.isDescendant(of: documentView) },
+                    "Settings sidebar categories must stay fixed outside the scrolling document.")
+        }
         for category in categories {
             #expect(category is BoardManSettingsCategoryButton,
                     "Settings category is missing hover-aware button behavior.")
@@ -1405,9 +1461,10 @@ final class BoardManUIRegressionTests {
         let tabs = try #require(descendants.compactMap { $0 as? BoardManHeaderSegmentedControl }.first)
         let tabFrameBeforeHover = tabs.frame
         let tabWidthsBeforeHover = (0..<tabs.segmentCount).map { tabs.width(forSegment: $0) }
+        let trailingSegment = tabs.segmentCount - 1
         tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
-        let trailingHoverRect = try #require(tabs.hoverBackgroundRect(forSegment: 2))
-        #expect(tabs.hoveredSegment == 2)
+        let trailingHoverRect = try #require(tabs.hoverBackgroundRect(forSegment: trailingSegment))
+        #expect(tabs.hoveredSegment == trailingSegment)
         #expect(trailingHoverRect.maxX <= tabs.bounds.maxX)
         #expect(trailingHoverRect.minX >= tabs.bounds.minX)
         #expect(tabs.frame == tabFrameBeforeHover, "Hover must not resize or move the tab control.")
@@ -1589,6 +1646,74 @@ final class BoardManUIRegressionTests {
 extension BoardManPanelLayoutTests {
 
     @Test
+    func multipleSnippetGroupsFilterTogetherAndDeletedGroupsAreDiscarded() throws {
+        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
+        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let realm = try Realm()
+        let firstFolder = CPYFolder()
+        firstFolder.title = "First"
+        firstFolder.enable = true
+        let secondFolder = CPYFolder()
+        secondFolder.title = "Second"
+        secondFolder.enable = true
+        try realm.write {
+            realm.add([firstFolder, secondFolder])
+        }
+        let firstIdentifier = firstFolder.identifier
+        let secondIdentifier = secondFolder.identifier
+
+        func snippetItem(hash: String, folder: CPYFolder) -> BoardManHistoryItem {
+            return BoardManHistoryItem(
+                title: hash,
+                primaryTitle: hash,
+                compactTitle: hash,
+                metadataText: folder.title,
+                timestampText: "",
+                countText: "",
+                previewTitle: hash,
+                dataHash: hash,
+                imageDataPath: "",
+                inlineThumbnail: nil,
+                pasteCount: 0,
+                isPinned: false,
+                isMasked: false,
+                isEnabled: true,
+                source: .snippet,
+                categoryIdentifier: folder.identifier,
+                categoryTitle: folder.title
+            )
+        }
+
+        let panel = BoardManPanel()
+        panel.openSnippetsManagerMode()
+        panel.loadItemsForTesting([
+            snippetItem(hash: "first", folder: firstFolder),
+            snippetItem(hash: "second", folder: secondFolder)
+        ])
+        panel.setSnippetGroupIdentifiersForTesting(Set([firstIdentifier, secondIdentifier]))
+
+        #expect(panel.activeSnippetGroupIdentifiersForTesting == Set([firstIdentifier, secondIdentifier]))
+        #expect(panel.visibleItemHashesForTesting == ["first", "second"])
+        let popup = try #require(panel.contentView.flatMap { root in
+            (root.subviews + root.subviews.flatMap { $0.subviews })
+                .compactMap { $0 as? NSPopUpButton }
+                .first { $0.identifier?.rawValue == "BoardManSnippetGroupPopup" }
+        })
+        #expect(popup.itemArray.first { ($0.representedObject as? String) == firstIdentifier }?.state == .on)
+        #expect(popup.itemArray.first { ($0.representedObject as? String) == secondIdentifier }?.state == .on)
+
+        try realm.write {
+            realm.delete(secondFolder)
+        }
+        panel.reloadSnippetGroupsForTesting()
+        #expect(panel.activeSnippetGroupIdentifiersForTesting == Set([firstIdentifier]))
+        #expect(panel.visibleItemHashesForTesting == ["first"])
+        #expect(!popup.itemArray.contains { ($0.representedObject as? String) == secondIdentifier })
+    }
+
+    @Test
     func responsiveTemplateTabLabelsStayReadableAcrossLanguages() async throws {
         let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
         Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
@@ -1696,8 +1821,21 @@ extension BoardManPanelLayoutTests {
             Issue.record("Hover-aware header tabs were not created.")
             return
         }
-        tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.midX, y: tabs.bounds.midY))
-        #expect(tabs.hoveredSegment == 1, "Header hover tracking did not resolve the middle segment.")
+        #expect(tabs.segmentCount == 2,
+                "The header should expose only History and Templates as primary tabs.")
+        tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
+        #expect(tabs.hoveredSegment == 1, "Header hover tracking did not resolve the trailing Templates segment.")
+
+        let settingsButton = descendants.compactMap { $0 as? NSButton }.first {
+            $0.identifier?.rawValue == "BoardManSettingsButton"
+        }
+        #expect(settingsButton?.isHidden == false)
+        #expect(settingsButton?.target != nil && settingsButton?.action != nil,
+                "The header Settings gear is missing its action wiring.")
+        if let settingsButton {
+            #expect(abs(settingsButton.frame.midY - tabs.frame.midY) <= 0.5,
+                    "The Settings gear is not vertically aligned with the primary tabs.")
+        }
 
         let search = descendants.compactMap { $0 as? NSSearchField }.first
         #expect((search != nil) == expectsSearch || search?.isHidden == !expectsSearch)
@@ -1721,8 +1859,8 @@ extension BoardManPanelLayoutTests {
                         "Search optical correction must stay at the requested 2pt downward offset.")
                 #expect(abs((textRect.midY - search.bounds.midY) - cell.opticalYOffset) <= 0.5,
                         "Search text does not match its optical vertical offset.")
-                #expect(cell.searchButtonOpticalYOffset == -1,
-                        "Search icon requires a separate 1pt upward optical correction in flipped control coordinates.")
+                #expect(cell.searchButtonOpticalYOffset == -2,
+                        "Search icon requires the requested 2pt upward optical correction in flipped control coordinates.")
                 #expect(abs((iconRect.midY - search.bounds.midY) - (cell.opticalYOffset + cell.searchButtonOpticalYOffset)) <= 0.5,
                         "Search icon does not include its optical vertical correction.")
             }
@@ -1824,14 +1962,18 @@ private func assertSettingsCategoryControls(title: String, descendants: [NSView]
     if title == "General" {
         let field = descendants.first { $0.identifier?.rawValue == "BoardManVisibleHistoryField" } as? NSTextField
         let stepper = descendants.first { $0.identifier?.rawValue == "BoardManVisibleHistoryStepper" } as? NSStepper
-        #expect(field?.isHidden == false && field?.isEditable == true)
+        let decrease = descendants.first { $0.identifier?.rawValue == "BoardManVisibleHistoryDecreaseButton" } as? NSButton
+        let increase = descendants.first { $0.identifier?.rawValue == "BoardManVisibleHistoryIncreaseButton" } as? NSButton
+        #expect(field?.isHidden == false && field?.isEditable == true && field?.isBezeled == true)
         #expect(field?.target != nil && field?.action != nil)
-        #expect(stepper?.target != nil && stepper?.action != nil)
-        if let field, let stepper {
-            #expect(field.frame.minX < stepper.frame.minX,
-                    "Visible history input should sit to the left of its stepper, matching Pin duration.")
-            #expect(abs(field.frame.midY - stepper.frame.midY) <= 0.5,
-                    "Visible history input and stepper are vertically misaligned.")
+        #expect(stepper?.isHidden == true, "The native stepper should remain hidden behind the explicit minus/plus controls.")
+        #expect(decrease?.isHidden == false && decrease?.target != nil && decrease?.action != nil)
+        #expect(increase?.isHidden == false && increase?.target != nil && increase?.action != nil)
+        if let field, let stepper, let decrease, let increase {
+            #expect(decrease.frame.maxX < field.frame.minX)
+            #expect(field.frame.maxX < increase.frame.minX)
+            #expect(abs(field.frame.midY - decrease.frame.midY) <= 0.5)
+            #expect(abs(field.frame.midY - increase.frame.midY) <= 0.5)
             field.integerValue = 250
             _ = field.sendAction(field.action, to: field.target)
             #expect(AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.maxHistorySize) == 250)
@@ -1859,6 +2001,8 @@ private func assertSettingsCategoryControls(title: String, descendants: [NSView]
         }
         let delay = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayField" } as? NSTextField
         let delayStepper = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayStepper" } as? NSStepper
+        let delayDecrease = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayDecreaseButton" } as? NSButton
+        let delayIncrease = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutDelayIncreaseButton" } as? NSButton
         let shortcutRecord = descendants.first { $0.identifier?.rawValue == "BoardManTimestampShortcutRecordView" }
         let interaction = descendants.first { view in
             guard let popup = view as? NSPopUpButton else { return false }
@@ -1870,11 +2014,16 @@ private func assertSettingsCategoryControls(title: String, descendants: [NSView]
         let pinLabel = descendants.compactMap { $0 as? NSTextField }.first { $0.stringValue == "Pin duration" }
         let field = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationField" } as? NSTextField
         let stepper = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationStepper" } as? NSStepper
+        let decrease = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationDecreaseButton" } as? NSButton
+        let increase = descendants.first { $0.identifier?.rawValue == "BoardManTimedPinDurationIncreaseButton" } as? NSButton
         let unit = descendants.compactMap { $0 as? NSPopUpButton }.first {
             Set(["Minutes", "Hours", "Days", "Weeks"]).isSubset(of: Set($0.itemTitles))
         }
         #expect(toggle?.isHidden == false && toggle?.target != nil && toggle?.action != nil)
-        #expect(delay?.isHidden == false)
+        #expect(delay?.isHidden == false && delay?.isEditable == true && delay?.isBezeled == true)
+        #expect(delayStepper?.isHidden == true)
+        #expect(delayDecrease?.isHidden == false && delayDecrease?.target != nil && delayDecrease?.action != nil)
+        #expect(delayIncrease?.isHidden == false && delayIncrease?.target != nil && delayIncrease?.action != nil)
         if let shortcutLabel, let shortcutRecord {
             #expect(shortcutLabel.frame.minY > shortcutRecord.frame.maxY,
                     "Narrow History settings should stack the shortcut label above its recorder.")
@@ -1898,26 +2047,33 @@ private func assertSettingsCategoryControls(title: String, descendants: [NSView]
             _ = toggle.sendAction(toggle.action, to: toggle.target)
             #expect(delay?.isEnabled == true)
             #expect(delayStepper?.isEnabled == true)
+            #expect(delayDecrease?.isEnabled == true)
+            #expect(delayIncrease?.isEnabled == true)
             #expect(abs((shortcutRecord?.alphaValue ?? 0) - 1) <= 0.01,
                     "The timestamp shortcut must remain editable and undimmed while disabled.")
         }
         #expect(preset?.isHidden == false && (preset?.numberOfItems ?? 0) >= 1)
         #expect(add?.target != nil && add?.action != nil)
         #expect(remove?.target != nil && remove?.action != nil)
-        #expect(field?.isEditable == true && field?.isSelectable == true && field?.isEnabled == true)
+        #expect(field?.isEditable == true && field?.isSelectable == true && field?.isEnabled == true && field?.isBezeled == true)
         #expect(field?.target != nil && field?.action != nil)
-        if let pinLabel, let preset, let add, let remove, let field, let stepper, let unit {
+        #expect(stepper?.isHidden == true)
+        #expect(decrease?.isHidden == false && decrease?.target != nil && decrease?.action != nil)
+        #expect(increase?.isHidden == false && increase?.target != nil && increase?.action != nil)
+        if let pinLabel, let preset, let add, let remove, let field, let decrease, let increase, let unit {
             #expect(pinLabel.frame.minY > preset.frame.maxY,
                     "Pin duration label should sit above the preset control row.")
             #expect(abs(preset.frame.midY - add.frame.midY) <= 0.5)
             #expect(abs(preset.frame.midY - remove.frame.midY) <= 0.5)
             #expect(preset.frame.minY > field.frame.maxY,
                     "Preset selection should be separated from the value and unit row.")
-            #expect(field.frame.minX < stepper.frame.minX,
-                    "Pin duration input should remain on the left of its stepper.")
-            #expect(stepper.frame.maxX < unit.frame.minX,
-                    "Pin duration unit should follow the numeric field and stepper.")
-            #expect(abs(field.frame.midY - stepper.frame.midY) <= 0.5)
+            #expect(decrease.frame.maxX < field.frame.minX,
+                    "Pin duration minus button should remain on the left of its input.")
+            #expect(field.frame.maxX < increase.frame.minX)
+            #expect(increase.frame.maxX < unit.frame.minX,
+                    "Pin duration unit should follow the explicit minus/plus controls.")
+            #expect(abs(field.frame.midY - decrease.frame.midY) <= 0.5)
+            #expect(abs(field.frame.midY - increase.frame.midY) <= 0.5)
             #expect(abs(field.frame.midY - unit.frame.midY) <= 0.5)
         }
     } else if title == "Snippets" {
