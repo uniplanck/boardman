@@ -153,6 +153,24 @@ final class EntitlementGateTests {
     }
 
     @Test
+    func missingTextPayloadCanRecoverFromRealmTitleWithoutTreatingImagesAsText() {
+        let textClip = CPYClip()
+        textClip.title = "git status --short"
+        textClip.primaryType = NSPasteboard.PasteboardType.deprecatedString.rawValue
+        #expect(textClip.boardManRecoverableText == "git status --short")
+
+        let modernTextClip = CPYClip()
+        modernTextClip.title = "npm test"
+        modernTextClip.primaryType = NSPasteboard.PasteboardType.string.rawValue
+        #expect(modernTextClip.boardManRecoverableText == "npm test")
+
+        let imageClip = CPYClip()
+        imageClip.title = "PNG image"
+        imageClip.primaryType = NSPasteboard.PasteboardType.png.rawValue
+        #expect(imageClip.boardManRecoverableText == nil)
+    }
+
+    @Test
     func overflowArchiveStoresTextWithDateAndSkipsImages() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("TextHistoryArchiveStoreTests-\(UUID().uuidString)", isDirectory: true)

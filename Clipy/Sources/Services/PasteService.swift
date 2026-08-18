@@ -60,16 +60,23 @@ final class PasteService {
 extension PasteService {
     @discardableResult
     func paste(with clip: CPYClip, shortcut: KeyCombo) -> Bool {
-        guard !clip.isInvalidated,
-              NSKeyedUnarchiver.unarchiveObject(withFile: clip.dataPath) is CPYClipData else { return false }
-        copyToPasteboard(with: clip)
+        guard !clip.isInvalidated else { return false }
+        if NSKeyedUnarchiver.unarchiveObject(withFile: clip.dataPath) is CPYClipData {
+            copyToPasteboard(with: clip)
+        } else if let recoveredText = clip.boardManRecoverableText {
+            copyToPasteboard(with: recoveredText)
+        } else {
+            return false
+        }
         return sendShortcut(shortcut)
     }
 
     @discardableResult
     func paste(with clip: CPYClip) -> Bool {
         guard !clip.isInvalidated else { return false }
-        guard let data = NSKeyedUnarchiver.unarchiveObject(withFile: clip.dataPath) as? CPYClipData else { return false }
+        guard let data = NSKeyedUnarchiver.unarchiveObject(withFile: clip.dataPath) as? CPYClipData else {
+            return pasteRecoveredText(with: clip)
+        }
 
         // Handling modifier actions
         let isPastePlainText = self.isPastePlainText
@@ -94,6 +101,27 @@ extension PasteService {
             didPaste = paste()
         }
         // Delete clip
+        if isDeleteHistory || isPasteAndDeleteHistory {
+            AppEnvironment.current.clipService.delete(with: clip)
+        }
+        return didPaste
+    }
+
+    private func pasteRecoveredText(with clip: CPYClip) -> Bool {
+        guard let recoveredText = clip.boardManRecoverableText else { return false }
+
+        let isPastePlainText = self.isPastePlainText
+        let isPasteAndDeleteHistory = self.isPasteAndDeleteHistory
+        let isDeleteHistory = self.isDeleteHistory
+        var didPaste = false
+
+        if isPasteAndDeleteHistory {
+            AppEnvironment.current.clipService.incrementChangeCount()
+        }
+        if isPastePlainText || isPasteAndDeleteHistory || !isDeleteHistory {
+            copyToPasteboard(with: recoveredText)
+            didPaste = paste()
+        }
         if isDeleteHistory || isPasteAndDeleteHistory {
             AppEnvironment.current.clipService.delete(with: clip)
         }
