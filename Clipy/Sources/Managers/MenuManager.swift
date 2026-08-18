@@ -297,6 +297,20 @@ extension MenuManager {
         panel.focusTableForKeyboard()
     }
 
+    static func pasteTargetSettleDelay(bundleIdentifier: String?) -> TimeInterval {
+        let normalizedIdentifier = bundleIdentifier?.lowercased() ?? ""
+        let chromiumBundlePrefixes = [
+            "com.google.chrome",
+            "com.brave.browser",
+            "com.microsoft.edgemac",
+            "com.operasoftware.opera",
+            "com.vivaldi.vivaldi",
+            "org.chromium.chromium",
+            "company.thebrowser.browser"
+        ]
+        return chromiumBundlePrefixes.contains(where: normalizedIdentifier.hasPrefix) ? 0.24 : 0.08
+    }
+
     private func restorePreviousPasteTarget(
         attempt: Int = 0,
         completion: @escaping () -> Void
@@ -307,6 +321,7 @@ extension MenuManager {
         }
 
         application.activate(options: [.activateIgnoringOtherApps])
+        let settleDelay = Self.pasteTargetSettleDelay(bundleIdentifier: application.bundleIdentifier)
         let isTargetFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier
             == application.processIdentifier
         if isTargetFrontmost {
@@ -314,7 +329,10 @@ extension MenuManager {
                !PasteTargetVerifier.isFocused(focusTarget) {
                 _ = PasteTargetVerifier.restoreFocus(to: focusTarget)
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: completion)
+            // Chromium-based browsers report as frontmost before their web content has finished
+            // accepting synthetic key events. Keep the fast path for native apps, but give browser
+            // renderers a short settle window so the first Command+V is not dropped.
+            DispatchQueue.main.asyncAfter(deadline: .now() + settleDelay, execute: completion)
             return
         }
 
@@ -322,7 +340,7 @@ extension MenuManager {
             if let focusTarget = previousPasteFocusTarget {
                 _ = PasteTargetVerifier.restoreFocus(to: focusTarget)
             }
-            completion()
+            DispatchQueue.main.asyncAfter(deadline: .now() + settleDelay, execute: completion)
             return
         }
 

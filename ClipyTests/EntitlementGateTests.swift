@@ -797,6 +797,15 @@ struct PasteCountInputServiceTests {
     }
 
     @Test
+    func chromiumPasteTargetsReceiveLongerActivationSettleDelay() {
+        #expect(MenuManager.pasteTargetSettleDelay(bundleIdentifier: "com.google.chrome.for.testing") == 0.24)
+        #expect(MenuManager.pasteTargetSettleDelay(bundleIdentifier: "com.brave.Browser") == 0.24)
+        #expect(MenuManager.pasteTargetSettleDelay(bundleIdentifier: "com.microsoft.edgemac") == 0.24)
+        #expect(MenuManager.pasteTargetSettleDelay(bundleIdentifier: "com.apple.TextEdit") == 0.08)
+        #expect(MenuManager.pasteTargetSettleDelay(bundleIdentifier: nil) == 0.08)
+    }
+
+    @Test
     func historyConditionCombinesLengthWordsExclusionsAndShellDetection() {
         let condition = BoardManHistoryCondition(
             isEnabled: true,
