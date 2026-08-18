@@ -1694,6 +1694,51 @@ final class HistoryDisplayNameStore {
     }
 }
 
+// MARK: - Board-Man History/Snippet Links
+final class HistorySnippetLinkStore {
+
+    static let shared = HistorySnippetLinkStore()
+
+    private let defaults: UserDefaults
+    private let linksKey = "com.uniplanck.BoardMan.historySnippetLinks"
+
+    init(defaults: UserDefaults = AppEnvironment.current.defaults) {
+        self.defaults = defaults
+    }
+
+    func link(snippetIdentifier: String, historyIdentifier: String) {
+        guard !snippetIdentifier.isEmpty, !historyIdentifier.isEmpty else { return }
+        var values = links
+        values[snippetIdentifier] = historyIdentifier
+        defaults.set(values, forKey: linksKey)
+    }
+
+    func historyIdentifier(forSnippet snippetIdentifier: String) -> String? {
+        return links[snippetIdentifier]
+    }
+
+    func snippetIdentifiers(forHistory historyIdentifier: String) -> [String] {
+        return links.compactMap { snippetIdentifier, linkedHistoryIdentifier in
+            linkedHistoryIdentifier == historyIdentifier ? snippetIdentifier : nil
+        }.sorted()
+    }
+
+    func unlinkSnippet(_ snippetIdentifier: String) {
+        var values = links
+        values.removeValue(forKey: snippetIdentifier)
+        defaults.set(values, forKey: linksKey)
+    }
+
+    func unlinkHistory(_ historyIdentifier: String) {
+        let values = links.filter { $0.value != historyIdentifier }
+        defaults.set(values, forKey: linksKey)
+    }
+
+    private var links: [String: String] {
+        return defaults.dictionary(forKey: linksKey) as? [String: String] ?? [:]
+    }
+}
+
 // MARK: - BoardMan History Item (lightweight for panel)
 enum BoardManPresentationItemScope: Equatable {
     case historyOnly
@@ -1930,7 +1975,7 @@ func boardManText(_ english: String) -> String {
         "Long Press: Hide / Show Content": "長押し：内容を非表示／表示",
         "Count": "使用回数", "Style": "表示形式",
         "Used": "使用済み", "Theme": "テーマ", "Mode": "表示モード", "UI": "UI",
-        "Font": "フォント", "Lighten": "明るくする", "Height": "高さ",
+        "Font": "フォント", "Text size": "文字サイズ", "Lighten": "明るくする", "Height": "高さ",
         "Accent": "アクセント", "Panel": "パネル", "Used color": "使用済み色",
         "Opacity": "透明度", "Reset colors": "色をリセット",
         "Restart Board-Man": "Board-Manを再起動", "Quit Board-Man": "Board-Manを終了",
@@ -2043,7 +2088,7 @@ func boardManText(_ english: String) -> String {
         "Language": "语言", "Window mode": "窗口模式", "Show in Dock": "在 Dock 中显示",
         "Rows": "行号", "Time": "时间", "Position": "位置", "Relative format": "相对时间格式", "Number": "数字", "Unit": "单位", "Suffix": "后缀", "Under 1 minute": "1分钟以内", "Count": "使用次数",
         "Style": "样式", "Used": "已使用", "Theme": "主题", "Mode": "模式", "Font": "字体",
-        "Lighten": "变亮", "Height": "高度", "Accent": "强调色", "Panel": "面板",
+        "Text size": "文字大小", "Lighten": "变亮", "Height": "高度", "Accent": "强调色", "Panel": "面板",
         "Used color": "已使用颜色", "Opacity": "透明度", "Reset colors": "重置颜色",
         "Restart Board-Man": "重启 Board-Man", "Quit Board-Man": "退出 Board-Man",
         "Move Up": "上移", "Move Down": "下移", "Edit Mode": "编辑模式", "View Mode": "查看模式",
@@ -2067,7 +2112,7 @@ func boardManText(_ english: String) -> String {
         "Language": "언어", "Window mode": "윈도우 모드", "Show in Dock": "Dock에 표시",
         "Rows": "행 번호", "Time": "시간", "Position": "위치", "Relative format": "상대 시간 형식", "Number": "숫자", "Unit": "단위", "Suffix": "표기", "Under 1 minute": "1분 이내", "Count": "사용 횟수",
         "Style": "스타일", "Used": "사용됨", "Theme": "테마", "Mode": "모드", "Font": "폰트",
-        "Lighten": "밝게", "Height": "높이", "Accent": "강조색", "Panel": "패널",
+        "Text size": "글자 크기", "Lighten": "밝게", "Height": "높이", "Accent": "강조색", "Panel": "패널",
         "Used color": "사용됨 색상", "Opacity": "투명도", "Reset colors": "색상 초기화",
         "Restart Board-Man": "Board-Man 재시작", "Quit Board-Man": "Board-Man 종료",
         "Move Up": "위로 이동", "Move Down": "아래로 이동", "Edit Mode": "편집 모드", "View Mode": "보기 모드",
@@ -3236,6 +3281,7 @@ final class BoardManAppearancePreviewView: NSView {
         let timestampText: String
         let compactCount: Bool
         let simpleStyle: Bool
+        let uiStyleRawValue: String
     }
 
     private var snapshot = Snapshot(
@@ -3248,8 +3294,13 @@ final class BoardManAppearancePreviewView: NSView {
         timestampPosition: .right,
         timestampText: "now",
         compactCount: false,
-        simpleStyle: false
+        simpleStyle: false,
+        uiStyleRawValue: "Default"
     )
+
+    var uiStyleRawValueForTesting: String {
+        return snapshot.uiStyleRawValue
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -3271,18 +3322,28 @@ final class BoardManAppearancePreviewView: NSView {
         guard bounds.width > 40, bounds.height > 40 else { return }
 
         let outer = bounds.insetBy(dx: 1, dy: 1)
-        let outerPath = NSBezierPath(roundedRect: outer, xRadius: 10, yRadius: 10)
-        snapshot.panelColor.withAlphaComponent(0.72).setFill()
+        let outerRadius: CGFloat = snapshot.simpleStyle ? 6 : 10
+        let outerPath = NSBezierPath(roundedRect: outer, xRadius: outerRadius, yRadius: outerRadius)
+        snapshot.panelColor.withAlphaComponent(snapshot.simpleStyle ? 0.96 : 0.72).setFill()
         outerPath.fill()
-        snapshot.accentColor.withAlphaComponent(snapshot.simpleStyle ? 0.12 : 0.24).setStroke()
-        outerPath.lineWidth = 1
+        (snapshot.simpleStyle ? NSColor.separatorColor : snapshot.accentColor.withAlphaComponent(0.24)).setStroke()
+        outerPath.lineWidth = snapshot.simpleStyle ? 0.7 : 1
         outerPath.stroke()
 
         let headerHeight: CGFloat = 24
         let headerRect = NSRect(x: outer.minX + 1, y: outer.maxY - headerHeight - 1, width: outer.width - 2, height: headerHeight)
-        let headerPath = NSBezierPath(roundedRect: headerRect, xRadius: 9, yRadius: 9)
-        snapshot.accentColor.withAlphaComponent(snapshot.simpleStyle ? 0.05 : 0.09).setFill()
-        headerPath.fill()
+        if snapshot.simpleStyle {
+            let separator = NSBezierPath()
+            separator.move(to: NSPoint(x: headerRect.minX + 10, y: headerRect.minY))
+            separator.line(to: NSPoint(x: headerRect.maxX - 10, y: headerRect.minY))
+            NSColor.separatorColor.withAlphaComponent(0.55).setStroke()
+            separator.lineWidth = 0.5
+            separator.stroke()
+        } else {
+            let headerPath = NSBezierPath(roundedRect: headerRect, xRadius: 9, yRadius: 9)
+            snapshot.accentColor.withAlphaComponent(0.09).setFill()
+            headerPath.fill()
+        }
 
         drawText(
             boardManText("History"),
@@ -3299,24 +3360,34 @@ final class BoardManAppearancePreviewView: NSView {
             alignment: .right
         )
 
-        let rowsTop = headerRect.minY - 5
-        let rowsBottom = outer.minY + 7
-        let rowGap: CGFloat = 5
+        let rowsTop = headerRect.minY - 8
+        let rowsBottom = outer.minY + 10
+        let rowGap: CGFloat = 7
         let rowHeight = max(26, floor((rowsTop - rowsBottom - rowGap) / 2))
-        let rowWidth = outer.width - 16
-        let firstFrame = NSRect(x: outer.minX + 8, y: rowsBottom + rowHeight + rowGap, width: rowWidth, height: rowHeight)
-        let secondFrame = NSRect(x: outer.minX + 8, y: rowsBottom, width: rowWidth, height: rowHeight)
+        let rowInset: CGFloat = 12
+        let rowWidth = outer.width - (rowInset * 2)
+        let firstFrame = NSRect(x: outer.minX + rowInset, y: rowsBottom + rowHeight + rowGap, width: rowWidth, height: rowHeight)
+        let secondFrame = NSRect(x: outer.minX + rowInset, y: rowsBottom, width: rowWidth, height: rowHeight)
         drawPreviewRow(frame: firstFrame, index: 1, text: boardManText("Design review notes"), count: 3, used: false)
         drawPreviewRow(frame: secondFrame, index: 2, text: boardManText("Release checklist"), count: 7, used: true)
     }
 
     private func drawPreviewRow(frame: NSRect, index: Int, text: String, count: Int, used: Bool) {
-        let rowPath = NSBezierPath(roundedRect: frame, xRadius: 7, yRadius: 7)
-        (used ? snapshot.usedColor.withAlphaComponent(0.15) : NSColor.labelColor.withAlphaComponent(0.035)).setFill()
-        rowPath.fill()
-        (used ? snapshot.usedColor.withAlphaComponent(0.28) : NSColor.separatorColor.withAlphaComponent(0.20)).setStroke()
-        rowPath.lineWidth = 0.8
-        rowPath.stroke()
+        if snapshot.simpleStyle {
+            let separator = NSBezierPath()
+            separator.move(to: NSPoint(x: frame.minX, y: frame.minY))
+            separator.line(to: NSPoint(x: frame.maxX, y: frame.minY))
+            NSColor.separatorColor.withAlphaComponent(0.42).setStroke()
+            separator.lineWidth = 0.5
+            separator.stroke()
+        } else {
+            let rowPath = NSBezierPath(roundedRect: frame, xRadius: 7, yRadius: 7)
+            (used ? snapshot.usedColor.withAlphaComponent(0.15) : NSColor.labelColor.withAlphaComponent(0.035)).setFill()
+            rowPath.fill()
+            (used ? snapshot.usedColor.withAlphaComponent(0.28) : NSColor.separatorColor.withAlphaComponent(0.20)).setStroke()
+            rowPath.lineWidth = 0.8
+            rowPath.stroke()
+        }
 
         var left = frame.minX + 10
         let centerY = frame.midY
@@ -3335,9 +3406,11 @@ final class BoardManAppearancePreviewView: NSView {
         if snapshot.showCount {
             let countWidth: CGFloat = snapshot.compactCount ? 20 : 30
             let countRect = NSRect(x: right - countWidth, y: centerY - 9, width: countWidth, height: 18)
-            let badgePath = NSBezierPath(roundedRect: countRect, xRadius: 9, yRadius: 9)
-            snapshot.accentColor.withAlphaComponent(0.16).setFill()
-            badgePath.fill()
+            if !snapshot.simpleStyle {
+                let badgePath = NSBezierPath(roundedRect: countRect, xRadius: 9, yRadius: 9)
+                snapshot.accentColor.withAlphaComponent(0.16).setFill()
+                badgePath.fill()
+            }
             drawText(
                 snapshot.compactCount ? "\(count)" : "×\(count)",
                 in: countRect.insetBy(dx: 3, dy: 2),
@@ -3673,9 +3746,12 @@ final class BoardManHistoryCellView: NSTableCellView {
             AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice)
         )
         let isNarrowRow = bounds.width < 640
-        primaryLabel.font = fontChoice.font(ofSize: isNarrowRow ? 12.75 : 13.5, weight: .medium)
-        metadataLabel.font = fontChoice.font(ofSize: isNarrowRow ? 11 : 11.5, weight: .regular)
-        timestampAccessoryLabel.font = fontChoice.font(ofSize: isNarrowRow ? 10 : 10.5, weight: .medium)
+        let textScale = CGFloat(BoardManPanel.clampedItemTextScale(
+            AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        )) / 100
+        primaryLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 12.75 : 13.5) * textScale, weight: .medium)
+        metadataLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 11 : 11.5) * textScale, weight: .regular)
+        timestampAccessoryLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 10 : 10.5) * textScale, weight: .medium)
         countBadge.font = fontChoice.font(ofSize: isNarrowRow ? 10 : 10.5, weight: .medium)
         pinBadge.font = fontChoice.font(ofSize: 9.5, weight: .bold)
         timestampPosition = requestedTimestampPosition
@@ -3974,6 +4050,9 @@ class BoardManPanel: NSPanel {
     private var uiStylePopup: NSPopUpButton?
     private var fontChoiceLabel: NSTextField?
     private var fontChoicePopup: NSPopUpButton?
+    private var itemTextScaleLabel: NSTextField?
+    private var itemTextScaleSlider: NSSlider?
+    private var itemTextScaleValueLabel: NSTextField?
     private var themeLightenButton: NSButton?
     private var customAccentLabel: NSTextField?
     private var customAccentColorWell: NSColorWell?
@@ -4226,6 +4305,11 @@ class BoardManPanel: NSPanel {
         return BoardManFontChoice.allowed(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice))
     }
 
+    fileprivate var itemTextScale: CGFloat {
+        let stored = AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        return CGFloat(Self.clampedItemTextScale(stored)) / 100
+    }
+
     fileprivate var timestampPosition: BoardManTimestampPosition {
         let format = BoardManPanel.allowedTimestampFormat(
             AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)
@@ -4326,6 +4410,11 @@ class BoardManPanel: NSPanel {
 
     static func effectivePreviewScale(storedValue: Int, isPro: Bool) -> Int {
         return isPro ? clampedPreviewScale(storedValue) : 100
+    }
+
+    static func clampedItemTextScale(_ value: Int) -> Int {
+        let normalized = value == 0 ? 100 : value
+        return min(140, max(80, normalized))
     }
 
     static func clampedTimestampShortcutDelay(_ value: TimeInterval) -> TimeInterval {
@@ -5654,6 +5743,34 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(fontControl)
         fontChoicePopup = fontControl
 
+        let itemTextLabel = NSTextField(labelWithString: boardManText("Text size"))
+        itemTextLabel.font = NSFont.systemFont(ofSize: 11)
+        itemTextLabel.textColor = .labelColor
+        contentView.addSubview(itemTextLabel)
+        itemTextScaleLabel = itemTextLabel
+
+        let itemTextScale = NSSlider(
+            value: Double(BoardManPanel.clampedItemTextScale(
+                AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+            )),
+            minValue: 80,
+            maxValue: 140,
+            target: self,
+            action: #selector(itemTextScaleChanged(_:))
+        )
+        itemTextScale.numberOfTickMarks = 7
+        itemTextScale.allowsTickMarkValuesOnly = false
+        itemTextScale.identifier = NSUserInterfaceItemIdentifier("BoardManItemTextScaleSlider")
+        contentView.addSubview(itemTextScale)
+        itemTextScaleSlider = itemTextScale
+
+        let itemTextScaleValue = NSTextField(labelWithString: "\(itemTextScale.integerValue)%")
+        itemTextScaleValue.alignment = .right
+        itemTextScaleValue.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        itemTextScaleValue.identifier = NSUserInterfaceItemIdentifier("BoardManItemTextScaleValueLabel")
+        contentView.addSubview(itemTextScaleValue)
+        itemTextScaleValueLabel = itemTextScaleValue
+
         let lighten = NSButton(checkboxWithTitle: boardManText("Lighten"), target: self, action: #selector(themeLightenChanged(_:)))
         lighten.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManThemeLighten) ? .on : .off
         lighten.font = NSFont.systemFont(ofSize: 11)
@@ -6563,7 +6680,8 @@ class BoardManPanel: NSPanel {
             timestampShortcutDelayDecreaseButton, timestampShortcutDelayIncreaseButton, timestampShortcutSecondsLabel,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup,
             themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup,
-            uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup, themeLightenButton,
+            uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup,
+            itemTextScaleLabel, itemTextScaleSlider, itemTextScaleValueLabel, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -6663,12 +6781,17 @@ class BoardManPanel: NSPanel {
             format: format == "none" ? "relative" : format
         )
         let hasCustomPanelColor = defaults.string(forKey: Constants.UserDefaults.boardManCustomPanelColor) != nil
-        let panelColor = hasCustomPanelColor
-            ? customPanelTintColor
-            : themePreset.surfaceTintColor(
-                useLiquidGlass: isLiquidGlassEnabled && uiStyle != .simple,
+        let panelColor: NSColor
+        if uiStyle == .simple {
+            panelColor = NSColor.controlBackgroundColor
+        } else if hasCustomPanelColor {
+            panelColor = customPanelTintColor
+        } else {
+            panelColor = themePreset.surfaceTintColor(
+                useLiquidGlass: isLiquidGlassEnabled,
                 lighten: isThemeLightenEnabled
             )
+        }
         let hasCustomUsedColor = defaults.string(forKey: Constants.UserDefaults.boardManCustomUsedColor) != nil
         let usedColor = hasCustomUsedColor ? customUsedTintColor : NSColor.systemGray
         let countStyle = BoardManPanel.allowedUsageCountStyle(
@@ -6678,13 +6801,14 @@ class BoardManPanel: NSPanel {
             accentColor: themeAccentColor,
             panelColor: panelColor,
             usedColor: usedColor,
-            font: fontChoice.font(ofSize: 10.5, weight: .medium),
+            font: fontChoice.font(ofSize: 10.5 * itemTextScale, weight: .medium),
             showRows: showRows,
             showCount: showCount,
             timestampPosition: timestampPosition,
             timestampText: timestamp,
             compactCount: countStyle == "compact",
-            simpleStyle: uiStyle == .simple
+            simpleStyle: uiStyle == .simple,
+            uiStyleRawValue: uiStyle.rawValue
         ))
     }
 
@@ -6769,6 +6893,7 @@ class BoardManPanel: NSPanel {
         appearanceModeLabel?.stringValue = boardManText("Mode")
         uiStyleLabel?.stringValue = boardManText("UI")
         fontChoiceLabel?.stringValue = boardManText("Font")
+        itemTextScaleLabel?.stringValue = boardManText("Text size")
         themeLightenButton?.title = boardManText("Lighten")
         heightControlLabel?.stringValue = boardManText("Height")
         customAccentLabel?.stringValue = boardManText("Accent")
@@ -7067,7 +7192,7 @@ class BoardManPanel: NSPanel {
             label?.textColor = themePreset == .defaultPreset ? .labelColor : accentColor
         }
         [languageLabel, maxHistorySizeLabel, statusItemLabel, themePresetLabel, appearanceModeLabel,
-         uiStyleLabel, fontChoiceLabel, timestampLabel, timestampPositionLabel,
+         uiStyleLabel, fontChoiceLabel, itemTextScaleLabel, timestampLabel, timestampPositionLabel,
          relativeNumberLabel, relativeUnitLabel, relativeSuffixLabel, relativeNowLabel,
          timestampInteractionLabel, timestampShortcutLabel, timestampShortcutDelayLabel,
          usageStyleLabel, usedItemStyleLabel, heightControlLabel, customAccentLabel,
@@ -7493,9 +7618,9 @@ class BoardManPanel: NSPanel {
         case .general: requiredHeight = 790
         case .view:
             if stacksAppearanceCards {
-                requiredHeight = appearanceAdvancedExpanded ? 1_490 : 1_120
+                requiredHeight = appearanceAdvancedExpanded ? 1_560 : 1_200
             } else {
-                requiredHeight = appearanceAdvancedExpanded ? 1_070 : 820
+                requiredHeight = appearanceAdvancedExpanded ? 1_160 : 900
             }
         case .history: requiredHeight = 730
         case .snippets: requiredHeight = 640
@@ -7563,7 +7688,8 @@ class BoardManPanel: NSPanel {
             timestampShortcutDelayDecreaseButton, timestampShortcutDelayIncreaseButton, timestampShortcutSecondsLabel,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup,
             themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup,
-            uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup, themeLightenButton,
+            uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup,
+            itemTextScaleLabel, itemTextScaleSlider, itemTextScaleValueLabel, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -7625,7 +7751,8 @@ class BoardManPanel: NSPanel {
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel,
             usedItemStylePopup, themePresetLabel, themePresetPopup,
             appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup,
-            fontChoiceLabel, fontChoicePopup, themeLightenButton,
+            fontChoiceLabel, fontChoicePopup,
+            itemTextScaleLabel, itemTextScaleSlider, itemTextScaleValueLabel, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -7735,18 +7862,19 @@ class BoardManPanel: NSPanel {
                 imagePreviewScaleLabel, imagePreviewScaleSlider, imagePreviewScaleValueLabel, previewScaleProNoteLabel
             ]
 
-            let previewHeight: CGFloat = 148
+            let previewHeight: CGFloat = 172
             let previewY = originY - previewHeight
+            let previewInset: CGFloat = 22
             appearancePreviewCard?.frame = NSIntegralRect(NSRect(x: originX, y: previewY, width: width, height: previewHeight))
             appearancePreviewCard?.needsLayout = true
             appearancePreviewView?.frame = NSIntegralRect(NSRect(
-                x: originX + cardInset,
-                y: previewY + 12,
-                width: max(160, width - (cardInset * 2)),
-                height: previewHeight - 58
+                x: originX + previewInset,
+                y: previewY + 18,
+                width: max(160, width - (previewInset * 2)),
+                height: previewHeight - 70
             ))
 
-            let layoutCardHeight: CGFloat = stacksCards ? 158 : 178
+            let layoutCardHeight: CGFloat = stacksCards ? 198 : 218
             let timestampCardHeight: CGFloat = stacksCards ? 148 : 178
             let layoutCardY = previewY - cardGap - layoutCardHeight
             let timestampCardY = stacksCards
@@ -7783,6 +7911,26 @@ class BoardManPanel: NSPanel {
                 width: layoutWidth,
                 labelWidth: compactLabelWidth
             )
+            let textScaleY = layoutCardY + layoutCardHeight - 154
+            itemTextScaleLabel?.frame = NSIntegralRect(NSRect(
+                x: layoutX,
+                y: textScaleY + 7,
+                width: compactLabelWidth,
+                height: 16
+            ))
+            let textScaleControlX = layoutX + compactLabelWidth + 12
+            itemTextScaleValueLabel?.frame = NSIntegralRect(NSRect(
+                x: layoutX + layoutWidth - 52,
+                y: textScaleY,
+                width: 52,
+                height: rowH
+            ))
+            itemTextScaleSlider?.frame = NSIntegralRect(NSRect(
+                x: textScaleControlX,
+                y: textScaleY + 3,
+                width: max(64, layoutX + layoutWidth - 62 - textScaleControlX),
+                height: 24
+            ))
             heightControlLabel?.frame = NSIntegralRect(NSRect(
                 x: layoutX,
                 y: layoutCardY + 19,
@@ -8793,7 +8941,18 @@ class BoardManPanel: NSPanel {
         layoutPanelSubviews()
         placeholderList?.reloadData()
         synchronizeListGeometry()
+        refreshAppearancePreview()
         contentView?.needsDisplay = true
+    }
+
+    @objc private func itemTextScaleChanged(_ sender: NSSlider) {
+        let value = Self.clampedItemTextScale(sender.integerValue)
+        sender.integerValue = value
+        AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.boardManItemTextScale)
+        itemTextScaleValueLabel?.stringValue = "\(value)%"
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+        refreshAppearancePreview()
     }
 
     @objc private func themeLightenChanged(_ sender: NSButton) {
@@ -9143,7 +9302,14 @@ class BoardManPanel: NSPanel {
                 isSelected: activeSnippetGroupIdentifiers.contains(BoardManPanel.uncategorizedCategoryIdentifier)
             )
         }
-        popup.selectItem(at: 0)
+        if activeSnippetGroupIdentifiers.isEmpty,
+           let allItem = popup.itemArray.first(where: {
+               ($0.representedObject as? String) == BoardManPanel.allCategoriesIdentifier
+           }) {
+            popup.select(allItem)
+        } else {
+            popup.selectItem(at: 0)
+        }
         popup.toolTip = activeSnippetGroupIdentifiers.isEmpty
             ? boardManText("All Groups")
             : activeSnippetGroupIdentifiers.sorted().joined(separator: ", ")
@@ -9338,6 +9504,7 @@ class BoardManPanel: NSPanel {
         let title = normalizedSnippetTitle(sender.stringValue)
         sender.stringValue = title
         Self.persistSnippetTitle(title, snippet: snippet, realm: realm)
+        syncLinkedHistoryDisplayName(snippetIdentifier: snippet.identifier, title: title)
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: snippet.identifier)
         snippetEditorStatusLabel?.stringValue = boardManText("Saved")
@@ -9393,8 +9560,9 @@ class BoardManPanel: NSPanel {
         let savedFolder = editorFolder().flatMap {
             realm.object(ofType: CPYFolder.self, forPrimaryKey: $0.identifier)
         }
+        let savedTitle = normalizedSnippetTitle(snippetEditorTitleField?.stringValue ?? "")
         Self.persistSnippetDraft(
-            title: normalizedSnippetTitle(snippetEditorTitleField?.stringValue ?? ""),
+            title: savedTitle,
             content: content,
             snippetEnabled: snippetEnableButton?.state == .on,
             folderEnabled: snippetFolderEnableButton?.state == .on,
@@ -9403,6 +9571,7 @@ class BoardManPanel: NSPanel {
             folder: savedFolder,
             realm: realm
         )
+        syncLinkedHistoryDisplayName(snippetIdentifier: snippet.identifier, title: savedTitle)
         isSnippetEditing = false
         editingSnippetIdentifier = nil
         onRefreshRequested?()
@@ -9463,6 +9632,7 @@ class BoardManPanel: NSPanel {
         }
         PinnedSnippetStore.shared.remove(identifier)
         BoardManMaskedItemStore.shared.remove([identifier])
+        HistorySnippetLinkStore.shared.unlinkSnippet(identifier)
         selectedIndex = -1
         onRefreshRequested?()
         refreshSnippetEditor()
@@ -10698,7 +10868,11 @@ class BoardManPanel: NSPanel {
                         let title = folder.title.trimmingCharacters(in: .whitespacesAndNewlines)
                         let groupItem = NSMenuItem(title: title.isEmpty ? boardManText("Untitled folder") : title, action: #selector(addHistoryItemToSnippetGroup(_:)), keyEquivalent: "")
                         groupItem.target = self
-                        groupItem.representedObject = ["content": item.previewTitle, "folder": folder.identifier]
+                        groupItem.representedObject = [
+                            "content": item.previewTitle,
+                            "folder": folder.identifier,
+                            "history": item.dataHash
+                        ]
                         groupMenu.addItem(groupItem)
                     }
                     if !folders.isEmpty {
@@ -10707,7 +10881,11 @@ class BoardManPanel: NSPanel {
                 }
                 let uncategorizedItem = NSMenuItem(title: boardManText("Uncategorized"), action: #selector(addHistoryItemToSnippetGroup(_:)), keyEquivalent: "")
                 uncategorizedItem.target = self
-                uncategorizedItem.representedObject = ["content": item.previewTitle, "folder": BoardManPanel.uncategorizedCategoryIdentifier]
+                uncategorizedItem.representedObject = [
+                    "content": item.previewTitle,
+                    "folder": BoardManPanel.uncategorizedCategoryIdentifier,
+                    "history": item.dataHash
+                ]
                 groupMenu.addItem(uncategorizedItem)
                 addToSnippetsItem.submenu = groupMenu
                 menu.addItem(addToSnippetsItem)
@@ -10828,6 +11006,37 @@ class BoardManPanel: NSPanel {
         _ = copyItemToClipboard(item)
     }
 
+    private func syncLinkedSnippetTitles(historyIdentifier: String, title: String) {
+        let linkedSnippetIdentifiers = HistorySnippetLinkStore.shared.snippetIdentifiers(forHistory: historyIdentifier)
+        guard !linkedSnippetIdentifiers.isEmpty else { return }
+        let normalizedTitle = normalizedSnippetTitle(title)
+        let realm = try! Realm()
+        let snippets = linkedSnippetIdentifiers.compactMap {
+            realm.object(ofType: CPYSnippet.self, forPrimaryKey: $0)
+        }
+        guard !snippets.isEmpty else { return }
+        realm.transaction {
+            snippets.forEach { $0.title = normalizedTitle }
+        }
+    }
+
+    private func syncLinkedHistoryDisplayName(snippetIdentifier: String, title: String) {
+        guard let historyIdentifier = HistorySnippetLinkStore.shared.historyIdentifier(forSnippet: snippetIdentifier) else {
+            return
+        }
+        HistoryDisplayNameStore.shared.setName(title, for: historyIdentifier)
+        syncLinkedSnippetTitles(historyIdentifier: historyIdentifier, title: title)
+    }
+
+    private func defaultSnippetTitle(forHistoryIdentifier identifier: String) -> String? {
+        let realm = try! Realm()
+        guard let clip = realm.object(ofType: CPYClip.self, forPrimaryKey: identifier) else { return nil }
+        let rawTitle = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawTitle.isEmpty else { return nil }
+        let firstLine = rawTitle.components(separatedBy: .newlines).first ?? rawTitle
+        return normalizedSnippetTitle(String(firstLine.prefix(80)))
+    }
+
     @objc private func setHistoryDisplayNameFromMenu(_ sender: NSMenuItem) {
         guard let identifier = sender.representedObject as? String else { return }
         let currentName = HistoryDisplayNameStore.shared.name(for: identifier) ?? ""
@@ -10847,6 +11056,7 @@ class BoardManPanel: NSPanel {
             return
         }
         HistoryDisplayNameStore.shared.setName(trimmed, for: identifier)
+        syncLinkedSnippetTitles(historyIdentifier: identifier, title: trimmed)
         onRefreshRequested?()
     }
 
@@ -10860,6 +11070,9 @@ class BoardManPanel: NSPanel {
     @objc private func removeHistoryDisplayNameFromMenu(_ sender: NSMenuItem) {
         guard let identifier = sender.representedObject as? String else { return }
         HistoryDisplayNameStore.shared.setName("", for: identifier)
+        if let fallbackTitle = defaultSnippetTitle(forHistoryIdentifier: identifier) {
+            syncLinkedSnippetTitles(historyIdentifier: identifier, title: fallbackTitle)
+        }
         onRefreshRequested?()
     }
 
@@ -10867,6 +11080,7 @@ class BoardManPanel: NSPanel {
         guard let context = sender.representedObject as? [String: String],
               let content = context["content"],
               let folderIdentifier = context["folder"],
+              let historyIdentifier = context["history"],
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             NSSound.beep()
             return
@@ -10878,7 +11092,8 @@ class BoardManPanel: NSPanel {
         }
         let firstLine = content.components(separatedBy: .newlines).first ?? ""
         let snippet = CPYSnippet()
-        snippet.title = normalizedSnippetTitle(String(firstLine.prefix(80)))
+        let existingDisplayName = HistoryDisplayNameStore.shared.name(for: historyIdentifier)
+        snippet.title = normalizedSnippetTitle(existingDisplayName ?? String(firstLine.prefix(80)))
         snippet.content = content
         snippet.enable = true
         if isProEntitled {
@@ -10895,6 +11110,10 @@ class BoardManPanel: NSPanel {
             }
             setActiveSnippetGroupIdentifiers([BoardManPanel.uncategorizedCategoryIdentifier])
         }
+        HistorySnippetLinkStore.shared.link(
+            snippetIdentifier: snippet.identifier,
+            historyIdentifier: historyIdentifier
+        )
         onRefreshRequested?()
     }
 
@@ -10928,6 +11147,7 @@ class BoardManPanel: NSPanel {
         BoardManMaskedItemStore.shared.remove([identifier])
         BoardManItemHighlightStore.shared.remove([identifier])
         HistoryDisplayNameStore.shared.remove([identifier])
+        HistorySnippetLinkStore.shared.unlinkHistory(identifier)
         selectedIndex = -1
         hidePreviewBubble()
         onRefreshRequested?()
@@ -10952,6 +11172,7 @@ class BoardManPanel: NSPanel {
         guard runSnippetPanelAlert(alert, initialFirstResponder: field) == .alertFirstButtonReturn else { return }
         let title = normalizedSnippetTitle(field.stringValue)
         Self.persistSnippetTitle(title, snippet: snippet, realm: realm)
+        syncLinkedHistoryDisplayName(snippetIdentifier: identifier, title: title)
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: identifier)
     }

@@ -888,6 +888,10 @@ final class BoardManInteractionRuleTests {
         #expect(BoardManPanel.effectivePreviewScale(storedValue: 50, isPro: false) == 100)
         #expect(BoardManPanel.effectivePreviewScale(storedValue: 50, isPro: true) == 50)
         #expect(BoardManPanel.effectivePreviewScale(storedValue: 200, isPro: true) == 200)
+        #expect(BoardManPanel.clampedItemTextScale(0) == 100)
+        #expect(BoardManPanel.clampedItemTextScale(60) == 80)
+        #expect(BoardManPanel.clampedItemTextScale(120) == 120)
+        #expect(BoardManPanel.clampedItemTextScale(170) == 140)
 
         #expect(BoardManPanel.tabDelta(horizontalDelta: -30, verticalDelta: 3) == 1)
         #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 3) == -1)
@@ -971,6 +975,29 @@ final class BoardManInteractionRuleTests {
         BoardManPanel.persistSnippetTitle("Renamed", snippet: snippet, realm: realm)
         #expect(snippet.title == "Renamed")
         #expect(snippet.content == "echo free")
+    }
+
+    @Test
+    func historySnippetLinksTrackBothDirectionsAndCanBeRemoved() {
+        let suiteName = "BoardManHistorySnippetLinksTests-\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Could not create isolated UserDefaults suite.")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = HistorySnippetLinkStore(defaults: defaults)
+
+        store.link(snippetIdentifier: "snippet-a", historyIdentifier: "history-1")
+        store.link(snippetIdentifier: "snippet-b", historyIdentifier: "history-1")
+        #expect(store.historyIdentifier(forSnippet: "snippet-a") == "history-1")
+        #expect(store.snippetIdentifiers(forHistory: "history-1") == ["snippet-a", "snippet-b"])
+
+        store.unlinkSnippet("snippet-a")
+        #expect(store.historyIdentifier(forSnippet: "snippet-a") == nil)
+        #expect(store.snippetIdentifiers(forHistory: "history-1") == ["snippet-b"])
+
+        store.unlinkHistory("history-1")
+        #expect(store.historyIdentifier(forSnippet: "snippet-b") == nil)
     }
 
     @Test
@@ -1300,15 +1327,25 @@ final class BoardManPanelLayoutTests {
         let originalTimestampFormat = defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)
         let originalTimestampPosition = defaults.string(forKey: Constants.UserDefaults.boardManTimestampPosition)
         let originalLanguage = defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
+        let originalUIStyle = defaults.string(forKey: Constants.UserDefaults.boardManUIStyle)
+        let originalItemTextScale = defaults.object(forKey: Constants.UserDefaults.boardManItemTextScale)
         let originalMaxHistory = defaults.object(forKey: Constants.UserDefaults.maxHistorySize)
         defaults.set("relative", forKey: Constants.UserDefaults.boardManTimestampFormat)
         defaults.set("below", forKey: Constants.UserDefaults.boardManTimestampPosition)
         defaults.set("English", forKey: Constants.UserDefaults.boardManLanguage)
+        defaults.set("Default", forKey: Constants.UserDefaults.boardManUIStyle)
+        defaults.set(100, forKey: Constants.UserDefaults.boardManItemTextScale)
         defaults.set(100, forKey: Constants.UserDefaults.maxHistorySize)
         defer {
             defaults.set(originalTimestampFormat, forKey: Constants.UserDefaults.boardManTimestampFormat)
             defaults.set(originalTimestampPosition, forKey: Constants.UserDefaults.boardManTimestampPosition)
             defaults.set(originalLanguage, forKey: Constants.UserDefaults.boardManLanguage)
+            defaults.set(originalUIStyle, forKey: Constants.UserDefaults.boardManUIStyle)
+            if let originalItemTextScale {
+                defaults.set(originalItemTextScale, forKey: Constants.UserDefaults.boardManItemTextScale)
+            } else {
+                defaults.removeObject(forKey: Constants.UserDefaults.boardManItemTextScale)
+            }
             if let originalMaxHistory {
                 defaults.set(originalMaxHistory, forKey: Constants.UserDefaults.maxHistorySize)
             } else {
@@ -1333,31 +1370,7 @@ final class BoardManPanelLayoutTests {
         assertHistoryToolbar(panel, expectsVisible: false)
         assertHistoryRowGeometry(panel)
         if let root = panel.contentView {
-            let descendants = allSubviews(of: root)
-            let titleField = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorTitleField" } as? NSTextField
-            let statusLabel = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorStatusLabel" } as? NSTextField
-            let saveButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetSaveButton" } as? NSButton
-            let cancelButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetCancelButton" } as? NSButton
-            let folderToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Group Enabled" }
-            let snippetToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Snippet Enabled" }
-            let hoverGroupPopup = descendants.compactMap { $0 as? BoardManHoverPopUpButton }.first { !$0.isHidden }
-            #expect(titleField != nil, "Snippet title editor was not created.")
-            #expect(saveButton?.target != nil && saveButton?.action != nil,
-                    "Snippet Save button is missing its action wiring.")
-            #expect(cancelButton?.target != nil && cancelButton?.action != nil,
-                    "Snippet Cancel button is missing its action wiring.")
-            #expect(hoverGroupPopup != nil, "Snippet group selector is not hover-aware.")
-            #expect((titleField?.frame.width ?? 0) >= 250,
-                    "Snippet title editor is still cramped.")
-            if let titleField, let statusLabel, let folderToggle, let snippetToggle {
-                #expect(statusLabel.isHidden,
-                        "The redundant snippet editor status band should remain removed.")
-                #expect(abs(folderToggle.frame.midY - snippetToggle.frame.midY) <= 0.5)
-                #expect(folderToggle.frame.minY >= 12,
-                        "Snippet enable controls need deliberate bottom padding.")
-                #expect(titleField.frame.maxY <= (titleField.superview?.bounds.maxY ?? titleField.frame.maxY) - 12,
-                        "Snippet title needs deliberate top padding.")
-            }
+            assertSnippetManagerControls(root)
         }
 
         panel.selectSettingsTab()
@@ -1436,9 +1449,14 @@ final class BoardManPanelLayoutTests {
             let themeCard = try #require(view("BoardManAppearanceThemeCard", as: BoardManSettingsCardView.self))
             let advancedCard = try #require(view("BoardManAppearanceAdvancedCard", as: BoardManSettingsCardView.self))
             let advancedToggle = try #require(view("BoardManAppearanceAdvancedToggle", as: NSButton.self))
+            let itemTextScale = try #require(view("BoardManItemTextScaleSlider", as: NSSlider.self))
 
             #expect(previewCard.isHidden == false && preview.isHidden == false)
             #expect(previewCard.frame.contains(preview.frame), "Live preview must remain inside the preview card.")
+            #expect(preview.frame.minX - previewCard.frame.minX >= 20,
+                    "Live preview needs deliberate horizontal breathing room.")
+            #expect(preview.frame.minY - previewCard.frame.minY >= 16,
+                    "Live preview needs deliberate bottom breathing room.")
             #expect(layoutCard.frame.minY > timestampCard.frame.maxY,
                     "Narrow Appearance settings should stack Layout above Timestamp.")
             #expect(timestampCard.frame.minY > usageCard.frame.maxY,
@@ -1447,6 +1465,21 @@ final class BoardManPanelLayoutTests {
                     "Narrow Appearance settings should stack Usage above Theme.")
             #expect(advancedToggle.isHidden == false)
             #expect(advancedCard.isHidden, "Advanced appearance settings should start collapsed.")
+            #expect(itemTextScale.isHidden == false)
+            #expect(itemTextScale.minValue == 80 && itemTextScale.maxValue == 140)
+            #expect(itemTextScale.integerValue == 100)
+
+            if let uiPopup = appearanceViews.compactMap({ $0 as? NSPopUpButton }).first(where: {
+                Set(["Default", "Simple", "Monochrome"]).isSubset(of: Set($0.itemTitles))
+            }) {
+                uiPopup.selectItem(withTitle: "Simple")
+                _ = uiPopup.sendAction(uiPopup.action, to: uiPopup.target)
+                await settlePanelLayout(panel)
+                #expect(preview.uiStyleRawValueForTesting == "Simple",
+                        "Live preview must consume the selected UI style instead of rendering the default style.")
+            } else {
+                Issue.record("Appearance UI style popup was not found.")
+            }
 
             let relativePopupIDs = [
                 "BoardManRelativeNumberStylePopup", "BoardManRelativeUnitStylePopup",
@@ -1497,6 +1530,37 @@ final class BoardManPanelLayoutTests {
             assertTopLevelLayout(panel, mode: "Settings category \(category.tag)", expectsSearch: false)
 
             assertSettingsCategoryControls(title: category.title, descendants: allSubviews(of: root))
+        }
+    }
+
+    private func assertSnippetManagerControls(_ root: NSView) {
+        let descendants = allSubviews(of: root)
+        let titleField = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorTitleField" } as? NSTextField
+        let statusLabel = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorStatusLabel" } as? NSTextField
+        let saveButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetSaveButton" } as? NSButton
+        let cancelButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetCancelButton" } as? NSButton
+        let folderToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Group Enabled" }
+        let snippetToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Snippet Enabled" }
+        let hoverGroupPopup = descendants.compactMap { $0 as? BoardManHoverPopUpButton }.first { !$0.isHidden }
+        let groupPopup = descendants.first {
+            $0.identifier?.rawValue == "BoardManSnippetGroupPopup"
+        } as? NSPopUpButton
+
+        #expect(titleField != nil, "Snippet title editor was not created.")
+        #expect((groupPopup?.selectedItem?.representedObject as? String) == BoardManPanel.allCategoriesIdentifier,
+                "Empty snippet group selection should visibly fall back to All Groups.")
+        #expect(saveButton?.target != nil && saveButton?.action != nil,
+                "Snippet Save button is missing its action wiring.")
+        #expect(cancelButton?.target != nil && cancelButton?.action != nil,
+                "Snippet Cancel button is missing its action wiring.")
+        #expect(hoverGroupPopup != nil, "Snippet group selector is not hover-aware.")
+        #expect((titleField?.frame.width ?? 0) >= 250, "Snippet title editor is still cramped.")
+        if let titleField, let statusLabel, let folderToggle, let snippetToggle {
+            #expect(statusLabel.isHidden, "The redundant snippet editor status band should remain removed.")
+            #expect(abs(folderToggle.frame.midY - snippetToggle.frame.midY) <= 0.5)
+            #expect(folderToggle.frame.minY >= 12, "Snippet enable controls need deliberate bottom padding.")
+            #expect(titleField.frame.maxY <= (titleField.superview?.bounds.maxY ?? titleField.frame.maxY) - 12,
+                    "Snippet title needs deliberate top padding.")
         }
     }
 

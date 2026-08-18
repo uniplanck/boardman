@@ -98,6 +98,7 @@ struct Constants {
         static let boardManAppearanceMode = "BoardManAppearanceMode"
         static let boardManUIStyle = "BoardManUIStyle"
         static let boardManFontChoice = "BoardManFontChoice"
+        static let boardManItemTextScale = "BoardManItemTextScale"
         static let boardManLanguage = "BoardManLanguage"
         static let boardManSkipPinnedInKeyboardNavigation = "BoardManSkipPinnedInKeyboardNavigation"
         static let boardManLongPressAction = "BoardManLongPressAction"

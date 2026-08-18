@@ -85,6 +85,7 @@ final class CPYUtilities {
         defaultValues.updateValue("System", forKey: Constants.UserDefaults.boardManAppearanceMode)
         defaultValues.updateValue("Default", forKey: Constants.UserDefaults.boardManUIStyle)
         defaultValues.updateValue("System", forKey: Constants.UserDefaults.boardManFontChoice)
+        defaultValues.updateValue(NSNumber(value: 100), forKey: Constants.UserDefaults.boardManItemTextScale)
         defaultValues.updateValue("System", forKey: Constants.UserDefaults.boardManLanguage)
         defaultValues.updateValue(NSNumber(value: false), forKey: Constants.UserDefaults.boardManSkipPinnedInKeyboardNavigation)
         defaultValues.updateValue("togglePin", forKey: Constants.UserDefaults.boardManLongPressAction)
