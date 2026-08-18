@@ -1142,8 +1142,11 @@ final class BoardManInteractionRuleTests {
                 "Narrow rows need stable breathing room after the Pin badge.")
         #expect(narrowPrimary.frame.maxX <= narrowTimestamp.frame.minX - 12,
                 "Only the center title may compress between fixed accessories.")
-        #expect((narrowPrimary.font?.pointSize ?? 99) <= 12.75,
-                "Narrow rows should use the compact title font instead of squeezing accessories.")
+        let configuredTextScale = CGFloat(BoardManPanel.clampedItemTextScale(
+            AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        )) / 100
+        #expect((narrowPrimary.font?.pointSize ?? 99) <= (12.75 * configuredTextScale) + 0.01,
+                "Narrow rows should use the compact title font at the configured text scale instead of squeezing accessories.")
 
         let resizedCellFrame = BoardManHistoryCellView.synchronizedCellFrame(
             existingFrame: NSRect(x: 14, y: 0, width: 746, height: 46),
@@ -1449,7 +1452,7 @@ final class BoardManPanelLayoutTests {
             let themeCard = try #require(view("BoardManAppearanceThemeCard", as: BoardManSettingsCardView.self))
             let advancedCard = try #require(view("BoardManAppearanceAdvancedCard", as: BoardManSettingsCardView.self))
             let advancedToggle = try #require(view("BoardManAppearanceAdvancedToggle", as: NSButton.self))
-            let itemTextScale = try #require(view("BoardManItemTextScaleSlider", as: NSSlider.self))
+            try assertItemTextScaleControls(appearanceViews)
 
             #expect(previewCard.isHidden == false && preview.isHidden == false)
             #expect(previewCard.frame.contains(preview.frame), "Live preview must remain inside the preview card.")
@@ -1465,9 +1468,6 @@ final class BoardManPanelLayoutTests {
                     "Narrow Appearance settings should stack Usage above Theme.")
             #expect(advancedToggle.isHidden == false)
             #expect(advancedCard.isHidden, "Advanced appearance settings should start collapsed.")
-            #expect(itemTextScale.isHidden == false)
-            #expect(itemTextScale.minValue == 80 && itemTextScale.maxValue == 140)
-            #expect(itemTextScale.integerValue == 100)
 
             if let uiPopup = appearanceViews.compactMap({ $0 as? NSPopUpButton }).first(where: {
                 Set(["Default", "Simple", "Monochrome"]).isSubset(of: Set($0.itemTitles))
@@ -1533,6 +1533,32 @@ final class BoardManPanelLayoutTests {
         }
     }
 
+    private func assertItemTextScaleControls(_ views: [NSView]) throws {
+        let field = try #require(views.first {
+            $0.identifier?.rawValue == "BoardManItemTextScaleField"
+        } as? NSTextField)
+        let decrease = try #require(views.first {
+            $0.identifier?.rawValue == "BoardManItemTextScaleDecreaseButton"
+        } as? NSButton)
+        let increase = try #require(views.first {
+            $0.identifier?.rawValue == "BoardManItemTextScaleIncreaseButton"
+        } as? NSButton)
+        let formatter = try #require(field.formatter as? NumberFormatter)
+
+        #expect(!field.isHidden && !decrease.isHidden && !increase.isHidden)
+        #expect(field.integerValue == 100)
+        #expect(formatter.minimum?.intValue == 80 && formatter.maximum?.intValue == 140)
+        _ = increase.sendAction(increase.action, to: increase.target)
+        #expect(field.integerValue == 105)
+        _ = decrease.sendAction(decrease.action, to: decrease.target)
+        #expect(field.integerValue == 100)
+        field.integerValue = 141
+        _ = field.sendAction(field.action, to: field.target)
+        #expect(field.integerValue == 140)
+        field.integerValue = 100
+        _ = field.sendAction(field.action, to: field.target)
+    }
+
     private func assertSnippetManagerControls(_ root: NSView) {
         let descendants = allSubviews(of: root)
         let titleField = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorTitleField" } as? NSTextField
@@ -1584,6 +1610,11 @@ final class BoardManUIRegressionTests {
         let root = try #require(panel.contentView)
         let descendants = allSubviews(of: root)
         let tabs = try #require(descendants.compactMap { $0 as? BoardManHeaderSegmentedControl }.first)
+        #expect(tabs.focusRingType == .none,
+                "Header tabs should not draw a focus halo around the outer capsule.")
+        #expect(tabs.segmentStyle == .rounded,
+                "Header tabs should use one clean rounded capsule instead of separated edge glow.")
+        #expect(tabs.layer?.masksToBounds == true)
         let tabFrameBeforeHover = tabs.frame
         let tabWidthsBeforeHover = (0..<tabs.segmentCount).map { tabs.width(forSegment: $0) }
         let trailingSegment = tabs.segmentCount - 1

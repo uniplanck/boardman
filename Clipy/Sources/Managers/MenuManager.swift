@@ -4051,8 +4051,9 @@ class BoardManPanel: NSPanel {
     private var fontChoiceLabel: NSTextField?
     private var fontChoicePopup: NSPopUpButton?
     private var itemTextScaleLabel: NSTextField?
-    private var itemTextScaleSlider: NSSlider?
-    private var itemTextScaleValueLabel: NSTextField?
+    private var itemTextScaleField: NSTextField?
+    private var itemTextScaleDecreaseButton: NSButton?
+    private var itemTextScaleIncreaseButton: NSButton?
     private var themeLightenButton: NSButton?
     private var customAccentLabel: NSTextField?
     private var customAccentColorWell: NSColorWell?
@@ -4957,8 +4958,12 @@ class BoardManPanel: NSPanel {
         tabs.target = self
         tabs.action = #selector(tabChanged(_:))
         if #available(macOS 10.10, *) {
-            tabs.segmentStyle = .separated
+            tabs.segmentStyle = .rounded
         }
+        tabs.focusRingType = .none
+        tabs.wantsLayer = true
+        tabs.layer?.masksToBounds = true
+        tabs.layer?.cornerRadius = 14
         tabs.controlSize = .large
         tabs.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
         contentView.addSubview(tabs)
@@ -5749,27 +5754,49 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(itemTextLabel)
         itemTextScaleLabel = itemTextLabel
 
-        let itemTextScale = NSSlider(
-            value: Double(BoardManPanel.clampedItemTextScale(
-                AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
-            )),
-            minValue: 80,
-            maxValue: 140,
-            target: self,
-            action: #selector(itemTextScaleChanged(_:))
+        let itemTextScaleValue = BoardManPanel.clampedItemTextScale(
+            AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
         )
-        itemTextScale.numberOfTickMarks = 7
-        itemTextScale.allowsTickMarkValuesOnly = false
-        itemTextScale.identifier = NSUserInterfaceItemIdentifier("BoardManItemTextScaleSlider")
-        contentView.addSubview(itemTextScale)
-        itemTextScaleSlider = itemTextScale
+        let itemTextField = NSTextField(frame: .zero)
+        itemTextField.cell = BoardManCenteredTextFieldCell(textCell: "\(itemTextScaleValue)")
+        itemTextField.alignment = .right
+        itemTextField.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        itemTextField.textColor = .labelColor
+        itemTextField.integerValue = itemTextScaleValue
+        itemTextField.isEditable = true
+        itemTextField.isSelectable = true
+        itemTextField.isEnabled = true
+        itemTextField.target = self
+        itemTextField.action = #selector(itemTextScaleFieldChanged(_:))
+        itemTextField.delegate = self
+        let itemTextFormatter = NumberFormatter()
+        itemTextFormatter.numberStyle = .none
+        itemTextFormatter.minimum = 80
+        itemTextFormatter.maximum = 140
+        itemTextFormatter.allowsFloats = false
+        itemTextField.formatter = itemTextFormatter
+        itemTextField.identifier = NSUserInterfaceItemIdentifier("BoardManItemTextScaleField")
+        configureSettingsInputField(itemTextField)
+        contentView.addSubview(itemTextField)
+        itemTextScaleField = itemTextField
 
-        let itemTextScaleValue = NSTextField(labelWithString: "\(itemTextScale.integerValue)%")
-        itemTextScaleValue.alignment = .right
-        itemTextScaleValue.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
-        itemTextScaleValue.identifier = NSUserInterfaceItemIdentifier("BoardManItemTextScaleValueLabel")
-        contentView.addSubview(itemTextScaleValue)
-        itemTextScaleValueLabel = itemTextScaleValue
+        let itemTextDecrease = makeAdjustmentButton(
+            title: "−",
+            action: #selector(adjustItemTextScale(_:)),
+            identifier: "BoardManItemTextScaleDecreaseButton",
+            delta: -1
+        )
+        contentView.addSubview(itemTextDecrease)
+        itemTextScaleDecreaseButton = itemTextDecrease
+
+        let itemTextIncrease = makeAdjustmentButton(
+            title: "+",
+            action: #selector(adjustItemTextScale(_:)),
+            identifier: "BoardManItemTextScaleIncreaseButton",
+            delta: 1
+        )
+        contentView.addSubview(itemTextIncrease)
+        itemTextScaleIncreaseButton = itemTextIncrease
 
         let lighten = NSButton(checkboxWithTitle: boardManText("Lighten"), target: self, action: #selector(themeLightenChanged(_:)))
         lighten.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManThemeLighten) ? .on : .off
@@ -6681,7 +6708,7 @@ class BoardManPanel: NSPanel {
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup,
             themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup,
             uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup,
-            itemTextScaleLabel, itemTextScaleSlider, itemTextScaleValueLabel, themeLightenButton,
+            itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -7689,7 +7716,7 @@ class BoardManPanel: NSPanel {
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup,
             themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup,
             uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup,
-            itemTextScaleLabel, itemTextScaleSlider, itemTextScaleValueLabel, themeLightenButton,
+            itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -7752,7 +7779,7 @@ class BoardManPanel: NSPanel {
             usedItemStylePopup, themePresetLabel, themePresetPopup,
             appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup,
             fontChoiceLabel, fontChoicePopup,
-            itemTextScaleLabel, itemTextScaleSlider, itemTextScaleValueLabel, themeLightenButton,
+            itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -7919,17 +7946,24 @@ class BoardManPanel: NSPanel {
                 height: 16
             ))
             let textScaleControlX = layoutX + compactLabelWidth + 12
-            itemTextScaleValueLabel?.frame = NSIntegralRect(NSRect(
-                x: layoutX + layoutWidth - 52,
+            let textScaleValueWidth: CGFloat = max(52, min(58, layoutWidth - compactLabelWidth - 94))
+            itemTextScaleDecreaseButton?.frame = NSIntegralRect(NSRect(
+                x: textScaleControlX,
                 y: textScaleY,
-                width: 52,
+                width: 28,
                 height: rowH
             ))
-            itemTextScaleSlider?.frame = NSIntegralRect(NSRect(
-                x: textScaleControlX,
-                y: textScaleY + 3,
-                width: max(64, layoutX + layoutWidth - 62 - textScaleControlX),
-                height: 24
+            itemTextScaleField?.frame = NSIntegralRect(NSRect(
+                x: textScaleControlX + 34,
+                y: textScaleY,
+                width: textScaleValueWidth,
+                height: rowH
+            ))
+            itemTextScaleIncreaseButton?.frame = NSIntegralRect(NSRect(
+                x: textScaleControlX + 40 + textScaleValueWidth,
+                y: textScaleY,
+                width: 28,
+                height: rowH
             ))
             heightControlLabel?.frame = NSIntegralRect(NSRect(
                 x: layoutX,
@@ -8945,14 +8979,24 @@ class BoardManPanel: NSPanel {
         contentView?.needsDisplay = true
     }
 
-    @objc private func itemTextScaleChanged(_ sender: NSSlider) {
-        let value = Self.clampedItemTextScale(sender.integerValue)
-        sender.integerValue = value
+    private func applyItemTextScale(_ rawValue: Int) {
+        let value = Self.clampedItemTextScale(rawValue)
+        itemTextScaleField?.integerValue = value
         AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.boardManItemTextScale)
-        itemTextScaleValueLabel?.stringValue = "\(value)%"
         placeholderList?.reloadData()
         synchronizeListGeometry()
         refreshAppearancePreview()
+    }
+
+    @objc private func itemTextScaleFieldChanged(_ sender: NSTextField) {
+        applyItemTextScale(sender.integerValue)
+    }
+
+    @objc private func adjustItemTextScale(_ sender: NSButton) {
+        let current = itemTextScaleField?.integerValue ?? Self.clampedItemTextScale(
+            AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        )
+        applyItemTextScale(current + (sender.tag * 5))
     }
 
     @objc private func themeLightenChanged(_ sender: NSButton) {
