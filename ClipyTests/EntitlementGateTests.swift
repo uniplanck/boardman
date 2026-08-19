@@ -1316,6 +1316,22 @@ final class BoardManInteractionRuleTests {
 }
 
 @MainActor @Suite(.serialized)
+final class BoardManTimestampHitTests {
+    @Test
+    func rightTimestampHitRectCoversVisibleTimestampOnly() throws {
+        let metadataLabel = NSTextField(labelWithString: "")
+        let timestampFrame = NSRect(x: 640, y: 13, width: 72, height: 20)
+        let hitRect = try #require(boardManTimestampHitRect(
+            timestampText: "22h",
+            timestampPosition: .right,
+            timestampAccessoryFrame: timestampFrame,
+            metadataLabel: metadataLabel
+        ))
+        #expect(hitRect.contains(NSPoint(x: timestampFrame.midX, y: timestampFrame.midY)))
+        #expect(!hitRect.contains(NSPoint(x: timestampFrame.minX - 20, y: timestampFrame.midY)))
+    }
+}
+
 final class BoardManFilterSettingsTests {
 
     @Test

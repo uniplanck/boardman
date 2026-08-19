@@ -452,13 +452,17 @@ extension MenuManager {
             let executionDelay = BoardManPanel.clampedTimestampShortcutDelay(delay)
             DispatchQueue.main.asyncAfter(deadline: .now() + executionDelay) { [weak self] in
                 guard let self else { return }
+                let didSend = AppEnvironment.current.pasteService.sendShortcut(shortcut)
                 if let clickStartedAt {
                     PasteCountInputService.shared.logBoardManPerformance(
                         "panel_timestamp_shortcut_dispatch",
-                        startedAt: clickStartedAt
+                        startedAt: clickStartedAt,
+                        details: "sent=\(didSend)"
                     )
                 }
-                _ = AppEnvironment.current.pasteService.sendShortcut(shortcut)
+                if !didSend {
+                    NSSound.beep()
+                }
                 self.clearPreviousPasteTarget()
             }
         }
@@ -3764,6 +3768,32 @@ final class BoardManCenteredSearchFieldCell: NSSearchFieldCell {
 
 }
 
+func boardManTimestampHitRect(
+    timestampText: String,
+    timestampPosition: BoardManTimestampPosition,
+    timestampAccessoryFrame: NSRect,
+    metadataLabel: NSTextField
+) -> NSRect? {
+    guard !timestampText.isEmpty, timestampPosition != .hidden else { return nil }
+    if timestampPosition == .left || timestampPosition == .right {
+        return timestampAccessoryFrame.insetBy(dx: -5, dy: -5)
+    }
+    guard timestampPosition == .below, !metadataLabel.isHidden,
+          let font = metadataLabel.font else { return nil }
+    let metadata = metadataLabel.stringValue as NSString
+    let range = metadata.range(of: timestampText)
+    guard range.location != NSNotFound else { return nil }
+    let attributes: [NSAttributedString.Key: Any] = [.font: font]
+    let prefixWidth = ceil((metadata.substring(to: range.location) as NSString).size(withAttributes: attributes).width)
+    let valueWidth = ceil((metadata.substring(with: range) as NSString).size(withAttributes: attributes).width)
+    return NSRect(
+        x: metadataLabel.frame.minX + prefixWidth,
+        y: metadataLabel.frame.minY,
+        width: min(valueWidth, max(0, metadataLabel.frame.width - prefixWidth)),
+        height: metadataLabel.frame.height
+    ).insetBy(dx: -5, dy: -5)
+}
+
 func boardManCapCenteredTextFrame(
     for label: NSTextField,
     originX: CGFloat,
@@ -3989,28 +4019,22 @@ final class BoardManHistoryCellView: NSTableCellView {
         needsLayout = true
     }
 
-    fileprivate func containsTimestamp(at point: NSPoint) -> Bool {
-        guard !configuredTimestampText.isEmpty, timestampPosition != .hidden else { return false }
-        if timestampPosition == .left || timestampPosition == .right {
-            return timestampAccessoryLabel.frame.insetBy(dx: -5, dy: -5).contains(point)
-        }
-        guard timestampPosition == .below, !metadataLabel.isHidden,
-              let font = metadataLabel.font else { return false }
-        let metadata = metadataLabel.stringValue as NSString
-        let range = metadata.range(of: configuredTimestampText)
-        guard range.location != NSNotFound else { return false }
-        let attributes: [NSAttributedString.Key: Any] = [.font: font]
-        let prefix = metadata.substring(to: range.location) as NSString
-        let value = metadata.substring(with: range) as NSString
-        let prefixWidth = ceil(prefix.size(withAttributes: attributes).width)
-        let valueWidth = ceil(value.size(withAttributes: attributes).width)
-        let hitRect = NSRect(
-            x: metadataLabel.frame.minX + prefixWidth,
-            y: metadataLabel.frame.minY,
-            width: min(valueWidth, max(0, metadataLabel.frame.maxX - metadataLabel.frame.minX - prefixWidth)),
-            height: metadataLabel.frame.height
+    private var timestampHitRect: NSRect? {
+        return boardManTimestampHitRect(
+            timestampText: configuredTimestampText,
+            timestampPosition: timestampPosition,
+            timestampAccessoryFrame: timestampAccessoryLabel.frame,
+            metadataLabel: metadataLabel
         )
-        return hitRect.insetBy(dx: -5, dy: -5).contains(point)
+    }
+
+    fileprivate func containsTimestamp(at point: NSPoint) -> Bool {
+        return timestampHitRect?.contains(point) == true
+    }
+
+    fileprivate func containsTimestamp(windowPoint: NSPoint) -> Bool {
+        guard let timestampHitRect else { return false }
+        return convert(timestampHitRect, to: nil).contains(windowPoint)
     }
 
     static func usageBadgeFrame(in bounds: NSRect, intrinsicWidth: CGFloat) -> NSRect {
@@ -11001,6 +11025,15 @@ class BoardManPanel: NSPanel {
         return cell.containsTimestamp(at: cell.convert(tablePoint, from: table))
     }
 
+    private func isTimestampHitAtCurrentPointer(row: Int, table: NSTableView) -> Bool {
+        guard let window = table.window,
+              let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? BoardManHistoryCellView else {
+            return false
+        }
+        cell.layoutSubtreeIfNeeded()
+        return cell.containsTimestamp(windowPoint: window.mouseLocationOutsideOfEventStream)
+    }
+
     private func performTimestampShortcut(startedAt: CFAbsoluteTime?) {
         guard configuredTimestampShortcutEnabled else {
             NSSound.beep()
@@ -11023,12 +11056,13 @@ class BoardManPanel: NSPanel {
         let row = sender.clickedRow >= 0 ? sender.clickedRow : sender.selectedRow
         guard row >= 0, let item = historyItems[safe: row] else { return }
         let tablePoint = NSApp.currentEvent.map { sender.convert($0.locationInWindow, from: nil) }
-        let timestampWasHit = tablePoint.map { isTimestampHit(row: row, tablePoint: $0, table: sender) } ?? false
+        let eventTimestampHit = tablePoint.map { isTimestampHit(row: row, tablePoint: $0, table: sender) } ?? false
+        let timestampWasHit = eventTimestampHit || isTimestampHitAtCurrentPointer(row: row, table: sender)
 
         PasteCountInputService.shared.logBoardManPerformance(
             "panel_row_click",
             startedAt: startedAt,
-            details: "row=\(row) source=\(item.source)"
+            details: "row=\(row) source=\(item.source) timestampHit=\(timestampWasHit)"
         )
 
         let wasEditing = isSnippetEditing
