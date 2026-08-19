@@ -3764,6 +3764,29 @@ final class BoardManCenteredSearchFieldCell: NSSearchFieldCell {
 
 }
 
+func boardManCapCenteredTextFrame(
+    for label: NSTextField,
+    originX: CGFloat,
+    width: CGFloat,
+    capCenterY: CGFloat
+) -> NSRect {
+    guard let font = label.font else {
+        return NSRect(x: originX, y: capCenterY, width: width, height: 0)
+    }
+    let descenderDepth = abs(font.descender)
+    let metricsHeight = max(0, font.ascender - font.descender + font.leading)
+    let requiredHeight = max(metricsHeight, label.firstBaselineOffsetFromTop + descenderDepth)
+    let frameHeight = ceil(requiredHeight)
+    let baselineY = capCenterY - (font.capHeight / 2)
+    let frameMaxY = baselineY + label.firstBaselineOffsetFromTop
+    return NSRect(
+        x: originX,
+        y: frameMaxY - frameHeight,
+        width: width,
+        height: frameHeight
+    )
+}
+
 final class BoardManHistoryCellView: NSTableCellView {
     private let primaryLabel = NSTextField(labelWithString: "")
     private let metadataLabel = NSTextField(labelWithString: "")
@@ -3887,8 +3910,12 @@ final class BoardManHistoryCellView: NSTableCellView {
         let textScale = CGFloat(BoardManPanel.clampedItemTextScale(
             AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
         )) / 100
-        primaryLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 12.75 : 13.5) * textScale, weight: .medium)
-        metadataLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 11 : 11.5) * textScale, weight: .regular)
+        let primaryBaseSize: CGFloat = isNarrowRow ? 12.75 : 13.5
+        let metadataBaseSize: CGFloat = isNarrowRow ? 11 : 11.5
+        let primaryFont = fontChoice.font(ofSize: primaryBaseSize * textScale, weight: .medium)
+        let metadataFont = fontChoice.font(ofSize: metadataBaseSize * textScale, weight: .regular)
+        primaryLabel.font = primaryFont
+        metadataLabel.font = metadataFont
         timestampAccessoryLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 10 : 10.5) * textScale, weight: .medium)
         countBadge.font = fontChoice.font(ofSize: isNarrowRow ? 10 : 10.5, weight: .medium)
         pinBadge.font = fontChoice.font(ofSize: 9.5, weight: .bold)
@@ -4016,8 +4043,8 @@ final class BoardManHistoryCellView: NSTableCellView {
         let horizontalInset: CGFloat = 10
         let trailingInset: CGFloat = 24
         let accessoryGap: CGFloat = 12
-        let titleHeight: CGFloat = 18
-        let metadataHeight: CGFloat = 15
+        let titleSlotHeight: CGFloat = 18
+        let metadataSlotHeight: CGFloat = 15
         let textGap: CGFloat = 4
         let timeWidth: CGFloat = 72
         let countWidth: CGFloat = 64
@@ -4106,28 +4133,30 @@ final class BoardManHistoryCellView: NSTableCellView {
 
         let textWidth = max(0, textRight - textLeft)
         if timestampPosition == .below {
-            let textBlockHeight = titleHeight + textGap + metadataHeight
+            let textBlockHeight = titleSlotHeight + textGap + metadataSlotHeight
             let textBottom = floor((bounds.height - textBlockHeight) / 2)
-            metadataLabel.frame = NSIntegralRect(NSRect(
-                x: textLeft,
-                y: textBottom,
+            let metadataCapCenterY = textBottom + (metadataSlotHeight / 2)
+            let primaryCapCenterY = textBottom + metadataSlotHeight + textGap + (titleSlotHeight / 2)
+            metadataLabel.frame = boardManCapCenteredTextFrame(
+                for: metadataLabel,
+                originX: textLeft,
                 width: textWidth,
-                height: metadataHeight
-            ))
-            primaryLabel.frame = NSIntegralRect(NSRect(
-                x: textLeft,
-                y: textBottom + metadataHeight + textGap,
+                capCenterY: metadataCapCenterY
+            )
+            primaryLabel.frame = boardManCapCenteredTextFrame(
+                for: primaryLabel,
+                originX: textLeft,
                 width: textWidth,
-                height: titleHeight
-            ))
+                capCenterY: primaryCapCenterY
+            )
         } else {
             metadataLabel.frame = .zero
-            primaryLabel.frame = NSIntegralRect(NSRect(
-                x: textLeft,
-                y: floor(bounds.midY - titleHeight / 2),
+            primaryLabel.frame = boardManCapCenteredTextFrame(
+                for: primaryLabel,
+                originX: textLeft,
                 width: textWidth,
-                height: titleHeight
-            ))
+                capCenterY: bounds.midY
+            )
         }
     }
 }
