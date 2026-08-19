@@ -6,7 +6,7 @@ Board-Man은 Clipy에서 파생된 macOS 클립보드 생산성 앱입니다.
 
 메뉴 막대에서 클립보드 기록을 바로 사용할 수 있게 하고, 텍스트, URL, 명령어, 이미지를 앱 사이에서 반복적으로 복사, 붙여넣기, 편집, 이동하는 작업 흐름을 더 잘 볼 수 있게 해줍니다.
 
-> 릴리스 상태: 현재 정식 제품 라인은 **v0.1.0**입니다. 이전 v1.2.3 실험 라인 이후 의도적으로 버전을 재설정한 제품 라인이며, `main` 브랜치는 계속 개발 중이고 이 번역은 영어 README보다 늦을 수 있습니다.
+> 릴리스 상태: 현재 정식 제품 라인은 **v0.2.0**입니다. 이전 실험 라인 이후 의도적으로 버전을 재설정했으며, 기존 v0.1.x / v1.2.x 태그는 재사용하지 않고 보존합니다. `main` 브랜치는 계속 개발 중이고 이 번역은 영어 README보다 늦을 수 있습니다.
 
 ## 스크린샷
 
@@ -26,12 +26,12 @@ Board-Man은 Clipy에서 파생된 macOS 클립보드 생산성 앱입니다.
 
 ## 다운로드
 
-- [Board-Man v0.1.0 다운로드](https://github.com/uniplanck/boardman/releases/tag/v0.1.0)
-- macOS 앱 아카이브: `Board-Man-v0.1.0.zip`
+- [Board-Man v0.2.0 다운로드](https://github.com/uniplanck/boardman/releases/tag/v0.2.0)
+- macOS 앱 아카이브: `Board-Man-v0.2.0.zip`
 
 ## 설치 및 첫 실행
 
-1. 릴리스 페이지에서 `Board-Man-v0.1.0.zip`을 다운로드합니다.
+1. 릴리스 페이지에서 `Board-Man-v0.2.0.zip`을 다운로드합니다.
 2. 아카이브의 압축을 풉니다.
 3. `Board-Man.app`을 `/Applications`로 이동합니다.
 4. Board-Man을 엽니다.

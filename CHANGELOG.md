@@ -4,11 +4,11 @@ Board-Man follows tagged GitHub releases for published builds. The `main` branch
 
 ## Unreleased
 
-No user-facing changes have been recorded after v0.1.0 yet.
+No user-facing changes have been recorded after v0.2.0 yet.
 
-## v0.1.0 — 2026-08-19
+## v0.2.0 — 2026-08-19
 
-v0.1.0 is the first formal product-line release after the internal 0.0.1 baseline. The project intentionally reset versioning from the older v1.2.3 experimental line; v1.2.3 remains available as a legacy historical release.
+v0.2.0 is the first formal product-line release after the internal 0.0.1 baseline. The project intentionally reset product versioning after the older experimental line. Historical tags already occupy v0.1.0 through v0.1.2 and v1.2.x, so those tags are preserved rather than rewritten; the formal line therefore resumes at v0.2.0.
 
 ### Panel and workflow
 
@@ -44,9 +44,11 @@ v0.1.0 is the first formal product-line release after the internal 0.0.1 baselin
 - Added deterministic isolated README screenshot generation.
 - Added issue forms, pull-request guidance, support, security, conduct, and contribution documentation.
 - Expanded CI with repository checks and a macOS build-and-test job.
-- Aligned app/test bundle metadata to `0.1.0` / build `2` for this formal release.
+- Aligned app/test bundle metadata to `0.2.0` / build `2` for this formal release.
 
 ## Legacy experimental releases
+
+The historical experimental line remains intact. In particular, existing v0.1.0, v0.1.1, v0.1.2, v1.2.2, and v1.2.3 tags are not reused or rewritten.
 
 - [v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3) — legacy experimental release with panel clipping, keyboard selection, preview priority, and opening-flicker fixes.
 - [v1.2.2](https://github.com/uniplanck/boardman/releases/tag/v1.2.2) — legacy experimental release with theme, responsive list width, and keyboard navigation improvements.
