@@ -3474,78 +3474,181 @@ final class BoardManAppearancePreviewView: NSView {
     }
 }
 
-final class BoardManHeaderSegmentedControl: NSSegmentedControl {
+final class BoardManHeaderTabButton: NSButton {
     private var hoverTrackingArea: NSTrackingArea?
-    private(set) var hoveredSegment = -1
+    private(set) var isHovering = false
+    var hoverDidChange: (() -> Void)?
 
     override func updateTrackingAreas() {
         if let hoverTrackingArea {
             removeTrackingArea(hoverTrackingArea)
         }
-        let options: NSTrackingArea.Options = [
-            .mouseMoved,
-            .mouseEnteredAndExited,
-            .activeInKeyWindow,
-            .inVisibleRect
-        ]
-        let trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
         addTrackingArea(trackingArea)
         hoverTrackingArea = trackingArea
         super.updateTrackingAreas()
     }
 
-    override func mouseMoved(with event: NSEvent) {
-        updateHoveredSegment(at: convert(event.locationInWindow, from: nil))
-        super.mouseMoved(with: event)
+    override func mouseEntered(with event: NSEvent) {
+        setHovering(true)
+        super.mouseEntered(with: event)
     }
 
     override func mouseExited(with event: NSEvent) {
-        setHoveredSegment(-1)
+        setHovering(false)
         super.mouseExited(with: event)
     }
 
-    func updateHoveredSegment(at point: NSPoint) {
-        guard bounds.contains(point), segmentCount > 0, bounds.width > 0 else {
-            setHoveredSegment(-1)
-            return
+    func setHoveringForTesting(_ value: Bool) {
+        setHovering(value)
+    }
+
+    private func setHovering(_ value: Bool) {
+        guard isHovering != value else { return }
+        isHovering = value
+        hoverDidChange?()
+    }
+}
+
+final class BoardManHeaderTabBar: NSView {
+    let historyButton = BoardManHeaderTabButton(title: "", target: nil, action: nil)
+    let snippetsButton = BoardManHeaderTabButton(title: "", target: nil, action: nil)
+    let separatorView = NSView(frame: .zero)
+    private(set) var selectedIndex = BoardManPanelTab.history.rawValue
+    var selectionDidChange: ((Int) -> Void)?
+
+    var buttons: [BoardManHeaderTabButton] {
+        return [historyButton, snippetsButton]
+    }
+
+    var hoveredIndex: Int {
+        return buttons.firstIndex(where: { $0.isHovering }) ?? -1
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 14
+        layer?.borderWidth = 1
+        layer?.masksToBounds = true
+        layer?.shadowOpacity = 0
+
+        for (index, button) in buttons.enumerated() {
+            button.tag = index
+            button.target = self
+            button.action = #selector(tabButtonPressed(_:))
+            button.isBordered = false
+            button.showsBorderOnlyWhileMouseInside = false
+            button.focusRingType = .none
+            button.imagePosition = .imageLeading
+            button.imageScaling = .scaleProportionallyDown
+            button.alignment = .center
+            button.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 11
+            button.layer?.masksToBounds = true
+            button.layer?.borderWidth = 0
+            button.layer?.shadowOpacity = 0
+            button.hoverDidChange = { [weak self] in self?.refreshVisualState() }
+            addSubview(button)
         }
-        let index = (0..<segmentCount).first { segmentFrame(for: $0)?.contains(point) == true } ?? -1
-        setHoveredSegment(index)
+
+        separatorView.wantsLayer = true
+        separatorView.layer?.shadowOpacity = 0
+        addSubview(separatorView)
+        refreshVisualState()
     }
 
-    func hoverBackgroundRect(forSegment segment: Int) -> NSRect? {
-        guard let segmentRect = segmentFrame(for: segment) else { return nil }
-        return NSIntegralRect(segmentRect.insetBy(dx: 2, dy: 3))
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
-    private func segmentFrame(for segment: Int) -> NSRect? {
-        guard segment >= 0, segment < segmentCount, bounds.width > 0 else { return nil }
-        let configuredWidths = (0..<segmentCount).map { max(0, width(forSegment: $0)) }
-        let configuredTotal = configuredWidths.reduce(0, +)
-        let widths = configuredTotal > 0
-            ? configuredWidths.map { bounds.width * ($0 / configuredTotal) }
-            : Array(repeating: bounds.width / CGFloat(segmentCount), count: segmentCount)
-        let minX = bounds.minX + widths.prefix(segment).reduce(0, +)
-        let maxX = segment == segmentCount - 1 ? bounds.maxX : minX + widths[segment]
-        return NSRect(x: minX, y: bounds.minY, width: max(0, maxX - minX), height: bounds.height)
+    override func layout() {
+        super.layout()
+        let halfWidth = floor(bounds.width / 2)
+        historyButton.frame = NSIntegralRect(NSRect(
+            x: 2,
+            y: 2,
+            width: max(0, halfWidth - 3),
+            height: max(0, bounds.height - 4)
+        ))
+        snippetsButton.frame = NSIntegralRect(NSRect(
+            x: halfWidth + 1,
+            y: 2,
+            width: max(0, bounds.width - halfWidth - 3),
+            height: max(0, bounds.height - 4)
+        ))
+        separatorView.frame = NSIntegralRect(NSRect(
+            x: halfWidth,
+            y: 8,
+            width: 1,
+            height: max(0, bounds.height - 16)
+        ))
     }
 
-    private func setHoveredSegment(_ value: Int) {
-        guard hoveredSegment != value else { return }
-        hoveredSegment = value
-        needsDisplay = true
+    func configureTab(index: Int, title: String, toolTip: String, image: NSImage?) {
+        guard buttons.indices.contains(index) else { return }
+        let button = buttons[index]
+        button.title = title
+        button.toolTip = toolTip
+        button.setAccessibilityLabel(toolTip)
+        button.image = image
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard let hoverRect = hoverBackgroundRect(forSegment: hoveredSegment) else { return }
+    func setFont(_ font: NSFont) {
+        buttons.forEach { $0.font = font }
+    }
 
-        let isSelected = hoveredSegment == selectedSegment
-        let path = NSBezierPath(roundedRect: hoverRect, xRadius: 8, yRadius: 8)
-        (isSelected
-            ? NSColor.selectedControlTextColor.withAlphaComponent(0.10)
-            : NSColor.labelColor.withAlphaComponent(0.08)).setFill()
-        path.fill()
+    func setSelectedIndex(_ index: Int) {
+        let normalized = buttons.indices.contains(index) ? index : -1
+        guard selectedIndex != normalized else { return }
+        selectedIndex = normalized
+        refreshVisualState()
+    }
+
+    func updateHoveredTab(at point: NSPoint) {
+        for button in buttons {
+            button.setHoveringForTesting(button.frame.contains(point))
+        }
+    }
+
+    func hoverBackgroundRect(forTab index: Int) -> NSRect? {
+        guard buttons.indices.contains(index) else { return nil }
+        return buttons[index].frame
+    }
+
+    func refreshVisualState() {
+        layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.16).cgColor
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.82).cgColor
+        separatorView.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.72).cgColor
+        for (index, button) in buttons.enumerated() {
+            let isSelected = selectedIndex == index
+            let fillColor: NSColor
+            if isSelected {
+                fillColor = NSColor.labelColor.withAlphaComponent(0.14)
+            } else if button.isHovering {
+                fillColor = NSColor.labelColor.withAlphaComponent(0.07)
+            } else {
+                fillColor = .clear
+            }
+            button.layer?.backgroundColor = fillColor.cgColor
+            button.layer?.borderColor = NSColor.clear.cgColor
+            button.layer?.shadowOpacity = 0
+            if #available(macOS 10.14, *) {
+                button.contentTintColor = isSelected ? .labelColor : .secondaryLabelColor
+            }
+        }
+    }
+
+    @objc private func tabButtonPressed(_ sender: NSButton) {
+        guard buttons.indices.contains(sender.tag) else { return }
+        setSelectedIndex(sender.tag)
+        selectionDidChange?(sender.tag)
     }
 }
 
@@ -3998,7 +4101,7 @@ class BoardManPanel: NSPanel {
 
     private var glassBackgroundView: NSVisualEffectView?
     private var searchField: NSSearchField?
-    private var segmentedControl: BoardManHeaderSegmentedControl?
+    private var headerTabBar: BoardManHeaderTabBar?
     private var settingsButton: NSButton?
     private var historyUsageFilterControl: NSSegmentedControl?
     private var historySortButton: NSButton?
@@ -4242,7 +4345,7 @@ class BoardManPanel: NSPanel {
             : NSSize(width: LayoutMetrics.minimumWidth, height: 600)
         if enabled {
             activeTab = .history
-            segmentedControl?.selectedSegment = BoardManPanelTab.history.rawValue
+            headerTabBar?.setSelectedIndex(BoardManPanelTab.history.rawValue)
         }
         selectedIndex = -1
         hoveredRow = -1
@@ -4253,7 +4356,7 @@ class BoardManPanel: NSPanel {
 
     func selectSettingsTab() {
         activeTab = .settings
-        segmentedControl?.selectedSegment = -1
+        headerTabBar?.setSelectedIndex(-1)
         shouldScrollSettingsToTop = true
         updateSettingsButtonAppearance()
         refreshGlobalShortcutRows()
@@ -4269,7 +4372,7 @@ class BoardManPanel: NSPanel {
 
     func openSnippetsManagerMode(categoryIdentifier: String? = nil) {
         activeTab = .snippets
-        segmentedControl?.selectedSegment = BoardManPanelTab.snippets.rawValue
+        headerTabBar?.setSelectedIndex(BoardManPanelTab.snippets.rawValue)
         updateSettingsButtonAppearance()
         if let categoryIdentifier {
             setActiveSnippetGroupIdentifiers(
@@ -4946,28 +5049,27 @@ class BoardManPanel: NSPanel {
         searchField = search
 
         // History and Templates remain the two primary tabs. Settings lives in the trailing gear button.
-        let tabs = BoardManHeaderSegmentedControl(frame: .zero)
-        tabs.segmentCount = 2
-        tabs.setLabel("History", forSegment: 0)
-        tabs.setLabel("Snippets", forSegment: 1)
-        if #available(macOS 11.0, *) {
-            tabs.setImage(NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: "History"), forSegment: 0)
-            tabs.setImage(NSImage(systemSymbolName: "text.badge.plus", accessibilityDescription: "Snippets"), forSegment: 1)
+        // This is intentionally custom-drawn instead of NSSegmentedControl so AppKit cannot add
+        // a system hover/focus halo around the capsule edges.
+        let tabs = BoardManHeaderTabBar(frame: .zero)
+        tabs.configureTab(
+            index: BoardManPanelTab.history.rawValue,
+            title: BoardManPanelTab.history.title,
+            toolTip: BoardManPanelTab.history.title,
+            image: NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: BoardManPanelTab.history.title)
+        )
+        tabs.configureTab(
+            index: BoardManPanelTab.snippets.rawValue,
+            title: BoardManPanelTab.snippets.title,
+            toolTip: BoardManPanelTab.snippets.title,
+            image: NSImage(systemSymbolName: "text.badge.plus", accessibilityDescription: BoardManPanelTab.snippets.title)
+        )
+        tabs.selectionDidChange = { [weak self] index in
+            let tab: BoardManPanelTab = index == BoardManPanelTab.snippets.rawValue ? .snippets : .history
+            self?.activateTab(tab)
         }
-        tabs.selectedSegment = 0
-        tabs.target = self
-        tabs.action = #selector(tabChanged(_:))
-        if #available(macOS 10.10, *) {
-            tabs.segmentStyle = .rounded
-        }
-        tabs.focusRingType = .none
-        tabs.wantsLayer = true
-        tabs.layer?.masksToBounds = true
-        tabs.layer?.cornerRadius = 14
-        tabs.controlSize = .large
-        tabs.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
         contentView.addSubview(tabs)
-        segmentedControl = tabs
+        headerTabBar = tabs
 
         let gear = NSButton(title: "", target: self, action: #selector(settingsButtonPressed(_:)))
         gear.bezelStyle = .rounded
@@ -7151,7 +7253,7 @@ class BoardManPanel: NSPanel {
         searchField?.backgroundColor = useGlass
             ? surfaceTint.withAlphaComponent(0.26)
             : NSColor.controlBackgroundColor.withAlphaComponent(0.78)
-        segmentedControl?.needsDisplay = true
+        headerTabBar?.refreshVisualState()
         updateHistorySortButton()
         updateHistoryConditionButton()
         settingsSidebarView?.layer?.backgroundColor = (useGlass
@@ -7324,9 +7426,8 @@ class BoardManPanel: NSPanel {
         let gearGap: CGFloat = isCompact ? 8 : 12
         let tabsWidth: CGFloat = isCompact ? 190 : min(250, max(216, floor(width * 0.31)))
         let tabsFrame = NSIntegralRect(NSRect(x: margin, y: headerY, width: tabsWidth, height: 36))
-        segmentedControl?.frame = tabsFrame
-        segmentedControl?.isHidden = isQuickMode
-        updateTabWidths(totalWidth: tabsWidth)
+        headerTabBar?.frame = tabsFrame
+        headerTabBar?.isHidden = isQuickMode
         applyResponsiveTabPresentation(isCompact: isCompact)
         settingsButton?.isHidden = isQuickMode
         settingsButton?.frame = NSIntegralRect(NSRect(
@@ -7618,22 +7719,19 @@ class BoardManPanel: NSPanel {
     }
 
     private func applyResponsiveTabPresentation(isCompact: Bool) {
-        guard let segmentedControl else { return }
-        segmentedControl.font = NSFont.systemFont(
+        guard let headerTabBar else { return }
+        headerTabBar.setFont(NSFont.systemFont(
             ofSize: isCompact ? 11.25 : 12.5,
             weight: .medium
-        )
+        ))
         for tab in [BoardManPanelTab.history, BoardManPanelTab.snippets] {
-            segmentedControl.setLabel(tab.title(compact: isCompact), forSegment: tab.rawValue)
-            segmentedControl.setToolTip(tab.title, forSegment: tab.rawValue)
-        }
-    }
-
-    private func updateTabWidths(totalWidth: CGFloat) {
-        guard let segmentedControl, segmentedControl.segmentCount > 0 else { return }
-        let segmentWidth = max(72, floor(totalWidth / CGFloat(segmentedControl.segmentCount)))
-        for segment in 0..<segmentedControl.segmentCount {
-            segmentedControl.setWidth(segmentWidth, forSegment: segment)
+            let symbolName = tab == .history ? "clock.arrow.circlepath" : "text.badge.plus"
+            headerTabBar.configureTab(
+                index: tab.rawValue,
+                title: tab.title(compact: isCompact),
+                toolTip: tab.title,
+                image: NSImage(systemSymbolName: symbolName, accessibilityDescription: tab.title)
+            )
         }
     }
 
@@ -9900,11 +9998,6 @@ class BoardManPanel: NSPanel {
         applyPanelHeight(current + (sender.tag * 40))
     }
 
-    @objc private func tabChanged(_ sender: NSSegmentedControl) {
-        let tab: BoardManPanelTab = sender.selectedSegment == BoardManPanelTab.snippets.rawValue ? .snippets : .history
-        activateTab(tab)
-    }
-
     @objc private func settingsButtonPressed(_ sender: NSButton) {
         activateTab(.settings)
     }
@@ -9927,7 +10020,7 @@ class BoardManPanel: NSPanel {
             _ = makeFirstResponder(nil)
         }
         activeTab = tab
-        segmentedControl?.selectedSegment = tab == .settings ? -1 : tab.rawValue
+        headerTabBar?.setSelectedIndex(tab == .settings ? -1 : tab.rawValue)
         if tab == .settings {
             shouldScrollSettingsToTop = true
         }

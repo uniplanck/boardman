@@ -1383,9 +1383,8 @@ final class BoardManPanelLayoutTests {
             return
         }
         let expectedTitles = Set(["General", "Appearance", "History", "Templates", "Privacy", "Updates", "License"])
-        let categories = root.subviews
-            .flatMap { $0.subviews }
-            .compactMap { $0 as? NSButton }
+        let categories = allSubviews(of: root)
+            .compactMap { $0 as? BoardManSettingsCategoryButton }
             .filter { expectedTitles.contains($0.title) }
             .sorted { $0.tag < $1.tag }
         #expect(panel.presentationItemScope == .historyOnly)
@@ -1609,23 +1608,26 @@ final class BoardManUIRegressionTests {
 
         let root = try #require(panel.contentView)
         let descendants = allSubviews(of: root)
-        let tabs = try #require(descendants.compactMap { $0 as? BoardManHeaderSegmentedControl }.first)
-        #expect(tabs.focusRingType == .none,
-                "Header tabs should not draw a focus halo around the outer capsule.")
-        #expect(tabs.segmentStyle == .rounded,
-                "Header tabs should use one clean rounded capsule instead of separated edge glow.")
+        let tabs = try #require(descendants.compactMap { $0 as? BoardManHeaderTabBar }.first)
+        #expect(!(tabs is NSSegmentedControl),
+                "Header tabs must not use NSSegmentedControl because AppKit adds a system hover halo.")
         #expect(tabs.layer?.masksToBounds == true)
+        #expect((tabs.layer?.shadowOpacity ?? 1) == 0)
+        #expect(tabs.buttons.allSatisfy { !$0.isBordered && $0.focusRingType == .none })
+        #expect(tabs.buttons.allSatisfy { ($0.layer?.shadowOpacity ?? 1) == 0 })
         let tabFrameBeforeHover = tabs.frame
-        let tabWidthsBeforeHover = (0..<tabs.segmentCount).map { tabs.width(forSegment: $0) }
-        let trailingSegment = tabs.segmentCount - 1
-        tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
-        let trailingHoverRect = try #require(tabs.hoverBackgroundRect(forSegment: trailingSegment))
-        #expect(tabs.hoveredSegment == trailingSegment)
+        let buttonFramesBeforeHover = tabs.buttons.map(\.frame)
+        let trailingTab = 1
+        tabs.updateHoveredTab(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
+        let trailingHoverRect = try #require(tabs.hoverBackgroundRect(forTab: trailingTab))
+        #expect(tabs.hoveredIndex == trailingTab)
         #expect(trailingHoverRect.maxX <= tabs.bounds.maxX)
         #expect(trailingHoverRect.minX >= tabs.bounds.minX)
-        #expect(tabs.frame == tabFrameBeforeHover, "Hover must not resize or move the tab control.")
-        #expect((0..<tabs.segmentCount).map { tabs.width(forSegment: $0) } == tabWidthsBeforeHover,
-                "Hover must not change any segment width.")
+        #expect(tabs.frame == tabFrameBeforeHover, "Hover must not resize or move the tab bar.")
+        #expect(tabs.buttons.map(\.frame) == buttonFramesBeforeHover,
+                "Hover must not change either custom tab button frame.")
+        #expect((tabs.layer?.shadowOpacity ?? 1) == 0,
+                "Hover must never add an outer glow to the custom tab capsule.")
 
         let search = try #require(descendants.compactMap { $0 as? NSSearchField }.first)
         let searchCell = try #require(search.cell as? BoardManCenteredSearchFieldCell)
@@ -1893,16 +1895,16 @@ extension BoardManPanelLayoutTests {
             await settlePanelLayout(panel)
             let root = try #require(panel.contentView)
             let regularTabs = try #require(allSubviews(of: root)
-                .compactMap { $0 as? BoardManHeaderSegmentedControl }.first)
-            #expect(regularTabs.label(forSegment: 1) == regularTitle)
-            #expect(regularTabs.toolTip(forSegment: 1) == regularTitle)
-            #expect((regularTabs.font?.pointSize ?? 0) >= 12.5)
+                .compactMap { $0 as? BoardManHeaderTabBar }.first)
+            #expect(regularTabs.snippetsButton.title == regularTitle)
+            #expect(regularTabs.snippetsButton.toolTip == regularTitle)
+            #expect((regularTabs.snippetsButton.font?.pointSize ?? 0) >= 12.5)
 
             panel.setFrame(NSRect(x: 0, y: 0, width: 640, height: 760), display: false)
             await settlePanelLayout(panel)
-            #expect(regularTabs.label(forSegment: 1) == compactTitle)
-            #expect(regularTabs.toolTip(forSegment: 1) == regularTitle)
-            #expect((regularTabs.font?.pointSize ?? 99) <= 11.25)
+            #expect(regularTabs.snippetsButton.title == compactTitle)
+            #expect(regularTabs.snippetsButton.toolTip == regularTitle)
+            #expect((regularTabs.snippetsButton.font?.pointSize ?? 99) <= 11.25)
         }
     }
 
@@ -1937,7 +1939,7 @@ extension BoardManPanelLayoutTests {
             return
         }
         let descendants = allSubviews(of: root)
-        let tabs = descendants.compactMap { $0 as? BoardManHeaderSegmentedControl }.first
+        let tabs = descendants.compactMap { $0 as? BoardManHeaderTabBar }.first
         let search = descendants.compactMap { $0 as? NSSearchField }.first
         let conditionButton = descendants
             .compactMap { $0 as? NSButton }
@@ -1973,14 +1975,15 @@ extension BoardManPanelLayoutTests {
                 || $0.identifier?.rawValue == "BoardManSearchOutline"
         }, "Legacy duplicate header outline views are still present.")
 
-        guard let tabs = descendants.compactMap({ $0 as? BoardManHeaderSegmentedControl }).first else {
-            Issue.record("Hover-aware header tabs were not created.")
+        guard let tabs = descendants.compactMap({ $0 as? BoardManHeaderTabBar }).first else {
+            Issue.record("Custom hover-aware header tabs were not created.")
             return
         }
-        #expect(tabs.segmentCount == 2,
+        #expect(tabs.buttons.count == 2,
                 "The header should expose only History and Templates as primary tabs.")
-        tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
-        #expect(tabs.hoveredSegment == 1, "Header hover tracking did not resolve the trailing Templates segment.")
+        #expect(tabs.buttons.allSatisfy { !$0.isBordered && $0.focusRingType == .none })
+        tabs.updateHoveredTab(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
+        #expect(tabs.hoveredIndex == 1, "Header hover tracking did not resolve the trailing Templates tab.")
 
         let settingsButton = descendants.compactMap { $0 as? NSButton }.first {
             $0.identifier?.rawValue == "BoardManSettingsButton"
@@ -2031,7 +2034,7 @@ extension BoardManPanelLayoutTests {
         let descendants = allSubviews(of: root)
         let usageFilter = descendants
             .compactMap { $0 as? NSSegmentedControl }
-            .first { !($0 is BoardManHeaderSegmentedControl) && $0.segmentCount == 3 }
+            .first { $0.segmentCount == 3 }
         let sortButton = descendants
             .compactMap { $0 as? NSButton }
             .first { ($0.toolTip ?? "").contains("Copy Order") || ($0.toolTip ?? "").contains("Recent Use") }
