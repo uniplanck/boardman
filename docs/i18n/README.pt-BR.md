@@ -6,7 +6,7 @@ Board-Man é um app de produtividade para a área de transferência do macOS der
 
 Ele mantém o histórico da área de transferência disponível na barra de menus e adiciona visibilidade orientada ao fluxo de trabalho para quem copia, cola, edita e move textos, URLs, comandos e imagens entre apps com frequência.
 
-> Status da versão: a linha formal atual do produto é a **v0.2.0**. Ela segue uma redefinição intencional após a antiga linha experimental; as tags históricas v0.1.x / v1.2.x são preservadas em vez de reutilizadas. A branch `main` continua em desenvolvimento ativo e esta tradução pode estar atrás do README em inglês.
+> Status da versão: a linha formal atual do produto é a **v0.2.1**. Ela segue uma redefinição intencional após a antiga linha experimental; as tags históricas v0.1.x / v1.2.x são preservadas em vez de reutilizadas. A branch `main` continua em desenvolvimento ativo e esta tradução pode estar atrás do README em inglês.
 
 ## Captura de tela
 
@@ -26,12 +26,12 @@ Ele mantém o histórico da área de transferência disponível na barra de menu
 
 ## Download
 
-- [Baixar Board-Man v0.2.0](https://github.com/uniplanck/boardman/releases/tag/v0.2.0)
-- Arquivo do app para macOS: `Board-Man-v0.2.0.zip`
+- [Baixar Board-Man v0.2.1](https://github.com/uniplanck/boardman/releases/tag/v0.2.1)
+- Arquivo do app para macOS: `Board-Man-v0.2.1.zip`
 
 ## Instalação e primeira abertura
 
-1. Baixe `Board-Man-v0.2.0.zip` na página da release.
+1. Baixe `Board-Man-v0.2.1.zip` na página da release.
 2. Descompacte o arquivo.
 3. Mova `Board-Man.app` para `/Applications`.
 4. Abra o Board-Man.

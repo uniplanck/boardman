@@ -6,7 +6,7 @@ Board-Man 是一款源自 Clipy 的 macOS 剪贴板效率工具。
 
 它让你可以从菜单栏随时访问剪贴板历史，并为经常在不同应用之间复制、粘贴、编辑和移动文本、URL、命令及图片的人提供更清晰的工作流可见性。
 
-> 发布状态：当前正式产品线为 **v0.2.0**。旧实验版本之后已主动重置版本号，并保留历史 v0.1.x / v1.2.x 标签而不重复使用；`main` 分支仍在持续开发，本翻译可能落后于英文 README。
+> 发布状态：当前正式产品线为 **v0.2.1**。旧实验版本之后已主动重置版本号，并保留历史 v0.1.x / v1.2.x 标签而不重复使用；`main` 分支仍在持续开发，本翻译可能落后于英文 README。
 
 ## 截图
 
@@ -26,12 +26,12 @@ Board-Man 是一款源自 Clipy 的 macOS 剪贴板效率工具。
 
 ## 下载
 
-- [下载 Board-Man v0.2.0](https://github.com/uniplanck/boardman/releases/tag/v0.2.0)
-- macOS 应用归档：`Board-Man-v0.2.0.zip`
+- [下载 Board-Man v0.2.1](https://github.com/uniplanck/boardman/releases/tag/v0.2.1)
+- macOS 应用归档：`Board-Man-v0.2.1.zip`
 
 ## 安装和首次启动
 
-1. 从发布页面下载 `Board-Man-v0.2.0.zip`。
+1. 从发布页面下载 `Board-Man-v0.2.1.zip`。
 2. 解压归档文件。
 3. 将 `Board-Man.app` 移动到 `/Applications`。
 4. 打开 Board-Man。

@@ -4,7 +4,7 @@
 
 Board-Man is a local-first macOS clipboard workspace for fast recall, repeated text, pins, search, images, usage signals, and keyboard-driven pasting.
 
-> The current formal product line is **v0.2.0**. It follows the intentional version reset from the older experimental line. Historical v0.1.x and v1.2.x tags are preserved rather than reused; `main` can still contain changes that have not yet shipped in a tagged archive.
+> The current formal product line is **v0.2.1**. It follows the intentional version reset from the older experimental line. Historical v0.1.x and v1.2.x tags are preserved rather than reused; `main` can still contain changes that have not yet shipped in a tagged archive.
 
 ![Board-Man History with safe demo content](docs/assets/screenshots/board-man-history-en.png)
 
@@ -110,7 +110,7 @@ macOS permission prompts are never bypassed. Accessibility and Input Monitoring 
 
 ## Download
 
-Download [Board-Man v0.2.0](https://github.com/uniplanck/boardman/releases/tag/v0.2.0), unzip `Board-Man-v0.2.0.zip`, and move `Board-Man.app` to `/Applications`.
+Download [Board-Man v0.2.1](https://github.com/uniplanck/boardman/releases/tag/v0.2.1), unzip `Board-Man-v0.2.1.zip`, and move `Board-Man.app` to `/Applications`.
 
 If macOS blocks the first launch, Control-click the app and choose **Open**, or allow it from **System Settings → Privacy & Security**.
 
@@ -168,13 +168,14 @@ See [`docs/readme-screenshots.md`](docs/readme-screenshots.md) for the full work
 
 ## Development status
 
-v0.2.0 is the first formal product-line release after the 0.0.1 internal baseline. The version uses 0.2.0 because historical experimental releases already occupy v0.1.0 through v0.1.2, and those tags are intentionally preserved. It brings together the rebuilt History / Templates / Settings panel, expanded Appearance controls, timed pins, usage styling, image controls, modern Template management, selection and responsive-layout polish, local licensing foundations, and update infrastructure.
+v0.2.1 is the current patch release on the formal product line introduced by v0.2.0. It keeps the rebuilt History / Templates / Settings workflow intact while shipping post-v0.2.0 fixes for large-text descenders, timestamp paste-then-shortcut actions, global shortcut recovery, Japanese Template empty-state copy, and safe repository/build cleanup.
 
 For the authoritative development summary, see [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Documentation
 
 - [Changelog](CHANGELOG.md)
+- [v0.2.1 release notes](docs/boardman-v0.2.1-release-notes.md)
 - [v0.2.0 release notes](docs/boardman-v0.2.0-release-notes.md)
 - [Development install guide](docs/boardman-dev-install.md)
 - [QA checklist](docs/BOARDMAN_QA_CHECKLIST.md)
