@@ -145,6 +145,70 @@ final class HotKeyServiceTests {
     }
 
     @Test
+    func preservesCurrentShortcutProfileAcrossRelaunchWhenMainIsUnassigned() throws {
+        defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
+        defaults.set(true, forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
+
+        let history = try #require(KeyCombo(
+            QWERTYKeyCode: 9,
+            carbonModifiers: Int(cmdKey) | Int(optionKey)
+        ))
+        let snippet = try #require(KeyCombo(
+            QWERTYKeyCode: 11,
+            carbonModifiers: Int(cmdKey) | Int(shiftKey)
+        ))
+        let quick = try #require(KeyCombo(
+            QWERTYKeyCode: 8,
+            carbonModifiers: Int(cmdKey) | Int(optionKey)
+        ))
+        defaults.setArchiveData(history, forKey: Constants.HotKey.historyKeyCombo)
+        defaults.setArchiveData(snippet, forKey: Constants.HotKey.snippetKeyCombo)
+        defaults.setArchiveData(quick, forKey: Constants.HotKey.quickModeKeyCombo)
+
+        let firstLaunch = HotKeyService(defaults: defaults)
+        firstLaunch.setupDefaultHotKeys()
+        #expect(firstLaunch.mainKeyCombo == nil)
+        #expect(firstLaunch.historyKeyCombo == history)
+        #expect(firstLaunch.snippetKeyCombo == snippet)
+        #expect(firstLaunch.quickModeKeyCombo == quick)
+        #expect(defaults.bool(forKey: Constants.HotKey.mainKeyComboExplicitlyCleared))
+
+        let secondLaunch = HotKeyService(defaults: defaults)
+        secondLaunch.setupDefaultHotKeys()
+        #expect(secondLaunch.mainKeyCombo == nil)
+        #expect(secondLaunch.historyKeyCombo == history)
+        #expect(secondLaunch.snippetKeyCombo == snippet)
+        #expect(secondLaunch.quickModeKeyCombo == quick)
+    }
+
+    @Test
+    func clearingMainShortcutPersistsAsAnIntentionalUnassignedState() throws {
+        defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
+        defaults.set(true, forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
+        defaults.set(true, forKey: Constants.HotKey.migrateExplicitlyClearedMainKeyCombo)
+        let initial = try #require(KeyCombo(
+            QWERTYKeyCode: 9,
+            carbonModifiers: Int(cmdKey) | Int(optionKey)
+        ))
+        defaults.setArchiveData(initial, forKey: Constants.HotKey.mainKeyCombo)
+
+        let service = HotKeyService(defaults: defaults)
+        service.setupDefaultHotKeys()
+        #expect(service.mainKeyCombo == initial)
+        service.change(with: .main, keyCombo: nil)
+        #expect(defaults.bool(forKey: Constants.HotKey.mainKeyComboExplicitlyCleared))
+
+        let relaunched = HotKeyService(defaults: defaults)
+        relaunched.setupDefaultHotKeys()
+        #expect(relaunched.mainKeyCombo == nil)
+    }
+
+    @Test
+    func hotKeyRegistrationRetryBackoffIsBoundedAndFast() {
+        #expect(HotKeyService.registrationRetryDelays == [0.20, 0.60, 1.40, 3.00])
+    }
+
+    @Test
     func unarchiveSavedKeyCombos() throws {
         defaults.set(true, forKey: Constants.HotKey.migrateNewKeyCombo)
         defaults.set(true, forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV)
