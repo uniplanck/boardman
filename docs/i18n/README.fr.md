@@ -6,7 +6,7 @@ Board-Man est une app de productivité pour le presse-papiers macOS dérivée de
 
 Elle garde l'historique du presse-papiers accessible depuis la barre de menus et ajoute une visibilité orientée flux de travail pour les personnes qui copient, collent, modifient et déplacent régulièrement du texte, des URL, des commandes et des images entre plusieurs apps.
 
-> État de la version : la ligne de produit officielle actuelle est **v0.1.0**. Elle suit la réinitialisation volontaire de version depuis l’ancienne ligne expérimentale v1.2.3. La branche `main` reste en développement actif et cette traduction peut être en retard sur le README anglais.
+> État de la version : la ligne de produit officielle actuelle est **v0.2.0**. Elle suit une réinitialisation volontaire depuis l’ancienne ligne expérimentale ; les anciens tags v0.1.x / v1.2.x sont conservés au lieu d’être réutilisés. La branche `main` reste en développement actif et cette traduction peut être en retard sur le README anglais.
 
 ## Capture d'écran
 
@@ -26,12 +26,12 @@ Elle garde l'historique du presse-papiers accessible depuis la barre de menus et
 
 ## Téléchargement
 
-- [Télécharger Board-Man v0.1.0](https://github.com/uniplanck/boardman/releases/tag/v0.1.0)
-- Archive de l'app macOS : `Board-Man-v0.1.0.zip`
+- [Télécharger Board-Man v0.2.0](https://github.com/uniplanck/boardman/releases/tag/v0.2.0)
+- Archive de l'app macOS : `Board-Man-v0.2.0.zip`
 
 ## Installation et premier lancement
 
-1. Téléchargez `Board-Man-v0.1.0.zip` depuis la page de release.
+1. Téléchargez `Board-Man-v0.2.0.zip` depuis la page de release.
 2. Décompressez l'archive.
 3. Déplacez `Board-Man.app` vers `/Applications`.
 4. Ouvrez Board-Man.

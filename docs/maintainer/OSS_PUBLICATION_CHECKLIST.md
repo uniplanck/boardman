@@ -31,7 +31,7 @@
 - [ ] README explains what the tool does in 30 seconds
 - [ ] Build steps are reproducible
 - [ ] Screenshot or demo GIF added
-- [x] v0.1.0 release notes prepared
+- [x] v0.2.0 release notes prepared
 - [ ] Known limitations documented
 - [ ] GitHub topics added
 - [ ] Issue template added if needed
