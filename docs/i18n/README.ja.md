@@ -4,7 +4,7 @@
 
 Board-Manは、クリップボード履歴、定型文、Pin、検索、使用回数、画像プレビューを1つのキーボード操作中心のパネルへまとめた、ローカルファーストのmacOSアプリです。
 
-> Board-Manは開発中です。現在ダウンロードできる最新版は **v1.2.3** で、`main`ブランチにはタグ付きリリースへ未収録の機能が含まれる場合があります。
+> 現在の正式な製品ラインは **v0.1.0** です。旧v1.2.3実験版から意図的にバージョンをリセットした後の正式ラインで、`main`ブランチにはタグ付きリリースへ未収録の変更が含まれる場合があります。
 
 ## 画面と主な機能
 
@@ -41,7 +41,7 @@ Board-Manは、クリップボード履歴、定型文、Pin、検索、使用�
 
 ## ダウンロード
 
-[Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)から`Board-Man-v1.2.3.zip`をダウンロードして展開し、`Board-Man.app`を`/Applications`へ移動してください。
+[Board-Man v0.1.0](https://github.com/uniplanck/boardman/releases/tag/v0.1.0)から`Board-Man-v0.1.0.zip`をダウンロードして展開し、`Board-Man.app`を`/Applications`へ移動してください。
 
 初回起動をmacOSに止められた場合は、Control-clickして**開く**を選ぶか、**システム設定 → プライバシーとセキュリティ**から許可してください。
 

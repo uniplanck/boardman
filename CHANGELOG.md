@@ -1,10 +1,14 @@
 # Changelog
 
-Board-Man follows tagged GitHub releases for published builds. The `main` branch can contain substantial work that has not yet shipped in a downloadable archive.
+Board-Man follows tagged GitHub releases for published builds. The `main` branch can contain work that has not yet shipped in a downloadable archive.
 
 ## Unreleased
 
-Changes on `main` since v1.2.3 include:
+No user-facing changes have been recorded after v0.1.0 yet.
+
+## v0.1.0 — 2026-08-19
+
+v0.1.0 is the first formal product-line release after the internal 0.0.1 baseline. The project intentionally reset versioning from the older v1.2.3 experimental line; v1.2.3 remains available as a legacy historical release.
 
 ### Panel and workflow
 
@@ -12,30 +16,38 @@ Changes on `main` since v1.2.3 include:
 - Added quick mode, search improvements, history conditions, usage filters, and keyboard-first navigation.
 - Added editable display names, highlights, masking, persistent pins, timed pins, and protected retention behavior.
 - Added modern Template creation, editing, grouping, ordering, and shortcut controls.
+- Added single-click Template paste with double-click editing.
+- Unified pointer hover and `↑` / `↓` row selection behavior.
 - Stabilized selection geometry and preserved row, Pin, timestamp, and accessory spacing across panel widths.
+- Fixed timestamp shortcut hit handling and refined Appearance card spacing.
 
 ### Clipboard and usage tracking
 
 - Improved direct-paste verification and manual paste-count tracking.
+- Improved Chromium paste reliability.
 - Improved image clipboard identity and image paste counting.
 - Added local paste-count visibility and used-item appearance options.
-- Improved legacy history and Template recovery.
+- Added configurable Pin labels and image visibility / preview position controls.
+- Improved legacy History and Template recovery, including missing pinned-text payload recovery.
 
 ### Settings, licensing, and updates
 
-- Expanded appearance, timestamp, history, Template, shortcut, privacy, update, and license settings.
-- Added local entitlement foundations and Free/Pro presentation without claiming a complete production purchase backend.
-- Added the Sparkle update-check foundation while keeping release signing credentials outside the repository.
+- Expanded Appearance, timestamp, History, Template, shortcut, privacy, update, and license settings.
+- Added local entitlement foundations and Free / Pro presentation without claiming a complete production purchase backend.
+- Added Owner Lifetime local-license foundations used by maintainer builds.
+- Added the Sparkle update-check foundation while keeping private signing credentials outside the repository.
+- Kept production Sparkle appcast publishing disabled until a proper signing/notarization distribution pipeline exists.
 
-### Repository
+### Repository and documentation
 
-- Rebuilt the English and Japanese READMEs around current product behavior.
-- Added isolated screenshot generation with deterministic demo clipboard content.
+- Rebuilt the English and Japanese READMEs around current product behavior and refreshed all translated download references.
+- Added deterministic isolated README screenshot generation.
 - Added issue forms, pull-request guidance, support, security, conduct, and contribution documentation.
 - Expanded CI with repository checks and a macOS build-and-test job.
+- Aligned app/test bundle metadata to `0.1.0` / build `2` for this formal release.
 
-## Published releases
+## Legacy experimental releases
 
-- [v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3) — panel clipping, keyboard selection, preview priority, and opening-flicker fixes.
-- [v1.2.2](https://github.com/uniplanck/boardman/releases/tag/v1.2.2) — theme, responsive list width, and keyboard navigation improvements.
+- [v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3) — legacy experimental release with panel clipping, keyboard selection, preview priority, and opening-flicker fixes.
+- [v1.2.2](https://github.com/uniplanck/boardman/releases/tag/v1.2.2) — legacy experimental release with theme, responsive list width, and keyboard navigation improvements.
 - [All releases](https://github.com/uniplanck/boardman/releases)
