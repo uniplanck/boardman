@@ -6,7 +6,7 @@ Board-Man es una app de productividad para el portapapeles de macOS derivada de 
 
 Mantiene el historial del portapapeles disponible desde la barra de menús y añade visibilidad orientada al flujo de trabajo para quienes copian, pegan, editan y mueven con frecuencia texto, URL, comandos e imágenes entre apps.
 
-> Estado de la versión: la descarga más reciente es **v1.2.3**. La rama `main` sigue en desarrollo activo. Esta traducción puede ir por detrás de la README en inglés.
+> Estado de la versión: la línea de producto formal actual es **v0.1.0**. Sigue al reinicio intencional de versión desde la antigua línea experimental v1.2.3. La rama `main` sigue en desarrollo activo y esta traducción puede ir por detrás de la README en inglés.
 
 ## Captura de pantalla
 
@@ -26,12 +26,12 @@ Mantiene el historial del portapapeles disponible desde la barra de menús y añ
 
 ## Descarga
 
-- [Descargar Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
-- Archivo de la app para macOS: `Board-Man-v1.2.3.zip`
+- [Descargar Board-Man v0.1.0](https://github.com/uniplanck/boardman/releases/tag/v0.1.0)
+- Archivo de la app para macOS: `Board-Man-v0.1.0.zip`
 
 ## Instalación y primer inicio
 
-1. Descarga `Board-Man-v1.2.3.zip` desde la página de la versión.
+1. Descarga `Board-Man-v0.1.0.zip` desde la página de la versión.
 2. Descomprime el archivo.
 3. Mueve `Board-Man.app` a `/Applications`.
 4. Abre Board-Man.

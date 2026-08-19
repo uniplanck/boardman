@@ -6,7 +6,7 @@ Board-Man ist eine macOS-Produktivitätsapp für die Zwischenablage, abgeleitet 
 
 Sie hält den Verlauf der Zwischenablage über die Menüleiste verfügbar und bietet arbeitsablauforientierte Übersicht für Menschen, die häufig Text, URLs, Befehle und Bilder zwischen Apps kopieren, einfügen, bearbeiten und verschieben.
 
-> Veröffentlichungsstatus: Die neueste herunterladbare Version ist **v1.2.3**. Der Branch `main` wird aktiv weiterentwickelt. Diese Übersetzung kann der englischen README zeitlich hinterherhinken.
+> Veröffentlichungsstatus: Die aktuelle formale Produktlinie ist **v0.1.0**. Sie folgt auf den absichtlichen Versions-Reset der älteren experimentellen v1.2.3-Linie. Der Branch `main` wird aktiv weiterentwickelt; diese Übersetzung kann der englischen README zeitlich hinterherhinken.
 
 ## Screenshot
 
@@ -26,12 +26,12 @@ Sie hält den Verlauf der Zwischenablage über die Menüleiste verfügbar und bi
 
 ## Download
 
-- [Board-Man v1.2.3 herunterladen](https://github.com/uniplanck/boardman/releases/tag/v1.2.3)
-- macOS-App-Archiv: `Board-Man-v1.2.3.zip`
+- [Board-Man v0.1.0 herunterladen](https://github.com/uniplanck/boardman/releases/tag/v0.1.0)
+- macOS-App-Archiv: `Board-Man-v0.1.0.zip`
 
 ## Installation und erster Start
 
-1. Lade `Board-Man-v1.2.3.zip` von der Release-Seite herunter.
+1. Lade `Board-Man-v0.1.0.zip` von der Release-Seite herunter.
 2. Entpacke das Archiv.
 3. Verschiebe `Board-Man.app` nach `/Applications`.
 4. Öffne Board-Man.
