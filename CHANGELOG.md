@@ -4,7 +4,25 @@ Board-Man follows tagged GitHub releases for published builds. The `main` branch
 
 ## Unreleased
 
-No user-facing changes have been recorded after v0.2.0 yet.
+No user-facing changes have been recorded after v0.2.1 yet.
+
+## v0.2.1 — 2026-08-19
+
+v0.2.1 is a focused patch release that ships the reliability, typography, shortcut, and repository-cleanup work merged after v0.2.0.
+
+### Reliability and interaction
+
+- Corrected the Japanese empty-state copy for Templates to `定型文はありません`.
+- Prevented descender clipping at larger text sizes using font metrics while preserving the visual center of capital letters.
+- Made timestamp shortcut hit detection reliable and changed timestamp shortcut actions to paste the selected history item before firing the configured shortcut after its delay.
+- Preserved intentionally cleared global shortcuts across rebuilds and relaunches.
+- Added bounded Carbon hotkey registration retries so transient registration failures do not leave a shortcut disabled for the rest of the process lifetime.
+
+### Maintenance
+
+- Removed proven-unused source images, legacy status-bar assets, and an unused legacy Template editor XIB.
+- Enabled normal Release dead-code stripping while preserving current UI assets and behavior.
+- Aligned app/test bundle metadata to `0.2.1` / build `3`.
 
 ## v0.2.0 — 2026-08-19
 
