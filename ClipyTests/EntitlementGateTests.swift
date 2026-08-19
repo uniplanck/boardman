@@ -897,10 +897,6 @@ final class BoardManInteractionRuleTests {
         #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 3) == -1)
         #expect(BoardManPanel.tabDelta(horizontalDelta: 10, verticalDelta: 0) == nil)
         #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 28) == nil)
-        #expect(BoardManPanel.restoredSnippetSelectionIndex(origin: 2, itemCount: 4) == 2)
-        #expect(BoardManPanel.restoredSnippetSelectionIndex(origin: -1, itemCount: 4) == -1)
-        #expect(BoardManPanel.restoredSnippetSelectionIndex(origin: 4, itemCount: 4) == -1)
-
         #expect(BoardManPanel.shouldBeginEditorContainerClick(
             isSnippetTab: true,
             isEditing: false,
@@ -1034,6 +1030,17 @@ final class BoardManInteractionRuleTests {
 
     @Test
     func historyCellMasksContentAndKeepsPinOnTheLeft() throws {
+        let defaults = AppEnvironment.current.defaults
+        let originalPinLabelStyle = defaults.string(forKey: Constants.UserDefaults.boardManPinLabelStyle)
+        defaults.set(BoardManPinLabelStyle.full.rawValue, forKey: Constants.UserDefaults.boardManPinLabelStyle)
+        defer {
+            if let originalPinLabelStyle {
+                defaults.set(originalPinLabelStyle, forKey: Constants.UserDefaults.boardManPinLabelStyle)
+            } else {
+                defaults.removeObject(forKey: Constants.UserDefaults.boardManPinLabelStyle)
+            }
+        }
+
         let cell = BoardManHistoryCellView(frame: NSRect(x: 0, y: 0, width: 760, height: 62))
         let item = BoardManHistoryItem(
             title: "secret content",
@@ -1096,6 +1103,19 @@ final class BoardManInteractionRuleTests {
                 "Selection must not resize the history or snippet cell.")
         #expect([primary.frame, pin.frame, count.frame] == unselectedFrames,
                 "Selection must not shift history or snippet row contents horizontally.")
+        let selectedFontSize = primary.font?.pointSize
+        cell.configure(
+            item: item,
+            isSelected: false,
+            usageStyle: "badge",
+            useLiquidGlass: false,
+            lightenTheme: false,
+            themePreset: .defaultPreset,
+            timestampPosition: .below
+        )
+        cell.layoutSubtreeIfNeeded()
+        #expect(primary.font?.pointSize == selectedFontSize,
+                "Clearing selection must restore the same row text size instead of leaving a larger selected font behind.")
 
         let narrowCell = BoardManHistoryCellView(frame: NSRect(x: 0, y: 0, width: 600, height: 46))
         let narrowItem = BoardManHistoryItem(
@@ -1579,6 +1599,9 @@ final class BoardManPanelLayoutTests {
         #expect(cancelButton?.target != nil && cancelButton?.action != nil,
                 "Snippet Cancel button is missing its action wiring.")
         #expect(hoverGroupPopup != nil, "Snippet group selector is not hover-aware.")
+        let snippetTable = descendants.compactMap { $0 as? NSTableView }.first { !$0.isHidden }
+        #expect(snippetTable?.doubleAction != nil,
+                "Templates table must expose a double-click action for editing.")
         #expect((titleField?.frame.width ?? 0) >= 250, "Snippet title editor is still cramped.")
         if let titleField, let statusLabel, let folderToggle, let snippetToggle {
             #expect(statusLabel.isHidden, "The redundant snippet editor status band should remain removed.")

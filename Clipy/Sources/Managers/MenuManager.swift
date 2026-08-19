@@ -4361,12 +4361,12 @@ class BoardManPanel: NSPanel {
     private var historyItems: [BoardManHistoryItem] = []
     private var selectedIndex: Int = -1
     private var hoveredRow: Int = -1
-    private var snippetHoverSelectionOriginIndex: Int?
     private var keyboardPreviewLockUntil: CFAbsoluteTime = 0
     private var localKeyMonitor: Any?
     private var previewLifecycleObservers: [NSObjectProtocol] = []
     private var isPanelLayoutScheduled = false
     private var suppressSingleClickUntil: CFAbsoluteTime = 0
+    private var pendingSnippetSingleClickWorkItem: DispatchWorkItem?
     private var isSnippetEditing = false
     private var editingSnippetIdentifier: String?
     private var isSnippetReorderMode = false
@@ -4410,7 +4410,6 @@ class BoardManPanel: NSPanel {
         }
         selectedIndex = -1
         hoveredRow = -1
-        snippetHoverSelectionOriginIndex = nil
         hidePreviewBubble()
         applyCurrentFilter()
     }
@@ -4425,7 +4424,6 @@ class BoardManPanel: NSPanel {
         refreshExcludedAppsSummary()
         selectedIndex = -1
         hoveredRow = -1
-        snippetHoverSelectionOriginIndex = nil
         hidePreviewBubble()
         applyCurrentFilter()
         makeFirstResponder(self)
@@ -4442,7 +4440,6 @@ class BoardManPanel: NSPanel {
         }
         selectedIndex = -1
         hoveredRow = -1
-        snippetHoverSelectionOriginIndex = nil
         hidePreviewBubble()
         reloadSnippetCategoryPopup()
         applyCurrentFilter()
@@ -4592,11 +4589,6 @@ class BoardManPanel: NSPanel {
 
     static func usesStackedAppearanceSettingsLayout(width: CGFloat) -> Bool {
         return width < 470
-    }
-
-    static func restoredSnippetSelectionIndex(origin: Int?, itemCount: Int) -> Int {
-        guard let origin, origin >= 0, origin < itemCount else { return -1 }
-        return origin
     }
 
     static func tabDelta(horizontalDelta: CGFloat, verticalDelta: CGFloat) -> Int? {
@@ -6667,7 +6659,7 @@ class BoardManPanel: NSPanel {
         table.delegate = self
         table.target = self
         table.action = #selector(handleTableSingleClick(_:))
-        table.doubleAction = nil  // disabled per spec: no double-click paste
+        table.doubleAction = #selector(handleTableDoubleClick(_:))
         table.registerForDraggedTypes([BoardManPanel.snippetDragType])
         table.setDraggingSourceOperationMask(.move, forLocal: true)
         table.verticalMotionCanBeginDrag = true
@@ -7699,7 +7691,7 @@ class BoardManPanel: NSPanel {
             )
         }
         let listFrameHeight = listHeight
-        let editorGap: CGFloat = showsSnippetCategories ? 16 : 0
+        let editorGap: CGFloat = showsSnippetCategories ? 8 : 0
         let editorWidth = showsSnippetCategories ? min(360, max(300, floor(width * 0.42))) : 0
         let listWidth = max(180, width - editorWidth - editorGap)
         scrollView?.frame = NSRect(x: margin, y: listBottom, width: listWidth, height: listFrameHeight)
@@ -8148,7 +8140,7 @@ class BoardManPanel: NSPanel {
             let layoutWidth = halfWidth - (cardInset * 2)
             rowNumbersButton?.frame = NSIntegralRect(NSRect(
                 x: layoutX,
-                y: layoutCardY + layoutCardHeight - 72,
+                y: layoutCardY + layoutCardHeight - 80,
                 width: layoutWidth,
                 height: 20
             ))
@@ -8156,11 +8148,11 @@ class BoardManPanel: NSPanel {
                 label: uiStyleLabel,
                 control: uiStylePopup,
                 originX: layoutX,
-                originY: layoutCardY + layoutCardHeight - 112,
+                originY: layoutCardY + layoutCardHeight - 120,
                 width: layoutWidth,
                 labelWidth: compactLabelWidth
             )
-            let textScaleY = layoutCardY + layoutCardHeight - 154
+            let textScaleY = layoutCardY + layoutCardHeight - 162
             itemTextScaleLabel?.frame = NSIntegralRect(NSRect(
                 x: layoutX,
                 y: textScaleY + 7,
@@ -8189,15 +8181,15 @@ class BoardManPanel: NSPanel {
             ))
             heightControlLabel?.frame = NSIntegralRect(NSRect(
                 x: layoutX,
-                y: layoutCardY + 19,
+                y: layoutCardY + 11,
                 width: compactLabelWidth,
                 height: 16
             ))
             let heightControlX = layoutX + compactLabelWidth + 12
             let heightValueWidth: CGFloat = max(52, min(68, layoutWidth - compactLabelWidth - 94))
-            heightDecreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX, y: layoutCardY + 12, width: 28, height: rowH))
-            heightLabel?.frame = NSIntegralRect(NSRect(x: heightControlX + 34, y: layoutCardY + 12, width: heightValueWidth, height: rowH))
-            heightIncreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX + 40 + heightValueWidth, y: layoutCardY + 12, width: 28, height: rowH))
+            heightDecreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX, y: layoutCardY + 4, width: 28, height: rowH))
+            heightLabel?.frame = NSIntegralRect(NSRect(x: heightControlX + 34, y: layoutCardY + 4, width: heightValueWidth, height: rowH))
+            heightIncreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX + 40 + heightValueWidth, y: layoutCardY + 4, width: 28, height: rowH))
 
             let timestampX = rightX + cardInset
             let timestampWidth = halfWidth - (cardInset * 2)
@@ -8205,7 +8197,7 @@ class BoardManPanel: NSPanel {
                 label: timestampLabel,
                 control: timestampPopup,
                 originX: timestampX,
-                originY: timestampCardY + timestampCardHeight - 86,
+                originY: timestampCardY + timestampCardHeight - 94,
                 width: timestampWidth,
                 labelWidth: compactLabelWidth
             )
@@ -8213,7 +8205,7 @@ class BoardManPanel: NSPanel {
                 label: timestampPositionLabel,
                 control: timestampPositionPopup,
                 originX: timestampX,
-                originY: timestampCardY + timestampCardHeight - 126,
+                originY: timestampCardY + timestampCardHeight - 134,
                 width: timestampWidth,
                 labelWidth: compactLabelWidth
             )
@@ -8243,7 +8235,7 @@ class BoardManPanel: NSPanel {
             let usageWidth = halfWidth - (cardInset * 2)
             usageCountButton?.frame = NSIntegralRect(NSRect(
                 x: usageX,
-                y: usageCardY + usageCardHeight - 74,
+                y: usageCardY + usageCardHeight - 82,
                 width: usageWidth,
                 height: 20
             ))
@@ -8251,7 +8243,7 @@ class BoardManPanel: NSPanel {
                 label: usageStyleLabel,
                 control: usageStylePopup,
                 originX: usageX,
-                originY: usageCardY + usageCardHeight - 116,
+                originY: usageCardY + usageCardHeight - 124,
                 width: usageWidth,
                 labelWidth: compactLabelWidth
             )
@@ -8259,7 +8251,7 @@ class BoardManPanel: NSPanel {
                 label: usedItemStyleLabel,
                 control: usedItemStylePopup,
                 originX: usageX,
-                originY: usageCardY + usageCardHeight - 156,
+                originY: usageCardY + usageCardHeight - 164,
                 width: usageWidth,
                 labelWidth: compactLabelWidth
             )
@@ -8267,13 +8259,13 @@ class BoardManPanel: NSPanel {
                 label: pinLabelStyleLabel,
                 control: pinLabelStylePopup,
                 originX: usageX,
-                originY: usageCardY + usageCardHeight - 196,
+                originY: usageCardY + usageCardHeight - 204,
                 width: usageWidth,
                 labelWidth: compactLabelWidth
             )
             showInlineImagesButton?.frame = NSIntegralRect(NSRect(
                 x: usageX,
-                y: usageCardY + usageCardHeight - 228,
+                y: usageCardY + usageCardHeight - 236,
                 width: usageWidth,
                 height: 20
             ))
@@ -8281,7 +8273,7 @@ class BoardManPanel: NSPanel {
                 label: inlineImagePositionLabel,
                 control: inlineImagePositionPopup,
                 originX: usageX,
-                originY: usageCardY + 18,
+                originY: usageCardY + 10,
                 width: usageWidth,
                 labelWidth: compactLabelWidth
             )
@@ -8293,7 +8285,7 @@ class BoardManPanel: NSPanel {
                 label: themePresetLabel,
                 control: themePresetPopup,
                 originX: themeX,
-                originY: themeCardY + themeCardHeight - 78,
+                originY: themeCardY + themeCardHeight - 86,
                 width: themeWidth,
                 labelWidth: compactLabelWidth
             )
@@ -8301,7 +8293,7 @@ class BoardManPanel: NSPanel {
                 label: appearanceModeLabel,
                 control: appearanceModePopup,
                 originX: themeX,
-                originY: themeCardY + themeCardHeight - 118,
+                originY: themeCardY + themeCardHeight - 126,
                 width: themeWidth,
                 labelWidth: compactLabelWidth
             )
@@ -8309,13 +8301,13 @@ class BoardManPanel: NSPanel {
                 label: fontChoiceLabel,
                 control: fontChoicePopup,
                 originX: themeX,
-                originY: themeCardY + themeCardHeight - 158,
+                originY: themeCardY + themeCardHeight - 166,
                 width: themeWidth,
                 labelWidth: compactLabelWidth
             )
             themeLightenButton?.frame = NSIntegralRect(NSRect(
                 x: themeX,
-                y: themeCardY + 15,
+                y: themeCardY + 7,
                 width: themeWidth,
                 height: 20
             ))
@@ -9831,6 +9823,8 @@ class BoardManPanel: NSPanel {
     }
 
     private func beginSnippetEditing() {
+        pendingSnippetSingleClickWorkItem?.cancel()
+        pendingSnippetSingleClickWorkItem = nil
         guard let item = selectedSnippetItem else {
             NSSound.beep()
             return
@@ -10974,6 +10968,7 @@ class BoardManPanel: NSPanel {
         guard let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? BoardManHistoryCellView else {
             return false
         }
+        cell.layoutSubtreeIfNeeded()
         return cell.containsTimestamp(at: cell.convert(tablePoint, from: table))
     }
 
@@ -10999,6 +10994,7 @@ class BoardManPanel: NSPanel {
         let row = sender.clickedRow >= 0 ? sender.clickedRow : sender.selectedRow
         guard row >= 0, let item = historyItems[safe: row] else { return }
         let tablePoint = NSApp.currentEvent.map { sender.convert($0.locationInWindow, from: nil) }
+        let timestampWasHit = tablePoint.map { isTimestampHit(row: row, tablePoint: $0, table: sender) } ?? false
 
         PasteCountInputService.shared.logBoardManPerformance(
             "panel_row_click",
@@ -11015,8 +11011,7 @@ class BoardManPanel: NSPanel {
         if activeTab == .snippets && (isSnippetReorderMode || wasEditing) {
             return
         }
-        if let tablePoint,
-           isTimestampHit(row: row, tablePoint: tablePoint, table: sender) {
+        if timestampWasHit {
             if configuredTimestampInteraction.runsShortcutOnClick {
                 performTimestampShortcut(startedAt: startedAt)
                 return
@@ -11030,8 +11025,44 @@ class BoardManPanel: NSPanel {
             NSSound.beep()
             return
         }
+        if activeTab == .snippets {
+            scheduleSnippetSingleClickPaste(item: item, startedAt: startedAt)
+            return
+        }
         hidePreviewBubble()
         onPasteRequested?(item, startedAt)
+    }
+
+    private func scheduleSnippetSingleClickPaste(item: BoardManHistoryItem, startedAt: CFAbsoluteTime) {
+        pendingSnippetSingleClickWorkItem?.cancel()
+        let identifier = item.dataHash
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingSnippetSingleClickWorkItem = nil
+            guard self.isVisible,
+                  self.activeTab == .snippets,
+                  !self.isSnippetEditing,
+                  !self.isSnippetReorderMode,
+                  let currentItem = self.historyItems.first(where: { $0.dataHash == identifier }),
+                  currentItem.isEnabled else { return }
+            self.hidePreviewBubble()
+            self.onPasteRequested?(currentItem, startedAt)
+        }
+        pendingSnippetSingleClickWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval, execute: workItem)
+    }
+
+    @objc private func handleTableDoubleClick(_ sender: NSTableView) {
+        guard activeTab == .snippets, !isSnippetReorderMode else { return }
+        pendingSnippetSingleClickWorkItem?.cancel()
+        pendingSnippetSingleClickWorkItem = nil
+        let row = sender.clickedRow >= 0 ? sender.clickedRow : sender.selectedRow
+        guard row >= 0,
+              let item = historyItems[safe: row],
+              item.source == .snippet else { return }
+        setSelectedIndex(row)
+        beginSnippetEditing()
+        snippetEditorTitleField?.selectText(nil)
     }
 
     @objc private func handleItemLongPress(_ gesture: NSPressGestureRecognizer) {
@@ -11042,9 +11073,10 @@ class BoardManPanel: NSPanel {
         let tablePoint = gesture.location(in: table)
         let row = table.row(at: tablePoint)
         guard row >= 0, let item = historyItems[safe: row] else { return }
+        let timestampWasHit = isTimestampHit(row: row, tablePoint: tablePoint, table: table)
         suppressSingleClickUntil = CFAbsoluteTimeGetCurrent() + 1.0
         setSelectedIndex(row)
-        if isTimestampHit(row: row, tablePoint: tablePoint, table: table) {
+        if timestampWasHit {
             if configuredTimestampInteraction.runsShortcutOnLongPress {
                 performTimestampShortcut(startedAt: CFAbsoluteTimeGetCurrent())
                 return
@@ -11768,16 +11800,8 @@ class BoardManPanel: NSPanel {
 
         hoveredRow = -1
         keyboardPreviewLockUntil = CFAbsoluteTimeGetCurrent() + 0.35
-        selectedIndex = next
-        table.selectRowIndexes(IndexSet(integer: next), byExtendingSelection: false)
+        setSelectedIndex(next)
         table.scrollRowToVisible(next)
-
-        table.rowView(atRow: next, makeIfNecessary: false)?.needsDisplay = true
-        if historyItems.indices.contains(previous), previous != next {
-            table.rowView(atRow: previous, makeIfNecessary: false)?.needsDisplay = true
-        }
-        table.needsDisplay = true
-        updateSnippetActionButtons()
         showPreviewBubble(for: next)
 
         return true
@@ -11994,11 +12018,7 @@ class BoardManPanel: NSPanel {
         guard row >= 0, historyItems[safe: row] != nil else { return }
         hoveredRow = row
         if activeTab == .snippets && !isSnippetEditing && !isSnippetReorderMode {
-            if snippetHoverSelectionOriginIndex == nil {
-                snippetHoverSelectionOriginIndex = selectedIndex
-            }
-            setSelectedIndex(row, preservesSnippetHoverOrigin: true)
-            refreshSnippetEditor()
+            setSelectedIndex(row)
         }
         refreshRowsInPlace(IndexSet(integer: row))
         if CFAbsoluteTimeGetCurrent() >= keyboardPreviewLockUntil {
@@ -12009,27 +12029,6 @@ class BoardManPanel: NSPanel {
     fileprivate func clearHoveredRow(_ row: Int) {
         if hoveredRow == row {
             hoveredRow = -1
-            if activeTab == .snippets,
-               !isSnippetEditing,
-               !isSnippetReorderMode,
-               let origin = snippetHoverSelectionOriginIndex {
-                let oldIndex = selectedIndex
-                snippetHoverSelectionOriginIndex = nil
-                let restoredIndex = Self.restoredSnippetSelectionIndex(
-                    origin: origin,
-                    itemCount: historyItems.count
-                )
-                if restoredIndex >= 0 {
-                    setSelectedIndex(restoredIndex)
-                } else {
-                    selectedIndex = -1
-                    syncNativeSelection()
-                    refreshSelectionRows(oldIndex: oldIndex, newIndex: -1)
-                    refreshSnippetEditor()
-                }
-            } else {
-                snippetHoverSelectionOriginIndex = nil
-            }
             hidePreviewBubble()
         }
         if row >= 0 {
@@ -12127,11 +12126,8 @@ class BoardManPanel: NSPanel {
         }
     }
 
-    private func setSelectedIndex(_ row: Int, preservesSnippetHoverOrigin: Bool = false) {
+    private func setSelectedIndex(_ row: Int) {
         guard row >= 0, row < historyItems.count else { return }
-        if !preservesSnippetHoverOrigin {
-            snippetHoverSelectionOriginIndex = nil
-        }
         let oldIndex = selectedIndex
         let nextIdentifier = historyItems[safe: row]?.dataHash
         if isSnippetEditing, editingSnippetIdentifier != nextIdentifier {
