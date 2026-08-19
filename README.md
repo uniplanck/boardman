@@ -2,42 +2,111 @@
 
 **English** · [日本語](docs/i18n/README.ja.md) · [简体中文](docs/i18n/README.zh-CN.md) · [한국어](docs/i18n/README.ko.md) · [Español](docs/i18n/README.es.md) · [Français](docs/i18n/README.fr.md) · [Deutsch](docs/i18n/README.de.md) · [Português](docs/i18n/README.pt-BR.md)
 
-Board-Man is a local-first macOS clipboard workspace that brings history, reusable templates, pins, search, usage signals, and image previews into one keyboard-driven panel.
+Board-Man is a local-first macOS clipboard workspace for fast recall, repeated text, pins, search, images, usage signals, and keyboard-driven pasting.
 
-> Board-Man is under active development. The latest downloadable release is **v1.2.3**; `main` may contain features that have not yet shipped in a tagged release.
+> Board-Man is under active development. The latest published download is **v1.2.3**. The `main` branch can contain newer interface and workflow changes that have not yet shipped in a tagged archive.
 
-## Screens and core features
+![Board-Man History with safe demo content](docs/assets/screenshots/board-man-history-en.png)
 
-![Board-Man clipboard history with safe demo content](docs/assets/screenshots/board-man-history-en.png)
+## What Board-Man does
 
-- Open clipboard history instantly with `⌘⌥V`
-- Search and paste text, URLs, commands, and images
-- Pin important entries and apply timed pins
-- Turn repeated text into reusable Templates
-- See paste-count signals for frequently reused content
+Board-Man keeps the clipboard workflow in one compact panel instead of making you bounce between a clipboard menu, a template manager, and a settings window.
+
+- Open clipboard history with `⌘⌥V`
+- Search text, URLs, commands, and image entries
+- Paste the selected item with Return or a single click
+- Pin important entries permanently or for a timed period
+- Store repeated text as reusable **Templates**
+- Group, reorder, enable, disable, and edit Templates
+- See local usage signals and style used items separately from pinned items
 - Mask sensitive rows without deleting their local data
-- Customize timestamps, shortcuts, appearance, retention, and panel behavior
-- Keep clipboard data on the Mac without requiring cloud synchronization
+- Adjust timestamp format, timestamp position, and timestamp actions
+- Show or hide image entries and place image previews on the left or right
+- Tune item text size, panel height, theme, font, and display density
+- Keep clipboard data local without requiring cloud synchronization
+
+## Interface tour
+
+### History
+
+![Board-Man clipboard history](docs/assets/screenshots/board-man-history-en.png)
+
+History is the main clipboard timeline. Mouse hover and keyboard navigation share the same active selection, so moving with `↑` / `↓` continues from the row currently under the pointer and moving the pointer updates the active row again.
+
+Rows can show pins, timestamps, usage indicators, masks, and image previews without allowing those accessories to squeeze the central title into an unreadable layout. Pin labels can be displayed as `OFF`, `P`, or `PIN`.
 
 ### Templates
 
 ![Board-Man Templates manager](docs/assets/screenshots/board-man-templates-en.png)
 
-Templates store text you paste repeatedly, such as replies, command patterns, URLs, and release checklists. They can be grouped, reordered, enabled or disabled, edited in place, and opened through group shortcuts.
+Templates are reusable text entries for replies, prompts, commands, URLs, checklists, and other content you paste repeatedly.
 
-The upstream code still uses the internal term `snippet`; the product UI uses **Templates** in English and **定型文** in Japanese.
+- **Single-click** a Template to paste it
+- **Double-click** a Template to open it for editing
+- Use `↑` / `↓` or the pointer to move through the same selection state
+- Create and rename groups
+- Enable or disable a group or individual Template
+- Reorder Templates without rebuilding the group
+- Edit title and content in the right-side editor
 
-### Settings and languages
+The source code still uses the historical internal term `snippet`; the product UI uses **Templates** in English and **定型文** in Japanese.
+
+### Settings and live appearance controls
 
 ![Board-Man Settings](docs/assets/screenshots/board-man-settings-en.png)
 
-Settings cover general behavior, appearance, history, Templates, privacy, updates, licensing, keyboard shortcuts, timestamps, usage indicators, and panel sizing. The interface includes English, Japanese, Simplified Chinese, and Korean product translations, with additional README translations in this repository.
+The Appearance screen uses card-based controls with a live preview. The current development UI includes controls for:
 
-### Compact layout
+- **Layout**: row numbers, UI density, item text size, panel height
+- **Timestamp**: relative/absolute presentation, position, and interaction behavior
+- **Usage**: usage counts, used-item appearance, Pin label style, image visibility and position
+- **Theme & color**: theme preset, light/dark mode, font, and lighten option
 
-![Board-Man at its compact width](docs/assets/screenshots/board-man-history-compact-en.png)
+Additional settings cover History, Templates, shortcuts, privacy, updates, licensing, excluded applications, and other panel behavior.
 
-At narrower widths, the panel preserves spacing for Pin badges and timestamps while the central preview text absorbs compression. Tab labels switch to shorter localized forms instead of collapsing into unreadable ellipses.
+### Compact width
+
+![Board-Man at compact width](docs/assets/screenshots/board-man-history-compact-en.png)
+
+At narrower widths, the center title absorbs compression while Pin, timestamp, and other fixed accessories retain usable spacing. Tab labels switch to shorter localized forms instead of collapsing into ellipses.
+
+### Japanese UI captures
+
+The screenshot workflow also keeps matching Japanese scenes current:
+
+- [History](docs/assets/screenshots/board-man-history-ja.png)
+- [Templates](docs/assets/screenshots/board-man-templates-ja.png)
+- [Settings](docs/assets/screenshots/board-man-settings-ja.png)
+- [Compact History](docs/assets/screenshots/board-man-history-compact-ja.png)
+
+## Core interactions
+
+| Action | Default interaction |
+|---|---|
+| Open Board-Man | `⌘⌥V` |
+| History / Templates / Settings | `⌘1` / `⌘2` / `⌘3` |
+| Focus search | `⌘F` |
+| Move active row | `↑` / `↓` |
+| Paste selected row | `Return` |
+| Paste a Template | Single click |
+| Edit a Template | Double click |
+| Copy selected row | `⌘C` |
+| Pin or unpin | `⌘P` |
+| Preview | `Space` |
+
+Timestamp actions and several other shortcuts are configurable in Settings rather than being fixed to one global default.
+
+## Local-first behavior
+
+Clipboard history can contain passwords, tokens, customer information, private URLs, local paths, and images. Board-Man therefore keeps its working data on the Mac and does not require a cloud clipboard account.
+
+Privacy-related behavior includes masking rows, history controls, excluded applications, and local retention settings. Review those settings before using Board-Man with especially sensitive workflows.
+
+## Paste reliability
+
+Board-Man uses macOS Accessibility and Input Monitoring permissions for global shortcuts and reliable direct pasting. Recent development work also includes Chromium paste reliability improvements, image clipboard identity handling, and recovery paths for older clipboard / Template records whose original payload needs reconstruction.
+
+macOS permission prompts are never bypassed. Accessibility and Input Monitoring must be granted by the user in System Settings.
 
 ## Download
 
@@ -45,34 +114,14 @@ Download [Board-Man v1.2.3](https://github.com/uniplanck/boardman/releases/tag/v
 
 If macOS blocks the first launch, Control-click the app and choose **Open**, or allow it from **System Settings → Privacy & Security**.
 
-Board-Man needs Accessibility and Input Monitoring permissions for global shortcuts and reliable pasting. These permissions must be granted manually; the app does not bypass macOS TCC protections.
-
-## Basic usage
-
-1. Copy text, a URL, a command, or an image.
-2. Press `⌘⌥V` or open Board-Man from the menu bar.
-3. Search or move through the list with the arrow keys.
-4. Press Return to paste the selected item into the original input field.
-5. Pin durable entries or save repeated text as a Template.
-
-| Action | Shortcut |
-|---|---|
-| Open Board-Man | `⌘⌥V` |
-| History / Templates / Settings | `⌘1` / `⌘2` / `⌘3` |
-| Focus search | `⌘F` |
-| Move selection | `↑` / `↓` |
-| Paste selected item | `Return` |
-| Copy selected item | `⌘C` |
-| Pin or unpin | `⌘P` |
-| Preview | `Space` |
-
 ## Requirements
 
 - macOS 13 or later
 - Apple Silicon or Intel Mac
-- Accessibility and Input Monitoring permissions for full shortcut and paste behavior
+- Accessibility permission for global interaction and direct paste behavior
+- Input Monitoring permission for reliable shortcut handling
 
-## Build
+## Build from source
 
 ```bash
 git clone https://github.com/uniplanck/boardman.git
@@ -87,7 +136,7 @@ xcodebuild \
   build
 ```
 
-Run the tests with:
+Run the test suite with:
 
 ```bash
 xcodebuild \
@@ -100,20 +149,28 @@ xcodebuild \
   test
 ```
 
-Maintainers installing local builds should use [`scripts/boardman/install-dev-stable.sh`](scripts/boardman/install-dev-stable.sh) and read [`docs/boardman-dev-install.md`](docs/boardman-dev-install.md).
+Maintainers installing a local development build should use [`scripts/boardman/install-dev-stable.sh`](scripts/boardman/install-dev-stable.sh) and read [`docs/boardman-dev-install.md`](docs/boardman-dev-install.md). The helper keeps the canonical local app at `/Applications/Board-Man.app`, uses a stable signing identity, verifies the result, and avoids accumulating indexed development copies.
 
-## Regenerate README images
+## Refresh README screenshots
 
-Build a current Debug app, then run:
+README captures are generated from isolated temporary Board-Man profiles with deterministic demo clipboard content. They do **not** use the maintainer's real clipboard history or Templates database.
+
+The automatic screenshot exporter is intentionally available in **Debug builds**. Build a current Debug app first, then pass that app to the capture script:
 
 ```bash
-BOARDMAN_SCREENSHOT_APP=/path/to/Board-Man.app \
+BOARDMAN_SCREENSHOT_APP=/path/to/Debug/Board-Man.app \
   ./scripts/boardman/capture-readme-screenshots.sh
 ```
 
-The script launches isolated temporary Board-Man profiles, replaces the clipboard with deterministic demo content, generates English and Japanese History, Templates, Settings, and compact-width scenes, writes the PNG files under `docs/assets/screenshots/`, removes the temporary profiles, and leaves a harmless completion message on the clipboard. It never uses the maintainer's real clipboard history or Templates database.
+The script generates English and Japanese History, Templates, Settings, and compact-width scenes under `docs/assets/screenshots/`, verifies the PNG dimensions, cleans up its temporary profiles, and restores the canonical app when needed.
 
 See [`docs/readme-screenshots.md`](docs/readme-screenshots.md) for the full workflow and verification checklist.
+
+## Development status
+
+The current development line goes beyond the v1.2.3 downloadable archive. Major unreleased areas include the rebuilt History / Templates / Settings panel, expanded Appearance controls, timed pins, usage styling, image controls, modern Template management, selection and responsive-layout polish, licensing foundations, and update infrastructure.
+
+For the authoritative development summary, see [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Documentation
 
@@ -126,12 +183,6 @@ See [`docs/readme-screenshots.md`](docs/readme-screenshots.md) for the full work
 - [Contributing guide](.github/CONTRIBUTING.md)
 - [Security policy](.github/SECURITY.md)
 - [Support guide](.github/SUPPORT.md)
-
-## Security
-
-Clipboard history can contain passwords, tokens, customer information, private URLs, and local paths. Review the Privacy settings, mask sensitive rows when useful, and avoid committing real clipboard data, `.env` files, credentials, or local authentication material.
-
-The README screenshots are generated only from isolated demo profiles. Security reports should follow [`.github/SECURITY.md`](.github/SECURITY.md).
 
 ## License and attribution
 
