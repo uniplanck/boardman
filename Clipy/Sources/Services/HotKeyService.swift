@@ -68,8 +68,10 @@ final class HotKeyService: NSObject {
     private var didRequestListenEventAccess = false
     private var mainCarbonHotKeyRegistered = false
     private var lastMainHotKeyInvocation: CFAbsoluteTime = 0
+    private var registrationRetryWorkItems: [String: DispatchWorkItem] = [:]
 
     static let mainHotKeyInvocationDebounce: TimeInterval = 0.75
+    static let registrationRetryDelays: [TimeInterval] = [0.20, 0.60, 1.40, 3.00]
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -108,6 +110,7 @@ final class HotKeyService: NSObject {
             CGEvent.tapEnable(tap: tap, enable: false)
             CFMachPortInvalidate(tap)
         }
+        registrationRetryWorkItems.values.forEach { $0.cancel() }
     }
 
 }
@@ -149,11 +152,14 @@ extension HotKeyService {
             defaults.synchronize()
         }
         migrateLegacyMainShortcutIfNeeded()
+        migrateExplicitlyClearedMainShortcutIfNeeded()
         // Snippet hotkey
         setupSnippetHotKeys()
 
-        // Main menu. A missing/corrupt archive must not leave Board-Man unreachable.
-        let mainKeyCombo = savedKeyCombo(forKey: Constants.HotKey.mainKeyCombo) ?? restoreDefaultMainKeyCombo()
+        // Main menu. Preserve an intentional "Not set" choice across app rebuilds/relaunches.
+        let savedMainKeyCombo = savedKeyCombo(forKey: Constants.HotKey.mainKeyCombo)
+        let mainKeyCombo = savedMainKeyCombo
+            ?? (defaults.bool(forKey: Constants.HotKey.mainKeyComboExplicitlyCleared) ? nil : restoreDefaultMainKeyCombo())
         change(with: .main, keyCombo: mainKeyCombo)
         // History menu
         change(with: .history, keyCombo: savedKeyCombo(forKey: Constants.HotKey.historyKeyCombo))
@@ -166,15 +172,21 @@ extension HotKeyService {
     }
 
     func change(with type: MenuType, keyCombo: KeyCombo?) {
+        cancelRegistrationRetry(for: type)
         switch type {
         case .main:
             mainKeyCombo = keyCombo
+            defaults.set(keyCombo == nil, forKey: Constants.HotKey.mainKeyComboExplicitlyCleared)
+            defaults.synchronize()
         case .history:
             historyKeyCombo = keyCombo
         case .snippet:
             snippetKeyCombo = keyCombo
         }
         let registered = register(with: type, keyCombo: keyCombo)
+        if let keyCombo, !registered {
+            scheduleRegistrationRetry(for: type, keyCombo: keyCombo, attempt: 0)
+        }
         if type == .main {
             mainCarbonHotKeyRegistered = registered
             setupGlobalMainHotKeyFallback()
@@ -387,19 +399,66 @@ private extension HotKeyService {
     @discardableResult
     func register(with type: MenuType, keyCombo: KeyCombo?) -> Bool {
         save(with: type, keyCombo: keyCombo)
+        return registerSystemHotKey(with: type, keyCombo: keyCombo)
+    }
+
+    @discardableResult
+    func registerSystemHotKey(with type: MenuType, keyCombo: KeyCombo?) -> Bool {
         // Tests verify persistence and migration only. Registering real Carbon hotkeys inside
         // XCTest can terminate and relaunch the test host, producing a false test failure.
         guard Self.shouldRegisterSystemHotKeys() else { return keyCombo != nil }
-        // Reset hotkey
         HotKeyCenter.shared.unregisterHotKey(with: type.rawValue)
-        // Register new hotkey
-        guard let keyCombo = keyCombo else { return false }
+        guard let keyCombo else { return false }
         let hotKey = HotKey(identifier: type.rawValue, keyCombo: keyCombo, target: self, action: type.hotKeySelector)
         let registered = hotKey.register()
-        if type == .main {
-            NSLog("Board-Man main hotkey Carbon registration=%@ fallback=%@", registered.description, (!registered).description)
-        }
+        NSLog(
+            "Board-Man hotkey %@ Carbon registration=%@",
+            type.rawValue,
+            registered.description
+        )
         return registered
+    }
+
+    func currentKeyCombo(for type: MenuType) -> KeyCombo? {
+        switch type {
+        case .main: return mainKeyCombo
+        case .history: return historyKeyCombo
+        case .snippet: return snippetKeyCombo
+        }
+    }
+
+    func cancelRegistrationRetry(for type: MenuType) {
+        registrationRetryWorkItems.removeValue(forKey: type.rawValue)?.cancel()
+    }
+
+    func scheduleRegistrationRetry(for type: MenuType, keyCombo: KeyCombo, attempt: Int) {
+        guard Self.shouldRegisterSystemHotKeys(), attempt < Self.registrationRetryDelays.count else { return }
+        cancelRegistrationRetry(for: type)
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self,
+                  self.currentKeyCombo(for: type) == keyCombo else { return }
+            let registered = self.registerSystemHotKey(with: type, keyCombo: keyCombo)
+            NSLog(
+                "Board-Man hotkey %@ retry=%d registration=%@",
+                type.rawValue,
+                attempt + 1,
+                registered.description
+            )
+            if registered {
+                self.registrationRetryWorkItems.removeValue(forKey: type.rawValue)
+                if type == .main {
+                    self.mainCarbonHotKeyRegistered = true
+                    self.setupGlobalMainHotKeyFallback()
+                }
+            } else {
+                self.scheduleRegistrationRetry(for: type, keyCombo: keyCombo, attempt: attempt + 1)
+            }
+        }
+        registrationRetryWorkItems[type.rawValue] = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + Self.registrationRetryDelays[attempt],
+            execute: workItem
+        )
     }
 
     func save(with type: MenuType, keyCombo: KeyCombo?) {
@@ -461,6 +520,24 @@ private extension HotKeyService {
             return
         }
         defaults.set(replacement.archive(), forKey: Constants.HotKey.mainKeyCombo)
+    }
+
+    func migrateExplicitlyClearedMainShortcutIfNeeded() {
+        guard !defaults.bool(forKey: Constants.HotKey.migrateExplicitlyClearedMainKeyCombo) else { return }
+        defer {
+            defaults.set(true, forKey: Constants.HotKey.migrateExplicitlyClearedMainKeyCombo)
+            defaults.synchronize()
+        }
+
+        guard defaults.bool(forKey: Constants.HotKey.migrateNewKeyCombo),
+              savedKeyCombo(forKey: Constants.HotKey.mainKeyCombo) == nil else { return }
+        let hasOtherModernShortcut = savedKeyCombo(forKey: Constants.HotKey.historyKeyCombo) != nil
+            || savedKeyCombo(forKey: Constants.HotKey.snippetKeyCombo) != nil
+            || savedKeyCombo(forKey: Constants.HotKey.quickModeKeyCombo) != nil
+            || savedKeyCombo(forKey: Constants.HotKey.clearHistoryKeyCombo) != nil
+        if hasOtherModernShortcut {
+            defaults.set(true, forKey: Constants.HotKey.mainKeyComboExplicitlyCleared)
+        }
     }
 }
 

@@ -262,9 +262,10 @@ extension MenuManager {
                 NSSound.beep()
             }
         }
-        panel.onTimestampActionRequested = { [weak self] shortcut, delay, clickStartedAt in
+        panel.onTimestampActionRequested = { [weak self] item, shortcut, delay, clickStartedAt in
             self?.handlePanelTimestampShortcut(
-                shortcut,
+                item: item,
+                shortcut: shortcut,
                 delay: delay,
                 clickStartedAt: clickStartedAt
             )
@@ -357,7 +358,8 @@ extension MenuManager {
 
     fileprivate func handlePanelPaste(
         dataHash: String,
-        clickStartedAt: CFAbsoluteTime?
+        clickStartedAt: CFAbsoluteTime?,
+        completion: (() -> Void)? = nil
     ) {
         guard let panel = boardManPanel else { return }
         let targetApplication = previousFrontmostApplication
@@ -398,13 +400,18 @@ extension MenuManager {
                     PasteCountStore.shared.increment(forKey: pasteCountKey)
                 }
             }
-            self.clearPreviousPasteTarget()
+            if let completion {
+                completion()
+            } else {
+                self.clearPreviousPasteTarget()
+            }
         }
     }
 
     fileprivate func handlePanelSnippetPaste(
         identifier: String,
-        clickStartedAt: CFAbsoluteTime?
+        clickStartedAt: CFAbsoluteTime?,
+        completion: (() -> Void)? = nil
     ) {
         guard let panel = boardManPanel else { return }
         panel.orderOut(nil)
@@ -435,32 +442,56 @@ extension MenuManager {
                 self.clearPreviousPasteTarget()
                 return
             }
-            self.clearPreviousPasteTarget()
+            if let completion {
+                completion()
+            } else {
+                self.clearPreviousPasteTarget()
+            }
         }
     }
 
     private func handlePanelTimestampShortcut(
-        _ shortcut: KeyCombo,
+        item: BoardManHistoryItem,
+        shortcut: KeyCombo,
         delay: TimeInterval,
         clickStartedAt: CFAbsoluteTime?
     ) {
-        guard let panel = boardManPanel else { return }
-        panel.orderOut(nil)
-
-        restorePreviousPasteTarget { [weak self] in
+        let dispatchShortcutAfterPaste = { [weak self] in
             guard let self else { return }
             let executionDelay = BoardManPanel.clampedTimestampShortcutDelay(delay)
             DispatchQueue.main.asyncAfter(deadline: .now() + executionDelay) { [weak self] in
                 guard let self else { return }
+                let didSend = AppEnvironment.current.pasteService.sendShortcut(shortcut)
                 if let clickStartedAt {
                     PasteCountInputService.shared.logBoardManPerformance(
                         "panel_timestamp_shortcut_dispatch",
-                        startedAt: clickStartedAt
+                        startedAt: clickStartedAt,
+                        details: "pasteFirst=true sent=\(didSend)"
                     )
                 }
-                _ = AppEnvironment.current.pasteService.sendShortcut(shortcut)
+                if !didSend {
+                    NSSound.beep()
+                }
                 self.clearPreviousPasteTarget()
             }
+        }
+
+        switch item.source {
+        case .clip:
+            handlePanelPaste(
+                dataHash: item.dataHash,
+                clickStartedAt: clickStartedAt,
+                completion: dispatchShortcutAfterPaste
+            )
+        case .snippet:
+            handlePanelSnippetPaste(
+                identifier: item.dataHash,
+                clickStartedAt: clickStartedAt,
+                completion: dispatchShortcutAfterPaste
+            )
+        case .favorite:
+            NSSound.beep()
+            clearPreviousPasteTarget()
         }
     }
 
@@ -3764,6 +3795,55 @@ final class BoardManCenteredSearchFieldCell: NSSearchFieldCell {
 
 }
 
+func boardManTimestampHitRect(
+    timestampText: String,
+    timestampPosition: BoardManTimestampPosition,
+    timestampAccessoryFrame: NSRect,
+    metadataLabel: NSTextField
+) -> NSRect? {
+    guard !timestampText.isEmpty, timestampPosition != .hidden else { return nil }
+    if timestampPosition == .left || timestampPosition == .right {
+        return timestampAccessoryFrame.insetBy(dx: -5, dy: -5)
+    }
+    guard timestampPosition == .below, !metadataLabel.isHidden,
+          let font = metadataLabel.font else { return nil }
+    let metadata = metadataLabel.stringValue as NSString
+    let range = metadata.range(of: timestampText)
+    guard range.location != NSNotFound else { return nil }
+    let attributes: [NSAttributedString.Key: Any] = [.font: font]
+    let prefixWidth = ceil((metadata.substring(to: range.location) as NSString).size(withAttributes: attributes).width)
+    let valueWidth = ceil((metadata.substring(with: range) as NSString).size(withAttributes: attributes).width)
+    return NSRect(
+        x: metadataLabel.frame.minX + prefixWidth,
+        y: metadataLabel.frame.minY,
+        width: min(valueWidth, max(0, metadataLabel.frame.width - prefixWidth)),
+        height: metadataLabel.frame.height
+    ).insetBy(dx: -5, dy: -5)
+}
+
+func boardManCapCenteredTextFrame(
+    for label: NSTextField,
+    originX: CGFloat,
+    width: CGFloat,
+    capCenterY: CGFloat
+) -> NSRect {
+    guard let font = label.font else {
+        return NSRect(x: originX, y: capCenterY, width: width, height: 0)
+    }
+    let descenderDepth = abs(font.descender)
+    let metricsHeight = max(0, font.ascender - font.descender + font.leading)
+    let requiredHeight = max(metricsHeight, label.firstBaselineOffsetFromTop + descenderDepth)
+    let frameHeight = ceil(requiredHeight)
+    let baselineY = capCenterY - (font.capHeight / 2)
+    let frameMaxY = baselineY + label.firstBaselineOffsetFromTop
+    return NSRect(
+        x: originX,
+        y: frameMaxY - frameHeight,
+        width: width,
+        height: frameHeight
+    )
+}
+
 final class BoardManHistoryCellView: NSTableCellView {
     private let primaryLabel = NSTextField(labelWithString: "")
     private let metadataLabel = NSTextField(labelWithString: "")
@@ -3887,8 +3967,12 @@ final class BoardManHistoryCellView: NSTableCellView {
         let textScale = CGFloat(BoardManPanel.clampedItemTextScale(
             AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
         )) / 100
-        primaryLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 12.75 : 13.5) * textScale, weight: .medium)
-        metadataLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 11 : 11.5) * textScale, weight: .regular)
+        let primaryBaseSize: CGFloat = isNarrowRow ? 12.75 : 13.5
+        let metadataBaseSize: CGFloat = isNarrowRow ? 11 : 11.5
+        let primaryFont = fontChoice.font(ofSize: primaryBaseSize * textScale, weight: .medium)
+        let metadataFont = fontChoice.font(ofSize: metadataBaseSize * textScale, weight: .regular)
+        primaryLabel.font = primaryFont
+        metadataLabel.font = metadataFont
         timestampAccessoryLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 10 : 10.5) * textScale, weight: .medium)
         countBadge.font = fontChoice.font(ofSize: isNarrowRow ? 10 : 10.5, weight: .medium)
         pinBadge.font = fontChoice.font(ofSize: 9.5, weight: .bold)
@@ -3962,28 +4046,22 @@ final class BoardManHistoryCellView: NSTableCellView {
         needsLayout = true
     }
 
-    fileprivate func containsTimestamp(at point: NSPoint) -> Bool {
-        guard !configuredTimestampText.isEmpty, timestampPosition != .hidden else { return false }
-        if timestampPosition == .left || timestampPosition == .right {
-            return timestampAccessoryLabel.frame.insetBy(dx: -5, dy: -5).contains(point)
-        }
-        guard timestampPosition == .below, !metadataLabel.isHidden,
-              let font = metadataLabel.font else { return false }
-        let metadata = metadataLabel.stringValue as NSString
-        let range = metadata.range(of: configuredTimestampText)
-        guard range.location != NSNotFound else { return false }
-        let attributes: [NSAttributedString.Key: Any] = [.font: font]
-        let prefix = metadata.substring(to: range.location) as NSString
-        let value = metadata.substring(with: range) as NSString
-        let prefixWidth = ceil(prefix.size(withAttributes: attributes).width)
-        let valueWidth = ceil(value.size(withAttributes: attributes).width)
-        let hitRect = NSRect(
-            x: metadataLabel.frame.minX + prefixWidth,
-            y: metadataLabel.frame.minY,
-            width: min(valueWidth, max(0, metadataLabel.frame.maxX - metadataLabel.frame.minX - prefixWidth)),
-            height: metadataLabel.frame.height
+    private var timestampHitRect: NSRect? {
+        return boardManTimestampHitRect(
+            timestampText: configuredTimestampText,
+            timestampPosition: timestampPosition,
+            timestampAccessoryFrame: timestampAccessoryLabel.frame,
+            metadataLabel: metadataLabel
         )
-        return hitRect.insetBy(dx: -5, dy: -5).contains(point)
+    }
+
+    fileprivate func containsTimestamp(at point: NSPoint) -> Bool {
+        return timestampHitRect?.contains(point) == true
+    }
+
+    fileprivate func containsTimestamp(windowPoint: NSPoint) -> Bool {
+        guard let timestampHitRect else { return false }
+        return convert(timestampHitRect, to: nil).contains(windowPoint)
     }
 
     static func usageBadgeFrame(in bounds: NSRect, intrinsicWidth: CGFloat) -> NSRect {
@@ -4016,8 +4094,8 @@ final class BoardManHistoryCellView: NSTableCellView {
         let horizontalInset: CGFloat = 10
         let trailingInset: CGFloat = 24
         let accessoryGap: CGFloat = 12
-        let titleHeight: CGFloat = 18
-        let metadataHeight: CGFloat = 15
+        let titleSlotHeight: CGFloat = 18
+        let metadataSlotHeight: CGFloat = 15
         let textGap: CGFloat = 4
         let timeWidth: CGFloat = 72
         let countWidth: CGFloat = 64
@@ -4106,28 +4184,30 @@ final class BoardManHistoryCellView: NSTableCellView {
 
         let textWidth = max(0, textRight - textLeft)
         if timestampPosition == .below {
-            let textBlockHeight = titleHeight + textGap + metadataHeight
+            let textBlockHeight = titleSlotHeight + textGap + metadataSlotHeight
             let textBottom = floor((bounds.height - textBlockHeight) / 2)
-            metadataLabel.frame = NSIntegralRect(NSRect(
-                x: textLeft,
-                y: textBottom,
+            let metadataCapCenterY = textBottom + (metadataSlotHeight / 2)
+            let primaryCapCenterY = textBottom + metadataSlotHeight + textGap + (titleSlotHeight / 2)
+            metadataLabel.frame = boardManCapCenteredTextFrame(
+                for: metadataLabel,
+                originX: textLeft,
                 width: textWidth,
-                height: metadataHeight
-            ))
-            primaryLabel.frame = NSIntegralRect(NSRect(
-                x: textLeft,
-                y: textBottom + metadataHeight + textGap,
+                capCenterY: metadataCapCenterY
+            )
+            primaryLabel.frame = boardManCapCenteredTextFrame(
+                for: primaryLabel,
+                originX: textLeft,
                 width: textWidth,
-                height: titleHeight
-            ))
+                capCenterY: primaryCapCenterY
+            )
         } else {
             metadataLabel.frame = .zero
-            primaryLabel.frame = NSIntegralRect(NSRect(
-                x: textLeft,
-                y: floor(bounds.midY - titleHeight / 2),
+            primaryLabel.frame = boardManCapCenteredTextFrame(
+                for: primaryLabel,
+                originX: textLeft,
                 width: textWidth,
-                height: titleHeight
-            ))
+                capCenterY: bounds.midY
+            )
         }
     }
 }
@@ -4377,7 +4457,7 @@ class BoardManPanel: NSPanel {
     private var activeSnippetGroupIdentifiers: Set<String> = []
     private var shouldScrollSettingsToTop = true
     fileprivate var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
-    fileprivate var onTimestampActionRequested: ((KeyCombo, TimeInterval, CFAbsoluteTime?) -> Void)?
+    fileprivate var onTimestampActionRequested: ((BoardManHistoryItem, KeyCombo, TimeInterval, CFAbsoluteTime?) -> Void)?
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
         return historyItems.count
@@ -10972,13 +11052,23 @@ class BoardManPanel: NSPanel {
         return cell.containsTimestamp(at: cell.convert(tablePoint, from: table))
     }
 
-    private func performTimestampShortcut(startedAt: CFAbsoluteTime?) {
-        guard configuredTimestampShortcutEnabled else {
+    private func isTimestampHitAtCurrentPointer(row: Int, table: NSTableView) -> Bool {
+        guard let window = table.window,
+              let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? BoardManHistoryCellView else {
+            return false
+        }
+        cell.layoutSubtreeIfNeeded()
+        return cell.containsTimestamp(windowPoint: window.mouseLocationOutsideOfEventStream)
+    }
+
+    private func performTimestampShortcut(item: BoardManHistoryItem, startedAt: CFAbsoluteTime?) {
+        guard configuredTimestampShortcutEnabled, item.isEnabled else {
             NSSound.beep()
             return
         }
         hidePreviewBubble()
         onTimestampActionRequested?(
+            item,
             configuredTimestampShortcut,
             configuredTimestampShortcutDelay,
             startedAt
@@ -10994,12 +11084,13 @@ class BoardManPanel: NSPanel {
         let row = sender.clickedRow >= 0 ? sender.clickedRow : sender.selectedRow
         guard row >= 0, let item = historyItems[safe: row] else { return }
         let tablePoint = NSApp.currentEvent.map { sender.convert($0.locationInWindow, from: nil) }
-        let timestampWasHit = tablePoint.map { isTimestampHit(row: row, tablePoint: $0, table: sender) } ?? false
+        let eventTimestampHit = tablePoint.map { isTimestampHit(row: row, tablePoint: $0, table: sender) } ?? false
+        let timestampWasHit = eventTimestampHit || isTimestampHitAtCurrentPointer(row: row, table: sender)
 
         PasteCountInputService.shared.logBoardManPerformance(
             "panel_row_click",
             startedAt: startedAt,
-            details: "row=\(row) source=\(item.source)"
+            details: "row=\(row) source=\(item.source) timestampHit=\(timestampWasHit)"
         )
 
         let wasEditing = isSnippetEditing
@@ -11013,7 +11104,7 @@ class BoardManPanel: NSPanel {
         }
         if timestampWasHit {
             if configuredTimestampInteraction.runsShortcutOnClick {
-                performTimestampShortcut(startedAt: startedAt)
+                performTimestampShortcut(item: item, startedAt: startedAt)
                 return
             }
             if configuredTimestampInteraction.togglesMaskOnClick {
@@ -11078,7 +11169,7 @@ class BoardManPanel: NSPanel {
         setSelectedIndex(row)
         if timestampWasHit {
             if configuredTimestampInteraction.runsShortcutOnLongPress {
-                performTimestampShortcut(startedAt: CFAbsoluteTimeGetCurrent())
+                performTimestampShortcut(item: item, startedAt: CFAbsoluteTimeGetCurrent())
                 return
             }
             if configuredTimestampInteraction.togglesMaskOnLongPress {

@@ -1179,6 +1179,30 @@ final class BoardManInteractionRuleTests {
     }
 
     @Test
+    func capCenteredTextFrameKeepsCapitalCenterStableAndFitsDescendersAcrossScales() {
+        let capCenterY: CGFloat = 23
+        for scale in [0.8, 1.0, 1.3, 1.4] {
+            let font = NSFont.systemFont(ofSize: 13.5 * scale, weight: .medium)
+            let label = NSTextField(labelWithString: "F g y p q j")
+            label.font = font
+            let frame = boardManCapCenteredTextFrame(
+                for: label,
+                originX: 10,
+                width: 280,
+                capCenterY: capCenterY
+            )
+            let baselineY = frame.maxY - label.firstBaselineOffsetFromTop
+            let resolvedCapCenterY = baselineY + (font.capHeight / 2)
+            let descenderBottomY = baselineY + font.descender
+
+            #expect(abs(resolvedCapCenterY - capCenterY) < 0.001,
+                    "Capital-height center must stay fixed regardless of text scale.")
+            #expect(descenderBottomY >= frame.minY - 0.001,
+                    "Font descenders must fit inside the dynamically sized text frame.")
+        }
+    }
+
+    @Test
     func hoverPopupTracksPointerStateWithoutOpeningDuringTests() {
         let popup = BoardManHoverPopUpButton(frame: NSRect(x: 0, y: 0, width: 180, height: 30), pullsDown: false)
         #expect(!popup.isHovering)
@@ -1292,6 +1316,22 @@ final class BoardManInteractionRuleTests {
 }
 
 @MainActor @Suite(.serialized)
+final class BoardManTimestampHitTests {
+    @Test
+    func rightTimestampHitRectCoversVisibleTimestampOnly() throws {
+        let metadataLabel = NSTextField(labelWithString: "")
+        let timestampFrame = NSRect(x: 640, y: 13, width: 72, height: 20)
+        let hitRect = try #require(boardManTimestampHitRect(
+            timestampText: "22h",
+            timestampPosition: .right,
+            timestampAccessoryFrame: timestampFrame,
+            metadataLabel: metadataLabel
+        ))
+        #expect(hitRect.contains(NSPoint(x: timestampFrame.midX, y: timestampFrame.midY)))
+        #expect(!hitRect.contains(NSPoint(x: timestampFrame.minX - 20, y: timestampFrame.midY)))
+    }
+}
+
 final class BoardManFilterSettingsTests {
 
     @Test
