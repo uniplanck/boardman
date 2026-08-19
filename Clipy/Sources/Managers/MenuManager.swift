@@ -1694,6 +1694,51 @@ final class HistoryDisplayNameStore {
     }
 }
 
+// MARK: - Board-Man History/Snippet Links
+final class HistorySnippetLinkStore {
+
+    static let shared = HistorySnippetLinkStore()
+
+    private let defaults: UserDefaults
+    private let linksKey = "com.uniplanck.BoardMan.historySnippetLinks"
+
+    init(defaults: UserDefaults = AppEnvironment.current.defaults) {
+        self.defaults = defaults
+    }
+
+    func link(snippetIdentifier: String, historyIdentifier: String) {
+        guard !snippetIdentifier.isEmpty, !historyIdentifier.isEmpty else { return }
+        var values = links
+        values[snippetIdentifier] = historyIdentifier
+        defaults.set(values, forKey: linksKey)
+    }
+
+    func historyIdentifier(forSnippet snippetIdentifier: String) -> String? {
+        return links[snippetIdentifier]
+    }
+
+    func snippetIdentifiers(forHistory historyIdentifier: String) -> [String] {
+        return links.compactMap { snippetIdentifier, linkedHistoryIdentifier in
+            linkedHistoryIdentifier == historyIdentifier ? snippetIdentifier : nil
+        }.sorted()
+    }
+
+    func unlinkSnippet(_ snippetIdentifier: String) {
+        var values = links
+        values.removeValue(forKey: snippetIdentifier)
+        defaults.set(values, forKey: linksKey)
+    }
+
+    func unlinkHistory(_ historyIdentifier: String) {
+        let values = links.filter { $0.value != historyIdentifier }
+        defaults.set(values, forKey: linksKey)
+    }
+
+    private var links: [String: String] {
+        return defaults.dictionary(forKey: linksKey) as? [String: String] ?? [:]
+    }
+}
+
 // MARK: - BoardMan History Item (lightweight for panel)
 enum BoardManPresentationItemScope: Equatable {
     case historyOnly
@@ -1898,6 +1943,15 @@ func boardManText(_ english: String) -> String {
         "Updates": "アップデート", "License": "ライセンス",
         "Startup, menu bar, and keyboard shortcuts": "起動、メニューバー、キーボードショートカット",
         "Layout, timestamps, counts, and theme": "レイアウト、時刻、回数、テーマ",
+        "Preview": "プレビュー", "Layout": "レイアウト", "Timestamp": "時刻", "Usage": "使用状況", "Theme & Colors": "テーマと色",
+        "Advanced settings": "詳細設定", "Show advanced settings": "詳細設定を表示", "Hide advanced settings": "詳細設定を隠す",
+        "See changes instantly before returning to History.": "履歴へ戻る前に変更結果をその場で確認できます。",
+        "Panel size, row structure, and visual density.": "パネルサイズ、行構造、表示密度を調整します。",
+        "Choose how time is formatted and placed.": "時刻の形式と表示位置を調整します。",
+        "Paste counts and used-item treatment.": "使用回数と使用済み項目の見え方を調整します。",
+        "Theme, mode, typography, and surface style.": "テーマ、表示モード、フォント、表面スタイルを調整します。",
+        "Relative time details, custom colors, and preview scale.": "相対時刻の詳細、カスタム色、プレビュー倍率を調整します。",
+        "Design review notes": "デザインレビューのメモ", "Release checklist": "リリース確認リスト",
         "Retention, duplicate handling, and cleanup": "保存件数、重複処理、履歴削除",
         "Folders, snippets, and folder shortcuts": "グループ、スニペット、グループショートカット",
         "Excluded apps, stored data, and filters": "除外アプリ、保存データ、フィルター",
@@ -1920,8 +1974,9 @@ func boardManText(_ english: String) -> String {
         "Click: Hide / Show Content": "クリック：内容を非表示／表示",
         "Long Press: Hide / Show Content": "長押し：内容を非表示／表示",
         "Count": "使用回数", "Style": "表示形式",
-        "Used": "使用済み", "Theme": "テーマ", "Mode": "表示モード", "UI": "UI",
-        "Font": "フォント", "Lighten": "明るくする", "Height": "高さ",
+        "Used": "使用済み", "Pin label": "Pin表記", "Images": "画像", "Image side": "画像位置",
+        "Theme": "テーマ", "Mode": "表示モード", "UI": "UI",
+        "Font": "フォント", "Text size": "文字サイズ", "Lighten": "明るくする", "Height": "高さ",
         "Accent": "アクセント", "Panel": "パネル", "Used color": "使用済み色",
         "Opacity": "透明度", "Reset colors": "色をリセット",
         "Restart Board-Man": "Board-Manを再起動", "Quit Board-Man": "Board-Manを終了",
@@ -2029,10 +2084,12 @@ func boardManText(_ english: String) -> String {
     let chinese: [String: String] = [
         "History": "历史", "Snippets": "模板", "Settings": "设置", "General": "常规",
         "Appearance": "外观", "Privacy": "隐私", "Updates": "更新", "License": "许可证",
+        "Preview": "预览", "Layout": "布局", "Timestamp": "时间", "Usage": "使用情况", "Theme & Colors": "主题与颜色",
+        "Advanced settings": "高级设置", "Show advanced settings": "显示高级设置", "Hide advanced settings": "隐藏高级设置",
         "Language": "语言", "Window mode": "窗口模式", "Show in Dock": "在 Dock 中显示",
         "Rows": "行号", "Time": "时间", "Position": "位置", "Relative format": "相对时间格式", "Number": "数字", "Unit": "单位", "Suffix": "后缀", "Under 1 minute": "1分钟以内", "Count": "使用次数",
         "Style": "样式", "Used": "已使用", "Theme": "主题", "Mode": "模式", "Font": "字体",
-        "Lighten": "变亮", "Height": "高度", "Accent": "强调色", "Panel": "面板",
+        "Text size": "文字大小", "Lighten": "变亮", "Height": "高度", "Accent": "强调色", "Panel": "面板",
         "Used color": "已使用颜色", "Opacity": "透明度", "Reset colors": "重置颜色",
         "Restart Board-Man": "重启 Board-Man", "Quit Board-Man": "退出 Board-Man",
         "Move Up": "上移", "Move Down": "下移", "Edit Mode": "编辑模式", "View Mode": "查看模式",
@@ -2051,10 +2108,12 @@ func boardManText(_ english: String) -> String {
     let korean: [String: String] = [
         "History": "기록", "Snippets": "문구", "Settings": "설정", "General": "일반",
         "Appearance": "모양", "Privacy": "개인정보", "Updates": "업데이트", "License": "라이선스",
+        "Preview": "미리보기", "Layout": "레이아웃", "Timestamp": "시간", "Usage": "사용 현황", "Theme & Colors": "테마 및 색상",
+        "Advanced settings": "고급 설정", "Show advanced settings": "고급 설정 표시", "Hide advanced settings": "고급 설정 숨기기",
         "Language": "언어", "Window mode": "윈도우 모드", "Show in Dock": "Dock에 표시",
         "Rows": "행 번호", "Time": "시간", "Position": "위치", "Relative format": "상대 시간 형식", "Number": "숫자", "Unit": "단위", "Suffix": "표기", "Under 1 minute": "1분 이내", "Count": "사용 횟수",
         "Style": "스타일", "Used": "사용됨", "Theme": "테마", "Mode": "모드", "Font": "폰트",
-        "Lighten": "밝게", "Height": "높이", "Accent": "강조색", "Panel": "패널",
+        "Text size": "글자 크기", "Lighten": "밝게", "Height": "높이", "Accent": "강조색", "Panel": "패널",
         "Used color": "사용됨 색상", "Opacity": "투명도", "Reset colors": "색상 초기화",
         "Restart Board-Man": "Board-Man 재시작", "Quit Board-Man": "Board-Man 종료",
         "Move Up": "위로 이동", "Move Down": "아래로 이동", "Edit Mode": "편집 모드", "View Mode": "보기 모드",
@@ -2320,6 +2379,27 @@ enum BoardManTimestampPosition: String, CaseIterable {
 
     static func allowed(_ value: String?) -> BoardManTimestampPosition {
         return allCases.first(where: { $0.rawValue.lowercased() == value?.lowercased() }) ?? .below
+    }
+}
+
+enum BoardManPinLabelStyle: String, CaseIterable {
+    case off = "OFF"
+    case compact = "P"
+    case full = "PIN"
+
+    static func allowed(_ value: String?) -> BoardManPinLabelStyle {
+        return allCases.first(where: { $0.rawValue.caseInsensitiveCompare(value ?? "") == .orderedSame }) ?? .full
+    }
+
+    var badgeTitle: String { self == .off ? "" : rawValue }
+}
+
+enum BoardManInlineImagePosition: String, CaseIterable {
+    case left = "Left"
+    case right = "Right"
+
+    static func allowed(_ value: String?) -> BoardManInlineImagePosition {
+        return allCases.first(where: { $0.rawValue.caseInsensitiveCompare(value ?? "") == .orderedSame }) ?? .right
     }
 }
 
@@ -2991,6 +3071,7 @@ final class BoardManHistoryRowView: NSTableRowView {
         let accentColor = previewOwner?.themeAccentColor ?? preset.accentColor
         let isSelected = previewOwner?.isSelectedRow(row) == true
         let isHovered = previewOwner?.isHoveredRow(row) == true
+        let isPinned = previewOwner?.isPinnedRow(row) == true
         let highlightAppearance = previewOwner?.itemHighlightAppearance(for: row)
         let usedAppearance = previewOwner?.usedItemAppearance(for: row)
         let kind = Self.backgroundKind(
@@ -3051,6 +3132,13 @@ final class BoardManHistoryRowView: NSTableRowView {
             } else {
                 super.drawBackground(in: dirtyRect)
             }
+        }
+
+        if isPinned {
+            let indicatorRect = NSRect(x: 8, y: 10, width: 3, height: max(10, bounds.height - 20))
+            let indicator = NSBezierPath(roundedRect: indicatorRect, xRadius: 1.5, yRadius: 1.5)
+            accentColor.withAlphaComponent(lightenTheme ? 0.52 : 0.88).setFill()
+            indicator.fill()
         }
     }
 
@@ -3150,78 +3238,451 @@ final class BoardManSettingsCategoryButton: NSButton {
     }
 }
 
-final class BoardManHeaderSegmentedControl: NSSegmentedControl {
-    private var hoverTrackingArea: NSTrackingArea?
-    private(set) var hoveredSegment = -1
+final class BoardManSettingsCardView: NSView {
+    private let iconView = NSImageView(frame: .zero)
+    let titleLabel = NSTextField(labelWithString: "")
+    let detailLabel = NSTextField(labelWithString: "")
 
-    override func updateTrackingAreas() {
-        if let hoverTrackingArea {
-            removeTrackingArea(hoverTrackingArea)
+    init(title: String, detail: String, symbolName: String) {
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.cornerRadius = 12
+        layer?.borderWidth = 1
+
+        iconView.image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title)
+        iconView.imageScaling = .scaleProportionallyDown
+        if #available(macOS 10.14, *) {
+            iconView.contentTintColor = .secondaryLabelColor
         }
-        let options: NSTrackingArea.Options = [
-            .mouseMoved,
-            .mouseEnteredAndExited,
-            .activeInKeyWindow,
-            .inVisibleRect
-        ]
-        let trackingArea = NSTrackingArea(rect: bounds, options: options, owner: self, userInfo: nil)
-        addTrackingArea(trackingArea)
-        hoverTrackingArea = trackingArea
-        super.updateTrackingAreas()
+        addSubview(iconView)
+
+        titleLabel.stringValue = title
+        titleLabel.font = NSFont.systemFont(ofSize: 12.5, weight: .semibold)
+        titleLabel.textColor = .labelColor
+        titleLabel.lineBreakMode = .byTruncatingTail
+        addSubview(titleLabel)
+
+        detailLabel.stringValue = detail
+        detailLabel.font = NSFont.systemFont(ofSize: 10.5)
+        detailLabel.textColor = .secondaryLabelColor
+        detailLabel.lineBreakMode = .byTruncatingTail
+        addSubview(detailLabel)
     }
 
-    override func mouseMoved(with event: NSEvent) {
-        updateHoveredSegment(at: convert(event.locationInWindow, from: nil))
-        super.mouseMoved(with: event)
+    required init?(coder: NSCoder) {
+        return nil
     }
 
-    override func mouseExited(with event: NSEvent) {
-        setHoveredSegment(-1)
-        super.mouseExited(with: event)
+    override func layout() {
+        super.layout()
+        let headerY = max(8, bounds.height - 34)
+        iconView.frame = NSIntegralRect(NSRect(x: 14, y: headerY + 1, width: 16, height: 16))
+        titleLabel.frame = NSIntegralRect(NSRect(x: 38, y: headerY + 1, width: max(80, bounds.width - 52), height: 17))
+        detailLabel.frame = NSIntegralRect(NSRect(x: 38, y: headerY - 15, width: max(80, bounds.width - 52), height: 14))
     }
 
-    func updateHoveredSegment(at point: NSPoint) {
-        guard bounds.contains(point), segmentCount > 0, bounds.width > 0 else {
-            setHoveredSegment(-1)
-            return
+    func updateText(title: String, detail: String) {
+        titleLabel.stringValue = title
+        detailLabel.stringValue = detail
+        iconView.image?.accessibilityDescription = title
+    }
+
+    func applyStyle(accentColor: NSColor, surfaceColor: NSColor, edgeColor: NSColor, simpleStyle: Bool) {
+        layer?.backgroundColor = surfaceColor.cgColor
+        layer?.borderColor = edgeColor.cgColor
+        layer?.cornerRadius = simpleStyle ? 9 : 12
+        titleLabel.textColor = .labelColor
+        detailLabel.textColor = .secondaryLabelColor
+        if #available(macOS 10.14, *) {
+            iconView.contentTintColor = accentColor
         }
-        let index = (0..<segmentCount).first { segmentFrame(for: $0)?.contains(point) == true } ?? -1
-        setHoveredSegment(index)
+    }
+}
+
+final class BoardManAppearancePreviewView: NSView {
+    struct Snapshot {
+        let accentColor: NSColor
+        let panelColor: NSColor
+        let usedColor: NSColor
+        let font: NSFont
+        let showRows: Bool
+        let showCount: Bool
+        let timestampPosition: BoardManTimestampPosition
+        let timestampText: String
+        let compactCount: Bool
+        let simpleStyle: Bool
+        let uiStyleRawValue: String
     }
 
-    func hoverBackgroundRect(forSegment segment: Int) -> NSRect? {
-        guard let segmentRect = segmentFrame(for: segment) else { return nil }
-        return NSIntegralRect(segmentRect.insetBy(dx: 2, dy: 3))
+    private var snapshot = Snapshot(
+        accentColor: .controlAccentColor,
+        panelColor: .controlBackgroundColor,
+        usedColor: .systemGray,
+        font: .systemFont(ofSize: 11),
+        showRows: true,
+        showCount: true,
+        timestampPosition: .right,
+        timestampText: "now",
+        compactCount: false,
+        simpleStyle: false,
+        uiStyleRawValue: "Default"
+    )
+
+    var uiStyleRawValueForTesting: String {
+        return snapshot.uiStyleRawValue
     }
 
-    private func segmentFrame(for segment: Int) -> NSRect? {
-        guard segment >= 0, segment < segmentCount, bounds.width > 0 else { return nil }
-        let configuredWidths = (0..<segmentCount).map { max(0, width(forSegment: $0)) }
-        let configuredTotal = configuredWidths.reduce(0, +)
-        let widths = configuredTotal > 0
-            ? configuredWidths.map { bounds.width * ($0 / configuredTotal) }
-            : Array(repeating: bounds.width / CGFloat(segmentCount), count: segmentCount)
-        let minX = bounds.minX + widths.prefix(segment).reduce(0, +)
-        let maxX = segment == segmentCount - 1 ? bounds.maxX : minX + widths[segment]
-        return NSRect(x: minX, y: bounds.minY, width: max(0, maxX - minX), height: bounds.height)
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 10
     }
 
-    private func setHoveredSegment(_ value: Int) {
-        guard hoveredSegment != value else { return }
-        hoveredSegment = value
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    func update(_ snapshot: Snapshot) {
+        self.snapshot = snapshot
         needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        guard let hoverRect = hoverBackgroundRect(forSegment: hoveredSegment) else { return }
+        guard bounds.width > 40, bounds.height > 40 else { return }
 
-        let isSelected = hoveredSegment == selectedSegment
-        let path = NSBezierPath(roundedRect: hoverRect, xRadius: 8, yRadius: 8)
-        (isSelected
-            ? NSColor.selectedControlTextColor.withAlphaComponent(0.10)
-            : NSColor.labelColor.withAlphaComponent(0.08)).setFill()
-        path.fill()
+        let outer = bounds.insetBy(dx: 1, dy: 1)
+        let outerRadius: CGFloat = snapshot.simpleStyle ? 6 : 10
+        let outerPath = NSBezierPath(roundedRect: outer, xRadius: outerRadius, yRadius: outerRadius)
+        snapshot.panelColor.withAlphaComponent(snapshot.simpleStyle ? 0.96 : 0.72).setFill()
+        outerPath.fill()
+        (snapshot.simpleStyle ? NSColor.separatorColor : snapshot.accentColor.withAlphaComponent(0.24)).setStroke()
+        outerPath.lineWidth = snapshot.simpleStyle ? 0.7 : 1
+        outerPath.stroke()
+
+        let headerHeight: CGFloat = 24
+        let headerRect = NSRect(x: outer.minX + 1, y: outer.maxY - headerHeight - 1, width: outer.width - 2, height: headerHeight)
+        if snapshot.simpleStyle {
+            let separator = NSBezierPath()
+            separator.move(to: NSPoint(x: headerRect.minX + 10, y: headerRect.minY))
+            separator.line(to: NSPoint(x: headerRect.maxX - 10, y: headerRect.minY))
+            NSColor.separatorColor.withAlphaComponent(0.55).setStroke()
+            separator.lineWidth = 0.5
+            separator.stroke()
+        } else {
+            let headerPath = NSBezierPath(roundedRect: headerRect, xRadius: 9, yRadius: 9)
+            snapshot.accentColor.withAlphaComponent(0.09).setFill()
+            headerPath.fill()
+        }
+
+        drawText(
+            boardManText("History"),
+            in: NSRect(x: headerRect.minX + 12, y: headerRect.minY + 5, width: 80, height: 14),
+            font: NSFont.systemFont(ofSize: 10.5, weight: .semibold),
+            color: .labelColor,
+            alignment: .left
+        )
+        drawText(
+            boardManText("Preview"),
+            in: NSRect(x: headerRect.maxX - 82, y: headerRect.minY + 5, width: 70, height: 14),
+            font: NSFont.systemFont(ofSize: 9.5, weight: .medium),
+            color: snapshot.accentColor,
+            alignment: .right
+        )
+
+        let rowsTop = headerRect.minY - 8
+        let rowsBottom = outer.minY + 10
+        let rowGap: CGFloat = 7
+        let rowHeight = max(26, floor((rowsTop - rowsBottom - rowGap) / 2))
+        let rowInset: CGFloat = 12
+        let rowWidth = outer.width - (rowInset * 2)
+        let firstFrame = NSRect(x: outer.minX + rowInset, y: rowsBottom + rowHeight + rowGap, width: rowWidth, height: rowHeight)
+        let secondFrame = NSRect(x: outer.minX + rowInset, y: rowsBottom, width: rowWidth, height: rowHeight)
+        drawPreviewRow(frame: firstFrame, index: 1, text: boardManText("Design review notes"), count: 3, used: false)
+        drawPreviewRow(frame: secondFrame, index: 2, text: boardManText("Release checklist"), count: 7, used: true)
+    }
+
+    private func drawPreviewRow(frame: NSRect, index: Int, text: String, count: Int, used: Bool) {
+        if snapshot.simpleStyle {
+            let separator = NSBezierPath()
+            separator.move(to: NSPoint(x: frame.minX, y: frame.minY))
+            separator.line(to: NSPoint(x: frame.maxX, y: frame.minY))
+            NSColor.separatorColor.withAlphaComponent(0.42).setStroke()
+            separator.lineWidth = 0.5
+            separator.stroke()
+        } else {
+            let rowPath = NSBezierPath(roundedRect: frame, xRadius: 7, yRadius: 7)
+            (used ? snapshot.usedColor.withAlphaComponent(0.15) : NSColor.labelColor.withAlphaComponent(0.035)).setFill()
+            rowPath.fill()
+            (used ? snapshot.usedColor.withAlphaComponent(0.28) : NSColor.separatorColor.withAlphaComponent(0.20)).setStroke()
+            rowPath.lineWidth = 0.8
+            rowPath.stroke()
+        }
+
+        var left = frame.minX + 10
+        let centerY = frame.midY
+        if snapshot.showRows {
+            drawText(
+                "\(index)",
+                in: NSRect(x: left, y: centerY - 7, width: 18, height: 14),
+                font: NSFont.monospacedDigitSystemFont(ofSize: 9.5, weight: .medium),
+                color: .tertiaryLabelColor,
+                alignment: .center
+            )
+            left += 26
+        }
+
+        var right = frame.maxX - 10
+        if snapshot.showCount {
+            let countWidth: CGFloat = snapshot.compactCount ? 20 : 30
+            let countRect = NSRect(x: right - countWidth, y: centerY - 9, width: countWidth, height: 18)
+            if !snapshot.simpleStyle {
+                let badgePath = NSBezierPath(roundedRect: countRect, xRadius: 9, yRadius: 9)
+                snapshot.accentColor.withAlphaComponent(0.16).setFill()
+                badgePath.fill()
+            }
+            drawText(
+                snapshot.compactCount ? "\(count)" : "×\(count)",
+                in: countRect.insetBy(dx: 3, dy: 2),
+                font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .semibold),
+                color: snapshot.accentColor,
+                alignment: .center
+            )
+            right = countRect.minX - 8
+        }
+
+        let timestampWidth: CGFloat = 48
+        if snapshot.timestampPosition == .left {
+            drawText(snapshot.timestampText,
+                     in: NSRect(x: left, y: centerY - 7, width: timestampWidth, height: 14),
+                     font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium),
+                     color: .secondaryLabelColor,
+                     alignment: .center)
+            left += timestampWidth + 8
+        } else if snapshot.timestampPosition == .right {
+            drawText(snapshot.timestampText,
+                     in: NSRect(x: right - timestampWidth, y: centerY - 7, width: timestampWidth, height: 14),
+                     font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium),
+                     color: .secondaryLabelColor,
+                     alignment: .center)
+            right -= timestampWidth + 8
+        }
+
+        let titleY = snapshot.timestampPosition == .below ? centerY + 1 : centerY - 7
+        drawText(
+            text,
+            in: NSRect(x: left, y: titleY, width: max(30, right - left), height: 14),
+            font: snapshot.font,
+            color: .labelColor,
+            alignment: .left
+        )
+        if snapshot.timestampPosition == .below {
+            drawText(snapshot.timestampText,
+                     in: NSRect(x: left, y: centerY - 14, width: max(30, right - left), height: 12),
+                     font: NSFont.monospacedDigitSystemFont(ofSize: 8.5, weight: .regular),
+                     color: .secondaryLabelColor,
+                     alignment: .left)
+        }
+    }
+
+    private func drawText(_ text: String,
+                          in rect: NSRect,
+                          font: NSFont,
+                          color: NSColor,
+                          alignment: NSTextAlignment) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineBreakMode = .byTruncatingTail
+        (text as NSString).draw(
+            in: rect,
+            withAttributes: [
+                .font: font,
+                .foregroundColor: color,
+                .paragraphStyle: paragraph
+            ]
+        )
+    }
+}
+
+final class BoardManHeaderTabButton: NSButton {
+    private var hoverTrackingArea: NSTrackingArea?
+    private(set) var isHovering = false
+    var hoverDidChange: (() -> Void)?
+
+    override func updateTrackingAreas() {
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+        super.updateTrackingAreas()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        setHovering(true)
+        super.mouseEntered(with: event)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        setHovering(false)
+        super.mouseExited(with: event)
+    }
+
+    func setHoveringForTesting(_ value: Bool) {
+        setHovering(value)
+    }
+
+    private func setHovering(_ value: Bool) {
+        guard isHovering != value else { return }
+        isHovering = value
+        hoverDidChange?()
+    }
+}
+
+final class BoardManHeaderTabBar: NSView {
+    let historyButton = BoardManHeaderTabButton(title: "", target: nil, action: nil)
+    let snippetsButton = BoardManHeaderTabButton(title: "", target: nil, action: nil)
+    let separatorView = NSView(frame: .zero)
+    private(set) var selectedIndex = BoardManPanelTab.history.rawValue
+    var selectionDidChange: ((Int) -> Void)?
+
+    var buttons: [BoardManHeaderTabButton] {
+        return [historyButton, snippetsButton]
+    }
+
+    var hoveredIndex: Int {
+        return buttons.firstIndex(where: { $0.isHovering }) ?? -1
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.cornerRadius = 14
+        layer?.borderWidth = 1
+        layer?.masksToBounds = true
+        layer?.shadowOpacity = 0
+
+        for (index, button) in buttons.enumerated() {
+            button.tag = index
+            button.target = self
+            button.action = #selector(tabButtonPressed(_:))
+            button.isBordered = false
+            button.showsBorderOnlyWhileMouseInside = false
+            button.focusRingType = .none
+            button.imagePosition = .imageLeading
+            button.imageScaling = .scaleProportionallyDown
+            if #available(macOS 11.0, *) {
+                button.imageHugsTitle = true
+            }
+            button.alignment = .center
+            button.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 11
+            button.layer?.masksToBounds = true
+            button.layer?.borderWidth = 0
+            button.layer?.shadowOpacity = 0
+            button.hoverDidChange = { [weak self] in self?.refreshVisualState() }
+            addSubview(button)
+        }
+
+        separatorView.wantsLayer = true
+        separatorView.layer?.shadowOpacity = 0
+        addSubview(separatorView)
+        refreshVisualState()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layout() {
+        super.layout()
+        let halfWidth = floor(bounds.width / 2)
+        historyButton.frame = NSIntegralRect(NSRect(
+            x: 4,
+            y: 4,
+            width: max(0, halfWidth - 6),
+            height: max(0, bounds.height - 8)
+        ))
+        snippetsButton.frame = NSIntegralRect(NSRect(
+            x: halfWidth + 2,
+            y: 4,
+            width: max(0, bounds.width - halfWidth - 6),
+            height: max(0, bounds.height - 8)
+        ))
+        separatorView.frame = NSIntegralRect(NSRect(
+            x: halfWidth,
+            y: 10,
+            width: 1,
+            height: max(0, bounds.height - 20)
+        ))
+    }
+
+    func configureTab(index: Int, title: String, toolTip: String, image: NSImage?) {
+        guard buttons.indices.contains(index) else { return }
+        let button = buttons[index]
+        button.title = title
+        button.toolTip = toolTip
+        button.setAccessibilityLabel(toolTip)
+        button.image = image
+    }
+
+    func setFont(_ font: NSFont) {
+        buttons.forEach { $0.font = font }
+    }
+
+    func setSelectedIndex(_ index: Int) {
+        let normalized = buttons.indices.contains(index) ? index : -1
+        guard selectedIndex != normalized else { return }
+        selectedIndex = normalized
+        refreshVisualState()
+    }
+
+    func updateHoveredTab(at point: NSPoint) {
+        let hoveredIndex: Int? = bounds.contains(point) ? (point.x < bounds.midX ? 0 : 1) : nil
+        for (index, button) in buttons.enumerated() {
+            button.setHoveringForTesting(index == hoveredIndex)
+        }
+    }
+
+    func hoverBackgroundRect(forTab index: Int) -> NSRect? {
+        guard buttons.indices.contains(index) else { return nil }
+        return buttons[index].frame
+    }
+
+    func refreshVisualState() {
+        layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.16).cgColor
+        layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.82).cgColor
+        separatorView.layer?.backgroundColor = NSColor.separatorColor.withAlphaComponent(0.72).cgColor
+        for (index, button) in buttons.enumerated() {
+            let isSelected = selectedIndex == index
+            let fillColor: NSColor
+            if isSelected {
+                fillColor = NSColor.labelColor.withAlphaComponent(0.14)
+            } else if button.isHovering {
+                fillColor = NSColor.labelColor.withAlphaComponent(0.07)
+            } else {
+                fillColor = .clear
+            }
+            button.layer?.backgroundColor = fillColor.cgColor
+            button.layer?.borderColor = NSColor.clear.cgColor
+            button.layer?.shadowOpacity = 0
+            if #available(macOS 10.14, *) {
+                button.contentTintColor = isSelected ? .labelColor : .secondaryLabelColor
+            }
+        }
+    }
+
+    @objc private func tabButtonPressed(_ sender: NSButton) {
+        guard buttons.indices.contains(sender.tag) else { return }
+        setSelectedIndex(sender.tag)
+        selectionDidChange?(sender.tag)
     }
 }
 
@@ -3312,6 +3773,7 @@ final class BoardManHistoryCellView: NSTableCellView {
     private let inlineImageView = NSImageView(frame: .zero)
     private let dragHandleLabel = NSTextField(labelWithString: "≡")
     private var timestampPosition: BoardManTimestampPosition = .below
+    private var inlineImagePosition: BoardManInlineImagePosition = .right
     private var configuredTimestampText = ""
     private var showsDragHandle = false
 
@@ -3422,9 +3884,12 @@ final class BoardManHistoryCellView: NSTableCellView {
             AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice)
         )
         let isNarrowRow = bounds.width < 640
-        primaryLabel.font = fontChoice.font(ofSize: isNarrowRow ? 12.75 : 13.5, weight: .medium)
-        metadataLabel.font = fontChoice.font(ofSize: isNarrowRow ? 11 : 11.5, weight: .regular)
-        timestampAccessoryLabel.font = fontChoice.font(ofSize: isNarrowRow ? 10 : 10.5, weight: .medium)
+        let textScale = CGFloat(BoardManPanel.clampedItemTextScale(
+            AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        )) / 100
+        primaryLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 12.75 : 13.5) * textScale, weight: .medium)
+        metadataLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 11 : 11.5) * textScale, weight: .regular)
+        timestampAccessoryLabel.font = fontChoice.font(ofSize: (isNarrowRow ? 10 : 10.5) * textScale, weight: .medium)
         countBadge.font = fontChoice.font(ofSize: isNarrowRow ? 10 : 10.5, weight: .medium)
         pinBadge.font = fontChoice.font(ofSize: 9.5, weight: .bold)
         timestampPosition = requestedTimestampPosition
@@ -3446,9 +3911,19 @@ final class BoardManHistoryCellView: NSTableCellView {
         let shouldShowCount = item.pasteCount > 0 && !item.countText.isEmpty
         countBadge.stringValue = shouldShowCount ? "\(badgePrefix)\(item.countText)" : ""
         countBadge.isHidden = !shouldShowCount
-        pinBadge.isHidden = !item.isPinned
+        let pinLabelStyle = BoardManPinLabelStyle.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManPinLabelStyle)
+        )
+        pinBadge.stringValue = pinLabelStyle.badgeTitle
+        pinBadge.isHidden = !item.isPinned || pinLabelStyle == .off
+        let showInlineImages = AppEnvironment.current.defaults.object(
+            forKey: Constants.UserDefaults.boardManShowInlineImages
+        ) as? Bool ?? true
+        inlineImagePosition = BoardManInlineImagePosition.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManInlineImagePosition)
+        )
         inlineImageView.image = item.isMasked ? nil : item.inlineThumbnail
-        inlineImageView.isHidden = item.isMasked || item.inlineThumbnail == nil
+        inlineImageView.isHidden = item.isMasked || item.inlineThumbnail == nil || !showInlineImages
 
         if isSelected {
             primaryLabel.textColor = .selectedMenuItemTextColor
@@ -3546,7 +4021,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         let textGap: CGFloat = 4
         let timeWidth: CGFloat = 72
         let countWidth: CGFloat = 64
-        let pinWidth: CGFloat = 44
+        let pinWidth: CGFloat = pinBadge.stringValue == "P" ? 28 : 44
         let accessoryHeight: CGFloat = 20
         var textLeft = horizontalInset
         var textRight = bounds.width - trailingInset
@@ -3566,6 +4041,17 @@ final class BoardManHistoryCellView: NSTableCellView {
         countBadge.frame = .zero
         pinBadge.frame = .zero
         inlineImageView.frame = .zero
+
+        if !inlineImageView.isHidden, inlineImagePosition == .left {
+            let imageSize: CGFloat = timestampPosition == .below ? 32 : 28
+            inlineImageView.frame = NSIntegralRect(NSRect(
+                x: textLeft,
+                y: floor((bounds.height - imageSize) / 2),
+                width: imageSize,
+                height: imageSize
+            ))
+            textLeft = inlineImageView.frame.maxX + accessoryGap
+        }
 
         if !pinBadge.isHidden {
             pinBadge.frame = NSIntegralRect(NSRect(
@@ -3607,7 +4093,7 @@ final class BoardManHistoryCellView: NSTableCellView {
             textRight = countBadge.frame.minX - accessoryGap
         }
 
-        if !inlineImageView.isHidden {
+        if !inlineImageView.isHidden, inlineImagePosition == .right {
             let imageSize: CGFloat = timestampPosition == .below ? 32 : 28
             inlineImageView.frame = NSIntegralRect(NSRect(
                 x: max(textLeft, textRight - imageSize),
@@ -3671,7 +4157,7 @@ class BoardManPanel: NSPanel {
 
     private var glassBackgroundView: NSVisualEffectView?
     private var searchField: NSSearchField?
-    private var segmentedControl: BoardManHeaderSegmentedControl?
+    private var headerTabBar: BoardManHeaderTabBar?
     private var settingsButton: NSButton?
     private var historyUsageFilterControl: NSSegmentedControl?
     private var historySortButton: NSButton?
@@ -3715,6 +4201,11 @@ class BoardManPanel: NSPanel {
     private var usageStylePopup: NSPopUpButton?
     private var usedItemStyleLabel: NSTextField?
     private var usedItemStylePopup: NSPopUpButton?
+    private var pinLabelStyleLabel: NSTextField?
+    private var pinLabelStylePopup: NSPopUpButton?
+    private var showInlineImagesButton: NSButton?
+    private var inlineImagePositionLabel: NSTextField?
+    private var inlineImagePositionPopup: NSPopUpButton?
     private var themePresetLabel: NSTextField?
     private var themePresetPopup: NSPopUpButton?
     private var appearanceModeLabel: NSTextField?
@@ -3723,6 +4214,10 @@ class BoardManPanel: NSPanel {
     private var uiStylePopup: NSPopUpButton?
     private var fontChoiceLabel: NSTextField?
     private var fontChoicePopup: NSPopUpButton?
+    private var itemTextScaleLabel: NSTextField?
+    private var itemTextScaleField: NSTextField?
+    private var itemTextScaleDecreaseButton: NSButton?
+    private var itemTextScaleIncreaseButton: NSButton?
     private var themeLightenButton: NSButton?
     private var customAccentLabel: NSTextField?
     private var customAccentColorWell: NSColorWell?
@@ -3812,6 +4307,15 @@ class BoardManPanel: NSPanel {
     private var imagePreviewScaleSlider: NSSlider?
     private var imagePreviewScaleValueLabel: NSTextField?
     private var previewScaleProNoteLabel: NSTextField?
+    private var appearancePreviewCard: BoardManSettingsCardView?
+    private var appearanceLayoutCard: BoardManSettingsCardView?
+    private var appearanceTimestampCard: BoardManSettingsCardView?
+    private var appearanceUsageCard: BoardManSettingsCardView?
+    private var appearanceThemeCard: BoardManSettingsCardView?
+    private var appearanceAdvancedCard: BoardManSettingsCardView?
+    private var appearancePreviewView: BoardManAppearancePreviewView?
+    private var appearanceAdvancedButton: NSButton?
+    private var appearanceAdvancedExpanded = false
     private var snippetGroupProNoteLabel: NSTextField?
     private var exportHistoryCSVButton: NSButton?
     private var privacySectionLabel: NSTextField?
@@ -3902,7 +4406,7 @@ class BoardManPanel: NSPanel {
             : NSSize(width: LayoutMetrics.minimumWidth, height: 600)
         if enabled {
             activeTab = .history
-            segmentedControl?.selectedSegment = BoardManPanelTab.history.rawValue
+            headerTabBar?.setSelectedIndex(BoardManPanelTab.history.rawValue)
         }
         selectedIndex = -1
         hoveredRow = -1
@@ -3913,7 +4417,7 @@ class BoardManPanel: NSPanel {
 
     func selectSettingsTab() {
         activeTab = .settings
-        segmentedControl?.selectedSegment = -1
+        headerTabBar?.setSelectedIndex(-1)
         shouldScrollSettingsToTop = true
         updateSettingsButtonAppearance()
         refreshGlobalShortcutRows()
@@ -3929,7 +4433,7 @@ class BoardManPanel: NSPanel {
 
     func openSnippetsManagerMode(categoryIdentifier: String? = nil) {
         activeTab = .snippets
-        segmentedControl?.selectedSegment = BoardManPanelTab.snippets.rawValue
+        headerTabBar?.setSelectedIndex(BoardManPanelTab.snippets.rawValue)
         updateSettingsButtonAppearance()
         if let categoryIdentifier {
             setActiveSnippetGroupIdentifiers(
@@ -3964,6 +4468,11 @@ class BoardManPanel: NSPanel {
 
     fileprivate var fontChoice: BoardManFontChoice {
         return BoardManFontChoice.allowed(AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManFontChoice))
+    }
+
+    fileprivate var itemTextScale: CGFloat {
+        let stored = AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        return CGFloat(Self.clampedItemTextScale(stored)) / 100
     }
 
     fileprivate var timestampPosition: BoardManTimestampPosition {
@@ -4068,12 +4577,21 @@ class BoardManPanel: NSPanel {
         return isPro ? clampedPreviewScale(storedValue) : 100
     }
 
+    static func clampedItemTextScale(_ value: Int) -> Int {
+        let normalized = value == 0 ? 100 : value
+        return min(140, max(80, normalized))
+    }
+
     static func clampedTimestampShortcutDelay(_ value: TimeInterval) -> TimeInterval {
         return min(60, max(0, value))
     }
 
     static func usesStackedHistorySettingsLayout(width: CGFloat) -> Bool {
         return width < 520
+    }
+
+    static func usesStackedAppearanceSettingsLayout(width: CGFloat) -> Bool {
+        return width < 470
     }
 
     static func restoredSnippetSelectionIndex(origin: Int?, itemCount: Int) -> Int {
@@ -4592,24 +5110,27 @@ class BoardManPanel: NSPanel {
         searchField = search
 
         // History and Templates remain the two primary tabs. Settings lives in the trailing gear button.
-        let tabs = BoardManHeaderSegmentedControl(frame: .zero)
-        tabs.segmentCount = 2
-        tabs.setLabel("History", forSegment: 0)
-        tabs.setLabel("Snippets", forSegment: 1)
-        if #available(macOS 11.0, *) {
-            tabs.setImage(NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: "History"), forSegment: 0)
-            tabs.setImage(NSImage(systemSymbolName: "text.badge.plus", accessibilityDescription: "Snippets"), forSegment: 1)
+        // This is intentionally custom-drawn instead of NSSegmentedControl so AppKit cannot add
+        // a system hover/focus halo around the capsule edges.
+        let tabs = BoardManHeaderTabBar(frame: .zero)
+        tabs.configureTab(
+            index: BoardManPanelTab.history.rawValue,
+            title: BoardManPanelTab.history.title,
+            toolTip: BoardManPanelTab.history.title,
+            image: NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: BoardManPanelTab.history.title)
+        )
+        tabs.configureTab(
+            index: BoardManPanelTab.snippets.rawValue,
+            title: BoardManPanelTab.snippets.title,
+            toolTip: BoardManPanelTab.snippets.title,
+            image: NSImage(systemSymbolName: "text.badge.plus", accessibilityDescription: BoardManPanelTab.snippets.title)
+        )
+        tabs.selectionDidChange = { [weak self] index in
+            let tab: BoardManPanelTab = index == BoardManPanelTab.snippets.rawValue ? .snippets : .history
+            self?.activateTab(tab)
         }
-        tabs.selectedSegment = 0
-        tabs.target = self
-        tabs.action = #selector(tabChanged(_:))
-        if #available(macOS 10.10, *) {
-            tabs.segmentStyle = .separated
-        }
-        tabs.controlSize = .large
-        tabs.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
         contentView.addSubview(tabs)
-        segmentedControl = tabs
+        headerTabBar = tabs
 
         let gear = NSButton(title: "", target: self, action: #selector(settingsButtonPressed(_:)))
         gear.bezelStyle = .rounded
@@ -4959,6 +5480,78 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(manageSnippets)
         manageSnippetsButton = manageSnippets
 
+        let previewCard = BoardManSettingsCardView(
+            title: boardManText("Preview"),
+            detail: boardManText("See changes instantly before returning to History."),
+            symbolName: "rectangle.on.rectangle"
+        )
+        previewCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearancePreviewCard")
+        contentView.addSubview(previewCard)
+        appearancePreviewCard = previewCard
+
+        let previewSurface = BoardManAppearancePreviewView(frame: .zero)
+        previewSurface.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceLivePreview")
+        contentView.addSubview(previewSurface)
+        appearancePreviewView = previewSurface
+
+        let layoutCard = BoardManSettingsCardView(
+            title: boardManText("Layout"),
+            detail: boardManText("Panel size, row structure, and visual density."),
+            symbolName: "rectangle.3.group"
+        )
+        layoutCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceLayoutCard")
+        contentView.addSubview(layoutCard)
+        appearanceLayoutCard = layoutCard
+
+        let timestampCard = BoardManSettingsCardView(
+            title: boardManText("Timestamp"),
+            detail: boardManText("Choose how time is formatted and placed."),
+            symbolName: "clock"
+        )
+        timestampCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceTimestampCard")
+        contentView.addSubview(timestampCard)
+        appearanceTimestampCard = timestampCard
+
+        let usageCard = BoardManSettingsCardView(
+            title: boardManText("Usage"),
+            detail: boardManText("Paste counts and used-item treatment."),
+            symbolName: "chart.bar"
+        )
+        usageCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceUsageCard")
+        contentView.addSubview(usageCard)
+        appearanceUsageCard = usageCard
+
+        let themeCard = BoardManSettingsCardView(
+            title: boardManText("Theme & Colors"),
+            detail: boardManText("Theme, mode, typography, and surface style."),
+            symbolName: "paintpalette"
+        )
+        themeCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceThemeCard")
+        contentView.addSubview(themeCard)
+        appearanceThemeCard = themeCard
+
+        let advancedCard = BoardManSettingsCardView(
+            title: boardManText("Advanced settings"),
+            detail: boardManText("Relative time details, custom colors, and preview scale."),
+            symbolName: "slider.horizontal.3"
+        )
+        advancedCard.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceAdvancedCard")
+        contentView.addSubview(advancedCard)
+        appearanceAdvancedCard = advancedCard
+
+        let advancedButton = NSButton(
+            title: boardManText("Show advanced settings"),
+            target: self,
+            action: #selector(toggleAppearanceAdvancedSettings(_:))
+        )
+        advancedButton.bezelStyle = .inline
+        advancedButton.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        advancedButton.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)
+        advancedButton.imagePosition = .imageLeading
+        advancedButton.identifier = NSUserInterfaceItemIdentifier("BoardManAppearanceAdvancedToggle")
+        contentView.addSubview(advancedButton)
+        appearanceAdvancedButton = advancedButton
+
         let viewTitle = BoardManPanel.makeSectionLabel("Appearance")
         contentView.addSubview(viewTitle)
         viewSectionLabel = viewTitle
@@ -5241,6 +5834,62 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(usedItemStyle)
         usedItemStylePopup = usedItemStyle
 
+        let pinLabelText = NSTextField(labelWithString: boardManText("Pin label"))
+        pinLabelText.font = NSFont.systemFont(ofSize: 11)
+        pinLabelText.textColor = .labelColor
+        contentView.addSubview(pinLabelText)
+        pinLabelStyleLabel = pinLabelText
+
+        let pinLabelStyle = NSPopUpButton(frame: .zero, pullsDown: false)
+        BoardManPinLabelStyle.allCases.forEach { style in
+            pinLabelStyle.addItem(withTitle: style.rawValue)
+            pinLabelStyle.lastItem?.representedObject = style.rawValue
+        }
+        let storedPinLabelStyle = BoardManPinLabelStyle.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManPinLabelStyle)
+        )
+        pinLabelStyle.selectItem(withTitle: storedPinLabelStyle.rawValue)
+        pinLabelStyle.font = NSFont.systemFont(ofSize: 11)
+        pinLabelStyle.target = self
+        pinLabelStyle.action = #selector(pinLabelStyleChanged(_:))
+        pinLabelStyle.identifier = NSUserInterfaceItemIdentifier("BoardManPinLabelStylePopup")
+        contentView.addSubview(pinLabelStyle)
+        pinLabelStylePopup = pinLabelStyle
+
+        let showInlineImages = NSButton(
+            checkboxWithTitle: boardManText("Images"),
+            target: self,
+            action: #selector(showInlineImagesChanged(_:))
+        )
+        showInlineImages.state = (AppEnvironment.current.defaults.object(
+            forKey: Constants.UserDefaults.boardManShowInlineImages
+        ) as? Bool ?? true) ? .on : .off
+        showInlineImages.font = NSFont.systemFont(ofSize: 11)
+        contentView.addSubview(showInlineImages)
+        showInlineImagesButton = showInlineImages
+
+        let imagePositionText = NSTextField(labelWithString: boardManText("Image side"))
+        imagePositionText.font = NSFont.systemFont(ofSize: 11)
+        imagePositionText.textColor = .labelColor
+        contentView.addSubview(imagePositionText)
+        inlineImagePositionLabel = imagePositionText
+
+        let imagePosition = NSPopUpButton(frame: .zero, pullsDown: false)
+        BoardManInlineImagePosition.allCases.forEach { position in
+            imagePosition.addItem(withTitle: boardManText(position.rawValue))
+            imagePosition.lastItem?.representedObject = position.rawValue
+        }
+        let storedImagePosition = BoardManInlineImagePosition.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManInlineImagePosition)
+        )
+        imagePosition.selectItem(at: BoardManInlineImagePosition.allCases.firstIndex(of: storedImagePosition) ?? 1)
+        imagePosition.font = NSFont.systemFont(ofSize: 11)
+        imagePosition.target = self
+        imagePosition.action = #selector(inlineImagePositionChanged(_:))
+        imagePosition.identifier = NSUserInterfaceItemIdentifier("BoardManInlineImagePositionPopup")
+        contentView.addSubview(imagePosition)
+        inlineImagePositionPopup = imagePosition
+
         let themeText = NSTextField(labelWithString: boardManText("Theme"))
         themeText.font = NSFont.systemFont(ofSize: 11)
         themeText.textColor = .labelColor
@@ -5317,6 +5966,56 @@ class BoardManPanel: NSPanel {
         fontControl.toolTip = "Macにインストール済みのフォントを選択できます。日本語グリフはmacOSのフォールバックで補完します。"
         contentView.addSubview(fontControl)
         fontChoicePopup = fontControl
+
+        let itemTextLabel = NSTextField(labelWithString: boardManText("Text size"))
+        itemTextLabel.font = NSFont.systemFont(ofSize: 11)
+        itemTextLabel.textColor = .labelColor
+        contentView.addSubview(itemTextLabel)
+        itemTextScaleLabel = itemTextLabel
+
+        let itemTextScaleValue = BoardManPanel.clampedItemTextScale(
+            AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        )
+        let itemTextField = NSTextField(frame: .zero)
+        itemTextField.cell = BoardManCenteredTextFieldCell(textCell: "\(itemTextScaleValue)")
+        itemTextField.alignment = .right
+        itemTextField.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        itemTextField.textColor = .labelColor
+        itemTextField.integerValue = itemTextScaleValue
+        itemTextField.isEditable = true
+        itemTextField.isSelectable = true
+        itemTextField.isEnabled = true
+        itemTextField.target = self
+        itemTextField.action = #selector(itemTextScaleFieldChanged(_:))
+        itemTextField.delegate = self
+        let itemTextFormatter = NumberFormatter()
+        itemTextFormatter.numberStyle = .none
+        itemTextFormatter.minimum = 80
+        itemTextFormatter.maximum = 140
+        itemTextFormatter.allowsFloats = false
+        itemTextField.formatter = itemTextFormatter
+        itemTextField.identifier = NSUserInterfaceItemIdentifier("BoardManItemTextScaleField")
+        configureSettingsInputField(itemTextField)
+        contentView.addSubview(itemTextField)
+        itemTextScaleField = itemTextField
+
+        let itemTextDecrease = makeAdjustmentButton(
+            title: "−",
+            action: #selector(adjustItemTextScale(_:)),
+            identifier: "BoardManItemTextScaleDecreaseButton",
+            delta: -1
+        )
+        contentView.addSubview(itemTextDecrease)
+        itemTextScaleDecreaseButton = itemTextDecrease
+
+        let itemTextIncrease = makeAdjustmentButton(
+            title: "+",
+            action: #selector(adjustItemTextScale(_:)),
+            identifier: "BoardManItemTextScaleIncreaseButton",
+            delta: 1
+        )
+        contentView.addSubview(itemTextIncrease)
+        itemTextScaleIncreaseButton = itemTextIncrease
 
         let lighten = NSButton(checkboxWithTitle: boardManText("Lighten"), target: self, action: #selector(themeLightenChanged(_:)))
         lighten.state = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.boardManThemeLighten) ? .on : .off
@@ -6216,6 +6915,8 @@ class BoardManPanel: NSPanel {
             snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetGroupProNoteLabel,
             snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton,
             snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton,
+            appearancePreviewCard, appearanceLayoutCard, appearanceTimestampCard, appearanceUsageCard, appearanceThemeCard,
+            appearanceAdvancedCard, appearancePreviewView, appearanceAdvancedButton,
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, timestampPositionLabel, timestampPositionPopup,
             relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
             relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
@@ -6224,8 +6925,10 @@ class BoardManPanel: NSPanel {
             timestampShortcutDelayLabel, timestampShortcutDelayField, timestampShortcutDelayStepper,
             timestampShortcutDelayDecreaseButton, timestampShortcutDelayIncreaseButton, timestampShortcutSecondsLabel,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup,
+            pinLabelStyleLabel, pinLabelStylePopup, showInlineImagesButton, inlineImagePositionLabel, inlineImagePositionPopup,
             themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup,
-            uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup, themeLightenButton,
+            uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup,
+            itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -6314,6 +7017,48 @@ class BoardManPanel: NSPanel {
         previewBubblePanel?.appearance = appearanceMode.appearance
     }
 
+    private func refreshAppearancePreview() {
+        guard let preview = appearancePreviewView else { return }
+        let defaults = AppEnvironment.current.defaults
+        let showRows = defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true
+        let showCount = defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true
+        let format = BoardManPanel.allowedTimestampFormat(defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat))
+        let timestamp = BoardManPanel.timestampText(
+            for: Int(Date().addingTimeInterval(-4_200).timeIntervalSince1970),
+            format: format == "none" ? "relative" : format
+        )
+        let hasCustomPanelColor = defaults.string(forKey: Constants.UserDefaults.boardManCustomPanelColor) != nil
+        let panelColor: NSColor
+        if uiStyle == .simple {
+            panelColor = NSColor.controlBackgroundColor
+        } else if hasCustomPanelColor {
+            panelColor = customPanelTintColor
+        } else {
+            panelColor = themePreset.surfaceTintColor(
+                useLiquidGlass: isLiquidGlassEnabled,
+                lighten: isThemeLightenEnabled
+            )
+        }
+        let hasCustomUsedColor = defaults.string(forKey: Constants.UserDefaults.boardManCustomUsedColor) != nil
+        let usedColor = hasCustomUsedColor ? customUsedTintColor : NSColor.systemGray
+        let countStyle = BoardManPanel.allowedUsageCountStyle(
+            defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)
+        )
+        preview.update(.init(
+            accentColor: themeAccentColor,
+            panelColor: panelColor,
+            usedColor: usedColor,
+            font: fontChoice.font(ofSize: 10.5 * itemTextScale, weight: .medium),
+            showRows: showRows,
+            showCount: showCount,
+            timestampPosition: timestampPosition,
+            timestampText: timestamp,
+            compactCount: countStyle == "compact",
+            simpleStyle: uiStyle == .simple,
+            uiStyleRawValue: uiStyle.rawValue
+        ))
+    }
+
     private func applyLocalizedStrings() {
         func rebuildPopup(_ popup: NSPopUpButton?, entries: [(raw: String, title: String)], selectedRaw: String) {
             guard let popup else { return }
@@ -6341,6 +7086,33 @@ class BoardManPanel: NSPanel {
         generalSectionLabel?.stringValue = boardManText("General")
         shortcutSectionLabel?.stringValue = boardManText("Keyboard Shortcuts")
         viewSectionLabel?.stringValue = boardManText("Appearance")
+        appearancePreviewCard?.updateText(
+            title: boardManText("Preview"),
+            detail: boardManText("See changes instantly before returning to History.")
+        )
+        appearanceLayoutCard?.updateText(
+            title: boardManText("Layout"),
+            detail: boardManText("Panel size, row structure, and visual density.")
+        )
+        appearanceTimestampCard?.updateText(
+            title: boardManText("Timestamp"),
+            detail: boardManText("Choose how time is formatted and placed.")
+        )
+        appearanceUsageCard?.updateText(
+            title: boardManText("Usage"),
+            detail: boardManText("Paste counts and used-item treatment.")
+        )
+        appearanceThemeCard?.updateText(
+            title: boardManText("Theme & Colors"),
+            detail: boardManText("Theme, mode, typography, and surface style.")
+        )
+        appearanceAdvancedCard?.updateText(
+            title: boardManText("Advanced settings"),
+            detail: boardManText("Relative time details, custom colors, and preview scale.")
+        )
+        appearanceAdvancedButton?.title = boardManText(
+            appearanceAdvancedExpanded ? "Hide advanced settings" : "Show advanced settings"
+        )
         historySectionLabel?.stringValue = boardManText("History")
         snippetSettingsSectionLabel?.stringValue = boardManText("Snippets")
         privacySectionLabel?.stringValue = boardManText("Privacy")
@@ -6364,10 +7136,14 @@ class BoardManPanel: NSPanel {
         usageCountButton?.title = boardManText("Count")
         usageStyleLabel?.stringValue = boardManText("Style")
         usedItemStyleLabel?.stringValue = boardManText("Used")
+        pinLabelStyleLabel?.stringValue = boardManText("Pin label")
+        showInlineImagesButton?.title = boardManText("Images")
+        inlineImagePositionLabel?.stringValue = boardManText("Image side")
         themePresetLabel?.stringValue = boardManText("Theme")
         appearanceModeLabel?.stringValue = boardManText("Mode")
         uiStyleLabel?.stringValue = boardManText("UI")
         fontChoiceLabel?.stringValue = boardManText("Font")
+        itemTextScaleLabel?.stringValue = boardManText("Text size")
         themeLightenButton?.title = boardManText("Lighten")
         heightControlLabel?.stringValue = boardManText("Height")
         customAccentLabel?.stringValue = boardManText("Accent")
@@ -6598,7 +7374,7 @@ class BoardManPanel: NSPanel {
         searchField?.backgroundColor = useGlass
             ? surfaceTint.withAlphaComponent(0.26)
             : NSColor.controlBackgroundColor.withAlphaComponent(0.78)
-        segmentedControl?.needsDisplay = true
+        headerTabBar?.refreshVisualState()
         updateHistorySortButton()
         updateHistoryConditionButton()
         settingsSidebarView?.layer?.backgroundColor = (useGlass
@@ -6619,6 +7395,25 @@ class BoardManPanel: NSPanel {
         settingsBackgroundView?.layer?.borderColor = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme).cgColor
         settingsBackgroundView?.layer?.borderWidth = 1
         settingsBackgroundView?.layer?.shadowOpacity = 0
+        let cardSurface = useGlass
+            ? surfaceTint.withAlphaComponent(simpleStyle ? 0.22 : 0.34)
+            : NSColor.controlBackgroundColor.withAlphaComponent(simpleStyle ? 0.54 : 0.76)
+        let cardEdge = preset.edgeColor(useLiquidGlass: useGlass, lighten: lightenTheme)
+            .withAlphaComponent(simpleStyle ? 0.22 : 0.48)
+        [appearancePreviewCard, appearanceLayoutCard, appearanceTimestampCard,
+         appearanceUsageCard, appearanceThemeCard, appearanceAdvancedCard].forEach { card in
+            card?.applyStyle(
+                accentColor: themePreset == .defaultPreset ? NSColor.secondaryLabelColor : accentColor,
+                surfaceColor: cardSurface,
+                edgeColor: cardEdge,
+                simpleStyle: simpleStyle
+            )
+        }
+        appearancePreviewView?.layer?.backgroundColor = NSColor.clear.cgColor
+        if #available(macOS 10.14, *) {
+            appearanceAdvancedButton?.contentTintColor = themePreset == .defaultPreset ? .secondaryLabelColor : accentColor
+        }
+        refreshAppearancePreview()
         scrollView?.layer?.backgroundColor = (useGlass
             ? surfaceTint.withAlphaComponent(0.30)
             : tintColor).cgColor
@@ -6647,7 +7442,7 @@ class BoardManPanel: NSPanel {
             label?.textColor = themePreset == .defaultPreset ? .labelColor : accentColor
         }
         [languageLabel, maxHistorySizeLabel, statusItemLabel, themePresetLabel, appearanceModeLabel,
-         uiStyleLabel, fontChoiceLabel, timestampLabel, timestampPositionLabel,
+         uiStyleLabel, fontChoiceLabel, itemTextScaleLabel, timestampLabel, timestampPositionLabel,
          relativeNumberLabel, relativeUnitLabel, relativeSuffixLabel, relativeNowLabel,
          timestampInteractionLabel, timestampShortcutLabel, timestampShortcutDelayLabel,
          usageStyleLabel, usedItemStyleLabel, heightControlLabel, customAccentLabel,
@@ -6752,9 +7547,8 @@ class BoardManPanel: NSPanel {
         let gearGap: CGFloat = isCompact ? 8 : 12
         let tabsWidth: CGFloat = isCompact ? 190 : min(250, max(216, floor(width * 0.31)))
         let tabsFrame = NSIntegralRect(NSRect(x: margin, y: headerY, width: tabsWidth, height: 36))
-        segmentedControl?.frame = tabsFrame
-        segmentedControl?.isHidden = isQuickMode
-        updateTabWidths(totalWidth: tabsWidth)
+        headerTabBar?.frame = tabsFrame
+        headerTabBar?.isHidden = isQuickMode
         applyResponsiveTabPresentation(isCompact: isCompact)
         settingsButton?.isHidden = isQuickMode
         settingsButton?.frame = NSIntegralRect(NSRect(
@@ -6805,24 +7599,25 @@ class BoardManPanel: NSPanel {
         historySortButton?.isHidden = !showsHistoryToolbar
         historyConditionButton?.isHidden = !showsHistoryToolbar
         historySavedFilterPopup?.isHidden = !showsHistoryToolbar
-        let historyToolbarY = isQuickMode ? bounds.height - 50 : contentTop - 30
+        let historyToolbarHeight: CGFloat = 30
+        let historyToolbarY = isQuickMode ? bounds.height - 52 : contentTop - 34
         if showsHistoryToolbar {
-            let filterWidth: CGFloat = 114
-            historyUsageFilterControl?.frame = NSRect(x: margin, y: historyToolbarY, width: filterWidth, height: 26)
+            let filterWidth: CGFloat = 118
+            historyUsageFilterControl?.frame = NSIntegralRect(NSRect(x: margin, y: historyToolbarY, width: filterWidth, height: historyToolbarHeight))
             if let filter = historyUsageFilterControl {
                 let segmentWidth = floor(filterWidth / CGFloat(max(1, filter.segmentCount)))
                 for segment in 0..<filter.segmentCount {
                     filter.setWidth(segmentWidth, forSegment: segment)
                 }
             }
-            historySortButton?.frame = NSRect(x: margin + filterWidth + 8, y: historyToolbarY, width: 32, height: 26)
-            historyConditionButton?.frame = NSRect(x: margin + filterWidth + 48, y: historyToolbarY, width: 32, height: 26)
-            let savedFilterX = margin + filterWidth + 88
+            historySortButton?.frame = NSIntegralRect(NSRect(x: margin + filterWidth + 10, y: historyToolbarY, width: 34, height: historyToolbarHeight))
+            historyConditionButton?.frame = NSIntegralRect(NSRect(x: margin + filterWidth + 54, y: historyToolbarY, width: 34, height: historyToolbarHeight))
+            let savedFilterX = margin + filterWidth + 100
             historySavedFilterPopup?.frame = NSIntegralRect(NSRect(
                 x: savedFilterX,
                 y: historyToolbarY,
                 width: max(140, min(isCompact ? 166 : 220, margin + width - savedFilterX)),
-                height: 26
+                height: historyToolbarHeight
             ))
         }
 
@@ -6844,7 +7639,10 @@ class BoardManPanel: NSPanel {
         settingsBackgroundView?.frame = settingsFrame
         settingsScrollView?.isHidden = !isSettings
         settingsScrollView?.frame = settingsFrame
-        let documentHeight = settingsDocumentHeight(viewportHeight: settingsViewportHeight)
+        let documentHeight = settingsDocumentHeight(
+            viewportHeight: settingsViewportHeight,
+            contentWidth: settingsContentWidth
+        )
         settingsDocumentView?.frame = NSRect(x: 0, y: 0, width: settingsContentWidth, height: documentHeight)
         layoutInlineSettingsControls(margin: 0, width: settingsContentWidth, topY: documentHeight, isVisible: isSettings)
         if isSettings, shouldScrollSettingsToTop, let scroll = settingsScrollView {
@@ -6863,7 +7661,7 @@ class BoardManPanel: NSPanel {
         if showsSnippetCategories {
             listTop = snippetInteractionRowY - 12
         } else if showsHistoryToolbar {
-            listTop = historyToolbarY - 12
+            listTop = historyToolbarY - 16
         } else {
             listTop = contentTop
         }
@@ -7043,30 +7841,34 @@ class BoardManPanel: NSPanel {
     }
 
     private func applyResponsiveTabPresentation(isCompact: Bool) {
-        guard let segmentedControl else { return }
-        segmentedControl.font = NSFont.systemFont(
+        guard let headerTabBar else { return }
+        headerTabBar.setFont(NSFont.systemFont(
             ofSize: isCompact ? 11.25 : 12.5,
             weight: .medium
-        )
+        ))
         for tab in [BoardManPanelTab.history, BoardManPanelTab.snippets] {
-            segmentedControl.setLabel(tab.title(compact: isCompact), forSegment: tab.rawValue)
-            segmentedControl.setToolTip(tab.title, forSegment: tab.rawValue)
+            let symbolName = tab == .history ? "clock.arrow.circlepath" : "text.badge.plus"
+            headerTabBar.configureTab(
+                index: tab.rawValue,
+                title: tab.title(compact: isCompact),
+                toolTip: tab.title,
+                image: NSImage(systemSymbolName: symbolName, accessibilityDescription: tab.title)
+            )
         }
     }
 
-    private func updateTabWidths(totalWidth: CGFloat) {
-        guard let segmentedControl, segmentedControl.segmentCount > 0 else { return }
-        let segmentWidth = max(72, floor(totalWidth / CGFloat(segmentedControl.segmentCount)))
-        for segment in 0..<segmentedControl.segmentCount {
-            segmentedControl.setWidth(segmentWidth, forSegment: segment)
-        }
-    }
-
-    private func settingsDocumentHeight(viewportHeight: CGFloat) -> CGFloat {
+    private func settingsDocumentHeight(viewportHeight: CGFloat, contentWidth: CGFloat) -> CGFloat {
+        let appearanceContentWidth = max(240, contentWidth - (LayoutMetrics.settingsInset * 2))
+        let stacksAppearanceCards = Self.usesStackedAppearanceSettingsLayout(width: appearanceContentWidth)
         let requiredHeight: CGFloat
         switch activeSettingsCategory {
         case .general: requiredHeight = 790
-        case .view: requiredHeight = 760
+        case .view:
+            if stacksAppearanceCards {
+                requiredHeight = appearanceAdvancedExpanded ? 1_720 : 1_360
+            } else {
+                requiredHeight = appearanceAdvancedExpanded ? 1_280 : 1_020
+            }
         case .history: requiredHeight = 730
         case .snippets: requiredHeight = 640
         case .privacy: requiredHeight = 690
@@ -7122,6 +7924,8 @@ class BoardManPanel: NSPanel {
             snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetGroupProNoteLabel,
             snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton,
             snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton,
+            appearancePreviewCard, appearanceLayoutCard, appearanceTimestampCard, appearanceUsageCard, appearanceThemeCard,
+            appearanceAdvancedCard, appearancePreviewView, appearanceAdvancedButton,
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup, timestampPositionLabel, timestampPositionPopup,
             relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
             relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
@@ -7130,8 +7934,10 @@ class BoardManPanel: NSPanel {
             timestampShortcutDelayLabel, timestampShortcutDelayField, timestampShortcutDelayStepper,
             timestampShortcutDelayDecreaseButton, timestampShortcutDelayIncreaseButton, timestampShortcutSecondsLabel,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup,
+            pinLabelStyleLabel, pinLabelStylePopup, showInlineImagesButton, inlineImagePositionLabel, inlineImagePositionPopup,
             themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup,
-            uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup, themeLightenButton,
+            uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup,
+            itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -7184,14 +7990,18 @@ class BoardManPanel: NSPanel {
         ]
         generalControls.append(contentsOf: globalShortcutRows.flatMap { $0.views }.map { Optional($0) })
         let viewControls: [NSView?] = [
+            appearancePreviewCard, appearanceLayoutCard, appearanceTimestampCard, appearanceUsageCard, appearanceThemeCard,
+            appearanceAdvancedCard, appearancePreviewView, appearanceAdvancedButton,
             viewSectionLabel, rowNumbersButton, timestampLabel, timestampPopup,
             timestampPositionLabel, timestampPositionPopup,
             relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
             relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel,
-            usedItemStylePopup, themePresetLabel, themePresetPopup,
+            usedItemStylePopup, pinLabelStyleLabel, pinLabelStylePopup, showInlineImagesButton,
+            inlineImagePositionLabel, inlineImagePositionPopup, themePresetLabel, themePresetPopup,
             appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup,
-            fontChoiceLabel, fontChoicePopup, themeLightenButton,
+            fontChoiceLabel, fontChoicePopup,
+            itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
@@ -7282,58 +8092,311 @@ class BoardManPanel: NSPanel {
         }
 
         func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(viewSectionLabel, originX: originX, originY: originY, width: width)
-            let columnGap = LayoutMetrics.settingsColumnGap
-            let halfWidth = max(180, floor((width - columnGap) / 2))
-            let rightX = originX + halfWidth + columnGap
-            let compactLabelWidth: CGFloat = 72
+            viewSectionLabel?.isHidden = true
+            let cardGap: CGFloat = 14
+            let columnGap: CGFloat = 14
+            let stacksCards = Self.usesStackedAppearanceSettingsLayout(width: width)
+            let halfWidth = stacksCards ? width : max(188, floor((width - columnGap) / 2))
+            let rightX = stacksCards ? originX : originX + halfWidth + columnGap
+            let compactLabelWidth: CGFloat = stacksCards ? 82 : 64
+            let cardInset: CGFloat = 16
 
-            rowNumbersButton?.frame = NSRect(x: originX, y: originY - 40, width: halfWidth, height: 20)
-            usageCountButton?.frame = NSRect(x: rightX, y: originY - 40, width: halfWidth, height: 20)
-            placeLabeledRow(label: timestampLabel, control: timestampPopup, originX: originX, originY: originY - 84, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: timestampPositionLabel, control: timestampPositionPopup, originX: rightX, originY: originY - 84, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeNumberLabel, control: relativeNumberPopup, originX: originX, originY: originY - 122, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeUnitLabel, control: relativeUnitPopup, originX: rightX, originY: originY - 122, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeSuffixLabel, control: relativeSuffixPopup, originX: originX, originY: originY - 160, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeNowLabel, control: relativeNowPopup, originX: rightX, originY: originY - 160, width: halfWidth, labelWidth: compactLabelWidth)
+            let advancedControls: [NSView?] = [
+                relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
+                relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
+                customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
+                customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
+                customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider, resetCustomColorsButton,
+                textPreviewScaleLabel, textPreviewScaleSlider, textPreviewScaleValueLabel,
+                imagePreviewScaleLabel, imagePreviewScaleSlider, imagePreviewScaleValueLabel, previewScaleProNoteLabel
+            ]
 
-            placeLabeledRow(label: usageStyleLabel, control: usageStylePopup, originX: originX, originY: originY - 198, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: usedItemStyleLabel, control: usedItemStylePopup, originX: rightX, originY: originY - 198, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: themePresetLabel, control: themePresetPopup, originX: originX, originY: originY - 236, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: appearanceModeLabel, control: appearanceModePopup, originX: rightX, originY: originY - 236, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: uiStyleLabel, control: uiStylePopup, originX: originX, originY: originY - 274, width: halfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: fontChoiceLabel, control: fontChoicePopup, originX: rightX, originY: originY - 274, width: halfWidth, labelWidth: compactLabelWidth)
+            let previewHeight: CGFloat = 172
+            let previewY = originY - previewHeight
+            let previewInset: CGFloat = 22
+            appearancePreviewCard?.frame = NSIntegralRect(NSRect(x: originX, y: previewY, width: width, height: previewHeight))
+            appearancePreviewCard?.needsLayout = true
+            appearancePreviewView?.frame = NSIntegralRect(NSRect(
+                x: originX + previewInset,
+                y: previewY + 18,
+                width: max(160, width - (previewInset * 2)),
+                height: previewHeight - 70
+            ))
 
-            themeLightenButton?.frame = NSRect(x: originX, y: originY - 312, width: 128, height: 20)
-            heightControlLabel?.frame = NSRect(x: originX + 144, y: originY - 312, width: fieldLabelWidth, height: 16)
-            let heightControlX = originX + 144 + fieldLabelWidth + 12
-            heightDecreaseButton?.frame = NSRect(x: heightControlX, y: originY - 319, width: 30, height: rowH)
-            heightLabel?.frame = NSRect(x: heightControlX + 36, y: originY - 319, width: 64, height: rowH)
-            heightIncreaseButton?.frame = NSRect(x: heightControlX + 106, y: originY - 319, width: 30, height: rowH)
+            let layoutCardHeight: CGFloat = stacksCards ? 218 : 218
+            let timestampCardHeight: CGFloat = layoutCardHeight
+            let layoutCardY = previewY - cardGap - layoutCardHeight
+            let timestampCardY = stacksCards
+                ? layoutCardY - cardGap - timestampCardHeight
+                : layoutCardY
+            appearanceLayoutCard?.frame = NSIntegralRect(NSRect(
+                x: originX,
+                y: layoutCardY,
+                width: halfWidth,
+                height: layoutCardHeight
+            ))
+            appearanceTimestampCard?.frame = NSIntegralRect(NSRect(
+                x: rightX,
+                y: timestampCardY,
+                width: halfWidth,
+                height: timestampCardHeight
+            ))
+            appearanceLayoutCard?.needsLayout = true
+            appearanceTimestampCard?.needsLayout = true
+
+            let layoutX = originX + cardInset
+            let layoutWidth = halfWidth - (cardInset * 2)
+            rowNumbersButton?.frame = NSIntegralRect(NSRect(
+                x: layoutX,
+                y: layoutCardY + layoutCardHeight - 72,
+                width: layoutWidth,
+                height: 20
+            ))
+            placeLabeledRow(
+                label: uiStyleLabel,
+                control: uiStylePopup,
+                originX: layoutX,
+                originY: layoutCardY + layoutCardHeight - 112,
+                width: layoutWidth,
+                labelWidth: compactLabelWidth
+            )
+            let textScaleY = layoutCardY + layoutCardHeight - 154
+            itemTextScaleLabel?.frame = NSIntegralRect(NSRect(
+                x: layoutX,
+                y: textScaleY + 7,
+                width: compactLabelWidth,
+                height: 16
+            ))
+            let textScaleControlX = layoutX + compactLabelWidth + 12
+            let textScaleValueWidth: CGFloat = max(52, min(58, layoutWidth - compactLabelWidth - 94))
+            itemTextScaleDecreaseButton?.frame = NSIntegralRect(NSRect(
+                x: textScaleControlX,
+                y: textScaleY,
+                width: 28,
+                height: rowH
+            ))
+            itemTextScaleField?.frame = NSIntegralRect(NSRect(
+                x: textScaleControlX + 34,
+                y: textScaleY,
+                width: textScaleValueWidth,
+                height: rowH
+            ))
+            itemTextScaleIncreaseButton?.frame = NSIntegralRect(NSRect(
+                x: textScaleControlX + 40 + textScaleValueWidth,
+                y: textScaleY,
+                width: 28,
+                height: rowH
+            ))
+            heightControlLabel?.frame = NSIntegralRect(NSRect(
+                x: layoutX,
+                y: layoutCardY + 19,
+                width: compactLabelWidth,
+                height: 16
+            ))
+            let heightControlX = layoutX + compactLabelWidth + 12
+            let heightValueWidth: CGFloat = max(52, min(68, layoutWidth - compactLabelWidth - 94))
+            heightDecreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX, y: layoutCardY + 12, width: 28, height: rowH))
+            heightLabel?.frame = NSIntegralRect(NSRect(x: heightControlX + 34, y: layoutCardY + 12, width: heightValueWidth, height: rowH))
+            heightIncreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX + 40 + heightValueWidth, y: layoutCardY + 12, width: 28, height: rowH))
+
+            let timestampX = rightX + cardInset
+            let timestampWidth = halfWidth - (cardInset * 2)
+            placeLabeledRow(
+                label: timestampLabel,
+                control: timestampPopup,
+                originX: timestampX,
+                originY: timestampCardY + timestampCardHeight - 86,
+                width: timestampWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: timestampPositionLabel,
+                control: timestampPositionPopup,
+                originX: timestampX,
+                originY: timestampCardY + timestampCardHeight - 126,
+                width: timestampWidth,
+                labelWidth: compactLabelWidth
+            )
+
+            let usageCardHeight: CGFloat = 292
+            let themeCardHeight: CGFloat = 292
+            let usageCardY = (stacksCards ? timestampCardY : layoutCardY) - cardGap - usageCardHeight
+            let themeCardY = stacksCards
+                ? usageCardY - cardGap - themeCardHeight
+                : usageCardY
+            appearanceUsageCard?.frame = NSIntegralRect(NSRect(
+                x: originX,
+                y: usageCardY,
+                width: halfWidth,
+                height: usageCardHeight
+            ))
+            appearanceThemeCard?.frame = NSIntegralRect(NSRect(
+                x: rightX,
+                y: themeCardY,
+                width: halfWidth,
+                height: themeCardHeight
+            ))
+            appearanceUsageCard?.needsLayout = true
+            appearanceThemeCard?.needsLayout = true
+
+            let usageX = originX + cardInset
+            let usageWidth = halfWidth - (cardInset * 2)
+            usageCountButton?.frame = NSIntegralRect(NSRect(
+                x: usageX,
+                y: usageCardY + usageCardHeight - 74,
+                width: usageWidth,
+                height: 20
+            ))
+            placeLabeledRow(
+                label: usageStyleLabel,
+                control: usageStylePopup,
+                originX: usageX,
+                originY: usageCardY + usageCardHeight - 116,
+                width: usageWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: usedItemStyleLabel,
+                control: usedItemStylePopup,
+                originX: usageX,
+                originY: usageCardY + usageCardHeight - 156,
+                width: usageWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: pinLabelStyleLabel,
+                control: pinLabelStylePopup,
+                originX: usageX,
+                originY: usageCardY + usageCardHeight - 196,
+                width: usageWidth,
+                labelWidth: compactLabelWidth
+            )
+            showInlineImagesButton?.frame = NSIntegralRect(NSRect(
+                x: usageX,
+                y: usageCardY + usageCardHeight - 228,
+                width: usageWidth,
+                height: 20
+            ))
+            placeLabeledRow(
+                label: inlineImagePositionLabel,
+                control: inlineImagePositionPopup,
+                originX: usageX,
+                originY: usageCardY + 18,
+                width: usageWidth,
+                labelWidth: compactLabelWidth
+            )
+            inlineImagePositionPopup?.isEnabled = showInlineImagesButton?.state == .on
+
+            let themeX = rightX + cardInset
+            let themeWidth = halfWidth - (cardInset * 2)
+            placeLabeledRow(
+                label: themePresetLabel,
+                control: themePresetPopup,
+                originX: themeX,
+                originY: themeCardY + themeCardHeight - 78,
+                width: themeWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: appearanceModeLabel,
+                control: appearanceModePopup,
+                originX: themeX,
+                originY: themeCardY + themeCardHeight - 118,
+                width: themeWidth,
+                labelWidth: compactLabelWidth
+            )
+            placeLabeledRow(
+                label: fontChoiceLabel,
+                control: fontChoicePopup,
+                originX: themeX,
+                originY: themeCardY + themeCardHeight - 158,
+                width: themeWidth,
+                labelWidth: compactLabelWidth
+            )
+            themeLightenButton?.frame = NSIntegralRect(NSRect(
+                x: themeX,
+                y: themeCardY + 15,
+                width: themeWidth,
+                height: 20
+            ))
+
+            let toggleY = (stacksCards ? themeCardY : usageCardY) - 36
+            appearanceAdvancedButton?.frame = NSIntegralRect(NSRect(x: originX, y: toggleY, width: min(210, width), height: 26))
+            appearanceAdvancedButton?.title = boardManText(
+                appearanceAdvancedExpanded ? "Hide advanced settings" : "Show advanced settings"
+            )
+            appearanceAdvancedButton?.image = NSImage(
+                systemSymbolName: appearanceAdvancedExpanded ? "chevron.down" : "chevron.right",
+                accessibilityDescription: nil
+            )
+
+            guard appearanceAdvancedExpanded else {
+                appearanceAdvancedCard?.isHidden = true
+                advancedControls.forEach { $0?.isHidden = true }
+                refreshAppearancePreview()
+                return
+            }
+
+            appearanceAdvancedCard?.isHidden = false
+            advancedControls.forEach { $0?.isHidden = false }
+            let advancedHeight: CGFloat = 350
+            let advancedY = toggleY - cardGap - advancedHeight
+            appearanceAdvancedCard?.frame = NSIntegralRect(NSRect(x: originX, y: advancedY, width: width, height: advancedHeight))
+            appearanceAdvancedCard?.needsLayout = true
+
+            let advancedX = originX + cardInset
+            let advancedWidth = width - (cardInset * 2)
+            let advancedHalfWidth = max(180, floor((advancedWidth - columnGap) / 2))
+            let advancedRightX = advancedX + advancedHalfWidth + columnGap
+            placeLabeledRow(label: relativeNumberLabel, control: relativeNumberPopup,
+                            originX: advancedX, originY: advancedY + advancedHeight - 92,
+                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: relativeUnitLabel, control: relativeUnitPopup,
+                            originX: advancedRightX, originY: advancedY + advancedHeight - 92,
+                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: relativeSuffixLabel, control: relativeSuffixPopup,
+                            originX: advancedX, originY: advancedY + advancedHeight - 132,
+                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
+            placeLabeledRow(label: relativeNowLabel, control: relativeNowPopup,
+                            originX: advancedRightX, originY: advancedY + advancedHeight - 132,
+                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
 
             func placeColorRow(label: NSTextField?, well: NSColorWell?, slider: NSSlider?, originX: CGFloat, originY: CGFloat, rowWidth: CGFloat) {
-                let labelWidth: CGFloat = min(78, max(56, floor(rowWidth * 0.28)))
-                let wellWidth: CGFloat = 42
-                label?.frame = NSRect(x: originX, y: originY + 5, width: labelWidth, height: 16)
-                well?.frame = NSRect(x: originX + labelWidth + 8, y: originY, width: wellWidth, height: rowH)
-                slider?.frame = NSRect(x: originX + labelWidth + wellWidth + 18, y: originY + 2, width: max(44, rowWidth - labelWidth - wellWidth - 18), height: 24)
+                let labelWidth: CGFloat = min(78, max(58, floor(rowWidth * 0.27)))
+                let wellWidth: CGFloat = 40
+                label?.frame = NSIntegralRect(NSRect(x: originX, y: originY + 6, width: labelWidth, height: 16))
+                well?.frame = NSIntegralRect(NSRect(x: originX + labelWidth + 8, y: originY, width: wellWidth, height: rowH))
+                slider?.frame = NSIntegralRect(NSRect(
+                    x: originX + labelWidth + wellWidth + 18,
+                    y: originY + 3,
+                    width: max(42, rowWidth - labelWidth - wellWidth - 18),
+                    height: 24
+                ))
             }
             placeColorRow(label: customAccentLabel, well: customAccentColorWell, slider: customAccentOpacitySlider,
-                          originX: originX, originY: originY - 350, rowWidth: halfWidth)
+                          originX: advancedX, originY: advancedY + advancedHeight - 180, rowWidth: advancedHalfWidth)
             placeColorRow(label: customPanelLabel, well: customPanelColorWell, slider: customPanelOpacitySlider,
-                          originX: rightX, originY: originY - 350, rowWidth: halfWidth)
+                          originX: advancedRightX, originY: advancedY + advancedHeight - 180, rowWidth: advancedHalfWidth)
             placeColorRow(label: customUsedColorLabel, well: customUsedColorWell, slider: customUsedOpacitySlider,
-                          originX: originX, originY: originY - 390, rowWidth: halfWidth)
-            resetCustomColorsButton?.frame = NSRect(x: rightX, y: originY - 392, width: min(150, halfWidth), height: LayoutMetrics.actionButtonHeight)
+                          originX: advancedX, originY: advancedY + advancedHeight - 220, rowWidth: advancedHalfWidth)
+            resetCustomColorsButton?.frame = NSIntegralRect(NSRect(
+                x: advancedRightX,
+                y: advancedY + advancedHeight - 222,
+                width: min(150, advancedHalfWidth),
+                height: LayoutMetrics.actionButtonHeight
+            ))
 
             func placePreviewScaleRow(label: NSTextField?, slider: NSSlider?, value: NSTextField?, rowY: CGFloat) {
-                label?.frame = NSRect(x: originX, y: rowY + 7, width: 116, height: 16)
-                slider?.frame = NSRect(x: originX + 128, y: rowY + 2, width: max(120, width - 208), height: 24)
-                value?.frame = NSRect(x: originX + width - 68, y: rowY, width: 68, height: rowH)
+                label?.frame = NSIntegralRect(NSRect(x: advancedX, y: rowY + 7, width: 104, height: 16))
+                slider?.frame = NSIntegralRect(NSRect(x: advancedX + 116, y: rowY + 3, width: max(120, advancedWidth - 192), height: 24))
+                value?.frame = NSIntegralRect(NSRect(x: advancedX + advancedWidth - 64, y: rowY, width: 64, height: rowH))
             }
-            placePreviewScaleRow(label: textPreviewScaleLabel, slider: textPreviewScaleSlider, value: textPreviewScaleValueLabel, rowY: originY - 434)
-            placePreviewScaleRow(label: imagePreviewScaleLabel, slider: imagePreviewScaleSlider, value: imagePreviewScaleValueLabel, rowY: originY - 474)
-            previewScaleProNoteLabel?.frame = NSRect(x: originX, y: originY - 514, width: width, height: 34)
+            placePreviewScaleRow(label: textPreviewScaleLabel, slider: textPreviewScaleSlider,
+                                 value: textPreviewScaleValueLabel, rowY: advancedY + 74)
+            placePreviewScaleRow(label: imagePreviewScaleLabel, slider: imagePreviewScaleSlider,
+                                 value: imagePreviewScaleValueLabel, rowY: advancedY + 34)
+            previewScaleProNoteLabel?.frame = NSIntegralRect(NSRect(x: advancedX, y: advancedY + 4, width: advancedWidth, height: 28))
+            refreshAppearancePreview()
         }
 
         func placeHistorySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -7968,6 +9031,17 @@ class BoardManPanel: NSPanel {
         }
     }
 
+    @objc private func toggleAppearanceAdvancedSettings(_ sender: NSButton) {
+        appearanceAdvancedExpanded.toggle()
+        shouldScrollSettingsToTop = false
+        sender.title = boardManText(appearanceAdvancedExpanded ? "Hide advanced settings" : "Show advanced settings")
+        sender.image = NSImage(
+            systemSymbolName: appearanceAdvancedExpanded ? "chevron.down" : "chevron.right",
+            accessibilityDescription: nil
+        )
+        layoutPanelSubviews()
+    }
+
     @objc private func previewScaleChanged(_ sender: NSSlider) {
         guard isProEntitled else {
             sender.integerValue = 100
@@ -7986,11 +9060,13 @@ class BoardManPanel: NSPanel {
             textPreviewScaleValueLabel?.stringValue = "\(value)%"
         }
         hidePreviewBubble()
+        refreshAppearancePreview()
     }
 
     @objc private func rowNumbersChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowRowNumbers)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func timestampFormatChanged(_ sender: NSPopUpButton) {
@@ -7998,30 +9074,35 @@ class BoardManPanel: NSPanel {
         let value = BoardManPanel.timestampFormat(forMenuTitle: selectedRaw)
         AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.boardManTimestampFormat)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func relativeNumberStyleChanged(_ sender: NSPopUpButton) {
         let style = BoardManRelativeNumberStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeNumberStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func relativeUnitStyleChanged(_ sender: NSPopUpButton) {
         let style = BoardManRelativeUnitStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeUnitStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func relativeSuffixStyleChanged(_ sender: NSPopUpButton) {
         let style = BoardManRelativeSuffixStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeSuffixStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func relativeNowStyleChanged(_ sender: NSPopUpButton) {
         let style = BoardManRelativeNowStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeNowStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func timestampShortcutEnabledChanged(_ sender: NSButton) {
@@ -8075,11 +9156,13 @@ class BoardManPanel: NSPanel {
             }
         }
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func usageCountChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowUsageCount)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func usageStyleChanged(_ sender: NSPopUpButton) {
@@ -8087,12 +9170,37 @@ class BoardManPanel: NSPanel {
         AppEnvironment.current.defaults.set(BoardManPanel.allowedUsageCountStyle(selectedRaw),
                                             forKey: Constants.UserDefaults.boardManUsageCountStyle)
         onRefreshRequested?()
+        refreshAppearancePreview()
     }
 
     @objc private func usedItemStyleChanged(_ sender: NSPopUpButton) {
         let selectedRaw = sender.selectedItem?.representedObject as? String ?? sender.titleOfSelectedItem
         AppEnvironment.current.defaults.set(BoardManPanel.allowedUsedItemStyle(selectedRaw),
                                             forKey: Constants.UserDefaults.boardManUsedItemStyle)
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+        refreshAppearancePreview()
+    }
+
+    @objc private func pinLabelStyleChanged(_ sender: NSPopUpButton) {
+        let rawValue = sender.selectedItem?.representedObject as? String ?? sender.titleOfSelectedItem
+        let style = BoardManPinLabelStyle.allowed(rawValue)
+        AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManPinLabelStyle)
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+    }
+
+    @objc private func showInlineImagesChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowInlineImages)
+        inlineImagePositionPopup?.isEnabled = sender.state == .on
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+    }
+
+    @objc private func inlineImagePositionChanged(_ sender: NSPopUpButton) {
+        let rawValue = sender.selectedItem?.representedObject as? String ?? sender.titleOfSelectedItem
+        let position = BoardManInlineImagePosition.allowed(rawValue)
+        AppEnvironment.current.defaults.set(position.rawValue, forKey: Constants.UserDefaults.boardManInlineImagePosition)
         placeholderList?.reloadData()
         synchronizeListGeometry()
     }
@@ -8135,7 +9243,28 @@ class BoardManPanel: NSPanel {
         layoutPanelSubviews()
         placeholderList?.reloadData()
         synchronizeListGeometry()
+        refreshAppearancePreview()
         contentView?.needsDisplay = true
+    }
+
+    private func applyItemTextScale(_ rawValue: Int) {
+        let value = Self.clampedItemTextScale(rawValue)
+        itemTextScaleField?.integerValue = value
+        AppEnvironment.current.defaults.set(value, forKey: Constants.UserDefaults.boardManItemTextScale)
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+        refreshAppearancePreview()
+    }
+
+    @objc private func itemTextScaleFieldChanged(_ sender: NSTextField) {
+        applyItemTextScale(sender.integerValue)
+    }
+
+    @objc private func adjustItemTextScale(_ sender: NSButton) {
+        let current = itemTextScaleField?.integerValue ?? Self.clampedItemTextScale(
+            AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        )
+        applyItemTextScale(current + (sender.tag * 5))
     }
 
     @objc private func themeLightenChanged(_ sender: NSButton) {
@@ -8254,7 +9383,7 @@ class BoardManPanel: NSPanel {
         imagePreviewScaleSlider?.integerValue = storedImageScale
         textPreviewScaleValueLabel?.stringValue = "\(storedTextScale)%"
         imagePreviewScaleValueLabel?.stringValue = "\(storedImageScale)%"
-        previewScaleProNoteLabel?.isHidden = pro || activeSettingsCategory != .view || activeTab != .settings
+        previewScaleProNoteLabel?.isHidden = pro || !appearanceAdvancedExpanded || activeSettingsCategory != .view || activeTab != .settings
 
         [snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton].forEach {
             setControlTree($0, enabled: pro, alpha: proAlpha)
@@ -8485,7 +9614,14 @@ class BoardManPanel: NSPanel {
                 isSelected: activeSnippetGroupIdentifiers.contains(BoardManPanel.uncategorizedCategoryIdentifier)
             )
         }
-        popup.selectItem(at: 0)
+        if activeSnippetGroupIdentifiers.isEmpty,
+           let allItem = popup.itemArray.first(where: {
+               ($0.representedObject as? String) == BoardManPanel.allCategoriesIdentifier
+           }) {
+            popup.select(allItem)
+        } else {
+            popup.selectItem(at: 0)
+        }
         popup.toolTip = activeSnippetGroupIdentifiers.isEmpty
             ? boardManText("All Groups")
             : activeSnippetGroupIdentifiers.sorted().joined(separator: ", ")
@@ -8680,6 +9816,7 @@ class BoardManPanel: NSPanel {
         let title = normalizedSnippetTitle(sender.stringValue)
         sender.stringValue = title
         Self.persistSnippetTitle(title, snippet: snippet, realm: realm)
+        syncLinkedHistoryDisplayName(snippetIdentifier: snippet.identifier, title: title)
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: snippet.identifier)
         snippetEditorStatusLabel?.stringValue = boardManText("Saved")
@@ -8735,8 +9872,9 @@ class BoardManPanel: NSPanel {
         let savedFolder = editorFolder().flatMap {
             realm.object(ofType: CPYFolder.self, forPrimaryKey: $0.identifier)
         }
+        let savedTitle = normalizedSnippetTitle(snippetEditorTitleField?.stringValue ?? "")
         Self.persistSnippetDraft(
-            title: normalizedSnippetTitle(snippetEditorTitleField?.stringValue ?? ""),
+            title: savedTitle,
             content: content,
             snippetEnabled: snippetEnableButton?.state == .on,
             folderEnabled: snippetFolderEnableButton?.state == .on,
@@ -8745,6 +9883,7 @@ class BoardManPanel: NSPanel {
             folder: savedFolder,
             realm: realm
         )
+        syncLinkedHistoryDisplayName(snippetIdentifier: snippet.identifier, title: savedTitle)
         isSnippetEditing = false
         editingSnippetIdentifier = nil
         onRefreshRequested?()
@@ -8805,6 +9944,7 @@ class BoardManPanel: NSPanel {
         }
         PinnedSnippetStore.shared.remove(identifier)
         BoardManMaskedItemStore.shared.remove([identifier])
+        HistorySnippetLinkStore.shared.unlinkSnippet(identifier)
         selectedIndex = -1
         onRefreshRequested?()
         refreshSnippetEditor()
@@ -9028,11 +10168,6 @@ class BoardManPanel: NSPanel {
         applyPanelHeight(current + (sender.tag * 40))
     }
 
-    @objc private func tabChanged(_ sender: NSSegmentedControl) {
-        let tab: BoardManPanelTab = sender.selectedSegment == BoardManPanelTab.snippets.rawValue ? .snippets : .history
-        activateTab(tab)
-    }
-
     @objc private func settingsButtonPressed(_ sender: NSButton) {
         activateTab(.settings)
     }
@@ -9055,7 +10190,7 @@ class BoardManPanel: NSPanel {
             _ = makeFirstResponder(nil)
         }
         activeTab = tab
-        segmentedControl?.selectedSegment = tab == .settings ? -1 : tab.rawValue
+        headerTabBar?.setSelectedIndex(tab == .settings ? -1 : tab.rawValue)
         if tab == .settings {
             shouldScrollSettingsToTop = true
         }
@@ -10040,7 +11175,11 @@ class BoardManPanel: NSPanel {
                         let title = folder.title.trimmingCharacters(in: .whitespacesAndNewlines)
                         let groupItem = NSMenuItem(title: title.isEmpty ? boardManText("Untitled folder") : title, action: #selector(addHistoryItemToSnippetGroup(_:)), keyEquivalent: "")
                         groupItem.target = self
-                        groupItem.representedObject = ["content": item.previewTitle, "folder": folder.identifier]
+                        groupItem.representedObject = [
+                            "content": item.previewTitle,
+                            "folder": folder.identifier,
+                            "history": item.dataHash
+                        ]
                         groupMenu.addItem(groupItem)
                     }
                     if !folders.isEmpty {
@@ -10049,7 +11188,11 @@ class BoardManPanel: NSPanel {
                 }
                 let uncategorizedItem = NSMenuItem(title: boardManText("Uncategorized"), action: #selector(addHistoryItemToSnippetGroup(_:)), keyEquivalent: "")
                 uncategorizedItem.target = self
-                uncategorizedItem.representedObject = ["content": item.previewTitle, "folder": BoardManPanel.uncategorizedCategoryIdentifier]
+                uncategorizedItem.representedObject = [
+                    "content": item.previewTitle,
+                    "folder": BoardManPanel.uncategorizedCategoryIdentifier,
+                    "history": item.dataHash
+                ]
                 groupMenu.addItem(uncategorizedItem)
                 addToSnippetsItem.submenu = groupMenu
                 menu.addItem(addToSnippetsItem)
@@ -10170,6 +11313,37 @@ class BoardManPanel: NSPanel {
         _ = copyItemToClipboard(item)
     }
 
+    private func syncLinkedSnippetTitles(historyIdentifier: String, title: String) {
+        let linkedSnippetIdentifiers = HistorySnippetLinkStore.shared.snippetIdentifiers(forHistory: historyIdentifier)
+        guard !linkedSnippetIdentifiers.isEmpty else { return }
+        let normalizedTitle = normalizedSnippetTitle(title)
+        let realm = try! Realm()
+        let snippets = linkedSnippetIdentifiers.compactMap {
+            realm.object(ofType: CPYSnippet.self, forPrimaryKey: $0)
+        }
+        guard !snippets.isEmpty else { return }
+        realm.transaction {
+            snippets.forEach { $0.title = normalizedTitle }
+        }
+    }
+
+    private func syncLinkedHistoryDisplayName(snippetIdentifier: String, title: String) {
+        guard let historyIdentifier = HistorySnippetLinkStore.shared.historyIdentifier(forSnippet: snippetIdentifier) else {
+            return
+        }
+        HistoryDisplayNameStore.shared.setName(title, for: historyIdentifier)
+        syncLinkedSnippetTitles(historyIdentifier: historyIdentifier, title: title)
+    }
+
+    private func defaultSnippetTitle(forHistoryIdentifier identifier: String) -> String? {
+        let realm = try! Realm()
+        guard let clip = realm.object(ofType: CPYClip.self, forPrimaryKey: identifier) else { return nil }
+        let rawTitle = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawTitle.isEmpty else { return nil }
+        let firstLine = rawTitle.components(separatedBy: .newlines).first ?? rawTitle
+        return normalizedSnippetTitle(String(firstLine.prefix(80)))
+    }
+
     @objc private func setHistoryDisplayNameFromMenu(_ sender: NSMenuItem) {
         guard let identifier = sender.representedObject as? String else { return }
         let currentName = HistoryDisplayNameStore.shared.name(for: identifier) ?? ""
@@ -10189,6 +11363,7 @@ class BoardManPanel: NSPanel {
             return
         }
         HistoryDisplayNameStore.shared.setName(trimmed, for: identifier)
+        syncLinkedSnippetTitles(historyIdentifier: identifier, title: trimmed)
         onRefreshRequested?()
     }
 
@@ -10202,6 +11377,9 @@ class BoardManPanel: NSPanel {
     @objc private func removeHistoryDisplayNameFromMenu(_ sender: NSMenuItem) {
         guard let identifier = sender.representedObject as? String else { return }
         HistoryDisplayNameStore.shared.setName("", for: identifier)
+        if let fallbackTitle = defaultSnippetTitle(forHistoryIdentifier: identifier) {
+            syncLinkedSnippetTitles(historyIdentifier: identifier, title: fallbackTitle)
+        }
         onRefreshRequested?()
     }
 
@@ -10209,6 +11387,7 @@ class BoardManPanel: NSPanel {
         guard let context = sender.representedObject as? [String: String],
               let content = context["content"],
               let folderIdentifier = context["folder"],
+              let historyIdentifier = context["history"],
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             NSSound.beep()
             return
@@ -10220,7 +11399,8 @@ class BoardManPanel: NSPanel {
         }
         let firstLine = content.components(separatedBy: .newlines).first ?? ""
         let snippet = CPYSnippet()
-        snippet.title = normalizedSnippetTitle(String(firstLine.prefix(80)))
+        let existingDisplayName = HistoryDisplayNameStore.shared.name(for: historyIdentifier)
+        snippet.title = normalizedSnippetTitle(existingDisplayName ?? String(firstLine.prefix(80)))
         snippet.content = content
         snippet.enable = true
         if isProEntitled {
@@ -10237,6 +11417,10 @@ class BoardManPanel: NSPanel {
             }
             setActiveSnippetGroupIdentifiers([BoardManPanel.uncategorizedCategoryIdentifier])
         }
+        HistorySnippetLinkStore.shared.link(
+            snippetIdentifier: snippet.identifier,
+            historyIdentifier: historyIdentifier
+        )
         onRefreshRequested?()
     }
 
@@ -10270,6 +11454,7 @@ class BoardManPanel: NSPanel {
         BoardManMaskedItemStore.shared.remove([identifier])
         BoardManItemHighlightStore.shared.remove([identifier])
         HistoryDisplayNameStore.shared.remove([identifier])
+        HistorySnippetLinkStore.shared.unlinkHistory(identifier)
         selectedIndex = -1
         hidePreviewBubble()
         onRefreshRequested?()
@@ -10294,6 +11479,7 @@ class BoardManPanel: NSPanel {
         guard runSnippetPanelAlert(alert, initialFirstResponder: field) == .alertFirstButtonReturn else { return }
         let title = normalizedSnippetTitle(field.stringValue)
         Self.persistSnippetTitle(title, snippet: snippet, realm: realm)
+        syncLinkedHistoryDisplayName(snippetIdentifier: identifier, title: title)
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: identifier)
     }
@@ -10892,8 +12078,15 @@ class BoardManPanel: NSPanel {
         return (base.withAlphaComponent(backgroundAlpha), base.withAlphaComponent(borderAlpha), 1.25)
     }
 
+    fileprivate func isPinnedRow(_ row: Int) -> Bool {
+        return row >= 0 && historyItems[safe: row]?.isPinned == true
+    }
+
     fileprivate func usedItemAppearance(for row: Int) -> (background: NSColor, border: NSColor, borderWidth: CGFloat)? {
-        guard row >= 0, let item = historyItems[safe: row], item.pasteCount >= 1 else { return nil }
+        guard row >= 0,
+              let item = historyItems[safe: row],
+              item.pasteCount >= 1,
+              !item.isPinned else { return nil }
         if AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManCustomUsedColor) != nil {
             let base = BoardManPanel.customColor(
                 forKey: Constants.UserDefaults.boardManCustomUsedColor,

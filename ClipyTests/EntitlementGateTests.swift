@@ -888,6 +888,10 @@ final class BoardManInteractionRuleTests {
         #expect(BoardManPanel.effectivePreviewScale(storedValue: 50, isPro: false) == 100)
         #expect(BoardManPanel.effectivePreviewScale(storedValue: 50, isPro: true) == 50)
         #expect(BoardManPanel.effectivePreviewScale(storedValue: 200, isPro: true) == 200)
+        #expect(BoardManPanel.clampedItemTextScale(0) == 100)
+        #expect(BoardManPanel.clampedItemTextScale(60) == 80)
+        #expect(BoardManPanel.clampedItemTextScale(120) == 120)
+        #expect(BoardManPanel.clampedItemTextScale(170) == 140)
 
         #expect(BoardManPanel.tabDelta(horizontalDelta: -30, verticalDelta: 3) == 1)
         #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 3) == -1)
@@ -909,6 +913,8 @@ final class BoardManInteractionRuleTests {
         ))
         #expect(BoardManPanel.usesStackedHistorySettingsLayout(width: 519))
         #expect(!BoardManPanel.usesStackedHistorySettingsLayout(width: 520))
+        #expect(BoardManPanel.usesStackedAppearanceSettingsLayout(width: 469))
+        #expect(!BoardManPanel.usesStackedAppearanceSettingsLayout(width: 470))
         #expect(BoardManHistoryRowView.backgroundKind(
             isSelected: true,
             isHovered: false,
@@ -969,6 +975,29 @@ final class BoardManInteractionRuleTests {
         BoardManPanel.persistSnippetTitle("Renamed", snippet: snippet, realm: realm)
         #expect(snippet.title == "Renamed")
         #expect(snippet.content == "echo free")
+    }
+
+    @Test
+    func historySnippetLinksTrackBothDirectionsAndCanBeRemoved() {
+        let suiteName = "BoardManHistorySnippetLinksTests-\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            Issue.record("Could not create isolated UserDefaults suite.")
+            return
+        }
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = HistorySnippetLinkStore(defaults: defaults)
+
+        store.link(snippetIdentifier: "snippet-a", historyIdentifier: "history-1")
+        store.link(snippetIdentifier: "snippet-b", historyIdentifier: "history-1")
+        #expect(store.historyIdentifier(forSnippet: "snippet-a") == "history-1")
+        #expect(store.snippetIdentifiers(forHistory: "history-1") == ["snippet-a", "snippet-b"])
+
+        store.unlinkSnippet("snippet-a")
+        #expect(store.historyIdentifier(forSnippet: "snippet-a") == nil)
+        #expect(store.snippetIdentifiers(forHistory: "history-1") == ["snippet-b"])
+
+        store.unlinkHistory("history-1")
+        #expect(store.historyIdentifier(forSnippet: "snippet-b") == nil)
     }
 
     @Test
@@ -1113,8 +1142,11 @@ final class BoardManInteractionRuleTests {
                 "Narrow rows need stable breathing room after the Pin badge.")
         #expect(narrowPrimary.frame.maxX <= narrowTimestamp.frame.minX - 12,
                 "Only the center title may compress between fixed accessories.")
-        #expect((narrowPrimary.font?.pointSize ?? 99) <= 12.75,
-                "Narrow rows should use the compact title font instead of squeezing accessories.")
+        let configuredTextScale = CGFloat(BoardManPanel.clampedItemTextScale(
+            AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManItemTextScale)
+        )) / 100
+        #expect((narrowPrimary.font?.pointSize ?? 99) <= (12.75 * configuredTextScale) + 0.01,
+                "Narrow rows should use the compact title font at the configured text scale instead of squeezing accessories.")
 
         let resizedCellFrame = BoardManHistoryCellView.synchronizedCellFrame(
             existingFrame: NSRect(x: 14, y: 0, width: 746, height: 46),
@@ -1289,7 +1321,7 @@ final class BoardManFilterSettingsTests {
 final class BoardManPanelLayoutTests {
 
     @Test
-    func majorTabsAndSettingsCategoriesStayInsidePanel() async {
+    func majorTabsAndSettingsCategoriesStayInsidePanel() async throws {
         let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
         Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
         defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
@@ -1298,15 +1330,25 @@ final class BoardManPanelLayoutTests {
         let originalTimestampFormat = defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)
         let originalTimestampPosition = defaults.string(forKey: Constants.UserDefaults.boardManTimestampPosition)
         let originalLanguage = defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
+        let originalUIStyle = defaults.string(forKey: Constants.UserDefaults.boardManUIStyle)
+        let originalItemTextScale = defaults.object(forKey: Constants.UserDefaults.boardManItemTextScale)
         let originalMaxHistory = defaults.object(forKey: Constants.UserDefaults.maxHistorySize)
         defaults.set("relative", forKey: Constants.UserDefaults.boardManTimestampFormat)
         defaults.set("below", forKey: Constants.UserDefaults.boardManTimestampPosition)
         defaults.set("English", forKey: Constants.UserDefaults.boardManLanguage)
+        defaults.set("Default", forKey: Constants.UserDefaults.boardManUIStyle)
+        defaults.set(100, forKey: Constants.UserDefaults.boardManItemTextScale)
         defaults.set(100, forKey: Constants.UserDefaults.maxHistorySize)
         defer {
             defaults.set(originalTimestampFormat, forKey: Constants.UserDefaults.boardManTimestampFormat)
             defaults.set(originalTimestampPosition, forKey: Constants.UserDefaults.boardManTimestampPosition)
             defaults.set(originalLanguage, forKey: Constants.UserDefaults.boardManLanguage)
+            defaults.set(originalUIStyle, forKey: Constants.UserDefaults.boardManUIStyle)
+            if let originalItemTextScale {
+                defaults.set(originalItemTextScale, forKey: Constants.UserDefaults.boardManItemTextScale)
+            } else {
+                defaults.removeObject(forKey: Constants.UserDefaults.boardManItemTextScale)
+            }
             if let originalMaxHistory {
                 defaults.set(originalMaxHistory, forKey: Constants.UserDefaults.maxHistorySize)
             } else {
@@ -1331,31 +1373,7 @@ final class BoardManPanelLayoutTests {
         assertHistoryToolbar(panel, expectsVisible: false)
         assertHistoryRowGeometry(panel)
         if let root = panel.contentView {
-            let descendants = allSubviews(of: root)
-            let titleField = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorTitleField" } as? NSTextField
-            let statusLabel = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorStatusLabel" } as? NSTextField
-            let saveButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetSaveButton" } as? NSButton
-            let cancelButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetCancelButton" } as? NSButton
-            let folderToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Group Enabled" }
-            let snippetToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Snippet Enabled" }
-            let hoverGroupPopup = descendants.compactMap { $0 as? BoardManHoverPopUpButton }.first { !$0.isHidden }
-            #expect(titleField != nil, "Snippet title editor was not created.")
-            #expect(saveButton?.target != nil && saveButton?.action != nil,
-                    "Snippet Save button is missing its action wiring.")
-            #expect(cancelButton?.target != nil && cancelButton?.action != nil,
-                    "Snippet Cancel button is missing its action wiring.")
-            #expect(hoverGroupPopup != nil, "Snippet group selector is not hover-aware.")
-            #expect((titleField?.frame.width ?? 0) >= 250,
-                    "Snippet title editor is still cramped.")
-            if let titleField, let statusLabel, let folderToggle, let snippetToggle {
-                #expect(statusLabel.isHidden,
-                        "The redundant snippet editor status band should remain removed.")
-                #expect(abs(folderToggle.frame.midY - snippetToggle.frame.midY) <= 0.5)
-                #expect(folderToggle.frame.minY >= 12,
-                        "Snippet enable controls need deliberate bottom padding.")
-                #expect(titleField.frame.maxY <= (titleField.superview?.bounds.maxY ?? titleField.frame.maxY) - 12,
-                        "Snippet title needs deliberate top padding.")
-            }
+            assertSnippetManagerControls(root)
         }
 
         panel.selectSettingsTab()
@@ -1365,9 +1383,8 @@ final class BoardManPanelLayoutTests {
             return
         }
         let expectedTitles = Set(["General", "Appearance", "History", "Templates", "Privacy", "Updates", "License"])
-        let categories = root.subviews
-            .flatMap { $0.subviews }
-            .compactMap { $0 as? NSButton }
+        let categories = allSubviews(of: root)
+            .compactMap { $0 as? BoardManSettingsCategoryButton }
             .filter { expectedTitles.contains($0.title) }
             .sorted { $0.tag < $1.tag }
         #expect(panel.presentationItemScope == .historyOnly)
@@ -1400,7 +1417,8 @@ final class BoardManPanelLayoutTests {
         if let appearanceCategory = categories.first(where: { $0.title == "Appearance" }) {
             _ = appearanceCategory.sendAction(appearanceCategory.action, to: appearanceCategory.target)
             await settlePanelLayout(panel)
-            let popupTitles = allSubviews(of: root)
+            let appearanceViews = allSubviews(of: root)
+            let popupTitles = appearanceViews
                 .compactMap { $0 as? NSPopUpButton }
                 .filter { !$0.isHidden }
                 .map { Set($0.itemTitles) }
@@ -1422,6 +1440,65 @@ final class BoardManPanelLayoutTests {
             #expect(popupTitles.contains { $0.contains("Teal") && $0.contains("Green") && $0.contains("Purple") && $0.contains("Indigo") },
                     "Expanded Used colors are missing.")
 
+            func view<T: NSView>(_ identifier: String, as type: T.Type = T.self) -> T? {
+                appearanceViews.first { $0.identifier?.rawValue == identifier } as? T
+            }
+            let previewCard = try #require(view("BoardManAppearancePreviewCard", as: BoardManSettingsCardView.self))
+            let preview = try #require(view("BoardManAppearanceLivePreview", as: BoardManAppearancePreviewView.self))
+            let layoutCard = try #require(view("BoardManAppearanceLayoutCard", as: BoardManSettingsCardView.self))
+            let timestampCard = try #require(view("BoardManAppearanceTimestampCard", as: BoardManSettingsCardView.self))
+            let usageCard = try #require(view("BoardManAppearanceUsageCard", as: BoardManSettingsCardView.self))
+            let themeCard = try #require(view("BoardManAppearanceThemeCard", as: BoardManSettingsCardView.self))
+            let advancedCard = try #require(view("BoardManAppearanceAdvancedCard", as: BoardManSettingsCardView.self))
+            let advancedToggle = try #require(view("BoardManAppearanceAdvancedToggle", as: NSButton.self))
+            try assertItemTextScaleControls(appearanceViews)
+
+            #expect(previewCard.isHidden == false && preview.isHidden == false)
+            #expect(previewCard.frame.contains(preview.frame), "Live preview must remain inside the preview card.")
+            #expect(preview.frame.minX - previewCard.frame.minX >= 20,
+                    "Live preview needs deliberate horizontal breathing room.")
+            #expect(preview.frame.minY - previewCard.frame.minY >= 16,
+                    "Live preview needs deliberate bottom breathing room.")
+            #expect(layoutCard.frame.minY > timestampCard.frame.maxY,
+                    "Narrow Appearance settings should stack Layout above Timestamp.")
+            #expect(timestampCard.frame.minY > usageCard.frame.maxY,
+                    "Narrow Appearance settings should stack Timestamp above Usage.")
+            #expect(usageCard.frame.minY > themeCard.frame.maxY,
+                    "Narrow Appearance settings should stack Usage above Theme.")
+            #expect(advancedToggle.isHidden == false)
+            #expect(advancedCard.isHidden, "Advanced appearance settings should start collapsed.")
+
+            if let uiPopup = appearanceViews.compactMap({ $0 as? NSPopUpButton }).first(where: {
+                Set(["Default", "Simple", "Monochrome"]).isSubset(of: Set($0.itemTitles))
+            }) {
+                uiPopup.selectItem(withTitle: "Simple")
+                _ = uiPopup.sendAction(uiPopup.action, to: uiPopup.target)
+                await settlePanelLayout(panel)
+                #expect(preview.uiStyleRawValueForTesting == "Simple",
+                        "Live preview must consume the selected UI style instead of rendering the default style.")
+            } else {
+                Issue.record("Appearance UI style popup was not found.")
+            }
+
+            let relativePopupIDs = [
+                "BoardManRelativeNumberStylePopup", "BoardManRelativeUnitStylePopup",
+                "BoardManRelativeSuffixStylePopup", "BoardManRelativeNowStylePopup"
+            ]
+            let relativePopups = relativePopupIDs.compactMap { identifier in
+                appearanceViews.first { $0.identifier?.rawValue == identifier } as? NSPopUpButton
+            }
+            #expect(relativePopups.count == relativePopupIDs.count)
+            #expect(relativePopups.allSatisfy { $0.isHidden },
+                    "Fine-grained relative-time controls should stay out of the default view.")
+
+            let collapsedDocumentHeight = settingsScroll?.documentView?.frame.height ?? 0
+            _ = advancedToggle.sendAction(advancedToggle.action, to: advancedToggle.target)
+            await settlePanelLayout(panel)
+            #expect(advancedCard.isHidden == false)
+            #expect(relativePopups.allSatisfy { !$0.isHidden })
+            #expect((settingsScroll?.documentView?.frame.height ?? 0) > collapsedDocumentHeight,
+                    "Expanding advanced appearance should grow the scroll document rather than cramming controls.")
+
             let visiblePopups = allSubviews(of: root)
                 .compactMap { $0 as? NSPopUpButton }
                 .filter { !$0.isHidden }
@@ -1432,28 +1509,17 @@ final class BoardManPanelLayoutTests {
             let timestampPopup = visiblePopups.first { Set(["Relative", "24-hour", "12-hour"]).isSubset(of: Set($0.itemTitles)) }
             let positionPopup = visiblePopups.first { Set(["Hidden", "Below", "Left", "Right"]).isSubset(of: Set($0.itemTitles)) }
             let alignedPopups = [themePopup, modePopup, uiPopup, fontPopup, timestampPopup, positionPopup].compactMap { $0 }
-            #expect(alignedPopups.count == 6, "Appearance form popups could not be identified.")
-            for popup in alignedPopups {
+            #expect(alignedPopups.count == 6, "Appearance core popups could not be identified.")
+            for popup in alignedPopups + relativePopups {
                 #expect(abs(popup.frame.height - 30) <= 0.5,
-                        "Appearance popup height is not aligned to the 30pt form grid.")
-            }
-            if let themePopup, let uiPopup {
-                #expect(abs(themePopup.frame.minX - uiPopup.frame.minX) <= 0.5)
-                #expect(abs(themePopup.frame.width - uiPopup.frame.width) <= 0.5)
-            }
-            if let modePopup, let fontPopup {
-                #expect(abs(modePopup.frame.minX - fontPopup.frame.minX) <= 0.5)
-                #expect(abs(modePopup.frame.width - fontPopup.frame.width) <= 0.5)
-            }
-            if let timestampPopup, let positionPopup {
-                #expect(abs(timestampPopup.frame.width - positionPopup.frame.width) <= 0.5)
-                #expect(abs(timestampPopup.frame.minY - positionPopup.frame.minY) <= 0.5)
+                        "Appearance popup height is not aligned to the 30pt control grid.")
             }
 
             let textScale = allSubviews(of: root).first { $0.identifier?.rawValue == "BoardManTextPreviewScaleSlider" }
             let imageScale = allSubviews(of: root).first { $0.identifier?.rawValue == "BoardManImagePreviewScaleSlider" }
             #expect(textScale is NSSlider)
             #expect(imageScale is NSSlider)
+            #expect(textScale?.isHidden == false && imageScale?.isHidden == false)
             #expect(abs((textScale?.frame.width ?? 0) - (imageScale?.frame.width ?? 0)) <= 0.5)
         }
 
@@ -1463,6 +1529,63 @@ final class BoardManPanelLayoutTests {
             assertTopLevelLayout(panel, mode: "Settings category \(category.tag)", expectsSearch: false)
 
             assertSettingsCategoryControls(title: category.title, descendants: allSubviews(of: root))
+        }
+    }
+
+    private func assertItemTextScaleControls(_ views: [NSView]) throws {
+        let field = try #require(views.first {
+            $0.identifier?.rawValue == "BoardManItemTextScaleField"
+        } as? NSTextField)
+        let decrease = try #require(views.first {
+            $0.identifier?.rawValue == "BoardManItemTextScaleDecreaseButton"
+        } as? NSButton)
+        let increase = try #require(views.first {
+            $0.identifier?.rawValue == "BoardManItemTextScaleIncreaseButton"
+        } as? NSButton)
+        let formatter = try #require(field.formatter as? NumberFormatter)
+
+        #expect(!field.isHidden && !decrease.isHidden && !increase.isHidden)
+        #expect(field.integerValue == 100)
+        #expect(formatter.minimum?.intValue == 80 && formatter.maximum?.intValue == 140)
+        _ = increase.sendAction(increase.action, to: increase.target)
+        #expect(field.integerValue == 105)
+        _ = decrease.sendAction(decrease.action, to: decrease.target)
+        #expect(field.integerValue == 100)
+        field.integerValue = 141
+        _ = field.sendAction(field.action, to: field.target)
+        #expect(field.integerValue == 140)
+        field.integerValue = 100
+        _ = field.sendAction(field.action, to: field.target)
+    }
+
+    private func assertSnippetManagerControls(_ root: NSView) {
+        let descendants = allSubviews(of: root)
+        let titleField = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorTitleField" } as? NSTextField
+        let statusLabel = descendants.first { $0.identifier?.rawValue == "BoardManSnippetEditorStatusLabel" } as? NSTextField
+        let saveButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetSaveButton" } as? NSButton
+        let cancelButton = descendants.first { $0.identifier?.rawValue == "BoardManSnippetCancelButton" } as? NSButton
+        let folderToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Group Enabled" }
+        let snippetToggle = descendants.compactMap { $0 as? NSButton }.first { $0.title == "Snippet Enabled" }
+        let hoverGroupPopup = descendants.compactMap { $0 as? BoardManHoverPopUpButton }.first { !$0.isHidden }
+        let groupPopup = descendants.first {
+            $0.identifier?.rawValue == "BoardManSnippetGroupPopup"
+        } as? NSPopUpButton
+
+        #expect(titleField != nil, "Snippet title editor was not created.")
+        #expect((groupPopup?.selectedItem?.representedObject as? String) == BoardManPanel.allCategoriesIdentifier,
+                "Empty snippet group selection should visibly fall back to All Groups.")
+        #expect(saveButton?.target != nil && saveButton?.action != nil,
+                "Snippet Save button is missing its action wiring.")
+        #expect(cancelButton?.target != nil && cancelButton?.action != nil,
+                "Snippet Cancel button is missing its action wiring.")
+        #expect(hoverGroupPopup != nil, "Snippet group selector is not hover-aware.")
+        #expect((titleField?.frame.width ?? 0) >= 250, "Snippet title editor is still cramped.")
+        if let titleField, let statusLabel, let folderToggle, let snippetToggle {
+            #expect(statusLabel.isHidden, "The redundant snippet editor status band should remain removed.")
+            #expect(abs(folderToggle.frame.midY - snippetToggle.frame.midY) <= 0.5)
+            #expect(folderToggle.frame.minY >= 12, "Snippet enable controls need deliberate bottom padding.")
+            #expect(titleField.frame.maxY <= (titleField.superview?.bounds.maxY ?? titleField.frame.maxY) - 12,
+                    "Snippet title needs deliberate top padding.")
         }
     }
 
@@ -1485,18 +1608,26 @@ final class BoardManUIRegressionTests {
 
         let root = try #require(panel.contentView)
         let descendants = allSubviews(of: root)
-        let tabs = try #require(descendants.compactMap { $0 as? BoardManHeaderSegmentedControl }.first)
+        let tabs = try #require(descendants.compactMap { $0 as? BoardManHeaderTabBar }.first)
+        #expect(!(tabs is NSSegmentedControl),
+                "Header tabs must not use NSSegmentedControl because AppKit adds a system hover halo.")
+        #expect(tabs.layer?.masksToBounds == true)
+        #expect((tabs.layer?.shadowOpacity ?? 1) == 0)
+        #expect(tabs.buttons.allSatisfy { !$0.isBordered && $0.focusRingType == .none })
+        #expect(tabs.buttons.allSatisfy { ($0.layer?.shadowOpacity ?? 1) == 0 })
         let tabFrameBeforeHover = tabs.frame
-        let tabWidthsBeforeHover = (0..<tabs.segmentCount).map { tabs.width(forSegment: $0) }
-        let trailingSegment = tabs.segmentCount - 1
-        tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
-        let trailingHoverRect = try #require(tabs.hoverBackgroundRect(forSegment: trailingSegment))
-        #expect(tabs.hoveredSegment == trailingSegment)
+        let buttonFramesBeforeHover = tabs.buttons.map(\.frame)
+        let trailingTab = 1
+        tabs.updateHoveredTab(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
+        let trailingHoverRect = try #require(tabs.hoverBackgroundRect(forTab: trailingTab))
+        #expect(tabs.hoveredIndex == trailingTab)
         #expect(trailingHoverRect.maxX <= tabs.bounds.maxX)
         #expect(trailingHoverRect.minX >= tabs.bounds.minX)
-        #expect(tabs.frame == tabFrameBeforeHover, "Hover must not resize or move the tab control.")
-        #expect((0..<tabs.segmentCount).map { tabs.width(forSegment: $0) } == tabWidthsBeforeHover,
-                "Hover must not change any segment width.")
+        #expect(tabs.frame == tabFrameBeforeHover, "Hover must not resize or move the tab bar.")
+        #expect(tabs.buttons.map(\.frame) == buttonFramesBeforeHover,
+                "Hover must not change either custom tab button frame.")
+        #expect((tabs.layer?.shadowOpacity ?? 1) == 0,
+                "Hover must never add an outer glow to the custom tab capsule.")
 
         let search = try #require(descendants.compactMap { $0 as? NSSearchField }.first)
         let searchCell = try #require(search.cell as? BoardManCenteredSearchFieldCell)
@@ -1764,16 +1895,16 @@ extension BoardManPanelLayoutTests {
             await settlePanelLayout(panel)
             let root = try #require(panel.contentView)
             let regularTabs = try #require(allSubviews(of: root)
-                .compactMap { $0 as? BoardManHeaderSegmentedControl }.first)
-            #expect(regularTabs.label(forSegment: 1) == regularTitle)
-            #expect(regularTabs.toolTip(forSegment: 1) == regularTitle)
-            #expect((regularTabs.font?.pointSize ?? 0) >= 12.5)
+                .compactMap { $0 as? BoardManHeaderTabBar }.first)
+            #expect(regularTabs.snippetsButton.title == regularTitle)
+            #expect(regularTabs.snippetsButton.toolTip == regularTitle)
+            #expect((regularTabs.snippetsButton.font?.pointSize ?? 0) >= 12.5)
 
             panel.setFrame(NSRect(x: 0, y: 0, width: 640, height: 760), display: false)
             await settlePanelLayout(panel)
-            #expect(regularTabs.label(forSegment: 1) == compactTitle)
-            #expect(regularTabs.toolTip(forSegment: 1) == regularTitle)
-            #expect((regularTabs.font?.pointSize ?? 99) <= 11.25)
+            #expect(regularTabs.snippetsButton.title == compactTitle)
+            #expect(regularTabs.snippetsButton.toolTip == regularTitle)
+            #expect((regularTabs.snippetsButton.font?.pointSize ?? 99) <= 11.25)
         }
     }
 
@@ -1808,7 +1939,7 @@ extension BoardManPanelLayoutTests {
             return
         }
         let descendants = allSubviews(of: root)
-        let tabs = descendants.compactMap { $0 as? BoardManHeaderSegmentedControl }.first
+        let tabs = descendants.compactMap { $0 as? BoardManHeaderTabBar }.first
         let search = descendants.compactMap { $0 as? NSSearchField }.first
         let conditionButton = descendants
             .compactMap { $0 as? NSButton }
@@ -1844,14 +1975,15 @@ extension BoardManPanelLayoutTests {
                 || $0.identifier?.rawValue == "BoardManSearchOutline"
         }, "Legacy duplicate header outline views are still present.")
 
-        guard let tabs = descendants.compactMap({ $0 as? BoardManHeaderSegmentedControl }).first else {
-            Issue.record("Hover-aware header tabs were not created.")
+        guard let tabs = descendants.compactMap({ $0 as? BoardManHeaderTabBar }).first else {
+            Issue.record("Custom hover-aware header tabs were not created.")
             return
         }
-        #expect(tabs.segmentCount == 2,
+        #expect(tabs.buttons.count == 2,
                 "The header should expose only History and Templates as primary tabs.")
-        tabs.updateHoveredSegment(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
-        #expect(tabs.hoveredSegment == 1, "Header hover tracking did not resolve the trailing Templates segment.")
+        #expect(tabs.buttons.allSatisfy { !$0.isBordered && $0.focusRingType == .none })
+        tabs.updateHoveredTab(at: NSPoint(x: tabs.bounds.maxX - 4, y: tabs.bounds.midY))
+        #expect(tabs.hoveredIndex == 1, "Header hover tracking did not resolve the trailing Templates tab.")
 
         let settingsButton = descendants.compactMap { $0 as? NSButton }.first {
             $0.identifier?.rawValue == "BoardManSettingsButton"
@@ -1902,7 +2034,7 @@ extension BoardManPanelLayoutTests {
         let descendants = allSubviews(of: root)
         let usageFilter = descendants
             .compactMap { $0 as? NSSegmentedControl }
-            .first { !($0 is BoardManHeaderSegmentedControl) && $0.segmentCount == 3 }
+            .first { $0.segmentCount == 3 }
         let sortButton = descendants
             .compactMap { $0 as? NSButton }
             .first { ($0.toolTip ?? "").contains("Copy Order") || ($0.toolTip ?? "").contains("Recent Use") }
