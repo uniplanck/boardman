@@ -1974,7 +1974,8 @@ func boardManText(_ english: String) -> String {
         "Click: Hide / Show Content": "クリック：内容を非表示／表示",
         "Long Press: Hide / Show Content": "長押し：内容を非表示／表示",
         "Count": "使用回数", "Style": "表示形式",
-        "Used": "使用済み", "Theme": "テーマ", "Mode": "表示モード", "UI": "UI",
+        "Used": "使用済み", "Pin label": "Pin表記", "Images": "画像", "Image side": "画像位置",
+        "Theme": "テーマ", "Mode": "表示モード", "UI": "UI",
         "Font": "フォント", "Text size": "文字サイズ", "Lighten": "明るくする", "Height": "高さ",
         "Accent": "アクセント", "Panel": "パネル", "Used color": "使用済み色",
         "Opacity": "透明度", "Reset colors": "色をリセット",
@@ -2378,6 +2379,27 @@ enum BoardManTimestampPosition: String, CaseIterable {
 
     static func allowed(_ value: String?) -> BoardManTimestampPosition {
         return allCases.first(where: { $0.rawValue.lowercased() == value?.lowercased() }) ?? .below
+    }
+}
+
+enum BoardManPinLabelStyle: String, CaseIterable {
+    case off = "OFF"
+    case compact = "P"
+    case full = "PIN"
+
+    static func allowed(_ value: String?) -> BoardManPinLabelStyle {
+        return allCases.first(where: { $0.rawValue.caseInsensitiveCompare(value ?? "") == .orderedSame }) ?? .full
+    }
+
+    var badgeTitle: String { self == .off ? "" : rawValue }
+}
+
+enum BoardManInlineImagePosition: String, CaseIterable {
+    case left = "Left"
+    case right = "Right"
+
+    static func allowed(_ value: String?) -> BoardManInlineImagePosition {
+        return allCases.first(where: { $0.rawValue.caseInsensitiveCompare(value ?? "") == .orderedSame }) ?? .right
     }
 }
 
@@ -3049,6 +3071,7 @@ final class BoardManHistoryRowView: NSTableRowView {
         let accentColor = previewOwner?.themeAccentColor ?? preset.accentColor
         let isSelected = previewOwner?.isSelectedRow(row) == true
         let isHovered = previewOwner?.isHoveredRow(row) == true
+        let isPinned = previewOwner?.isPinnedRow(row) == true
         let highlightAppearance = previewOwner?.itemHighlightAppearance(for: row)
         let usedAppearance = previewOwner?.usedItemAppearance(for: row)
         let kind = Self.backgroundKind(
@@ -3109,6 +3132,13 @@ final class BoardManHistoryRowView: NSTableRowView {
             } else {
                 super.drawBackground(in: dirtyRect)
             }
+        }
+
+        if isPinned {
+            let indicatorRect = NSRect(x: 8, y: 10, width: 3, height: max(10, bounds.height - 20))
+            let indicator = NSBezierPath(roundedRect: indicatorRect, xRadius: 1.5, yRadius: 1.5)
+            accentColor.withAlphaComponent(lightenTheme ? 0.52 : 0.88).setFill()
+            indicator.fill()
         }
     }
 
@@ -3547,6 +3577,9 @@ final class BoardManHeaderTabBar: NSView {
             button.focusRingType = .none
             button.imagePosition = .imageLeading
             button.imageScaling = .scaleProportionallyDown
+            if #available(macOS 11.0, *) {
+                button.imageHugsTitle = true
+            }
             button.alignment = .center
             button.font = NSFont.systemFont(ofSize: 12.5, weight: .medium)
             button.wantsLayer = true
@@ -3572,22 +3605,22 @@ final class BoardManHeaderTabBar: NSView {
         super.layout()
         let halfWidth = floor(bounds.width / 2)
         historyButton.frame = NSIntegralRect(NSRect(
-            x: 2,
-            y: 2,
-            width: max(0, halfWidth - 3),
-            height: max(0, bounds.height - 4)
+            x: 4,
+            y: 4,
+            width: max(0, halfWidth - 6),
+            height: max(0, bounds.height - 8)
         ))
         snippetsButton.frame = NSIntegralRect(NSRect(
-            x: halfWidth + 1,
-            y: 2,
-            width: max(0, bounds.width - halfWidth - 3),
-            height: max(0, bounds.height - 4)
+            x: halfWidth + 2,
+            y: 4,
+            width: max(0, bounds.width - halfWidth - 6),
+            height: max(0, bounds.height - 8)
         ))
         separatorView.frame = NSIntegralRect(NSRect(
             x: halfWidth,
-            y: 8,
+            y: 10,
             width: 1,
-            height: max(0, bounds.height - 16)
+            height: max(0, bounds.height - 20)
         ))
     }
 
@@ -3612,8 +3645,9 @@ final class BoardManHeaderTabBar: NSView {
     }
 
     func updateHoveredTab(at point: NSPoint) {
-        for button in buttons {
-            button.setHoveringForTesting(button.frame.contains(point))
+        let hoveredIndex: Int? = bounds.contains(point) ? (point.x < bounds.midX ? 0 : 1) : nil
+        for (index, button) in buttons.enumerated() {
+            button.setHoveringForTesting(index == hoveredIndex)
         }
     }
 
@@ -3739,6 +3773,7 @@ final class BoardManHistoryCellView: NSTableCellView {
     private let inlineImageView = NSImageView(frame: .zero)
     private let dragHandleLabel = NSTextField(labelWithString: "≡")
     private var timestampPosition: BoardManTimestampPosition = .below
+    private var inlineImagePosition: BoardManInlineImagePosition = .right
     private var configuredTimestampText = ""
     private var showsDragHandle = false
 
@@ -3876,9 +3911,19 @@ final class BoardManHistoryCellView: NSTableCellView {
         let shouldShowCount = item.pasteCount > 0 && !item.countText.isEmpty
         countBadge.stringValue = shouldShowCount ? "\(badgePrefix)\(item.countText)" : ""
         countBadge.isHidden = !shouldShowCount
-        pinBadge.isHidden = !item.isPinned
+        let pinLabelStyle = BoardManPinLabelStyle.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManPinLabelStyle)
+        )
+        pinBadge.stringValue = pinLabelStyle.badgeTitle
+        pinBadge.isHidden = !item.isPinned || pinLabelStyle == .off
+        let showInlineImages = AppEnvironment.current.defaults.object(
+            forKey: Constants.UserDefaults.boardManShowInlineImages
+        ) as? Bool ?? true
+        inlineImagePosition = BoardManInlineImagePosition.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManInlineImagePosition)
+        )
         inlineImageView.image = item.isMasked ? nil : item.inlineThumbnail
-        inlineImageView.isHidden = item.isMasked || item.inlineThumbnail == nil
+        inlineImageView.isHidden = item.isMasked || item.inlineThumbnail == nil || !showInlineImages
 
         if isSelected {
             primaryLabel.textColor = .selectedMenuItemTextColor
@@ -3976,7 +4021,7 @@ final class BoardManHistoryCellView: NSTableCellView {
         let textGap: CGFloat = 4
         let timeWidth: CGFloat = 72
         let countWidth: CGFloat = 64
-        let pinWidth: CGFloat = 44
+        let pinWidth: CGFloat = pinBadge.stringValue == "P" ? 28 : 44
         let accessoryHeight: CGFloat = 20
         var textLeft = horizontalInset
         var textRight = bounds.width - trailingInset
@@ -3996,6 +4041,17 @@ final class BoardManHistoryCellView: NSTableCellView {
         countBadge.frame = .zero
         pinBadge.frame = .zero
         inlineImageView.frame = .zero
+
+        if !inlineImageView.isHidden, inlineImagePosition == .left {
+            let imageSize: CGFloat = timestampPosition == .below ? 32 : 28
+            inlineImageView.frame = NSIntegralRect(NSRect(
+                x: textLeft,
+                y: floor((bounds.height - imageSize) / 2),
+                width: imageSize,
+                height: imageSize
+            ))
+            textLeft = inlineImageView.frame.maxX + accessoryGap
+        }
 
         if !pinBadge.isHidden {
             pinBadge.frame = NSIntegralRect(NSRect(
@@ -4037,7 +4093,7 @@ final class BoardManHistoryCellView: NSTableCellView {
             textRight = countBadge.frame.minX - accessoryGap
         }
 
-        if !inlineImageView.isHidden {
+        if !inlineImageView.isHidden, inlineImagePosition == .right {
             let imageSize: CGFloat = timestampPosition == .below ? 32 : 28
             inlineImageView.frame = NSIntegralRect(NSRect(
                 x: max(textLeft, textRight - imageSize),
@@ -4145,6 +4201,11 @@ class BoardManPanel: NSPanel {
     private var usageStylePopup: NSPopUpButton?
     private var usedItemStyleLabel: NSTextField?
     private var usedItemStylePopup: NSPopUpButton?
+    private var pinLabelStyleLabel: NSTextField?
+    private var pinLabelStylePopup: NSPopUpButton?
+    private var showInlineImagesButton: NSButton?
+    private var inlineImagePositionLabel: NSTextField?
+    private var inlineImagePositionPopup: NSPopUpButton?
     private var themePresetLabel: NSTextField?
     private var themePresetPopup: NSPopUpButton?
     private var appearanceModeLabel: NSTextField?
@@ -5773,6 +5834,62 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(usedItemStyle)
         usedItemStylePopup = usedItemStyle
 
+        let pinLabelText = NSTextField(labelWithString: boardManText("Pin label"))
+        pinLabelText.font = NSFont.systemFont(ofSize: 11)
+        pinLabelText.textColor = .labelColor
+        contentView.addSubview(pinLabelText)
+        pinLabelStyleLabel = pinLabelText
+
+        let pinLabelStyle = NSPopUpButton(frame: .zero, pullsDown: false)
+        BoardManPinLabelStyle.allCases.forEach { style in
+            pinLabelStyle.addItem(withTitle: style.rawValue)
+            pinLabelStyle.lastItem?.representedObject = style.rawValue
+        }
+        let storedPinLabelStyle = BoardManPinLabelStyle.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManPinLabelStyle)
+        )
+        pinLabelStyle.selectItem(withTitle: storedPinLabelStyle.rawValue)
+        pinLabelStyle.font = NSFont.systemFont(ofSize: 11)
+        pinLabelStyle.target = self
+        pinLabelStyle.action = #selector(pinLabelStyleChanged(_:))
+        pinLabelStyle.identifier = NSUserInterfaceItemIdentifier("BoardManPinLabelStylePopup")
+        contentView.addSubview(pinLabelStyle)
+        pinLabelStylePopup = pinLabelStyle
+
+        let showInlineImages = NSButton(
+            checkboxWithTitle: boardManText("Images"),
+            target: self,
+            action: #selector(showInlineImagesChanged(_:))
+        )
+        showInlineImages.state = (AppEnvironment.current.defaults.object(
+            forKey: Constants.UserDefaults.boardManShowInlineImages
+        ) as? Bool ?? true) ? .on : .off
+        showInlineImages.font = NSFont.systemFont(ofSize: 11)
+        contentView.addSubview(showInlineImages)
+        showInlineImagesButton = showInlineImages
+
+        let imagePositionText = NSTextField(labelWithString: boardManText("Image side"))
+        imagePositionText.font = NSFont.systemFont(ofSize: 11)
+        imagePositionText.textColor = .labelColor
+        contentView.addSubview(imagePositionText)
+        inlineImagePositionLabel = imagePositionText
+
+        let imagePosition = NSPopUpButton(frame: .zero, pullsDown: false)
+        BoardManInlineImagePosition.allCases.forEach { position in
+            imagePosition.addItem(withTitle: boardManText(position.rawValue))
+            imagePosition.lastItem?.representedObject = position.rawValue
+        }
+        let storedImagePosition = BoardManInlineImagePosition.allowed(
+            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManInlineImagePosition)
+        )
+        imagePosition.selectItem(at: BoardManInlineImagePosition.allCases.firstIndex(of: storedImagePosition) ?? 1)
+        imagePosition.font = NSFont.systemFont(ofSize: 11)
+        imagePosition.target = self
+        imagePosition.action = #selector(inlineImagePositionChanged(_:))
+        imagePosition.identifier = NSUserInterfaceItemIdentifier("BoardManInlineImagePositionPopup")
+        contentView.addSubview(imagePosition)
+        inlineImagePositionPopup = imagePosition
+
         let themeText = NSTextField(labelWithString: boardManText("Theme"))
         themeText.font = NSFont.systemFont(ofSize: 11)
         themeText.textColor = .labelColor
@@ -6808,6 +6925,7 @@ class BoardManPanel: NSPanel {
             timestampShortcutDelayLabel, timestampShortcutDelayField, timestampShortcutDelayStepper,
             timestampShortcutDelayDecreaseButton, timestampShortcutDelayIncreaseButton, timestampShortcutSecondsLabel,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup,
+            pinLabelStyleLabel, pinLabelStylePopup, showInlineImagesButton, inlineImagePositionLabel, inlineImagePositionPopup,
             themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup,
             uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup,
             itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
@@ -7018,6 +7136,9 @@ class BoardManPanel: NSPanel {
         usageCountButton?.title = boardManText("Count")
         usageStyleLabel?.stringValue = boardManText("Style")
         usedItemStyleLabel?.stringValue = boardManText("Used")
+        pinLabelStyleLabel?.stringValue = boardManText("Pin label")
+        showInlineImagesButton?.title = boardManText("Images")
+        inlineImagePositionLabel?.stringValue = boardManText("Image side")
         themePresetLabel?.stringValue = boardManText("Theme")
         appearanceModeLabel?.stringValue = boardManText("Mode")
         uiStyleLabel?.stringValue = boardManText("UI")
@@ -7478,24 +7599,25 @@ class BoardManPanel: NSPanel {
         historySortButton?.isHidden = !showsHistoryToolbar
         historyConditionButton?.isHidden = !showsHistoryToolbar
         historySavedFilterPopup?.isHidden = !showsHistoryToolbar
-        let historyToolbarY = isQuickMode ? bounds.height - 50 : contentTop - 30
+        let historyToolbarHeight: CGFloat = 30
+        let historyToolbarY = isQuickMode ? bounds.height - 52 : contentTop - 34
         if showsHistoryToolbar {
-            let filterWidth: CGFloat = 114
-            historyUsageFilterControl?.frame = NSRect(x: margin, y: historyToolbarY, width: filterWidth, height: 26)
+            let filterWidth: CGFloat = 118
+            historyUsageFilterControl?.frame = NSIntegralRect(NSRect(x: margin, y: historyToolbarY, width: filterWidth, height: historyToolbarHeight))
             if let filter = historyUsageFilterControl {
                 let segmentWidth = floor(filterWidth / CGFloat(max(1, filter.segmentCount)))
                 for segment in 0..<filter.segmentCount {
                     filter.setWidth(segmentWidth, forSegment: segment)
                 }
             }
-            historySortButton?.frame = NSRect(x: margin + filterWidth + 8, y: historyToolbarY, width: 32, height: 26)
-            historyConditionButton?.frame = NSRect(x: margin + filterWidth + 48, y: historyToolbarY, width: 32, height: 26)
-            let savedFilterX = margin + filterWidth + 88
+            historySortButton?.frame = NSIntegralRect(NSRect(x: margin + filterWidth + 10, y: historyToolbarY, width: 34, height: historyToolbarHeight))
+            historyConditionButton?.frame = NSIntegralRect(NSRect(x: margin + filterWidth + 54, y: historyToolbarY, width: 34, height: historyToolbarHeight))
+            let savedFilterX = margin + filterWidth + 100
             historySavedFilterPopup?.frame = NSIntegralRect(NSRect(
                 x: savedFilterX,
                 y: historyToolbarY,
                 width: max(140, min(isCompact ? 166 : 220, margin + width - savedFilterX)),
-                height: 26
+                height: historyToolbarHeight
             ))
         }
 
@@ -7539,7 +7661,7 @@ class BoardManPanel: NSPanel {
         if showsSnippetCategories {
             listTop = snippetInteractionRowY - 12
         } else if showsHistoryToolbar {
-            listTop = historyToolbarY - 12
+            listTop = historyToolbarY - 16
         } else {
             listTop = contentTop
         }
@@ -7743,9 +7865,9 @@ class BoardManPanel: NSPanel {
         case .general: requiredHeight = 790
         case .view:
             if stacksAppearanceCards {
-                requiredHeight = appearanceAdvancedExpanded ? 1_560 : 1_200
+                requiredHeight = appearanceAdvancedExpanded ? 1_720 : 1_360
             } else {
-                requiredHeight = appearanceAdvancedExpanded ? 1_160 : 900
+                requiredHeight = appearanceAdvancedExpanded ? 1_280 : 1_020
             }
         case .history: requiredHeight = 730
         case .snippets: requiredHeight = 640
@@ -7812,6 +7934,7 @@ class BoardManPanel: NSPanel {
             timestampShortcutDelayLabel, timestampShortcutDelayField, timestampShortcutDelayStepper,
             timestampShortcutDelayDecreaseButton, timestampShortcutDelayIncreaseButton, timestampShortcutSecondsLabel,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup,
+            pinLabelStyleLabel, pinLabelStylePopup, showInlineImagesButton, inlineImagePositionLabel, inlineImagePositionPopup,
             themePresetLabel, themePresetPopup, appearanceModeLabel, appearanceModePopup,
             uiStyleLabel, uiStylePopup, fontChoiceLabel, fontChoicePopup,
             itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
@@ -7874,7 +7997,8 @@ class BoardManPanel: NSPanel {
             relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
             relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
             usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel,
-            usedItemStylePopup, themePresetLabel, themePresetPopup,
+            usedItemStylePopup, pinLabelStyleLabel, pinLabelStylePopup, showInlineImagesButton,
+            inlineImagePositionLabel, inlineImagePositionPopup, themePresetLabel, themePresetPopup,
             appearanceModeLabel, appearanceModePopup, uiStyleLabel, uiStylePopup,
             fontChoiceLabel, fontChoicePopup,
             itemTextScaleLabel, itemTextScaleField, itemTextScaleDecreaseButton, itemTextScaleIncreaseButton, themeLightenButton,
@@ -7999,8 +8123,8 @@ class BoardManPanel: NSPanel {
                 height: previewHeight - 70
             ))
 
-            let layoutCardHeight: CGFloat = stacksCards ? 198 : 218
-            let timestampCardHeight: CGFloat = stacksCards ? 148 : 178
+            let layoutCardHeight: CGFloat = stacksCards ? 218 : 218
+            let timestampCardHeight: CGFloat = layoutCardHeight
             let layoutCardY = previewY - cardGap - layoutCardHeight
             let timestampCardY = stacksCards
                 ? layoutCardY - cardGap - timestampCardHeight
@@ -8094,8 +8218,8 @@ class BoardManPanel: NSPanel {
                 labelWidth: compactLabelWidth
             )
 
-            let usageCardHeight: CGFloat = stacksCards ? 178 : 196
-            let themeCardHeight: CGFloat = stacksCards ? 218 : 196
+            let usageCardHeight: CGFloat = 292
+            let themeCardHeight: CGFloat = 292
             let usageCardY = (stacksCards ? timestampCardY : layoutCardY) - cardGap - usageCardHeight
             let themeCardY = stacksCards
                 ? usageCardY - cardGap - themeCardHeight
@@ -8139,6 +8263,29 @@ class BoardManPanel: NSPanel {
                 width: usageWidth,
                 labelWidth: compactLabelWidth
             )
+            placeLabeledRow(
+                label: pinLabelStyleLabel,
+                control: pinLabelStylePopup,
+                originX: usageX,
+                originY: usageCardY + usageCardHeight - 196,
+                width: usageWidth,
+                labelWidth: compactLabelWidth
+            )
+            showInlineImagesButton?.frame = NSIntegralRect(NSRect(
+                x: usageX,
+                y: usageCardY + usageCardHeight - 228,
+                width: usageWidth,
+                height: 20
+            ))
+            placeLabeledRow(
+                label: inlineImagePositionLabel,
+                control: inlineImagePositionPopup,
+                originX: usageX,
+                originY: usageCardY + 18,
+                width: usageWidth,
+                labelWidth: compactLabelWidth
+            )
+            inlineImagePositionPopup?.isEnabled = showInlineImagesButton?.state == .on
 
             let themeX = rightX + cardInset
             let themeWidth = halfWidth - (cardInset * 2)
@@ -9033,6 +9180,29 @@ class BoardManPanel: NSPanel {
         placeholderList?.reloadData()
         synchronizeListGeometry()
         refreshAppearancePreview()
+    }
+
+    @objc private func pinLabelStyleChanged(_ sender: NSPopUpButton) {
+        let rawValue = sender.selectedItem?.representedObject as? String ?? sender.titleOfSelectedItem
+        let style = BoardManPinLabelStyle.allowed(rawValue)
+        AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManPinLabelStyle)
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+    }
+
+    @objc private func showInlineImagesChanged(_ sender: NSButton) {
+        AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowInlineImages)
+        inlineImagePositionPopup?.isEnabled = sender.state == .on
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
+    }
+
+    @objc private func inlineImagePositionChanged(_ sender: NSPopUpButton) {
+        let rawValue = sender.selectedItem?.representedObject as? String ?? sender.titleOfSelectedItem
+        let position = BoardManInlineImagePosition.allowed(rawValue)
+        AppEnvironment.current.defaults.set(position.rawValue, forKey: Constants.UserDefaults.boardManInlineImagePosition)
+        placeholderList?.reloadData()
+        synchronizeListGeometry()
     }
 
     @objc private func themePresetChanged(_ sender: NSPopUpButton) {
@@ -11908,8 +12078,15 @@ class BoardManPanel: NSPanel {
         return (base.withAlphaComponent(backgroundAlpha), base.withAlphaComponent(borderAlpha), 1.25)
     }
 
+    fileprivate func isPinnedRow(_ row: Int) -> Bool {
+        return row >= 0 && historyItems[safe: row]?.isPinned == true
+    }
+
     fileprivate func usedItemAppearance(for row: Int) -> (background: NSColor, border: NSColor, borderWidth: CGFloat)? {
-        guard row >= 0, let item = historyItems[safe: row], item.pasteCount >= 1 else { return nil }
+        guard row >= 0,
+              let item = historyItems[safe: row],
+              item.pasteCount >= 1,
+              !item.isPinned else { return nil }
         if AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManCustomUsedColor) != nil {
             let base = BoardManPanel.customColor(
                 forKey: Constants.UserDefaults.boardManCustomUsedColor,
