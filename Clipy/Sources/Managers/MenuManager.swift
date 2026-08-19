@@ -1994,7 +1994,7 @@ func boardManText(_ english: String) -> String {
         "Updates will be delivered through GitHub Releases once an appcast is published.": "appcast公開後、GitHub Releases経由でアップデートを配信します。",
         "Search clipboard history and snippets": "履歴とスニペットを検索", "Search": "検索",
         "Condition": "条件", "Condition ON": "条件 ON", "Recent Use": "最近使用順", "Copy Order": "コピー順",
-        "No clipboard history yet": "クリップボード履歴はありません", "No snippets yet": "スニペットはありません",
+        "No clipboard history yet": "クリップボード履歴はありません", "No snippets yet": "定型文はありません",
         "Open Board-Man": "Board-Manを開く", "Quick Mode": "クイックモード",
         "Open History": "履歴を開く", "Open Snippets": "スニペットを開く", "Clear History": "履歴を消去",
         "Show the main clipboard panel": "メインのクリップボードパネルを表示します",
