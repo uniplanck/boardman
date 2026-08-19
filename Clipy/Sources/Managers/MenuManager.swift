@@ -262,9 +262,10 @@ extension MenuManager {
                 NSSound.beep()
             }
         }
-        panel.onTimestampActionRequested = { [weak self] shortcut, delay, clickStartedAt in
+        panel.onTimestampActionRequested = { [weak self] item, shortcut, delay, clickStartedAt in
             self?.handlePanelTimestampShortcut(
-                shortcut,
+                item: item,
+                shortcut: shortcut,
                 delay: delay,
                 clickStartedAt: clickStartedAt
             )
@@ -357,7 +358,8 @@ extension MenuManager {
 
     fileprivate func handlePanelPaste(
         dataHash: String,
-        clickStartedAt: CFAbsoluteTime?
+        clickStartedAt: CFAbsoluteTime?,
+        completion: (() -> Void)? = nil
     ) {
         guard let panel = boardManPanel else { return }
         let targetApplication = previousFrontmostApplication
@@ -398,13 +400,18 @@ extension MenuManager {
                     PasteCountStore.shared.increment(forKey: pasteCountKey)
                 }
             }
-            self.clearPreviousPasteTarget()
+            if let completion {
+                completion()
+            } else {
+                self.clearPreviousPasteTarget()
+            }
         }
     }
 
     fileprivate func handlePanelSnippetPaste(
         identifier: String,
-        clickStartedAt: CFAbsoluteTime?
+        clickStartedAt: CFAbsoluteTime?,
+        completion: (() -> Void)? = nil
     ) {
         guard let panel = boardManPanel else { return }
         panel.orderOut(nil)
@@ -435,19 +442,21 @@ extension MenuManager {
                 self.clearPreviousPasteTarget()
                 return
             }
-            self.clearPreviousPasteTarget()
+            if let completion {
+                completion()
+            } else {
+                self.clearPreviousPasteTarget()
+            }
         }
     }
 
     private func handlePanelTimestampShortcut(
-        _ shortcut: KeyCombo,
+        item: BoardManHistoryItem,
+        shortcut: KeyCombo,
         delay: TimeInterval,
         clickStartedAt: CFAbsoluteTime?
     ) {
-        guard let panel = boardManPanel else { return }
-        panel.orderOut(nil)
-
-        restorePreviousPasteTarget { [weak self] in
+        let dispatchShortcutAfterPaste = { [weak self] in
             guard let self else { return }
             let executionDelay = BoardManPanel.clampedTimestampShortcutDelay(delay)
             DispatchQueue.main.asyncAfter(deadline: .now() + executionDelay) { [weak self] in
@@ -457,7 +466,7 @@ extension MenuManager {
                     PasteCountInputService.shared.logBoardManPerformance(
                         "panel_timestamp_shortcut_dispatch",
                         startedAt: clickStartedAt,
-                        details: "sent=\(didSend)"
+                        details: "pasteFirst=true sent=\(didSend)"
                     )
                 }
                 if !didSend {
@@ -465,6 +474,24 @@ extension MenuManager {
                 }
                 self.clearPreviousPasteTarget()
             }
+        }
+
+        switch item.source {
+        case .clip:
+            handlePanelPaste(
+                dataHash: item.dataHash,
+                clickStartedAt: clickStartedAt,
+                completion: dispatchShortcutAfterPaste
+            )
+        case .snippet:
+            handlePanelSnippetPaste(
+                identifier: item.dataHash,
+                clickStartedAt: clickStartedAt,
+                completion: dispatchShortcutAfterPaste
+            )
+        case .favorite:
+            NSSound.beep()
+            clearPreviousPasteTarget()
         }
     }
 
@@ -4430,7 +4457,7 @@ class BoardManPanel: NSPanel {
     private var activeSnippetGroupIdentifiers: Set<String> = []
     private var shouldScrollSettingsToTop = true
     fileprivate var onPasteRequested: ((BoardManHistoryItem, CFAbsoluteTime?) -> Void)?
-    fileprivate var onTimestampActionRequested: ((KeyCombo, TimeInterval, CFAbsoluteTime?) -> Void)?
+    fileprivate var onTimestampActionRequested: ((BoardManHistoryItem, KeyCombo, TimeInterval, CFAbsoluteTime?) -> Void)?
     var onRefreshRequested: (() -> Void)?
     var itemCount: Int {
         return historyItems.count
@@ -11034,13 +11061,14 @@ class BoardManPanel: NSPanel {
         return cell.containsTimestamp(windowPoint: window.mouseLocationOutsideOfEventStream)
     }
 
-    private func performTimestampShortcut(startedAt: CFAbsoluteTime?) {
-        guard configuredTimestampShortcutEnabled else {
+    private func performTimestampShortcut(item: BoardManHistoryItem, startedAt: CFAbsoluteTime?) {
+        guard configuredTimestampShortcutEnabled, item.isEnabled else {
             NSSound.beep()
             return
         }
         hidePreviewBubble()
         onTimestampActionRequested?(
+            item,
             configuredTimestampShortcut,
             configuredTimestampShortcutDelay,
             startedAt
@@ -11076,7 +11104,7 @@ class BoardManPanel: NSPanel {
         }
         if timestampWasHit {
             if configuredTimestampInteraction.runsShortcutOnClick {
-                performTimestampShortcut(startedAt: startedAt)
+                performTimestampShortcut(item: item, startedAt: startedAt)
                 return
             }
             if configuredTimestampInteraction.togglesMaskOnClick {
@@ -11141,7 +11169,7 @@ class BoardManPanel: NSPanel {
         setSelectedIndex(row)
         if timestampWasHit {
             if configuredTimestampInteraction.runsShortcutOnLongPress {
-                performTimestampShortcut(startedAt: CFAbsoluteTimeGetCurrent())
+                performTimestampShortcut(item: item, startedAt: CFAbsoluteTimeGetCurrent())
                 return
             }
             if configuredTimestampInteraction.togglesMaskOnLongPress {
