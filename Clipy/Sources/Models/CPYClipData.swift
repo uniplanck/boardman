@@ -117,20 +117,31 @@ final class CPYClipData: NSObject {
         guard plain != rich else { return plain }
 
         // Chromium can expose a plain-text fallback with extra line breaks that are not
-        // always a perfect 2x expansion of the rich representation. Reconcile whenever the
-        // two representations contain exactly the same non-line-break text and the plain
-        // fallback has strictly more line breaks. Rich text is then proof of the intended
-        // layout, while intentional blank lines remain intact because they are preserved in
-        // that representation.
+        // always a perfect 2x expansion of the rich representation. Reconcile only when the
+        // non-line-break text matches and the surplus is systematic across multiple line-break
+        // runs, or when every run is the classic exact 2x expansion. A single extra blank line
+        // is not enough evidence because it can be intentional user content.
         let plainWithoutLineBreaks = plain.replacingOccurrences(of: "\n", with: "")
         let richWithoutLineBreaks = rich.replacingOccurrences(of: "\n", with: "")
-        let plainLineBreakCount = plain.filter { $0 == "\n" }.count
-        let richLineBreakCount = rich.filter { $0 == "\n" }.count
-        if plainWithoutLineBreaks == richWithoutLineBreaks,
-           plainLineBreakCount > richLineBreakCount {
-            return rich
+        let plainRuns = lineBreakRunLengths(in: plain)
+        let richRuns = lineBreakRunLengths(in: rich)
+        guard plainWithoutLineBreaks == richWithoutLineBreaks,
+              plainRuns.count == richRuns.count else {
+            return plain
         }
-        return plain
+
+        var surplusRunCount = 0
+        var allRunsDoubled = !richRuns.isEmpty
+        for (plainRun, richRun) in zip(plainRuns, richRuns) {
+            guard plainRun >= richRun else { return plain }
+            if plainRun > richRun {
+                surplusRunCount += 1
+            }
+            if plainRun != richRun * 2 {
+                allRunsDoubled = false
+            }
+        }
+        return (allRunsDoubled || surplusRunCount >= 2) ? rich : plain
     }
 
     static func liveSanitizedPlainText(from pasteboard: NSPasteboard) -> String? {
@@ -150,6 +161,23 @@ final class CPYClipData: NSObject {
             .replacingOccurrences(of: "\r", with: "\n")
             .replacingOccurrences(of: "\u{2028}", with: "\n")
             .replacingOccurrences(of: "\u{2029}", with: "\n")
+    }
+
+    private static func lineBreakRunLengths(in value: String) -> [Int] {
+        var runs = [Int]()
+        var currentRun = 0
+        for character in value {
+            if character == "\n" {
+                currentRun += 1
+            } else if currentRun > 0 {
+                runs.append(currentRun)
+                currentRun = 0
+            }
+        }
+        if currentRun > 0 {
+            runs.append(currentRun)
+        }
+        return runs
     }
 
     private static func richTextString(from data: Data?,
