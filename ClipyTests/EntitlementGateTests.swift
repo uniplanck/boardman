@@ -731,6 +731,28 @@ struct PasteCountInputServiceTests {
     }
 
     @Test
+    func clipboardTextReconciliationHandlesNonUniformExtraLineBreaks() {
+        let richText = "A\nB\n\nC\nD"
+        let chromePlainText = "A\n\nB\n\n\nC\n\nD"
+
+        #expect(CPYClipData.preferredTextValue(
+            plainText: chromePlainText,
+            richText: richText
+        ) == richText)
+    }
+
+    @Test
+    func clipboardTextReconciliationDoesNotUseRichTextWhenItWouldAddLineBreaks() {
+        let plainText = "A\nB"
+        let richerLayout = "A\n\nB"
+
+        #expect(CPYClipData.preferredTextValue(
+            plainText: plainText,
+            richText: richerLayout
+        ) == plainText)
+    }
+
+    @Test
     func clipboardTextReconciliationPreservesIntentionalBlankLinesWithoutProof() {
         let intentionalBlankLine = "A\nB\n\nC"
         #expect(CPYClipData.preferredTextValue(

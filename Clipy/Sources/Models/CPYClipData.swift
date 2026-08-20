@@ -116,12 +116,21 @@ final class CPYClipData: NSObject {
         }
         guard plain != rich else { return plain }
 
-        // Some apps (notably Chrome for block-level HTML) expose a plain-text fallback where
-        // every visual line break is duplicated. Only correct that exact relationship.
-        // Intentional blank lines remain intact because two rich breaks become four in the
-        // broken plain representation.
-        let doubledRichLineBreaks = rich.replacingOccurrences(of: "\n", with: "\n\n")
-        return plain == doubledRichLineBreaks ? rich : plain
+        // Chromium can expose a plain-text fallback with extra line breaks that are not
+        // always a perfect 2x expansion of the rich representation. Reconcile whenever the
+        // two representations contain exactly the same non-line-break text and the plain
+        // fallback has strictly more line breaks. Rich text is then proof of the intended
+        // layout, while intentional blank lines remain intact because they are preserved in
+        // that representation.
+        let plainWithoutLineBreaks = plain.replacingOccurrences(of: "\n", with: "")
+        let richWithoutLineBreaks = rich.replacingOccurrences(of: "\n", with: "")
+        let plainLineBreakCount = plain.filter { $0 == "\n" }.count
+        let richLineBreakCount = rich.filter { $0 == "\n" }.count
+        if plainWithoutLineBreaks == richWithoutLineBreaks,
+           plainLineBreakCount > richLineBreakCount {
+            return rich
+        }
+        return plain
     }
 
     static func liveSanitizedPlainText(from pasteboard: NSPasteboard) -> String? {
