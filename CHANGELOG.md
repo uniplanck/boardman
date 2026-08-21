@@ -2,9 +2,18 @@
 
 Board-Man follows tagged GitHub releases for published builds. The `main` branch can contain work that has not yet shipped in a downloadable archive.
 
-## Unreleased
+## Unreleased — v0.2.2 candidate
 
-No user-facing changes have been recorded after v0.2.1 yet.
+The current development build is versioned as `0.2.2` / build `4`. It is not a published GitHub Release until a `v0.2.2` tag and release assets are created.
+
+### Clipboard reliability
+
+- Reconciled unintended extra line breaks introduced while clipboard text moves through macOS pasteboard representations.
+- Preserved intentional blank lines while removing only line breaks that were artifacts of the clipboard representation path.
+
+### Release metadata
+
+- Advanced app and test bundle metadata from `0.2.1` / build `3` to `0.2.2` / build `4` so local development installs are distinguishable from the published v0.2.1 archive.
 
 ## v0.2.1 — 2026-08-19
 
