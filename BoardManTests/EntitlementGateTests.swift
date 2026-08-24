@@ -1936,9 +1936,8 @@ extension BoardManUIRegressionTests {
 
         let panel = BoardManPanel()
         panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
-        panel.makeKeyAndOrderFront(nil)
         defer { panel.orderOut(nil) }
-        await settlePanelLayout(panel)
+        await presentPanelForTesting(panel)
 
         let root = try #require(panel.contentView)
         let descendants = allSubviews(of: root)
@@ -2129,6 +2128,12 @@ extension BoardManUIRegressionTests {
             }
         }
         panel.contentView?.layoutSubtreeIfNeeded()
+    }
+
+    private func presentPanelForTesting(_ panel: BoardManPanel) async {
+        panel.orderFrontRegardless()
+        await waitForWindowVisibility(panel, toEqual: true)
+        await settlePanelLayout(panel)
     }
 
     private func waitForWindowVisibility(
@@ -2322,9 +2327,7 @@ extension BoardManUIRegressionTests {
         let panel = BoardManPanel()
         #expect(panel.hidesOnDeactivate)
 
-        NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
-        await settlePanelLayout(panel)
+        await presentPanelForTesting(panel)
         #expect(panel.isVisible)
 
         NotificationCenter.default.post(

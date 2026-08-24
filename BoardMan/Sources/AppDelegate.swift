@@ -236,6 +236,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     }
 
     private func reflectLoginItemState() {
+        guard !BoardManRuntimeEnvironment.isBenchmarkProfile() else { return }
         let isInLoginItems = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.loginItem)
         toggleAddingToLoginItems(isInLoginItems)
     }
@@ -248,7 +249,8 @@ extension AppDelegate: NSApplicationDelegate {
         NSApplication.shared.applicationIconImage = NSImage(named: "AppIcon") ?? NSApplication.shared.applicationIconImage
 
         // Environments
-        AppEnvironment.replaceCurrent(environment: AppEnvironment.fromStorage())
+        let runtimeDefaults = BoardManRuntimeSupport.runtimeDefaults()
+        AppEnvironment.replaceCurrent(environment: AppEnvironment.fromStorage(defaults: runtimeDefaults))
         // UserDefaults
         BoardManRuntimeSupport.registerUserDefaults()
 
@@ -298,6 +300,10 @@ extension AppDelegate: NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             AppEnvironment.current.menuManager.prewarmBoardManPanel()
         }
+
+        // The explicit benchmark profile keeps normal runtime services active for representative
+        // measurements, but never opens permission prompts that would invalidate launch/idle samples.
+        guard !BoardManRuntimeEnvironment.isBenchmarkProfile() else { return }
 
 #if DEBUG
         let screenshotEnvironment = ProcessInfo.processInfo.environment

@@ -113,7 +113,7 @@ final class ClipService {
     }
 
     func ingestCurrentPasteboard() {
-        create()
+        create(detectedAt: CFAbsoluteTimeGetCurrent())
     }
 
     func sanitizePasteboardSoonAfterUserCopy() {
@@ -136,13 +136,14 @@ final class ClipService {
         }
         cachedChangeCount = changeCount
         lock.unlock()
+        let detectedAt = CFAbsoluteTimeGetCurrent()
 
         if sanitizeLivePlainTextIfNeeded(pasteboard) {
             lock.lock()
             cachedChangeCount = pasteboard.changeCount
             lock.unlock()
         }
-        create()
+        create(detectedAt: detectedAt)
     }
 
     @discardableResult
@@ -185,7 +186,7 @@ final class ClipService {
 
 // MARK: - Create Clip
 extension ClipService {
-    fileprivate func create() {
+    fileprivate func create(detectedAt: CFAbsoluteTime? = nil) {
         lock.lock(); defer { lock.unlock() }
 
         // Store types
@@ -203,7 +204,7 @@ extension ClipService {
 
         // Create data
         let data = BoardManClipData(pasteboard: pasteboard, types: types)
-        save(with: data)
+        save(with: data, detectedAt: detectedAt)
     }
 
     func create(with image: NSImage) {
@@ -214,7 +215,7 @@ extension ClipService {
         save(with: data)
     }
 
-    fileprivate func save(with data: BoardManClipData) {
+    fileprivate func save(with data: BoardManClipData, detectedAt: CFAbsoluteTime? = nil) {
         let realm = try! Realm()
         // Copy already copied history
         let isCopySameHistory = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.copySameHistory)
@@ -259,6 +260,13 @@ extension ClipService {
                 if NSKeyedArchiver.archiveRootObject(data, toFile: savedPath) {
                     dispatchRealm.transaction {
                         dispatchRealm.add(clip, update: .all)
+                    }
+                    if let detectedAt {
+                        PasteCountInputService.shared.logBoardManPerformance(
+                            "clipboard_capture_to_queryable",
+                            startedAt: detectedAt,
+                            details: "type=\(clip.primaryType.isEmpty ? "unknown" : clip.primaryType)"
+                        )
                     }
                     self.trimHistoryIfNeeded(in: dispatchRealm)
                 }

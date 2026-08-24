@@ -16,6 +16,15 @@ import Carbon
 import RealmSwift
 
 enum BoardManRuntimeEnvironment {
+    static let benchmarkProfileEnvironmentKey = "BOARDMAN_BENCHMARK_PROFILE"
+
+    static func isBenchmarkProfile(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        guard let rawValue = environment[benchmarkProfileEnvironmentKey] else { return false }
+        return ["1", "true", "yes", "on"].contains(rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+    }
+
     static func isRunningTests(
         environment: [String: String] = ProcessInfo.processInfo.environment,
         arguments: [String] = ProcessInfo.processInfo.arguments,
@@ -88,6 +97,7 @@ final class HotKeyService: NSObject {
         bundlePaths: [String] = Bundle.allBundles.map(\.bundlePath),
         hasXCTestCase: Bool = NSClassFromString("XCTestCase") != nil
     ) -> Bool {
+        guard !BoardManRuntimeEnvironment.isBenchmarkProfile(environment: environment) else { return false }
         return !BoardManRuntimeEnvironment.isRunningTests(
             environment: environment,
             arguments: arguments,

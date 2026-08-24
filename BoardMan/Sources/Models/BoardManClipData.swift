@@ -73,7 +73,7 @@ final class BoardManClipData: NSObject {
         return types == [.deprecatedString] || types == [.string]
     }
     var thumbnailImage: NSImage? {
-        let defaults = UserDefaults.standard
+        let defaults = AppEnvironment.current.defaults
         let width = defaults.integer(forKey: Constants.UserDefaults.thumbnailWidth)
         let height = defaults.integer(forKey: Constants.UserDefaults.thumbnailHeight)
 

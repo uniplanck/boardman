@@ -366,13 +366,20 @@ extension MenuManager {
 
         // Snapshot verification is only for reliable usage counting. It must never block paste itself.
         panel.orderOut(nil)
+        let restoreStartedAt = CFAbsoluteTimeGetCurrent()
         restorePreviousPasteTarget { [weak self] in
             guard let self else { return }
 
+            PasteCountInputService.shared.logBoardManPerformance(
+                "paste_target_restore_settle",
+                startedAt: restoreStartedAt,
+                details: "source=history"
+            )
             if let clickStartedAt {
                 PasteCountInputService.shared.logBoardManPerformance("panel_direct_paste_dispatch", startedAt: clickStartedAt)
             }
 
+            let dispatchStartedAt = CFAbsoluteTimeGetCurrent()
             let realm = try! Realm()
             guard let clip = realm.object(ofType: BoardManClip.self, forPrimaryKey: dataHash) else {
                 BoardManRuntimeSupport.sendDiagnosticLog("BoardMan direct paste: cannot fetch clip")
@@ -383,6 +390,11 @@ extension MenuManager {
 
             let pasteCountKey = PasteCountStore.shared.key(for: clip)
             let didSend = AppEnvironment.current.pasteService.paste(with: clip)
+            PasteCountInputService.shared.logBoardManPerformance(
+                "paste_dispatch_overhead",
+                startedAt: dispatchStartedAt,
+                details: "source=history sent=\(didSend)"
+            )
             guard didSend else {
                 self.clearPreviousPasteTarget()
                 return
@@ -414,13 +426,20 @@ extension MenuManager {
         guard let panel = boardManPanel else { return }
         panel.orderOut(nil)
 
+        let restoreStartedAt = CFAbsoluteTimeGetCurrent()
         restorePreviousPasteTarget { [weak self] in
             guard let self else { return }
 
+            PasteCountInputService.shared.logBoardManPerformance(
+                "paste_target_restore_settle",
+                startedAt: restoreStartedAt,
+                details: "source=snippet"
+            )
             if let clickStartedAt {
                 PasteCountInputService.shared.logBoardManPerformance("panel_snippet_paste_dispatch", startedAt: clickStartedAt)
             }
 
+            let dispatchStartedAt = CFAbsoluteTimeGetCurrent()
             let realm = try! Realm()
             guard let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: identifier) else {
                 BoardManRuntimeSupport.sendDiagnosticLog("BoardMan direct paste: cannot fetch snippet")
@@ -436,6 +455,11 @@ extension MenuManager {
 
             AppEnvironment.current.pasteService.copyToPasteboard(with: snippet.content)
             let didSend = AppEnvironment.current.pasteService.paste()
+            PasteCountInputService.shared.logBoardManPerformance(
+                "paste_dispatch_overhead",
+                startedAt: dispatchStartedAt,
+                details: "source=snippet sent=\(didSend)"
+            )
             guard didSend else {
                 self.clearPreviousPasteTarget()
                 return

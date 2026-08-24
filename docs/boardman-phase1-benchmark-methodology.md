@@ -15,6 +15,7 @@ This harness establishes repeatable measurements before Board-Man changes storag
 - User-visible runtime observations such as installed-app RSS/CPU are recorded separately from deterministic fixture benchmarks.
 - Record host contention at the measurement boundary. Runs performed while unrelated builds or other processes materially load the machine may prove harness correctness, but must be marked `host-contended` and excluded from SLO calibration.
 - Never terminate unrelated user processes merely to obtain a cleaner benchmark run.
+- AppKit UI-regression fixtures must not depend on the XCTest host being the active application. Test panels are presented with a deterministic test-only front-ordering helper before visibility assertions.
 - SQLiteData migration work remains out of scope for Phase 1.
 
 ## Deterministic fixtures
@@ -50,6 +51,52 @@ The fixture contents are generated before measurement so fixture construction ti
 
 Each metric records iterations, p50, p95, average, and maximum milliseconds. The test prints a machine-readable JSON object prefixed with `BOARDMAN_PHASE1_BENCHMARK_JSON=` and writes the same JSON to `BOARDMAN_BENCHMARK_OUTPUT` when that variable reaches the test process, otherwise to `/tmp/boardman-phase1-benchmark.json`. The actual path is printed as `BOARDMAN_PHASE1_BENCHMARK_OUTPUT=`.
 
+## Runtime instrumentation metrics
+
+Runtime performance logging now separates user-visible orchestration delay from Board-Man's own measured work:
+
+- `paste_target_restore_settle`: starts immediately before restoring the previously focused target application and ends after the target is frontmost/focused plus the required app-specific settle delay. This intentionally includes the 80 ms native-app or 240 ms Chromium settle window and is **not** compared with the paste-overhead SLO.
+- `paste_dispatch_overhead`: starts only after target restoration/settling is complete, then measures Realm lookup plus pasteboard replay and synthetic paste-event enqueue through `PasteService`. This is the metric eligible for comparison with the candidate `p95 <= 50 ms` paste-dispatch-overhead SLO.
+- `clipboard_capture_to_queryable`: starts when `ClipService` detects a new pasteboard `changeCount` (or explicit ingestion begins) and ends immediately after the archived payload is written and the corresponding Realm transaction commits. History trimming occurs after this marker, so the endpoint means the captured clip is queryable.
+
+Legacy `panel_direct_paste_dispatch` / `panel_snippet_paste_dispatch` logging remains for end-to-end continuity but includes target restoration and settle behavior; it must not be used as the pure dispatch-overhead SLO metric.
+
+## Isolated benchmark runtime profile
+
+Set `BOARDMAN_BENCHMARK_PROFILE=1` only for explicit runtime measurement launches. The profile isolates benchmark state from the user's normal Board-Man runtime by using:
+
+- a dedicated Application Support directory ending in `Benchmark`,
+- a dedicated Realm file named `benchmark.realm`,
+- a dedicated `com.uniplanck.BoardMan.Benchmark` UserDefaults suite,
+- a dedicated `~/Library/Logs/Board-Man Benchmark/paste-count-input.log`,
+- no legacy Realm import/recovery into the benchmark Realm,
+- no launch-time accessibility permission prompt.
+
+Normal runtime services remain active so launch/idle measurements remain representative. Do not run the normal installed Board-Man and the benchmark instance simultaneously when measuring global hotkey/input behavior; stop the normal instance, run the bounded benchmark, then relaunch the installed app.
+
+## UI regression stability evidence
+
+After replacing test-host activation-dependent panel presentation with the deterministic test-only helper, `BoardManUIRegressionTests` passed 90/90 executions across 10 serial iterations. The same source then passed the complete serial suite at 98/98 tests across 16 suites. After adding benchmark-only license/device-state isolation, the final source again passed the complete serial suite at 98/98 tests across 16 suites. These results validate test-harness determinism and regression safety; they are not performance SLO measurements.
+
+## Runtime benchmark isolation acceptance
+
+The final-source Universal Release build was launched directly with `BOARDMAN_BENCHMARK_PROFILE=1` after the installed `/Applications/Board-Man.app` instance was cleanly stopped. Production state was fingerprinted before launch, during benchmark execution, and after benchmark termination.
+
+Expected benchmark-only artifacts were created under `~/Library/Application Support/Board-Man Benchmark`, `~/Library/Logs/Board-Man Benchmark`, and the `com.uniplanck.BoardMan.Benchmark` preferences domain, including `benchmark.realm` and Realm management files.
+
+The following production state remained fingerprint-identical across the benchmark run:
+
+- `~/Library/Application Support/com.uniplanck.BoardMan`
+- `~/Library/Application Support/Board-Man`
+- `~/Library/Application Support/Board-Man Archive`
+- `~/Library/Logs/Board-Man`
+- `~/Library/Preferences/com.uniplanck.BoardMan.plist`
+- the exported normal `com.uniplanck.BoardMan` defaults domain
+
+Result: runtime benchmark storage/configuration isolation **PASS**. The installed production app was relaunched successfully afterward.
+
+This proves isolation, not performance SLO compliance. Host contention during Release dependency compilation materially distorted timing conditions, so those timing samples remain excluded from SLO calibration.
+
 ## Runtime footprint metrics
 
 Release artifact/runtime baseline should separately record:
@@ -68,7 +115,7 @@ Deterministic Swift benchmarks currently run in the Debug test host because the 
 
 Release artifact size/dependency measurements are collected from the actual Release build.
 
-A distinct search first-result metric is not claimed while Board-Man's measured test path filters synchronously to completion. Likewise, existing paste-dispatch performance logging includes target-application settle behavior and cannot be compared directly with the candidate dispatch-overhead SLO until those boundaries are separated.
+A distinct search first-result metric is not claimed while Board-Man's measured test path filters synchronously to completion. Paste-dispatch instrumentation is now boundary-separated as documented above; candidate SLO calibration still requires repeated quiet-host runtime samples before becoming a gate.
 
 Migration duration and post-migration SQLite size become measurable only after a Phase 2 migration candidate exists. They remain required future acceptance measurements, but Phase 1 does not start Phase 2 merely to manufacture those numbers.
 

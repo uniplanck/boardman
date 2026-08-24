@@ -80,14 +80,17 @@ struct AppEnvironment {
             excludeApplications = applications
         }
         let excludeAppService = ExcludeAppService(applications: excludeApplications)
+        let hotKeyService = BoardManRuntimeEnvironment.isBenchmarkProfile()
+            ? HotKeyService(defaults: defaults)
+            : current.hotKeyService
         return Environment(clipService: current.clipService,
-                           hotKeyService: current.hotKeyService,
+                           hotKeyService: hotKeyService,
                            dataCleanService: current.dataCleanService,
                            pasteService: current.pasteService,
                            excludeAppService: excludeAppService,
                            accessibilityService: current.accessibilityService,
                            menuManager: current.menuManager,
-                           defaults: current.defaults)
+                           defaults: defaults)
     }
 
  }

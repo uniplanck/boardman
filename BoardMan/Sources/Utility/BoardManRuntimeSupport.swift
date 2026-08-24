@@ -6,11 +6,46 @@
 import Cocoa
 
 final class BoardManRuntimeSupport {
-    private static let applicationSupportFolderPath: String = {
+    private static let benchmarkDefaultsSuiteName = "com.uniplanck.BoardMan.Benchmark"
+
+    static func applicationSupportFolder(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String {
         let paths = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true)
         let basePath = paths.first ?? NSTemporaryDirectory()
-        return (basePath as NSString).appendingPathComponent(Constants.Application.name)
-    }()
+        let folderName = BoardManRuntimeEnvironment.isBenchmarkProfile(environment: environment)
+            ? "\(Constants.Application.name) Benchmark"
+            : Constants.Application.name
+        return (basePath as NSString).appendingPathComponent(folderName)
+    }
+
+    static func benchmarkRealmFileURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL? {
+        guard BoardManRuntimeEnvironment.isBenchmarkProfile(environment: environment) else { return nil }
+        return URL(fileURLWithPath: applicationSupportFolder(environment: environment), isDirectory: true)
+            .appendingPathComponent("benchmark.realm")
+    }
+
+    static func runtimeDefaults(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> UserDefaults {
+        guard BoardManRuntimeEnvironment.isBenchmarkProfile(environment: environment) else { return .standard }
+        guard let defaults = UserDefaults(suiteName: benchmarkDefaultsSuiteName) else {
+            preconditionFailure("Board-Man benchmark defaults suite is unavailable")
+        }
+        return defaults
+    }
+
+    static func performanceLogDirectory(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        let directoryName = BoardManRuntimeEnvironment.isBenchmarkProfile(environment: environment)
+            ? "Board-Man Benchmark"
+            : "Board-Man"
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Logs/\(directoryName)", isDirectory: true)
+    }
 
     static func initializeOptionalServices() {
         guard AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.collectCrashReport) else { return }
@@ -96,11 +131,14 @@ final class BoardManRuntimeSupport {
         defaults[Constants.Beta.pasteAndDeleteHistory] = false
         defaults[Constants.Beta.pasteAndDeleteHistoryModifier] = 0
         defaults[Constants.Beta.observerScreenshot] = false
-        AppEnvironment.current.defaults.register(defaults: defaults)
-    }
-
-    static func applicationSupportFolder() -> String {
-        applicationSupportFolderPath
+        let runtimeDefaults = AppEnvironment.current.defaults
+        runtimeDefaults.register(defaults: defaults)
+        if BoardManRuntimeEnvironment.isBenchmarkProfile() {
+            runtimeDefaults.set(false, forKey: Constants.UserDefaults.loginItem)
+            runtimeDefaults.set(true, forKey: Constants.UserDefaults.suppressAlertForLoginItem)
+            runtimeDefaults.set(false, forKey: Constants.UserDefaults.collectCrashReport)
+            runtimeDefaults.set(false, forKey: Constants.Update.enableAutomaticCheck)
+        }
     }
 
     static func prepareDirectory(at path: String) -> Bool {

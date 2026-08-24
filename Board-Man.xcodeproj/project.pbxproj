@@ -83,6 +83,7 @@
 		FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6167951D3ACDD80049FA14 /* SnippetTests.swift */; };
 		FA0D5CF81DDCC61600AC9052 /* EntitlementGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */; };
 		B0A1B00226A8240000000001 /* BoardManPerformanceBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */; };
+		B0A1B00426A8240000000001 /* BoardManRuntimeEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */; };
 		FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */; };
 		FAC0DCE91DE15FD900309C49 /* DataCleanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCE81DE15FD900309C49 /* DataCleanService.swift */; };
 		FAC0DCEF1DE3255E00309C49 /* NSImage+NSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCEE1DE3255E00309C49 /* NSImage+NSColor.swift */; };
@@ -211,6 +212,7 @@
 		FA6167951D3ACDD80049FA14 /* SnippetTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SnippetTests.swift; sourceTree = "<group>"; };
 		FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EntitlementGateTests.swift; sourceTree = "<group>"; };
 		B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPerformanceBaselineTests.swift; sourceTree = "<group>"; };
+		B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManRuntimeEnvironmentTests.swift; sourceTree = "<group>"; };
 		FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
 		FAAA885C1E6853B80088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManServicesPreferenceViewController.xib; sourceTree = "<group>"; };
 		FAAA88621E6858030088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManServicesPreferenceViewController.strings; sourceTree = "<group>"; };
@@ -534,6 +536,7 @@
 				FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */,
 				FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */,
 				B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */,
+				B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */,
 				FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */,
 				FA6167911D3ABEB10049FA14 /* FolderTests.swift */,
 				FA6167951D3ACDD80049FA14 /* SnippetTests.swift */,
@@ -773,6 +776,7 @@
 				FA08EDF81D1FED7D000D1D13 /* HotKeyServiceTests.swift in Sources */,
 				FA0D5CF81DDCC61600AC9052 /* EntitlementGateTests.swift in Sources */,
 				B0A1B00226A8240000000001 /* BoardManPerformanceBaselineTests.swift in Sources */,
+				B0A1B00426A8240000000001 /* BoardManRuntimeEnvironmentTests.swift in Sources */,
 				FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */,
 				FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */,
 			);

@@ -47,11 +47,17 @@ final class TextHistoryArchiveStore {
         return fileURL
     }
 
-    static func defaultFileURL(fileManager: FileManager = .default) -> URL {
+    static func defaultFileURL(
+        fileManager: FileManager = .default,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
         let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let directoryName = BoardManRuntimeEnvironment.isBenchmarkProfile(environment: environment)
+            ? "Board-Man Benchmark Archive"
+            : "Board-Man Archive"
         return applicationSupport
-            .appendingPathComponent("Board-Man Archive", isDirectory: true)
+            .appendingPathComponent(directoryName, isDirectory: true)
             .appendingPathComponent("Text History.jsonl", isDirectory: false)
     }
 

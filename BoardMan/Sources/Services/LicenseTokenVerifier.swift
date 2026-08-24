@@ -173,7 +173,7 @@ final class LicenseBootstrapService {
 
     private func publishDiagnostic(status: String, plan: EntitlementPlan) {
         // Diagnostic only. Entitlement decisions never read these defaults.
-        let defaults = UserDefaults.standard
+        let defaults = AppEnvironment.current.defaults
         defaults.set(status, forKey: "BoardManDiagnosticEntitlementStatus")
         defaults.set(plan.rawValue, forKey: "BoardManDiagnosticEntitlementPlan")
         defaults.set(Date(), forKey: "BoardManDiagnosticEntitlementCheckedAt")

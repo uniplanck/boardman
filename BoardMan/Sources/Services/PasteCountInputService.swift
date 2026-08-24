@@ -234,8 +234,7 @@ final class PasteCountInputService {
     private var logFileSize: UInt64 = 0
 
     private init() {
-        let logDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/Board-Man", isDirectory: true)
+        let logDirectory = BoardManRuntimeSupport.performanceLogDirectory()
         self.logURL = logDirectory.appendingPathComponent("paste-count-input.log")
         log("service initialized logFile=\(logURL.path)")
     }

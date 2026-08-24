@@ -217,7 +217,21 @@ protocol LicenseTokenStoring {
 
 enum BoardManLocalStatePaths {
     static var directoryURL: URL {
-        let fileManager = FileManager.default
+        return directoryURL(environment: ProcessInfo.processInfo.environment)
+    }
+
+    static func directoryURL(
+        environment: [String: String],
+        fileManager: FileManager = .default
+    ) -> URL {
+        if BoardManRuntimeEnvironment.isBenchmarkProfile(environment: environment) {
+            return URL(
+                fileURLWithPath: BoardManRuntimeSupport.applicationSupportFolder(environment: environment),
+                isDirectory: true
+            )
+            .appendingPathComponent("Local State", isDirectory: true)
+        }
+
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? fileManager.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Application Support", isDirectory: true)

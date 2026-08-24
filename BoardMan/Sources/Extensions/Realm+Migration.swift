@@ -104,13 +104,18 @@ extension Realm {
             return
         }
 
-        let config = Realm.Configuration(
+        var config = Realm.Configuration(
             schemaVersion: LegacySnippetMigrationService.schemaVersion,
             migrationBlock: applyBoardManMigration
         )
+        if let benchmarkRealmURL = BoardManRuntimeSupport.benchmarkRealmFileURL() {
+            _ = BoardManRuntimeSupport.prepareDirectory(at: benchmarkRealmURL.deletingLastPathComponent().path)
+            config.fileURL = benchmarkRealmURL
+        }
         Realm.Configuration.defaultConfiguration = config
 
         let realm = try! Realm()
+        guard !BoardManRuntimeEnvironment.isBenchmarkProfile() else { return }
         let snippetResult = LegacySnippetMigrationService.migrateIfNeeded(into: realm)
         LegacySnippetMigrationService.publishDiagnostic(snippetResult)
         let historyResult = LegacyHistoryRecoveryService.migrateIfNeeded(into: realm)

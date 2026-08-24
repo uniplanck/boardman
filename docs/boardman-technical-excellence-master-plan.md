@@ -181,7 +181,7 @@ Before replacing Realm:
 
 # Phase 1 — Measurement and performance budget
 
-**Execution status: ACTIVE as of 2026-08-24.**
+**Execution status: ACTIVE as of 2026-08-24; benchmark foundation committed, runtime measurement closure in progress.**
 
 **Goal: know exactly where Board-Man is heavy before optimizing it.**
 
@@ -213,8 +213,8 @@ At minimum:
 - keyboard navigation latency,
 - search first-result latency,
 - search full-result latency,
-- paste dispatch latency,
-- clipboard capture-to-queryable latency,
+- paste dispatch latency, with required target-app settle measured separately from pure Board-Man dispatch overhead,
+- clipboard capture-to-queryable latency from pasteboard change detection through archive + committed queryable record,
 - migration duration for each fixture once a Phase 2 importer candidate exists; required for Phase 2 acceptance, not a reason to start Phase 2 early,
 - SQLite file size after migration once a Phase 2 destination candidate exists; required for Phase 2 acceptance, not a Phase 1 prerequisite to implementation,
 - energy impact where reproducibly measurable.
@@ -631,7 +631,7 @@ Every phase closes only with evidence for:
 
 **Continue Phase 1 measurement. Do not start Phase 2 yet.**
 
-The fresh repository/artifact snapshot has been captured. Build and stabilize the deterministic benchmark harness, record machine-readable baseline results, then add safe runtime observations for launch/idle footprint. Calibrate candidate SLOs only after repeated measurements show enough stability to avoid flaky gates.
+The deterministic benchmark harness and machine-readable provisional baseline are committed. Runtime instrumentation now separates target-app settle, pure paste dispatch overhead, and clipboard capture-to-queryable latency. The isolated benchmark runtime profile is implemented and actual Release runtime acceptance proved production Realm, payload, archive, logs, preferences, and defaults remain unchanged while benchmark-only Realm/log/defaults state is created separately. Final-source serial regression is 98/98 across 16 suites, and the Universal Release build plus codesign verification are GREEN. Remaining Phase 1 work is quiet-host launch/idle/runtime sampling and candidate SLO calibration after repeated stable measurements.
 
 SQLiteData migration, broad `MenuManager` decomposition, and dependency replacement remain blocked until Phase 1 has enough evidence to justify them.
 
