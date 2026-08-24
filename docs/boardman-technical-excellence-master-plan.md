@@ -1,8 +1,9 @@
 # Board-Man Technical Excellence Master Plan
 
-Status: authoritative roadmap draft
+Status: authoritative roadmap; Phase 1 ACTIVE
 Created: 2026-08-21
-Execution rule: **Phase 0 must be completed and accepted before Phase 1 begins.**
+Baseline refreshed: 2026-08-24
+Execution rule: **Phase 0 must be completed and accepted before Phase 1 begins. Phase 0 is now PASS / CLOSED.**
 
 ## 1. Purpose
 
@@ -33,33 +34,39 @@ The roadmap optimizes for **measured user-visible quality**, not modernization f
 
 ## 3. Current baseline snapshot
 
-This snapshot is a planning baseline, not a permanent truth. Re-measure it at the start of Phase 1.
+Fresh Phase 1 entry snapshot captured on 2026-08-24. Detailed evidence lives in `docs/boardman-phase1-baseline-snapshot.md` and the benchmark methodology in `docs/boardman-phase1-benchmark-methodology.md`.
 
-### Already improved on the current independent-core branch
+### Accepted independent-core state
 
-- historical Clipy-organization Swift packages removed from dependency resolution,
+- Phase 0 Independent Core: PASS / CLOSED,
+- historical Clipy-organization Swift package references in `Package.resolved`: `0`,
+- CPY-named Swift source files: `0`,
 - Board-Man-owned hotkey registry and shortcut recording layer introduced,
 - login-at-launch moved to macOS `SMAppService`,
 - screenshot observation moved to Board-Man implementation,
 - `BoardManApplicationInfo`, `BoardManDragPayload`, and `BoardManRuntimeSupport` introduced,
-- several CPY-named UI helpers moved to Board-Man equivalents,
 - MIT-client / commercial-service entitlement boundary introduced,
 - local feature limits removed from the commercial entitlement model,
 - signed entitlement verification supports subscription/trial/owner-lifetime forms,
-- Debug build has been returned to green with SwiftLint serious violations at zero.
+- Phase 0 full tests, Debug/Release build, codesign, installed-app smoke, compatibility and attribution gates passed,
+- post-Phase-0 horizontal keyboard navigation now covers History → Templates All → persisted template groups.
 
-### Remaining measurable technical debt observed before this plan
+Required upstream MIT attribution and explicitly isolated persistence/archive compatibility identifiers remain intentionally. Their presence is not evidence that normal product code still depends on an active CPY product type.
 
-- CPY-prefixed Swift source files remain,
-- historical Clipy copyright/header text remains in multiple files,
-- Xcode target/build internals still use historical `Clipy` naming,
-- Realm is still referenced directly from several areas,
-- many direct `Realm()` access points remain,
-- persistence/domain/UI responsibilities are still coupled in places,
-- `MenuManager` has grown into a very large coordinator and must be decomposed,
-- old XIB/controller names and compatibility identifiers remain,
+### Fresh measurable technical debt at Phase 1 entry
+
+- Swift source/test files: `61`,
+- production Swift files importing `RealmSwift`: `13`,
+- direct production `Realm()` construction sites: `59`,
+- persistence/domain/UI responsibilities remain coupled in places,
+- `MenuManager` remains a very large coordinator and must eventually be decomposed,
+- Release app footprint at Phase 1 entry: `36,088 KiB` by `du -sk`,
+- Release main executable: `31,804,640` bytes,
+- directly embedded top-level framework count: `1` (`Sparkle.framework`),
 - production notarization / Sparkle release automation is not yet complete,
-- current persistence migration strategy is stronger than before but is not yet the final Board-Man-native store architecture.
+- the final Board-Man-native store architecture remains Phase 2 work.
+
+Do not interpret Realm counts as permission to start the SQLiteData migration during Phase 1. Measure first.
 
 ## 4. North-star architecture
 
@@ -116,7 +123,7 @@ Do not split into modules merely to increase module count. Split when the bounda
 
 # Phase 0 — Finish the current independent-core work
 
-**Execution status: ACTIVE. All later phases are blocked.**
+**Execution status: PASS / CLOSED. Phase 1 is unblocked.**
 
 ## P0.1 Clipy implementation independence
 
@@ -174,6 +181,8 @@ Before replacing Realm:
 
 # Phase 1 — Measurement and performance budget
 
+**Execution status: ACTIVE as of 2026-08-24.**
+
 **Goal: know exactly where Board-Man is heavy before optimizing it.**
 
 Build a repeatable benchmark harness and commit results in machine-readable form where practical.
@@ -206,8 +215,8 @@ At minimum:
 - search full-result latency,
 - paste dispatch latency,
 - clipboard capture-to-queryable latency,
-- migration duration for each fixture,
-- SQLite file size after migration,
+- migration duration for each fixture once a Phase 2 importer candidate exists; required for Phase 2 acceptance, not a reason to start Phase 2 early,
+- SQLite file size after migration once a Phase 2 destination candidate exists; required for Phase 2 acceptance, not a Phase 1 prerequisite to implementation,
 - energy impact where reproducibly measurable.
 
 ## P1.3 Initial SLO candidates
@@ -620,8 +629,10 @@ Every phase closes only with evidence for:
 
 # 10. Immediate next action
 
-**Do not start Phase 1 yet.**
+**Continue Phase 1 measurement. Do not start Phase 2 yet.**
 
-Resume and finish the currently active independent-core work under Phase 0. Once its gate passes, capture a fresh repository/runtime snapshot, update the baseline section of this document, and then begin Phase 1 measurement before changing storage or architecture further.
+The fresh repository/artifact snapshot has been captured. Build and stabilize the deterministic benchmark harness, record machine-readable baseline results, then add safe runtime observations for launch/idle footprint. Calibrate candidate SLOs only after repeated measurements show enough stability to avoid flaky gates.
 
-This document becomes the default technical roadmap after Phase 0, unless a newer explicitly approved roadmap supersedes it.
+SQLiteData migration, broad `MenuManager` decomposition, and dependency replacement remain blocked until Phase 1 has enough evidence to justify them.
+
+This document remains the default technical roadmap unless a newer explicitly approved roadmap supersedes it.

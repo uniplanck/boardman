@@ -8821,8 +8821,33 @@ class BoardManPanel: NSPanel {
     }
 
 #if DEBUG
+    private var benchmarkIsolationForTesting = false
+
+    func setBenchmarkIsolationForTesting(_ enabled: Bool) {
+        benchmarkIsolationForTesting = enabled
+    }
+
     func loadItemsForTesting(_ items: [BoardManHistoryItem]) {
         reloadHistoryItems(items)
+    }
+
+    func setSearchQueryForTesting(_ query: String) {
+        searchField?.stringValue = query
+        selectedIndex = -1
+        applyCurrentFilter()
+    }
+
+    var visibleItemCountForTesting: Int {
+        return historyItems.count
+    }
+
+    @discardableResult
+    func moveVerticalSelectionForTesting(delta: Int) -> Bool {
+        return selectRowByKeyboard(delta: delta)
+    }
+
+    var selectedIndexForTesting: Int {
+        return selectedIndex
     }
 
     func selectItemForTesting(at index: Int) {
@@ -10943,8 +10968,15 @@ class BoardManPanel: NSPanel {
         let tabbedItems: [BoardManHistoryItem]
         switch activeTab {
         case .history:
+            #if DEBUG
+            let usageFilter: BoardManHistoryUsageFilter = benchmarkIsolationForTesting ? .all : currentHistoryUsageFilter
+            let condition = benchmarkIsolationForTesting
+                ? nil
+                : BoardManHistoryConditionStore.shared.condition(for: usageFilter)
+            #else
             let usageFilter = currentHistoryUsageFilter
             let condition = BoardManHistoryConditionStore.shared.condition(for: usageFilter)
+            #endif
             let filteredClips = allItems.filter { item in
                 guard item.source == .clip, item.isEnabled, usageFilter.includes(item) else { return false }
                 guard let condition, condition.isEnabled else { return true }
@@ -10970,7 +11002,11 @@ class BoardManPanel: NSPanel {
             tabbedItems = []
         }
 
+        #if DEBUG
+        let hideRules = benchmarkIsolationForTesting ? [] : BoardManHideRuleStore.shared.rules
+        #else
         let hideRules = BoardManHideRuleStore.shared.rules
+        #endif
         let visibleItems = hideRules.isEmpty ? tabbedItems : tabbedItems.filter { item in
             let searchableText = [item.primaryTitle, item.title, item.previewTitle]
                 .joined(separator: "\n")

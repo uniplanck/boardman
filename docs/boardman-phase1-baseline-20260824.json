@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "status": "provisional-host-contended",
+  "capturedAt": "2026-08-24T04:19:47Z",
+  "excludedFromSloCalibration": true,
+  "exclusionReasons": [
+    "Host load was highly contended during deterministic timing runs.",
+    "A concurrent SizeForge xcodebuild/swift-frontend process was observed during an earlier run.",
+    "At the latest run boundary, system load averages were 35.29, 27.52, and 19.16 with multiple unrelated Brave/The-Agents processes consuming substantial CPU."
+  ],
+  "repository": {
+    "branch": "refactor/boardman-independent-core-20260821",
+    "phase1EntryHead": "6f7fbfcd066b3e21830adcaa1400038c39cf9896",
+    "originMain": "78c86fd8da103bb9ece87259c02e608bba49a894",
+    "entryAhead": 3,
+    "entryBehind": 0
+  },
+  "sourceBaseline": {
+    "swiftSourceAndTestFiles": 61,
+    "productionRealmSwiftImportFiles": 13,
+    "directProductionRealmConstructionSites": 59,
+    "cpyNamedSwiftFiles": 0,
+    "clipyOrganizationPackageReferences": 0
+  },
+  "releaseArtifact": {
+    "bundleDiskKiB": 36088,
+    "approximateBundleMiB": 35.2,
+    "mainExecutableBytes": 31804640,
+    "embeddedTopLevelFrameworkCount": 1,
+    "embeddedTopLevelFrameworks": ["Sparkle.framework"]
+  },
+  "deterministicDebugTestHost": {
+    "configuration": "Debug test host; correctness and relative-observation harness only",
+    "architecture": "arm64",
+    "operatingSystem": "macOS 26.5.2 build 25F84",
+    "processorCount": 8,
+    "physicalMemoryBytes": 25769803776,
+    "fixtureHistoryCounts": [0, 100, 1000, 10000],
+    "fixtureTemplateCounts": [100, 1000],
+    "metrics": [
+      {"name":"history_load","fixture":"empty","iterations":8,"p50Milliseconds":520.804,"p95Milliseconds":642.246,"averageMilliseconds":469.564,"maxMilliseconds":642.246},
+      {"name":"history_load","fixture":"100","iterations":8,"p50Milliseconds":399.973,"p95Milliseconds":551.795,"averageMilliseconds":401.967,"maxMilliseconds":551.795},
+      {"name":"history_load","fixture":"1000","iterations":6,"p50Milliseconds":364.018,"p95Milliseconds":533.72,"averageMilliseconds":384.041,"maxMilliseconds":533.72},
+      {"name":"history_load","fixture":"10000","iterations":4,"p50Milliseconds":539.63,"p95Milliseconds":545.983,"averageMilliseconds":477.437,"maxMilliseconds":545.983},
+      {"name":"search_full_result","fixture":"history-10000-single-hit","iterations":12,"p50Milliseconds":49.864,"p95Milliseconds":53.847,"averageMilliseconds":50.061,"maxMilliseconds":53.847},
+      {"name":"keyboard_row_navigation","fixture":"history-10000","iterations":40,"p50Milliseconds":8.048,"p95Milliseconds":11.055,"averageMilliseconds":7.894,"maxMilliseconds":11.168},
+      {"name":"history_load","fixture":"1000-half-pinned","iterations":6,"p50Milliseconds":16.416,"p95Milliseconds":19.031,"averageMilliseconds":16.28,"maxMilliseconds":19.031},
+      {"name":"search_full_result","fixture":"100-long-text","iterations":8,"p50Milliseconds":84.818,"p95Milliseconds":97.895,"averageMilliseconds":86.57,"maxMilliseconds":97.895},
+      {"name":"template_load","fixture":"100","iterations":8,"p50Milliseconds":14.381,"p95Milliseconds":16.833,"averageMilliseconds":13.458,"maxMilliseconds":16.833},
+      {"name":"template_load","fixture":"1000","iterations":6,"p50Milliseconds":16.303,"p95Milliseconds":16.8,"averageMilliseconds":14.193,"maxMilliseconds":16.8},
+      {"name":"template_search","fixture":"1000-single-hit","iterations":10,"p50Milliseconds":16.63,"p95Milliseconds":16.971,"averageMilliseconds":16.568,"maxMilliseconds":16.971},
+      {"name":"template_group_filter","fixture":"1000-10-groups","iterations":8,"p50Milliseconds":16.917,"p95Milliseconds":20.696,"averageMilliseconds":16.588,"maxMilliseconds":20.696},
+      {"name":"horizontal_group_traversal","fixture":"10-groups","iterations":5,"p50Milliseconds":224.241,"p95Milliseconds":282.177,"averageMilliseconds":230.784,"maxMilliseconds":282.177}
+    ]
+  },
+  "currentProfileObservations": {
+    "scope": "real installed profile; observational only",
+    "installedProcessPointInTime": {
+      "pid": 2108,
+      "rssKiB": 75456,
+      "cpuPercent": 0.0,
+      "elapsed": "01:25:33"
+    },
+    "performanceLog20260824": {
+      "panel_visible_fast": {"samples":13,"p50Milliseconds":61.0,"p95Milliseconds":83.7,"averageMilliseconds":65.4,"maxMilliseconds":135.2},
+      "history_reload": {"samples":12,"p50Milliseconds":80.1,"p95Milliseconds":177.7,"averageMilliseconds":93.8,"maxMilliseconds":185.2},
+      "panel_prewarm": {"samples":5,"p50Milliseconds":578.4,"p95Milliseconds":825.1,"averageMilliseconds":648.9,"maxMilliseconds":833.3},
+      "panel_direct_paste_dispatch": {"samples":1,"p50Milliseconds":333.0,"p95Milliseconds":333.0,"averageMilliseconds":333.0,"maxMilliseconds":333.0}
+    }
+  },
+  "measurementNotes": [
+    "Paste dispatch log timing includes required target-application settle behavior and is not directly comparable with the candidate <=50 ms dispatch-overhead SLO.",
+    "Current synchronous search records full query completion; a distinct first-result boundary does not yet exist in this harness.",
+    "The attempted five-minute idle sampler was invalidated by the GAF stall timeout and produced no accepted five-minute result.",
+    "Cold/warm launch timing is pending a verified isolated profile so the user's live clipboard store is not mutated or treated as a fixed fixture.",
+    "Migration duration and SQLite file size are not measurable until a Phase 2 migration candidate exists; they remain future acceptance measurements and do not authorize Phase 2 work now."
+  ],
+  "remainingForStablePhase1Baseline": [
+    "Repeat deterministic measurements under a quiet-host condition and establish variance.",
+    "Capture a valid fixed five-minute idle CPU/RSS observation without sampler timeout.",
+    "Create a verified isolated profile for cold/warm launch measurement.",
+    "Separate paste dispatch overhead from target-application settle delay.",
+    "Add clipboard capture-to-queryable latency instrumentation.",
+    "Define performance fail thresholds only after stable repeated measurements."
+  ]
+}
