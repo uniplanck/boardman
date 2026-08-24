@@ -2224,6 +2224,63 @@ extension BoardManUIRegressionTests {
     }
 
     @Test
+    func horizontalArrowNavigationMovesThroughHistoryAllAndSnippetGroups() throws {
+        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
+        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
+        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
+
+        let realm = try Realm()
+        let firstFolder = BoardManFolder()
+        firstFolder.title = "First"
+        firstFolder.index = 0
+        let secondFolder = BoardManFolder()
+        secondFolder.title = "Second"
+        secondFolder.index = 1
+        try realm.write {
+            realm.add([firstFolder, secondFolder])
+        }
+
+        let firstIdentifier = firstFolder.identifier
+        let secondIdentifier = secondFolder.identifier
+        let panel = BoardManPanel()
+        panel.selectHistoryTab()
+
+        #expect(panel.activePanelTabForTesting == "history")
+
+        panel.moveHorizontalNavigationForTesting(delta: 1)
+        #expect(panel.activePanelTabForTesting == "snippets")
+        #expect(panel.activeSnippetGroupIdentifiersForTesting.isEmpty,
+                "Right from History should enter Templates at All Groups.")
+
+        panel.moveHorizontalNavigationForTesting(delta: 1)
+        #expect(panel.activeSnippetGroupIdentifiersForTesting == Set([firstIdentifier]),
+                "The first Templates group should follow All Groups.")
+
+        panel.moveHorizontalNavigationForTesting(delta: 1)
+        #expect(panel.activeSnippetGroupIdentifiersForTesting == Set([secondIdentifier]),
+                "Groups should follow their persisted index order.")
+
+        panel.moveHorizontalNavigationForTesting(delta: 1)
+        #expect(panel.activeSnippetGroupIdentifiersForTesting == Set([secondIdentifier]),
+                "Right navigation should stop at the final group instead of wrapping.")
+
+        panel.moveHorizontalNavigationForTesting(delta: -1)
+        #expect(panel.activeSnippetGroupIdentifiersForTesting == Set([firstIdentifier]))
+
+        panel.moveHorizontalNavigationForTesting(delta: -1)
+        #expect(panel.activeSnippetGroupIdentifiersForTesting.isEmpty,
+                "Left from the first group should return to All Groups.")
+
+        panel.moveHorizontalNavigationForTesting(delta: -1)
+        #expect(panel.activePanelTabForTesting == "history",
+                "Left from Templates All should return to History.")
+
+        panel.moveHorizontalNavigationForTesting(delta: -1)
+        #expect(panel.activePanelTabForTesting == "history",
+                "Left navigation should stop at History instead of wrapping.")
+    }
+
+    @Test
     func responsiveTemplateTabLabelsStayReadableAcrossLanguages() async throws {
         let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
         Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)

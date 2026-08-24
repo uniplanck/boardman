@@ -8844,6 +8844,18 @@ class BoardManPanel: NSPanel {
         return activeSnippetGroupIdentifiers
     }
 
+    var activePanelTabForTesting: String {
+        switch activeTab {
+        case .history: return "history"
+        case .snippets: return "snippets"
+        case .settings: return "settings"
+        }
+    }
+
+    func moveHorizontalNavigationForTesting(delta: Int) {
+        moveHorizontalNavigation(delta: delta)
+    }
+
     var visibleItemHashesForTesting: [String] {
         return historyItems.map(\.dataHash)
     }
@@ -11737,10 +11749,10 @@ class BoardManPanel: NSPanel {
             orderOut(nil)
             return true
         case 123:
-            moveTab(delta: -1)
+            moveHorizontalNavigation(delta: -1)
             return true
         case 124:
-            moveTab(delta: 1)
+            moveHorizontalNavigation(delta: 1)
             return true
         case 125:
             return selectRowByKeyboard(delta: 1)
@@ -11776,12 +11788,49 @@ class BoardManPanel: NSPanel {
         makeFirstResponder(placeholderList)
     }
 
-    private func moveTab(delta: Int) {
-        let tabs = [BoardManPanelTab.history, BoardManPanelTab.snippets]
-        guard let currentIndex = tabs.firstIndex(of: activeTab) else { return }
-        let nextIndex = min(tabs.count - 1, max(0, currentIndex + delta))
+    private func moveHorizontalNavigation(delta: Int) {
+        guard delta != 0, activeTab != .settings else { return }
+
+        let snippetCategories = horizontalSnippetCategoryIdentifiers()
+        let currentIndex: Int
+        switch activeTab {
+        case .history:
+            currentIndex = 0
+        case .snippets:
+            if activeSnippetGroupIdentifiers.isEmpty {
+                currentIndex = 1
+            } else if activeSnippetGroupIdentifiers.count == 1,
+                      let identifier = activeSnippetGroupIdentifiers.first,
+                      let categoryIndex = snippetCategories.firstIndex(of: identifier) {
+                currentIndex = categoryIndex + 1
+            } else {
+                currentIndex = 1
+            }
+        case .settings:
+            return
+        }
+
+        let nextIndex = min(snippetCategories.count, max(0, currentIndex + delta))
         guard nextIndex != currentIndex else { return }
-        activateTab(tabs[nextIndex])
+        if nextIndex == 0 {
+            activateTab(.history)
+        } else {
+            openSnippetsManagerMode(categoryIdentifier: snippetCategories[nextIndex - 1])
+        }
+    }
+
+    private func horizontalSnippetCategoryIdentifiers() -> [String] {
+        let realm = try! Realm()
+        let folders = realm.objects(BoardManFolder.self)
+            .sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
+        var identifiers = [BoardManPanel.allCategoriesIdentifier]
+        identifiers.append(contentsOf: folders.map(\.identifier))
+        if allItems.contains(where: {
+            $0.source == .snippet && $0.categoryIdentifier == BoardManPanel.uncategorizedCategoryIdentifier
+        }) {
+            identifiers.append(BoardManPanel.uncategorizedCategoryIdentifier)
+        }
+        return identifiers
     }
 
     @discardableResult
