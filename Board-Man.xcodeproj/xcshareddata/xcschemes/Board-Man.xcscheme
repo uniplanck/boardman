@@ -16,7 +16,7 @@
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "FAC43DC51B35D8B100C06102"
                BuildableName = "Board-Man.app"
-               BlueprintName = "Clipy"
+               BlueprintName = "Board-Man"
                ReferencedContainer = "container:Board-Man.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -29,8 +29,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "FAC43DD71B35D8B100C06102"
-               BuildableName = "ClipyTests.xctest"
-               BlueprintName = "ClipyTests"
+               BuildableName = "Board-ManTests.xctest"
+               BlueprintName = "Board-ManTests"
                ReferencedContainer = "container:Board-Man.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -48,8 +48,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "FAC43DD71B35D8B100C06102"
-               BuildableName = "ClipyTests.xctest"
-               BlueprintName = "ClipyTests"
+               BuildableName = "Board-ManTests.xctest"
+               BlueprintName = "Board-ManTests"
                ReferencedContainer = "container:Board-Man.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -59,7 +59,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FAC43DC51B35D8B100C06102"
             BuildableName = "Board-Man.app"
-            BlueprintName = "Clipy"
+            BlueprintName = "Board-Man"
             ReferencedContainer = "container:Board-Man.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -82,7 +82,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FAC43DC51B35D8B100C06102"
             BuildableName = "Board-Man.app"
-            BlueprintName = "Clipy"
+            BlueprintName = "Board-Man"
             ReferencedContainer = "container:Board-Man.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -101,7 +101,7 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "FAC43DC51B35D8B100C06102"
             BuildableName = "Board-Man.app"
-            BlueprintName = "Clipy"
+            BlueprintName = "Board-Man"
             ReferencedContainer = "container:Board-Man.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
