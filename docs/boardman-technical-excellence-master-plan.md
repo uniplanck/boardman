@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, and README/demo fixture extractions accepted (2026-08-25).**
+**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, and timestamp presentation/interaction extractions accepted (2026-08-26).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -444,7 +444,14 @@ Fourth accepted extraction:
 - `MenuManager.swift` reduced from `12,295` to `12,157` lines in this slice (`-138` net), while the focused screenshot coordinator is `181` lines.
 - screenshot parsing moved into its own `BoardManReadmeScreenshotCoordinatorTests` suite rather than expanding the already-large interaction suite; focused screenshot + interaction verification is `12/12` PASS and the build-time SwiftLint gate returned to `0` serious violations.
 
-P4.1 remains open for the larger layout/presentation ownership still embedded in `MenuManager.swift`. The major behavioral coordinators for search, horizontal navigation, panel paste/timestamp dispatch, and README/demo fixture generation are now outside the giant coordinator.
+Fifth accepted extraction:
+
+- `BoardManTimestampPresentation.swift` now owns timestamp format validation/menu mapping, absolute and relative text rendering, relative number/unit/suffix/now policies, timestamp position, and bounded shortcut delay policy.
+- `BoardManTimestampInteraction.swift` now owns timestamp click/long-press/mask interaction semantics plus persisted timestamp shortcut configuration; `BoardManPanelPasteCoordinator` delegates delay clamping to the timestamp presentation owner rather than duplicating that rule.
+- `MenuManager.swift` reduced from `12,157` to `11,885` lines in this slice (`-272` net). The timestamp presentation owner is `269` lines and the interaction/shortcut owner is `53` lines.
+- focused paste/interaction/timestamp verification is `27/27` PASS. Full regression is XCTest `35/35` PASS plus Swift Testing `103/103` across `18` suites; SwiftLint reports `319` warnings / `0` serious violations; `git diff --check` passes.
+
+P4.1 remains open for the larger panel/history/template presentation ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, and timestamp formatting/interaction rules now have focused owners outside the giant coordinator.
 
 ## P4.2 Dependency audit
 
@@ -697,10 +704,10 @@ Every phase closes only with evidence for:
 
 # 10. Immediate next action
 
-**Continue Phase 1 measurement. Do not start Phase 2 yet.**
+**Continue Phase 4 structural decomposition. Phase 2 and Phase 3 are already PASS / CLOSED.**
 
-The deterministic benchmark harness and machine-readable provisional baseline are committed. Runtime instrumentation now separates target-app settle, pure paste dispatch overhead, and clipboard capture-to-queryable latency. The isolated benchmark runtime profile is implemented and actual Release runtime acceptance proved production Realm, payload, archive, logs, preferences, and defaults remain unchanged while benchmark-only Realm/log/defaults state is created separately. Final-source serial regression is 98/98 across 16 suites, and the Universal Release build plus codesign verification are GREEN. Remaining Phase 1 work is quiet-host launch/idle/runtime sampling and candidate SLO calibration after repeated stable measurements.
+P4.1 should continue by extracting coherent panel/history/template presentation responsibilities from `MenuManager.swift`, prioritizing pure layout/presentation policies and testable service boundaries over mechanical line-count reduction. Search, navigation, paste orchestration, screenshot/demo fixtures, and timestamp presentation/interaction already have focused owners. Once the remaining high-coupling presentation ownership is sufficiently separated, proceed directly to P4.2 dependency audit and then P4.3 concurrency/main-thread discipline.
 
-SQLiteData migration, broad `MenuManager` decomposition, and dependency replacement remain blocked until Phase 1 has enough evidence to justify them.
+Phase 1 measurement remains useful as non-blocking calibration evidence, but it no longer blocks the accepted SQLiteData migration, FTS/search work, or Phase 4 decomposition.
 
 This document remains the default technical roadmap unless a newer explicitly approved roadmap supersedes it.

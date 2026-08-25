@@ -32,7 +32,7 @@ final class BoardManPanelPasteCoordinator {
     }
 
     static func clampedTimestampShortcutDelay(_ value: TimeInterval) -> TimeInterval {
-        return min(60, max(0, value))
+        return BoardManTimestampPresentation.clampedShortcutDelay(value)
     }
 
     func captureTarget(frontmostApplication: NSRunningApplication?) {
