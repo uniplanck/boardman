@@ -1684,6 +1684,20 @@ final class HistoryDisplayNameStore {
         return value?.isEmpty == false ? value : nil
     }
 
+    func matchingIdentifiers(containing query: String) -> Set<String> {
+        return Set(searchMatches(for: query).keys)
+    }
+
+    func searchMatches(for query: String) -> [String: Int] {
+        var matches: [String: Int] = [:]
+        for (identifier, value) in names {
+            if let matchClass = BoardManSearchMatcher.matchClass(query: query, fields: [value]) {
+                matches[identifier] = matchClass
+            }
+        }
+        return matches
+    }
+
     func setName(_ value: String, for identifier: String) {
         var values = names
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -11005,8 +11019,82 @@ class BoardManPanel: NSPanel {
                 .joined(separator: "\n")
             return !hideRules.contains { $0.matches(searchableText) }
         }
-        let searchedItems = query.isEmpty ? visibleItems : visibleItems.filter {
-            $0.title.lowercased().contains(query) || $0.previewTitle.lowercased().contains(query)
+        let searchedItems: [BoardManHistoryItem]
+        if query.isEmpty {
+            searchedItems = visibleItems
+        } else {
+            let startedAt = CFAbsoluteTimeGetCurrent()
+            let scope: BoardManSearchScope = activeTab == .snippets ? .snippets : .all
+            #if DEBUG
+            let hits = benchmarkIsolationForTesting
+                ? benchmarkSearchHits(query: query, items: visibleItems, scope: scope)
+                : store.search(query, scope: scope, limit: max(1, allItems.count))
+            #else
+            let hits = store.search(query, scope: scope, limit: max(1, allItems.count))
+            #endif
+            var visibleBySearchKey: [String: BoardManHistoryItem] = [:]
+            var visibleOrderBySearchKey: [String: Int] = [:]
+            for (order, item) in visibleItems.enumerated() {
+                let source: BoardManSearchSource?
+                switch item.source {
+                case .clip: source = .history
+                case .snippet: source = .snippet
+                case .favorite: source = nil
+                }
+                if let source {
+                    let key = "\(source.rawValue):\(item.dataHash)"
+                    visibleBySearchKey[key] = item
+                    visibleOrderBySearchKey[key] = order
+                }
+            }
+
+            var candidatesByKey: [String: BoardManSearchRankCandidate] = [:]
+            for hit in hits {
+                let key = "\(hit.source.rawValue):\(hit.identifier)"
+                guard let item = visibleBySearchKey[key],
+                      let baseOrder = visibleOrderBySearchKey[key] else { continue }
+                candidatesByKey[key] = BoardManSearchRankCandidate(
+                    hit: hit,
+                    isPinned: item.isPinned,
+                    usageCount: item.pasteCount,
+                    baseOrder: baseOrder
+                )
+            }
+
+            // Custom display names remain in UserDefaults for compatibility. Convert their
+            // exact/prefix/contains match into the same deterministic ranking path as FTS hits.
+            if activeTab == .history {
+                for (identifier, matchClass) in HistoryDisplayNameStore.shared.searchMatches(for: query) {
+                    let key = "\(BoardManSearchSource.history.rawValue):\(identifier)"
+                    guard let item = visibleBySearchKey[key],
+                          let baseOrder = visibleOrderBySearchKey[key] else { continue }
+                    let customHit = BoardManSearchHit(
+                        identifier: identifier,
+                        source: .history,
+                        matchClass: matchClass,
+                        relevance: 0
+                    )
+                    if let existing = candidatesByKey[key], existing.hit.matchClass <= matchClass {
+                        continue
+                    }
+                    candidatesByKey[key] = BoardManSearchRankCandidate(
+                        hit: customHit,
+                        isPinned: item.isPinned,
+                        usageCount: item.pasteCount,
+                        baseOrder: baseOrder
+                    )
+                }
+            }
+
+            let rankedHits = BoardManSearchRanker.rank(Array(candidatesByKey.values))
+            searchedItems = rankedHits.compactMap { hit in
+                visibleBySearchKey["\(hit.source.rawValue):\(hit.identifier)"]
+            }
+            PasteCountInputService.shared.logBoardManPerformance(
+                "search_query",
+                startedAt: startedAt,
+                details: "chars=\(query.count) indexed_hits=\(hits.count) visible_hits=\(searchedItems.count)"
+            )
         }
         historyItems = isQuickMode ? Array(searchedItems.prefix(Self.quickItemLimit)) : searchedItems
         if historyItems.isEmpty {
@@ -11032,6 +11120,38 @@ class BoardManPanel: NSPanel {
         updateSnippetActionButtons()
         updateHistoryConditionButton()
     }
+
+    #if DEBUG
+    private func benchmarkSearchHits(
+        query: String,
+        items: [BoardManHistoryItem],
+        scope: BoardManSearchScope
+    ) -> [BoardManSearchHit] {
+        items.compactMap { item in
+            let source: BoardManSearchSource
+            switch item.source {
+            case .clip:
+                guard scope != .snippets else { return nil }
+                source = .history
+            case .snippet:
+                guard scope != .history else { return nil }
+                source = .snippet
+            case .favorite:
+                return nil
+            }
+            guard let matchClass = BoardManSearchMatcher.matchClass(
+                query: query,
+                fields: [item.primaryTitle, item.title, item.previewTitle]
+            ) else { return nil }
+            return BoardManSearchHit(
+                identifier: item.dataHash,
+                source: source,
+                matchClass: matchClass,
+                relevance: Double(matchClass)
+            )
+        }
+    }
+    #endif
 
     private func isTimestampHit(row: Int, tablePoint: NSPoint, table: NSTableView) -> Bool {
         guard let cell = table.view(atColumn: 0, row: row, makeIfNecessary: false) as? BoardManHistoryCellView else {

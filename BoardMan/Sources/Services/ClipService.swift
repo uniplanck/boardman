@@ -205,7 +205,8 @@ extension ClipService {
 
         // Create data
         let data = BoardManClipData(pasteboard: pasteboard, types: types)
-        save(with: data, detectedAt: detectedAt)
+        let sourceApplication = AppEnvironment.current.excludeAppService.frontApplicationSearchMetadata()
+        save(with: data, sourceApplication: sourceApplication, detectedAt: detectedAt)
     }
 
     func create(with image: NSImage) {
@@ -216,7 +217,11 @@ extension ClipService {
         save(with: data)
     }
 
-    fileprivate func save(with data: BoardManClipData, detectedAt: CFAbsoluteTime? = nil) {
+    fileprivate func save(
+        with data: BoardManClipData,
+        sourceApplication: (name: String, bundleIdentifier: String)? = nil,
+        detectedAt: CFAbsoluteTime? = nil
+    ) {
         // Copy already copied history
         let isCopySameHistory = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.copySameHistory)
         if store.clip(identifier: "\(data.hash)") != nil, !isCopySameHistory { return }
@@ -241,6 +246,15 @@ extension ClipService {
         clip.updateTime = unixTime
         clip.primaryType = data.primaryType?.rawValue ?? ""
 
+        let fullText = String(data.boardManTextValue.prefix(100_000))
+        let searchMetadata = BoardManHistorySearchMetadata(
+            text: fullText == clip.title ? "" : fullText,
+            filePaths: Array(data.fileNames.prefix(256)).map { String($0.prefix(4_096)) },
+            urls: Array(data.URLs.prefix(256)).map { String($0.prefix(4_096)) },
+            sourceApplicationName: sourceApplication?.name ?? "",
+            sourceApplicationBundleID: sourceApplication?.bundleIdentifier ?? ""
+        )
+
         DispatchQueue.main.async {
             // Save thumbnail image
             if let thumbnailImage = data.thumbnailImage {
@@ -256,6 +270,7 @@ extension ClipService {
             if BoardManRuntimeSupport.prepareDirectory(at: BoardManRuntimeSupport.applicationSupportFolder()) {
                 if NSKeyedArchiver.archiveRootObject(data, toFile: savedPath) {
                     self.store.upsertClip(clip)
+                    self.store.upsertHistorySearchMetadata(identifier: clip.dataHash, metadata: searchMetadata)
                     if let detectedAt {
                         PasteCountInputService.shared.logBoardManPerformance(
                             "clipboard_capture_to_queryable",

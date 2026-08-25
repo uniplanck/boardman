@@ -1,9 +1,9 @@
 # Board-Man Technical Excellence Master Plan
 
-Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 next
+Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 Core (P3.1-P3.2) PASS / CLOSED, P3.3 next
 Created: 2026-08-21
 Baseline refreshed: 2026-08-25
-Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED and Phase 3 is the next implementation phase.**
+Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 Core (P3.1-P3.2) is PASS / CLOSED and P3.3 query capability is next.**
 
 ## 1. Purpose
 
@@ -331,6 +331,10 @@ Realm dependency removal is now permitted by the gate, but is intentionally defe
 
 ## P3.1 FTS5-backed unified search
 
+**Implementation status: PASS / CLOSED (2026-08-25).**
+
+SQLiteData-backed unified FTS5 search now replaces the panel's prior full-array text scan. Search index synchronization covers history upsert/delete/replace, template updates/deletes/moves, and folder renames. Existing SQLite-authoritative history is backfilled on a utility queue in bounded 50-item batches; unreadable legacy payloads are marked processed rather than retried forever.
+
 Index searchable text across:
 
 - clipboard text,
@@ -342,7 +346,13 @@ Index searchable text across:
 - folder names,
 - optional normalized metadata.
 
+For newly captured history, local supplemental metadata records clipboard text, file paths, URLs, and source application name/bundle ID. Existing archived history can recover text/file/URL metadata from its local payload archive; historical source-application identity cannot be reconstructed because older history records never stored it.
+
+Observed focused 10,000-item FTS queries during implementation were approximately `0.29-1.69 ms` with the latest full-regression run at `1.08 ms / 1 hit`. These are implementation observations, not a formal quiet-host p95 SLO claim.
+
 ## P3.2 Board-Man ranking
+
+**Implementation status: PASS / CLOSED (2026-08-25).**
 
 Ranking should combine relevance with actual workflow value, for example:
 
@@ -357,7 +367,13 @@ text relevance
 
 Keep ranking deterministic, testable, and inspectable. Do not add opaque AI ranking to the local default path.
 
+Implemented ranking combines exact/prefix/contains match class, pin state, usage frequency, existing display/manual order as recency/order context, and FTS relevance with deterministic tie-breaking. User-defined history display names enter the same ranker rather than being appended as a separate unordered result set.
+
+P3 Core acceptance evidence: `BoardManStoreTests` 29/29 PASS; full regression 98/98 PASS across 16 suites; benchmark-isolated 10k panel search compatibility restored after the indexed-search transition; SwiftLint 318 warnings / 0 serious. Global lint debt remains and is not claimed closed.
+
 ## P3.3 Query capability
+
+**Implementation status: NEXT.**
 
 Candidate additions after core ranking is stable:
 

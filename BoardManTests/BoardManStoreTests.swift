@@ -50,6 +50,233 @@ final class BoardManStoreTests: XCTestCase {
         try assertTemplateStoreContract(SQLiteBoardManStore.inMemoryForTesting())
     }
 
+    func testSQLiteFTS5UnifiedSearchRanksHistoryAndSearchesSnippetContentAndFolderNames() throws {
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
+        store.upsertClip(makeClip(identifier: "history-exact", updateTime: 3, title: "Board"))
+        store.upsertClip(makeClip(identifier: "history-prefix", updateTime: 2, title: "Board Man roadmap"))
+        store.upsertClip(makeClip(identifier: "history-term", updateTime: 1, title: "Clipboard board notes"))
+
+        let folder = makeFolder(identifier: "folder-ops", index: 0, title: "Operations")
+        let snippet = makeSnippet(identifier: "snippet-restart", index: 0, title: "Restart Service")
+        snippet.content = "launchctl kickstart -k gui/501/com.uniplanck.BoardMan"
+        store.upsertFolder(folder)
+        store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
+
+        let boardHits = store.search("board", scope: .all, limit: 10)
+        XCTAssertEqual(
+            Array(boardHits.prefix(3)).map(\.identifier),
+            ["history-exact", "history-prefix", "history-term"]
+        )
+        XCTAssertEqual(boardHits.first?.matchClass, 0)
+        XCTAssertEqual(store.search("launchctl", scope: .snippets, limit: 10).map(\.identifier), ["snippet-restart"])
+        XCTAssertEqual(store.search("operations", scope: .snippets, limit: 10).map(\.identifier), ["snippet-restart"])
+        XCTAssertTrue(store.search("launchctl", scope: .history, limit: 10).isEmpty)
+    }
+
+    func testSearchRankerCombinesExactPrefixPinUsageRecencyAndFTSRelevanceDeterministically() {
+        let candidates = [
+            BoardManSearchRankCandidate(
+                hit: BoardManSearchHit(identifier: "term-pinned", source: .history, matchClass: 2, relevance: -10),
+                isPinned: true,
+                usageCount: 99,
+                baseOrder: 0
+            ),
+            BoardManSearchRankCandidate(
+                hit: BoardManSearchHit(identifier: "prefix-regular", source: .history, matchClass: 1, relevance: -1),
+                isPinned: false,
+                usageCount: 1,
+                baseOrder: 8
+            ),
+            BoardManSearchRankCandidate(
+                hit: BoardManSearchHit(identifier: "exact-regular", source: .history, matchClass: 0, relevance: -1),
+                isPinned: false,
+                usageCount: 1,
+                baseOrder: 8
+            ),
+            BoardManSearchRankCandidate(
+                hit: BoardManSearchHit(identifier: "prefix-pinned-low-usage", source: .history, matchClass: 1, relevance: -8),
+                isPinned: true,
+                usageCount: 2,
+                baseOrder: 5
+            ),
+            BoardManSearchRankCandidate(
+                hit: BoardManSearchHit(identifier: "prefix-pinned-high-usage-old", source: .history, matchClass: 1, relevance: -2),
+                isPinned: true,
+                usageCount: 9,
+                baseOrder: 7
+            ),
+            BoardManSearchRankCandidate(
+                hit: BoardManSearchHit(identifier: "prefix-pinned-high-usage-new", source: .history, matchClass: 1, relevance: -0.5),
+                isPinned: true,
+                usageCount: 9,
+                baseOrder: 2
+            ),
+        ]
+
+        XCTAssertEqual(
+            BoardManSearchRanker.rank(candidates).map(\.identifier),
+            [
+                "exact-regular",
+                "prefix-pinned-high-usage-new",
+                "prefix-pinned-high-usage-old",
+                "prefix-pinned-low-usage",
+                "prefix-regular",
+                "term-pinned",
+            ]
+        )
+    }
+
+    func testSQLiteFTS5SearchesSupplementalHistoryMetadataAndTracksReplacement() throws {
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
+        let clip = makeClip(identifier: "metadata-history", updateTime: 1, title: "Attachment")
+        store.upsertClip(clip)
+        store.upsertHistorySearchMetadata(
+            identifier: clip.dataHash,
+            metadata: BoardManHistorySearchMetadata(
+                text: "Quarterly launch checklist",
+                filePaths: ["/Users/example/Documents/Launch Plan.pdf"],
+                urls: ["https://docs.example.test/releases/board-man"],
+                sourceApplicationName: "Safari",
+                sourceApplicationBundleID: "com.apple.Safari"
+            )
+        )
+
+        XCTAssertEqual(store.search("quarterly", scope: .history, limit: 10).map(\.identifier), [clip.dataHash])
+        XCTAssertEqual(store.search("launch", scope: .history, limit: 10).map(\.identifier), [clip.dataHash])
+        XCTAssertEqual(store.search("docs.example.test", scope: .history, limit: 10).map(\.identifier), [clip.dataHash])
+        XCTAssertEqual(store.search("Safari", scope: .history, limit: 10).first?.matchClass, 0)
+        XCTAssertEqual(store.search("com.apple.Safari", scope: .history, limit: 10).first?.matchClass, 0)
+
+        store.upsertHistorySearchMetadata(
+            identifier: clip.dataHash,
+            metadata: BoardManHistorySearchMetadata(
+                filePaths: ["/Users/example/Desktop/New Name.txt"],
+                sourceApplicationName: "Finder",
+                sourceApplicationBundleID: "com.apple.finder"
+            )
+        )
+        XCTAssertTrue(store.search("quarterly", scope: .history, limit: 10).isEmpty)
+        XCTAssertTrue(store.search("Safari", scope: .history, limit: 10).isEmpty)
+        XCTAssertEqual(store.search("New Name", scope: .history, limit: 10).map(\.identifier), [clip.dataHash])
+        XCTAssertEqual(store.search("Finder", scope: .history, limit: 10).map(\.identifier), [clip.dataHash])
+
+        store.deleteClip(identifier: clip.dataHash)
+        XCTAssertTrue(store.search("Finder", scope: .history, limit: 10).isEmpty)
+    }
+
+    func testSQLiteHistorySearchMetadataBackfillIndexesLegacyPayloadsInBatches() throws {
+        let root = try makeTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
+        let payloadURL = root.appendingPathComponent("legacy.data")
+        let payload = BoardManClipData(string: "Legacy quarterly payload")
+        payload.fileNames = ["/Users/example/Documents/Legacy Plan.pdf"]
+        payload.URLs = ["https://legacy.example.test/runbook"]
+        XCTAssertTrue(NSKeyedArchiver.archiveRootObject(payload, toFile: payloadURL.path))
+        let archivedClip = makeClip(identifier: "legacy-archive", updateTime: 2, title: "Legacy item")
+        archivedClip.dataPath = payloadURL.path
+        let missingClip = makeClip(identifier: "legacy-missing", updateTime: 1, title: "Missing payload")
+        missingClip.dataPath = root.appendingPathComponent("missing.data").path
+        store.upsertClip(archivedClip)
+        store.upsertClip(missingClip)
+        XCTAssertEqual(store.historyClipsMissingSearchMetadata(limit: 1).map(\.dataHash), [archivedClip.dataHash])
+        XCTAssertEqual(BoardManHistorySearchMetadataBackfiller.backfillNextBatch(store: store, batchSize: 1), 1)
+        XCTAssertEqual(store.search("quarterly", scope: .history, limit: 10).map(\.identifier), [archivedClip.dataHash])
+        XCTAssertEqual(store.search("Legacy Plan", scope: .history, limit: 10).map(\.identifier), [archivedClip.dataHash])
+        XCTAssertEqual(store.search("legacy.example.test", scope: .history, limit: 10).map(\.identifier), [archivedClip.dataHash])
+        XCTAssertEqual(store.historyClipsMissingSearchMetadata(limit: 10).map(\.dataHash), [missingClip.dataHash])
+        XCTAssertEqual(BoardManHistorySearchMetadataBackfiller.backfillNextBatch(store: store, batchSize: 50), 1)
+        XCTAssertTrue(store.historyClipsMissingSearchMetadata(limit: 10).isEmpty)
+    }
+
+    func testSQLiteFTS5SearchIndexTracksUpdatesMovesFolderRenamesAndDeletes() throws {
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
+        let clip = makeClip(identifier: "history-a", updateTime: 1, title: "Alpha release")
+        store.upsertClip(clip)
+        XCTAssertEqual(store.search("alpha", scope: .history, limit: 10).map(\.identifier), ["history-a"])
+
+        clip.title = "Beta release"
+        store.upsertClip(clip)
+        XCTAssertTrue(store.search("alpha", scope: .history, limit: 10).isEmpty)
+        XCTAssertEqual(store.search("beta", scope: .history, limit: 10).map(\.identifier), ["history-a"])
+
+        let firstFolder = makeFolder(identifier: "folder-first", index: 0, title: "Engineering")
+        let secondFolder = makeFolder(identifier: "folder-second", index: 1, title: "Production")
+        let snippet = makeSnippet(identifier: "snippet-a", index: 0, title: "Restart")
+        snippet.content = "service command"
+        store.upsertFolder(firstFolder)
+        store.upsertFolder(secondFolder)
+        store.upsertSnippet(snippet, folderIdentifier: firstFolder.identifier)
+        XCTAssertEqual(store.search("engineering", scope: .snippets, limit: 10).map(\.identifier), ["snippet-a"])
+
+        firstFolder.title = "Development"
+        store.upsertFolder(firstFolder)
+        XCTAssertTrue(store.search("engineering", scope: .snippets, limit: 10).isEmpty)
+        XCTAssertEqual(store.search("development", scope: .snippets, limit: 10).map(\.identifier), ["snippet-a"])
+
+        store.moveSnippet(identifier: snippet.identifier, toFolderIdentifier: secondFolder.identifier, index: 0)
+        XCTAssertTrue(store.search("development", scope: .snippets, limit: 10).isEmpty)
+        XCTAssertEqual(store.search("production", scope: .snippets, limit: 10).map(\.identifier), ["snippet-a"])
+
+        store.deleteSnippet(identifier: snippet.identifier)
+        store.deleteClip(identifier: clip.dataHash)
+        XCTAssertTrue(store.search("production", scope: .all, limit: 10).isEmpty)
+        XCTAssertTrue(store.search("beta", scope: .all, limit: 10).isEmpty)
+    }
+
+    func testSQLiteFTS5SearchHandlesURLPunctuationAndHostileSyntaxAsLiteralInput() throws {
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
+        store.upsertClip(
+            makeClip(
+                identifier: "url-history",
+                updateTime: 1,
+                title: "https://github.com/uniplanck/boardman/releases"
+            )
+        )
+
+        XCTAssertEqual(store.search("github.com", scope: .history, limit: 10).map(\.identifier), ["url-history"])
+        XCTAssertTrue(store.search("\" OR *", scope: .all, limit: 10).isEmpty)
+        XCTAssertTrue(store.search("   ", scope: .all, limit: 10).isEmpty)
+    }
+
+    func testRealmSearchFallbackPreservesContainsSemanticsDuringCompatibilityWindow() throws {
+        let store = RealmBoardManStore.shared
+        store.upsertClip(makeClip(identifier: "realm-history", updateTime: 1, title: "Clipboard middle token"))
+        let folder = makeFolder(identifier: "realm-folder", index: 0, title: "Operations")
+        let snippet = makeSnippet(identifier: "realm-snippet", index: 0, title: "Restart")
+        snippet.content = "launchctl kickstart"
+        store.upsertFolder(folder)
+        store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
+
+        XCTAssertEqual(store.search("middle", scope: .history, limit: 10).map(\.identifier), ["realm-history"])
+        XCTAssertEqual(store.search("kickstart", scope: .snippets, limit: 10).map(\.identifier), ["realm-snippet"])
+        XCTAssertEqual(store.search("operations", scope: .all, limit: 10).map(\.identifier), ["realm-snippet"])
+    }
+
+    func testSQLiteFTS5TenThousandHistoryQueryBenchmark() throws {
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
+        let snapshots = (0..<10_000).map { index in
+            BoardManClipSnapshot(
+                makeClip(
+                    identifier: "search-history-\(index)",
+                    updateTime: index,
+                    title: index == 9_731 ? "Needleboard unique result" : "History item \(index)"
+                )
+            )
+        }
+        store.replaceAllClips(with: snapshots)
+
+        let startedAt = CFAbsoluteTimeGetCurrent()
+        let hits = store.search("needleboard", scope: .history, limit: 20)
+        let durationMilliseconds = (CFAbsoluteTimeGetCurrent() - startedAt) * 1_000
+
+        XCTAssertEqual(hits.map(\.identifier), ["search-history-9731"])
+        print(
+            "BOARDMAN_FTS5_BENCHMARK history=10000 query=needleboard " +
+            "duration_ms=\(String(format: "%.2f", durationMilliseconds)) hits=\(hits.count)"
+        )
+    }
+
     func testSQLiteAuthoritativeRuntimeModelFlowDoesNotTouchRealm() throws {
         let sqlite = try SQLiteBoardManStore.inMemoryForTesting()
         BoardManStores.authoritative.replaceBackend(with: sqlite)

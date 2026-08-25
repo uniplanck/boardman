@@ -51,6 +51,9 @@ class AppDelegate: NSObject, NSMenuItemValidation {
         } else {
             BoardManSQLiteShadowReplicator.shared.stop()
         }
+        if historyBootstrap.isSQLiteAuthoritative, Self.shouldStartRuntimeServices() {
+            BoardManHistorySearchMetadataBackfiller.start()
+        }
     }
 
     // MARK: - NSMenuItem Validation

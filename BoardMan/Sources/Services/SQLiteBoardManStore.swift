@@ -123,6 +123,129 @@ final class SQLiteBoardManStore: BoardManStore {
         }
     }
 
+    func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedQuery.isEmpty, limit > 0,
+              let matchExpression = Self.ftsMatchExpression(for: normalizedQuery) else {
+            return []
+        }
+        let prefixPattern = Self.likePrefixPattern(for: normalizedQuery)
+        return try! database.read { db in
+            let baseSQL = """
+                SELECT identifier, source,
+                       CASE
+                           WHEN lower(?) IN (
+                               lower(title), lower(content), lower(filePaths), lower(urls),
+                               lower(sourceApplicationName), lower(sourceApplicationBundleID), lower(folderTitle)
+                           ) THEN 0
+                           WHEN lower(title) LIKE lower(?) ESCAPE '\\'
+                             OR lower(content) LIKE lower(?) ESCAPE '\\'
+                             OR lower(filePaths) LIKE lower(?) ESCAPE '\\'
+                             OR lower(urls) LIKE lower(?) ESCAPE '\\'
+                             OR lower(sourceApplicationName) LIKE lower(?) ESCAPE '\\'
+                             OR lower(sourceApplicationBundleID) LIKE lower(?) ESCAPE '\\'
+                             OR lower(folderTitle) LIKE lower(?) ESCAPE '\\' THEN 1
+                           ELSE 2
+                       END AS matchClass,
+                       bm25(
+                           boardman_search_fts,
+                           0.0, 0.0, 6.0, 2.5, 3.0, 3.0, 2.0, 2.0, 1.0, 3.0
+                       ) AS relevance
+                FROM boardman_search_fts
+                WHERE boardman_search_fts MATCH ?
+                """
+            let commonArguments: [DatabaseValueConvertible?] = [
+                normalizedQuery,
+                prefixPattern, prefixPattern, prefixPattern, prefixPattern,
+                prefixPattern, prefixPattern, prefixPattern,
+                matchExpression,
+            ]
+            let rows: [Row]
+            switch scope {
+            case .all:
+                rows = try Row.fetchAll(
+                    db,
+                    sql: baseSQL + " ORDER BY matchClass ASC, relevance ASC, identifier ASC LIMIT ?",
+                    arguments: StatementArguments(commonArguments + [limit])
+                )
+            case .history:
+                rows = try Row.fetchAll(
+                    db,
+                    sql: baseSQL + " AND source = ? ORDER BY matchClass ASC, relevance ASC, identifier ASC LIMIT ?",
+                    arguments: StatementArguments(commonArguments + [BoardManSearchSource.history.rawValue, limit])
+                )
+            case .snippets:
+                rows = try Row.fetchAll(
+                    db,
+                    sql: baseSQL + " AND source = ? ORDER BY matchClass ASC, relevance ASC, identifier ASC LIMIT ?",
+                    arguments: StatementArguments(commonArguments + [BoardManSearchSource.snippet.rawValue, limit])
+                )
+            }
+            return rows.compactMap { row in
+                guard let source = BoardManSearchSource(rawValue: row["source"]) else { return nil }
+                return BoardManSearchHit(
+                    identifier: row["identifier"],
+                    source: source,
+                    matchClass: row["matchClass"],
+                    relevance: row["relevance"]
+                )
+            }
+        }
+    }
+
+    func historyClipsMissingSearchMetadata(limit: Int) -> [BoardManClip] {
+        guard limit > 0 else { return [] }
+        return try! database.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT h.dataHash, h.dataPath, h.title, h.primaryType,
+                           h.createdTime, h.updateTime, h.thumbnailPath, h.isColorCode
+                    FROM history_items h
+                    LEFT JOIN history_search_metadata m ON m.dataHash = h.dataHash
+                    WHERE m.dataHash IS NULL
+                    ORDER BY h.updateTime DESC, h.dataHash ASC
+                    LIMIT ?
+                    """,
+                arguments: [limit]
+            )
+            .map(Self.clip)
+        }
+    }
+
+    func upsertHistorySearchMetadata(identifier: String, metadata: BoardManHistorySearchMetadata) {
+        try! database.write { db in
+            guard try Int.fetchOne(
+                db,
+                sql: "SELECT 1 FROM history_items WHERE dataHash = ? LIMIT 1",
+                arguments: [identifier]
+            ) != nil else { return }
+            try db.execute(
+                sql: """
+                    INSERT INTO history_search_metadata (
+                        dataHash, content, filePaths, urls,
+                        sourceApplicationName, sourceApplicationBundleID
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(dataHash) DO UPDATE SET
+                        content = excluded.content,
+                        filePaths = excluded.filePaths,
+                        urls = excluded.urls,
+                        sourceApplicationName = excluded.sourceApplicationName,
+                        sourceApplicationBundleID = excluded.sourceApplicationBundleID
+                    """,
+                arguments: [
+                    identifier,
+                    metadata.text,
+                    metadata.filePathsSearchText,
+                    metadata.urlsSearchText,
+                    metadata.sourceApplicationName,
+                    metadata.sourceApplicationBundleID,
+                ]
+            )
+            try Self.refreshHistorySearchIndex(identifier: identifier, in: db)
+        }
+    }
+
     @discardableResult
     func updateClipUsage(identifier: String, updateTime: Int) -> Bool {
         try! database.write { db in
@@ -142,6 +265,7 @@ final class SQLiteBoardManStore: BoardManStore {
         let snapshot = BoardManClipSnapshot(clip)
         try! database.write { db in
             try Self.upsert(snapshot, in: db)
+            try Self.refreshHistorySearchIndex(identifier: snapshot.dataHash, in: db)
         }
         postHistoryDidChange()
     }
@@ -152,10 +276,12 @@ final class SQLiteBoardManStore: BoardManStore {
 
     func replaceAllClipsSafely(with snapshots: [BoardManClipSnapshot]) throws {
         try database.write { db in
+            try db.execute(sql: "DELETE FROM history_search_metadata")
             try db.execute(sql: "DELETE FROM history_items")
             for snapshot in snapshots {
                 try Self.upsert(snapshot, in: db)
             }
+            try Self.rebuildHistorySearchIndex(in: db)
         }
         postHistoryDidChange()
     }
@@ -179,6 +305,7 @@ final class SQLiteBoardManStore: BoardManStore {
         try! database.write { db in
             for identifier in identifiers {
                 try db.execute(sql: "DELETE FROM history_items WHERE dataHash = ?", arguments: [identifier])
+                try Self.deleteSearchItem(identifier: identifier, source: .history, in: db)
             }
         }
         postHistoryDidChange()
@@ -264,6 +391,7 @@ extension SQLiteBoardManStore {
                     """,
                 arguments: [folder.identifier, folder.index, folder.enable, folder.title]
             )
+            try Self.refreshFolderMemberSearchIndex(folderIdentifier: folder.identifier, in: db)
         }
         postTemplatesDidChange()
     }
@@ -277,6 +405,7 @@ extension SQLiteBoardManStore {
             )
             for snippetIdentifier in snippetIdentifiers {
                 try db.execute(sql: "DELETE FROM templates WHERE identifier = ?", arguments: [snippetIdentifier])
+                try Self.deleteSearchItem(identifier: snippetIdentifier, source: .snippet, in: db)
             }
             try db.execute(sql: "DELETE FROM template_folders WHERE identifier = ?", arguments: [identifier])
         }
@@ -292,6 +421,7 @@ extension SQLiteBoardManStore {
                 position: snippet.index,
                 in: db
             )
+            try Self.refreshSnippetSearchIndex(identifier: snippet.identifier, in: db)
         }
         postTemplatesDidChange()
     }
@@ -299,6 +429,7 @@ extension SQLiteBoardManStore {
     func deleteSnippet(identifier: String) {
         try! database.write { db in
             try db.execute(sql: "DELETE FROM templates WHERE identifier = ?", arguments: [identifier])
+            try Self.deleteSearchItem(identifier: identifier, source: .snippet, in: db)
         }
         postTemplatesDidChange()
     }
@@ -316,6 +447,7 @@ extension SQLiteBoardManStore {
                 position: index,
                 in: db
             )
+            try Self.refreshSnippetSearchIndex(identifier: identifier, in: db)
         }
         postTemplatesDidChange()
     }
@@ -347,6 +479,7 @@ extension SQLiteBoardManStore {
                     position: index,
                     in: db
                 )
+                try Self.refreshSnippetSearchIndex(identifier: identifier, in: db)
             }
         }
         postTemplatesDidChange()
@@ -398,6 +531,7 @@ extension SQLiteBoardManStore {
                     throw CocoaError(.fileReadCorruptFile)
                 }
             }
+            try Self.rebuildTemplateSearchIndex(in: db)
         }
         postTemplatesDidChange()
     }
@@ -515,6 +649,133 @@ extension SQLiteBoardManStore {
         )
     }
 
+    private static func ftsMatchExpression(for query: String) -> String? {
+        let terms = query
+            .components(separatedBy: .whitespacesAndNewlines)
+            .map { $0.trimmingCharacters(in: .punctuationCharacters.union(.symbols)) }
+            .filter { !$0.isEmpty }
+        guard !terms.isEmpty else { return nil }
+        return terms.map { term in
+            let escaped = term.replacingOccurrences(of: "\"", with: "\"\"")
+            return "\"\(escaped)\"*"
+        }.joined(separator: " AND ")
+    }
+
+    private static func likePrefixPattern(for query: String) -> String {
+        query
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_") + "%"
+    }
+
+    private static func deleteSearchItem(
+        identifier: String,
+        source: BoardManSearchSource,
+        in db: Database
+    ) throws {
+        try db.execute(
+            sql: "DELETE FROM boardman_search_fts WHERE identifier = ? AND source = ?",
+            arguments: [identifier, source.rawValue]
+        )
+    }
+
+    private static func refreshHistorySearchIndex(identifier: String, in db: Database) throws {
+        try deleteSearchItem(identifier: identifier, source: .history, in: db)
+        try db.execute(
+            sql: """
+                INSERT INTO boardman_search_fts (
+                    identifier, source, title, content, filePaths, urls,
+                    sourceApplicationName, sourceApplicationBundleID, metadata, folderTitle
+                )
+                SELECT h.dataHash, ?, h.title,
+                       COALESCE(m.content, ''), COALESCE(m.filePaths, ''), COALESCE(m.urls, ''),
+                       COALESCE(m.sourceApplicationName, ''), COALESCE(m.sourceApplicationBundleID, ''),
+                       h.primaryType, ''
+                FROM history_items h
+                LEFT JOIN history_search_metadata m ON m.dataHash = h.dataHash
+                WHERE h.dataHash = ?
+                """,
+            arguments: [BoardManSearchSource.history.rawValue, identifier]
+        )
+    }
+
+    private static func refreshSnippetSearchIndex(identifier: String, in db: Database) throws {
+        try deleteSearchItem(identifier: identifier, source: .snippet, in: db)
+        try db.execute(
+            sql: """
+                INSERT INTO boardman_search_fts (
+                    identifier, source, title, content, filePaths, urls,
+                    sourceApplicationName, sourceApplicationBundleID, metadata, folderTitle
+                )
+                SELECT t.identifier, ?, t.title, t.content, '', '', '', '', '', COALESCE(f.title, '')
+                FROM templates t
+                LEFT JOIN template_folder_membership m ON m.snippetIdentifier = t.identifier
+                LEFT JOIN template_folders f ON f.identifier = m.folderIdentifier
+                WHERE t.identifier = ?
+                """,
+            arguments: [BoardManSearchSource.snippet.rawValue, identifier]
+        )
+    }
+
+    private static func refreshFolderMemberSearchIndex(folderIdentifier: String, in db: Database) throws {
+        let identifiers = try String.fetchAll(
+            db,
+            sql: "SELECT snippetIdentifier FROM template_folder_membership WHERE folderIdentifier = ?",
+            arguments: [folderIdentifier]
+        )
+        for identifier in identifiers {
+            try refreshSnippetSearchIndex(identifier: identifier, in: db)
+        }
+    }
+
+    private static func rebuildHistorySearchIndex(in db: Database) throws {
+        try db.execute(
+            sql: "DELETE FROM boardman_search_fts WHERE source = ?",
+            arguments: [BoardManSearchSource.history.rawValue]
+        )
+        try db.execute(
+            sql: """
+                INSERT INTO boardman_search_fts (
+                    identifier, source, title, content, filePaths, urls,
+                    sourceApplicationName, sourceApplicationBundleID, metadata, folderTitle
+                )
+                SELECT h.dataHash, ?, h.title,
+                       COALESCE(m.content, ''), COALESCE(m.filePaths, ''), COALESCE(m.urls, ''),
+                       COALESCE(m.sourceApplicationName, ''), COALESCE(m.sourceApplicationBundleID, ''),
+                       h.primaryType, ''
+                FROM history_items h
+                LEFT JOIN history_search_metadata m ON m.dataHash = h.dataHash
+                """,
+            arguments: [BoardManSearchSource.history.rawValue]
+        )
+    }
+
+    private static func rebuildTemplateSearchIndex(in db: Database) throws {
+        try db.execute(
+            sql: "DELETE FROM boardman_search_fts WHERE source = ?",
+            arguments: [BoardManSearchSource.snippet.rawValue]
+        )
+        try db.execute(
+            sql: """
+                INSERT INTO boardman_search_fts (
+                    identifier, source, title, content, filePaths, urls,
+                    sourceApplicationName, sourceApplicationBundleID, metadata, folderTitle
+                )
+                SELECT t.identifier, ?, t.title, t.content, '', '', '', '', '', COALESCE(f.title, '')
+                FROM templates t
+                LEFT JOIN template_folder_membership m ON m.snippetIdentifier = t.identifier
+                LEFT JOIN template_folders f ON f.identifier = m.folderIdentifier
+                """,
+            arguments: [BoardManSearchSource.snippet.rawValue]
+        )
+    }
+
+    private static func rebuildSearchIndex(in db: Database) throws {
+        try db.execute(sql: "DELETE FROM boardman_search_fts")
+        try rebuildHistorySearchIndex(in: db)
+        try rebuildTemplateSearchIndex(in: db)
+    }
+
     private static func migrate(_ database: any DatabaseWriter) throws {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("Create history_items") { db in
@@ -572,6 +833,40 @@ extension SQLiteBoardManStore {
             try db.execute(
                 sql: "CREATE INDEX template_membership_folder_position_idx ON template_folder_membership(folderIdentifier, position ASC)"
             )
+        }
+        migrator.registerMigration("Create history search metadata") { db in
+            try db.execute(
+                sql: """
+                    CREATE TABLE history_search_metadata (
+                        dataHash TEXT NOT NULL PRIMARY KEY REFERENCES history_items(dataHash) ON DELETE CASCADE,
+                        content TEXT NOT NULL,
+                        filePaths TEXT NOT NULL,
+                        urls TEXT NOT NULL,
+                        sourceApplicationName TEXT NOT NULL,
+                        sourceApplicationBundleID TEXT NOT NULL
+                    ) STRICT
+                    """
+            )
+        }
+        migrator.registerMigration("Create unified FTS5 search") { db in
+            try db.execute(
+                sql: """
+                    CREATE VIRTUAL TABLE boardman_search_fts USING fts5(
+                        identifier UNINDEXED,
+                        source UNINDEXED,
+                        title,
+                        content,
+                        filePaths,
+                        urls,
+                        sourceApplicationName,
+                        sourceApplicationBundleID,
+                        metadata,
+                        folderTitle,
+                        tokenize = 'unicode61 remove_diacritics 2'
+                    )
+                    """
+            )
+            try rebuildSearchIndex(in: db)
         }
         try migrator.migrate(database)
     }

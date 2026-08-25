@@ -43,6 +43,109 @@ struct BoardManClipSnapshot: Sendable, Equatable {
     }
 }
 
+struct BoardManHistorySearchMetadata: Sendable, Equatable {
+    let text: String
+    let filePaths: [String]
+    let urls: [String]
+    let sourceApplicationName: String
+    let sourceApplicationBundleID: String
+
+    init(
+        text: String = "",
+        filePaths: [String] = [],
+        urls: [String] = [],
+        sourceApplicationName: String = "",
+        sourceApplicationBundleID: String = ""
+    ) {
+        self.text = text
+        self.filePaths = filePaths
+        self.urls = urls
+        self.sourceApplicationName = sourceApplicationName
+        self.sourceApplicationBundleID = sourceApplicationBundleID
+    }
+
+    var filePathsSearchText: String { filePaths.joined(separator: "\n") }
+    var urlsSearchText: String { urls.joined(separator: "\n") }
+
+    static func make(
+        from data: BoardManClipData,
+        sourceApplication: (name: String, bundleIdentifier: String)? = nil
+    ) -> BoardManHistorySearchMetadata {
+        let fullText = String(data.boardManTextValue.prefix(100_000))
+        return BoardManHistorySearchMetadata(
+            text: fullText,
+            filePaths: Array(data.fileNames.prefix(256)).map { String($0.prefix(4_096)) },
+            urls: Array(data.URLs.prefix(256)).map { String($0.prefix(4_096)) },
+            sourceApplicationName: sourceApplication?.name ?? "",
+            sourceApplicationBundleID: sourceApplication?.bundleIdentifier ?? ""
+        )
+    }
+}
+
+enum BoardManSearchSource: String, Sendable, Hashable {
+    case history
+    case snippet
+}
+
+enum BoardManSearchScope: Sendable {
+    case all
+    case history
+    case snippets
+}
+
+struct BoardManSearchHit: Sendable, Equatable {
+    let identifier: String
+    let source: BoardManSearchSource
+    let matchClass: Int
+    let relevance: Double
+}
+
+struct BoardManSearchRankCandidate: Sendable, Equatable {
+    let hit: BoardManSearchHit
+    let isPinned: Bool
+    let usageCount: Int
+    let baseOrder: Int
+}
+
+enum BoardManSearchMatcher {
+    static func matchClass(query: String, fields: [String]) -> Int? {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedQuery.isEmpty else { return nil }
+        let normalizedFields = fields.map { $0.lowercased() }
+        if normalizedFields.contains(normalizedQuery) { return 0 }
+        if normalizedFields.contains(where: { $0.hasPrefix(normalizedQuery) }) { return 1 }
+        if normalizedFields.contains(where: { $0.contains(normalizedQuery) }) { return 2 }
+        return nil
+    }
+}
+
+enum BoardManSearchRanker {
+    static func rank(_ candidates: [BoardManSearchRankCandidate]) -> [BoardManSearchHit] {
+        candidates.sorted { lhs, rhs in
+            if lhs.hit.matchClass != rhs.hit.matchClass {
+                return lhs.hit.matchClass < rhs.hit.matchClass
+            }
+            if lhs.isPinned != rhs.isPinned {
+                return lhs.isPinned && !rhs.isPinned
+            }
+            if lhs.usageCount != rhs.usageCount {
+                return lhs.usageCount > rhs.usageCount
+            }
+            if lhs.baseOrder != rhs.baseOrder {
+                return lhs.baseOrder < rhs.baseOrder
+            }
+            if lhs.hit.relevance != rhs.hit.relevance {
+                return lhs.hit.relevance < rhs.hit.relevance
+            }
+            if lhs.hit.source != rhs.hit.source {
+                return lhs.hit.source.rawValue < rhs.hit.source.rawValue
+            }
+            return lhs.hit.identifier < rhs.hit.identifier
+        }
+        .map(\.hit)
+    }
+}
+
 extension Notification.Name {
     static let boardManHistoryStoreDidChange = Notification.Name("BoardManHistoryStoreDidChange")
     static let boardManTemplatesStoreDidChange = Notification.Name("BoardManTemplatesStoreDidChange")
@@ -55,6 +158,9 @@ protocol BoardManStore: AnyObject {
     func clipsSortedByUpdateTimeDescending() -> [BoardManClip]
     func clipsSortedByCreatedTimeDescending() -> [BoardManClip]
     func latestClip(title: String, primaryTypes: [String]) -> BoardManClip?
+    func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit]
+    func historyClipsMissingSearchMetadata(limit: Int) -> [BoardManClip]
+    func upsertHistorySearchMetadata(identifier: String, metadata: BoardManHistorySearchMetadata)
     @discardableResult func updateClipUsage(identifier: String, updateTime: Int) -> Bool
     func upsertClip(_ clip: BoardManClip)
     func deleteClip(identifier: String)
@@ -109,6 +215,18 @@ final class BoardManStoreRouter: BoardManStore {
 
     func latestClip(title: String, primaryTypes: [String]) -> BoardManClip? {
         currentBackend().latestClip(title: title, primaryTypes: primaryTypes)
+    }
+
+    func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit] {
+        currentBackend().search(query, scope: scope, limit: limit)
+    }
+
+    func historyClipsMissingSearchMetadata(limit: Int) -> [BoardManClip] {
+        currentBackend().historyClipsMissingSearchMetadata(limit: limit)
+    }
+
+    func upsertHistorySearchMetadata(identifier: String, metadata: BoardManHistorySearchMetadata) {
+        currentBackend().upsertHistorySearchMetadata(identifier: identifier, metadata: metadata)
     }
 
     @discardableResult
@@ -222,6 +340,149 @@ enum BoardManStores {
 
     static func useRealmHistory() {
         authoritative.replaceBackend(with: RealmBoardManStore.shared)
+    }
+}
+
+enum BoardManHistorySearchMetadataBackfiller {
+    static let defaultBatchSize = 50
+
+    private static let queue = DispatchQueue(
+        label: "com.uniplanck.BoardMan.HistorySearchMetadataBackfill",
+        qos: .utility
+    )
+
+    static func start(
+        store: BoardManStore = BoardManStores.authoritative,
+        batchSize: Int = defaultBatchSize
+    ) {
+        guard batchSize > 0 else { return }
+        scheduleNextBatch(store: store, batchSize: batchSize)
+    }
+
+    @discardableResult
+    static func backfillNextBatch(store: BoardManStore, batchSize: Int = defaultBatchSize) -> Int {
+        guard batchSize > 0 else { return 0 }
+        let clips = store.historyClipsMissingSearchMetadata(limit: batchSize)
+        for clip in clips {
+            let metadata: BoardManHistorySearchMetadata
+            if let data = archivedClipData(at: clip.dataPath) {
+                metadata = .make(from: data)
+            } else {
+                // Mark unreadable/missing legacy payloads as processed so the backfill is bounded.
+                metadata = BoardManHistorySearchMetadata()
+            }
+            store.upsertHistorySearchMetadata(identifier: clip.dataHash, metadata: metadata)
+        }
+        return clips.count
+    }
+
+    private static func archivedClipData(at path: String) -> BoardManClipData? {
+        guard let archiveData = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let unarchiver = try? NSKeyedUnarchiver(forReadingFrom: archiveData) else {
+            return nil
+        }
+        unarchiver.requiresSecureCoding = false
+        defer { unarchiver.finishDecoding() }
+        return unarchiver.decodeObject(forKey: NSKeyedArchiveRootObjectKey) as? BoardManClipData
+    }
+
+    private static func scheduleNextBatch(store: BoardManStore, batchSize: Int) {
+        queue.async {
+            let processed = autoreleasepool {
+                backfillNextBatch(store: store, batchSize: batchSize)
+            }
+            guard processed == batchSize else { return }
+            queue.asyncAfter(deadline: .now() + .milliseconds(10)) {
+                scheduleNextBatch(store: store, batchSize: batchSize)
+            }
+        }
+    }
+}
+
+extension BoardManStore {
+    func historyClipsMissingSearchMetadata(limit: Int) -> [BoardManClip] {
+        return []
+    }
+
+    func upsertHistorySearchMetadata(identifier: String, metadata: BoardManHistorySearchMetadata) {
+        // The legacy compatibility backend has no supplemental search metadata table.
+    }
+
+    func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedQuery.isEmpty, limit > 0 else { return [] }
+
+        var candidates: [(hit: BoardManSearchHit, order: Int)] = []
+        var order = 0
+
+        if scope != .snippets {
+            for clip in clipsSortedByUpdateTimeDescending() {
+                guard let matchClass = BoardManSearchMatcher.matchClass(
+                    query: normalizedQuery,
+                    fields: [clip.title, clip.primaryType]
+                ) else { continue }
+                candidates.append((
+                    BoardManSearchHit(
+                        identifier: clip.dataHash,
+                        source: .history,
+                        matchClass: matchClass,
+                        relevance: Double(matchClass)
+                    ),
+                    order
+                ))
+                order += 1
+            }
+        }
+
+        if scope != .history {
+            let folders = foldersSortedByIndex()
+            var groupedIdentifiers = Set<String>()
+            for folder in folders {
+                for snippet in folder.snippets {
+                    groupedIdentifiers.insert(snippet.identifier)
+                    guard let matchClass = BoardManSearchMatcher.matchClass(
+                        query: normalizedQuery,
+                        fields: [snippet.title, snippet.content, folder.title]
+                    ) else { continue }
+                    candidates.append((
+                        BoardManSearchHit(
+                            identifier: snippet.identifier,
+                            source: .snippet,
+                            matchClass: matchClass,
+                            relevance: Double(matchClass)
+                        ),
+                        order
+                    ))
+                    order += 1
+                }
+            }
+            for snippet in uncategorizedSnippetsSortedByIndex() where !groupedIdentifiers.contains(snippet.identifier) {
+                guard let matchClass = BoardManSearchMatcher.matchClass(
+                    query: normalizedQuery,
+                    fields: [snippet.title, snippet.content, "Uncategorized"]
+                ) else { continue }
+                candidates.append((
+                    BoardManSearchHit(
+                        identifier: snippet.identifier,
+                        source: .snippet,
+                        matchClass: matchClass,
+                        relevance: Double(matchClass)
+                    ),
+                    order
+                ))
+                order += 1
+            }
+        }
+
+        return candidates
+            .sorted {
+                if $0.hit.matchClass != $1.hit.matchClass {
+                    return $0.hit.matchClass < $1.hit.matchClass
+                }
+                return $0.order < $1.order
+            }
+            .prefix(limit)
+            .map(\.hit)
     }
 }
 

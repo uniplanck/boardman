@@ -28,8 +28,18 @@ final class ExcludeAppService {
 
     func frontProcessIsExcludedApplication() -> Bool {
         guard !applications.isEmpty,
-              let identifier = frontApplication.value?.bundleIdentifier else { return false }
+              let identifier = currentFrontApplication()?.bundleIdentifier else { return false }
         return applications.contains { $0.identifier == identifier }
+    }
+
+    func frontApplicationSearchMetadata() -> (name: String, bundleIdentifier: String)? {
+        guard let application = currentFrontApplication(),
+              let bundleIdentifier = application.bundleIdentifier else { return nil }
+        return (application.localizedName ?? bundleIdentifier, bundleIdentifier)
+    }
+
+    private func currentFrontApplication() -> NSRunningApplication? {
+        return frontApplication.value ?? NSWorkspace.shared.frontmostApplication
     }
 
     func add(with appInfo: BoardManApplicationInfo) {

@@ -135,6 +135,9 @@ final class EntitlementGateTests {
         let reloaded = HistoryDisplayNameStore(defaults: defaults)
         #expect(reloaded.name(for: "history-1") == "Deploy command")
         #expect(reloaded.isNameOnly("history-1"))
+        #expect(reloaded.searchMatches(for: "deploy")["history-1"] == 1)
+        #expect(reloaded.searchMatches(for: "Deploy command")["history-1"] == 0)
+        #expect(reloaded.searchMatches(for: "command")["history-1"] == 2)
 
         reloaded.setName("", for: "history-1")
         #expect(reloaded.name(for: "history-1") == nil)
