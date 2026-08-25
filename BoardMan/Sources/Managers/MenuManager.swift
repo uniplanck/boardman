@@ -8426,21 +8426,24 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func addSnippetCategoryFromPanel(_ sender: Any?) {
-        guard let title = promptForCategoryTitle(title: boardManText("Add Group"), initialTitle: "") else { return }
-        let folder = BoardManFolder()
-        folder.title = title
-        folder.enable = true
-        folder.index = (store.foldersSortedByIndex().last?.index ?? -1) + 1
-        store.upsertFolder(folder)
+        guard let title = BoardManSnippetDialogCoordinator.promptCategoryTitle(
+            on: self,
+            title: boardManText("Add Group"),
+            initialTitle: ""
+        ) else { return }
+        let folder = BoardManSnippetCatalogService.createFolder(title: title, store: store)
         setActiveSnippetGroupIdentifiers([folder.identifier])
         onRefreshRequested?()
     }
 
     @objc private func renameSnippetCategoryFromPanel(_ sender: Any?) {
         guard let folder = selectedCategoryFolder(),
-              let title = promptForCategoryTitle(title: boardManText("Rename Group"), initialTitle: folder.title) else { return }
-        folder.title = title
-        store.upsertFolder(folder)
+              let title = BoardManSnippetDialogCoordinator.promptCategoryTitle(
+                on: self,
+                title: boardManText("Rename Group"),
+                initialTitle: folder.title
+              ) else { return }
+        BoardManSnippetCatalogService.renameFolder(folder, title: title, store: store)
         onRefreshRequested?()
     }
 
@@ -8449,67 +8452,29 @@ class BoardManPanel: NSPanel {
             NSSound.beep()
             return
         }
-
-        let alert = NSAlert()
-        alert.messageText = boardManText("Delete Group")
-        alert.informativeText = String(
-            format: boardManText("Delete \"%@\"? Snippets in this group will be moved to Uncategorized."),
-            folder.title
-        )
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: boardManText("Delete Group"))
-        alert.addButton(withTitle: boardManText("Cancel"))
-        guard runSnippetPanelAlert(alert) == .alertFirstButtonReturn else { return }
-
-        guard let savedFolder = store.folder(identifier: folder.identifier) else { return }
-        let fallbackFolder = uncategorizedFolder(excluding: savedFolder.identifier)
-        var destinationIndex = fallbackFolder.snippets.count
-        for snippet in savedFolder.snippets {
-            store.moveSnippet(
-                identifier: snippet.identifier,
-                toFolderIdentifier: fallbackFolder.identifier,
-                index: destinationIndex
-            )
-            destinationIndex += 1
-        }
-        store.deleteFolder(identifier: savedFolder.identifier)
+        guard BoardManSnippetDialogCoordinator.confirmDeleteGroup(title: folder.title, on: self) else { return }
+        guard let fallbackFolder = BoardManSnippetCatalogService.deleteFolder(
+            identifier: folder.identifier,
+            store: store
+        ) else { return }
         setActiveSnippetGroupIdentifiers([fallbackFolder.identifier])
         selectedIndex = -1
         onRefreshRequested?()
         refreshSnippetEditor()
     }
 
-    private func promptForCategoryTitle(title: String, initialTitle: String) -> String? {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = boardManText("Enter a group name.")
-        alert.addButton(withTitle: boardManText("Save"))
-        alert.addButton(withTitle: boardManText("Cancel"))
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-        field.stringValue = initialTitle
-        alert.accessoryView = field
-        guard runSnippetPanelAlert(alert, initialFirstResponder: field) == .alertFirstButtonReturn else { return nil }
-        let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            showSnippetValidationAlert(message: boardManText("Group name is required."))
-            return nil
-        }
-        return trimmed
-    }
-
     @objc private func addSnippetFromPanel(_ sender: Any?) {
-        let snippet = BoardManSnippet()
-        snippet.title = boardManText("Untitled snippet")
-        snippet.content = ""
-        snippet.enable = true
-        let folder = snippetTargetFolder(preferredIdentifier: activeSnippetCategoryIdentifier)
-        snippet.index = folder.snippets.count
-        store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
-        setActiveSnippetGroupIdentifiers([folder.identifier])
+        let creation = BoardManSnippetCatalogService.createSnippet(
+            preferredFolderIdentifier: activeSnippetCategoryIdentifier,
+            allCategoriesIdentifier: BoardManPanel.allCategoriesIdentifier,
+            uncategorizedIdentifier: BoardManPanel.uncategorizedCategoryIdentifier,
+            store: store
+        )
+        setActiveSnippetGroupIdentifiers([creation.folder.identifier])
         onRefreshRequested?()
-        selectSnippetInCurrentList(identifier: snippet.identifier)
+        selectSnippetInCurrentList(identifier: creation.snippet.identifier)
         isSnippetEditing = true
-        editingSnippetIdentifier = snippet.identifier
+        editingSnippetIdentifier = creation.snippet.identifier
         updateSnippetActionButtons()
         snippetEditorTitleField?.selectText(nil)
     }
@@ -8639,36 +8604,14 @@ class BoardManPanel: NSPanel {
             NSSound.beep()
             return
         }
-
-        let alert = NSAlert()
-        alert.messageText = boardManText("Delete Snippet")
-        alert.informativeText = String(
-            format: boardManText("Delete \"%@\" from snippets? Clipboard history is not changed."),
-            item.primaryTitle
-        )
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: boardManText("Delete"))
-        alert.addButton(withTitle: boardManText("Cancel"))
-        guard runSnippetPanelAlert(alert) == .alertFirstButtonReturn else { return }
-
-        guard let snippet = store.snippet(identifier: item.dataHash) else {
+        guard BoardManSnippetDialogCoordinator.confirmDeleteSnippet(title: item.primaryTitle, on: self) else { return }
+        guard BoardManSnippetCatalogService.deleteSnippet(identifier: item.dataHash, store: store) else {
             onRefreshRequested?()
             return
         }
-
-        let identifier = snippet.identifier
-        let folderIdentifier = store.folderIdentifier(forSnippetIdentifier: identifier)
-        store.deleteSnippet(identifier: identifier)
-        if let folderIdentifier,
-           let folder = store.folder(identifier: folderIdentifier) {
-            store.reorderSnippets(
-                Array(folder.snippets).map(\.identifier),
-                folderIdentifier: folderIdentifier
-            )
-        }
-        PinnedSnippetStore.shared.remove(identifier)
-        BoardManMaskedItemStore.shared.remove([identifier])
-        HistorySnippetLinkStore.shared.unlinkSnippet(identifier)
+        PinnedSnippetStore.shared.remove(item.dataHash)
+        BoardManMaskedItemStore.shared.remove([item.dataHash])
+        HistorySnippetLinkStore.shared.unlinkSnippet(item.dataHash)
         selectedIndex = -1
         onRefreshRequested?()
         refreshSnippetEditor()
@@ -8681,97 +8624,24 @@ class BoardManPanel: NSPanel {
         refreshSnippetEditor()
     }
 
-    private func promptForSnippet(title: String, initialTitle: String, initialContent: String, initialCategoryIdentifier: String) -> (title: String, content: String, categoryIdentifier: String)? {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = boardManText("Enter a title, category, and content.")
-        alert.addButton(withTitle: boardManText("Save"))
-        alert.addButton(withTitle: boardManText("Cancel"))
-
-        let accessory = NSView(frame: NSRect(x: 0, y: 0, width: 360, height: 224))
-        let titleLabel = NSTextField(labelWithString: boardManText("Title"))
-        titleLabel.frame = NSRect(x: 0, y: 202, width: 360, height: 16)
-        titleLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        accessory.addSubview(titleLabel)
-
-        let titleField = NSTextField(frame: NSRect(x: 0, y: 174, width: 360, height: 24))
-        titleField.stringValue = initialTitle
-        titleField.font = NSFont.systemFont(ofSize: 12)
-        accessory.addSubview(titleField)
-
-        let categoryLabel = NSTextField(labelWithString: boardManText("Category"))
-        categoryLabel.frame = NSRect(x: 0, y: 150, width: 360, height: 16)
-        categoryLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        accessory.addSubview(categoryLabel)
-
-        let categoryPopup = BoardManHoverPopUpButton(frame: NSRect(x: 0, y: 122, width: 360, height: 30), pullsDown: false)
-        categoryPopup.toolTip = boardManText("Hover to open group list")
-        populateCategoryPopup(categoryPopup, selectedIdentifier: initialCategoryIdentifier)
-        categoryPopup.font = NSFont.systemFont(ofSize: 12)
-        accessory.addSubview(categoryPopup)
-
-        let contentLabel = NSTextField(labelWithString: boardManText("Content"))
-        contentLabel.frame = NSRect(x: 0, y: 98, width: 360, height: 16)
-        contentLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        accessory.addSubview(contentLabel)
-
-        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 360, height: 94))
-        scroll.hasVerticalScroller = true
-        scroll.borderType = .bezelBorder
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 348, height: 94))
-        textView.string = initialContent
-        textView.font = NSFont.systemFont(ofSize: 12)
-        textView.isRichText = false
-        textView.isAutomaticQuoteSubstitutionEnabled = false
-        textView.enabledTextCheckingTypes = 0
-        scroll.documentView = textView
-        accessory.addSubview(scroll)
-
-        alert.accessoryView = accessory
-        guard runSnippetPanelAlert(alert, initialFirstResponder: initialTitle.isEmpty ? titleField : textView) == .alertFirstButtonReturn else { return nil }
-        let categoryIdentifier = (categoryPopup.selectedItem?.representedObject as? String) ?? BoardManPanel.allCategoriesIdentifier
-        return (titleField.stringValue, textView.string, categoryIdentifier)
-    }
-
     private func normalizedSnippetTitle(_ title: String) -> String {
-        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedTitle.isEmpty ? boardManText("Untitled snippet") : trimmedTitle
+        BoardManSnippetCatalogService.normalizedSnippetTitle(title)
     }
 
     private func showSnippetValidationAlert(message: String) {
-        let alert = NSAlert()
-        alert.messageText = boardManText("Snippet Not Saved")
-        alert.informativeText = message
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: boardManText("OK"))
-        runSnippetPanelAlert(alert)
+        BoardManSnippetDialogCoordinator.showValidation(message: message, on: self)
     }
 
     @discardableResult
-    private func runSnippetPanelAlert(_ alert: NSAlert, initialFirstResponder: NSView? = nil) -> NSApplication.ModalResponse {
-        NSApp.activate(ignoringOtherApps: true)
-        if isVisible {
-            makeKey()
-            orderFrontRegardless()
-        } else {
-            makeKeyAndOrderFront(nil)
-        }
-        alert.window.initialFirstResponder = initialFirstResponder
-        alert.window.level = .modalPanel
-
-        guard isVisible else {
-            alert.window.center()
-            alert.window.orderFrontRegardless()
-            return alert.runModal()
-        }
-
-        var response = NSApplication.ModalResponse.abort
-        alert.beginSheetModal(for: self) { result in
-            response = result
-            NSApp.stopModal()
-        }
-        NSApp.runModal(for: alert.window)
-        return response
+    private func runSnippetPanelAlert(
+        _ alert: NSAlert,
+        initialFirstResponder: NSView? = nil
+    ) -> NSApplication.ModalResponse {
+        BoardManSnippetDialogCoordinator.run(
+            alert,
+            on: self,
+            initialFirstResponder: initialFirstResponder
+        )
     }
 
     private func populateCategoryPopup(_ popup: NSPopUpButton, selectedIdentifier: String) {
@@ -8801,61 +8671,33 @@ class BoardManPanel: NSPanel {
     }
 
     private func snippetTargetFolder(preferredIdentifier: String) -> BoardManFolder {
-        if preferredIdentifier == BoardManPanel.uncategorizedCategoryIdentifier {
-            return uncategorizedFolder()
-        }
-        if preferredIdentifier != BoardManPanel.allCategoriesIdentifier,
-           let folder = store.folder(identifier: preferredIdentifier) {
-            return folder
-        }
-        return defaultSnippetFolder()
+        BoardManSnippetCatalogService.targetFolder(
+            preferredIdentifier: preferredIdentifier,
+            allCategoriesIdentifier: BoardManPanel.allCategoriesIdentifier,
+            uncategorizedIdentifier: BoardManPanel.uncategorizedCategoryIdentifier,
+            store: store
+        )
     }
 
     private func defaultSnippetFolder() -> BoardManFolder {
-        let folders = store.foldersSortedByIndex()
-        if let enabledFolder = folders.first(where: { $0.enable }) {
-            return enabledFolder
-        }
-        if let firstFolder = folders.first {
-            return firstFolder
-        }
-
-        let folder = BoardManFolder()
-        folder.title = "Board-Man Snippets"
-        folder.enable = true
-        folder.index = (folders.last?.index ?? -1) + 1
-        store.upsertFolder(folder)
-        return folder
+        BoardManSnippetCatalogService.defaultFolder(store: store)
     }
 
     private func uncategorizedFolder(excluding excludedIdentifier: String? = nil) -> BoardManFolder {
-        let folders = store.foldersSortedByIndex()
-        if let folder = folders.first(where: { $0.identifier != excludedIdentifier && $0.title == "Uncategorized" }) {
-            return folder
-        }
-        let folder = BoardManFolder()
-        folder.title = "Uncategorized"
-        folder.enable = true
-        folder.index = (folders.last?.index ?? -1) + 1
-        store.upsertFolder(folder)
-        return folder
+        BoardManSnippetCatalogService.uncategorizedFolder(
+            excluding: excludedIdentifier,
+            store: store
+        )
     }
 
     private func moveSnippet(_ snippet: BoardManSnippet, toCategoryIdentifier categoryIdentifier: String) {
-        let targetFolder = snippetTargetFolder(preferredIdentifier: categoryIdentifier)
-        let currentFolderIdentifier = store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
-        if currentFolderIdentifier == targetFolder.identifier { return }
-        let remainingIdentifiers = currentFolderIdentifier
-            .flatMap { store.folder(identifier: $0) }
-            .map { Array($0.snippets).map(\.identifier).filter { $0 != snippet.identifier } }
-        store.moveSnippet(
-            identifier: snippet.identifier,
-            toFolderIdentifier: targetFolder.identifier,
-            index: targetFolder.snippets.count
+        BoardManSnippetCatalogService.moveSnippet(
+            snippet,
+            toCategoryIdentifier: categoryIdentifier,
+            allCategoriesIdentifier: BoardManPanel.allCategoriesIdentifier,
+            uncategorizedIdentifier: BoardManPanel.uncategorizedCategoryIdentifier,
+            store: store
         )
-        if let currentFolderIdentifier, let remainingIdentifiers {
-            store.reorderSnippets(remainingIdentifiers, folderIdentifier: currentFolderIdentifier)
-        }
     }
 
     private func applyPanelHeight(_ rawValue: Int) {

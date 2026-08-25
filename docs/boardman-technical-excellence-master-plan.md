@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, history presentation, panel header presentation, snippet editing policy, and snippet presentation extractions accepted (2026-08-26).**
+**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, history presentation, panel header presentation, snippet editing policy/presentation, and snippet catalog/dialog orchestration extractions accepted (2026-08-26).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -481,7 +481,15 @@ Ninth accepted extraction:
 - new snippet presentation + editing policy verification is `7/7` PASS. The first combined UI run exposed one existing sheet-visibility timing failure; the isolated `BoardManUIRegressionTests` rerun passed `10/10`, including the same filter-sheet case, and the final full regression passed `147/147` (`35` XCTest + `112` Swift Testing across `22` suites).
 - SwiftLint reports `307` warnings / `0` serious violations across `87` files; the 10,000-item FTS benchmark improved in this run to `1.00 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `1280.81 ms`, and `git diff --check` passes.
 
-P4.1 remains open for snippet/category CRUD dialog orchestration and broader panel/settings layout ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance, history presentation, panel header presentation, snippet editing policy, and snippet presentation now have focused owners outside the giant coordinator.
+Tenth accepted extraction:
+
+- `BoardManSnippetCatalogService.swift` now owns snippet/group CRUD mutations, default/active/uncategorized folder resolution, snippet movement and post-delete ordering, plus category/snippet title normalization rather than leaving storage decisions inside the panel coordinator.
+- `BoardManSnippetDialogCoordinator.swift` now owns category-name prompts, snippet/group delete confirmations, validation alerts, and the panel-aware modal/sheet presentation boundary. `MenuManager.swift` retains only user-event wiring and panel-local selection/edit state.
+- the obsolete, unused `promptForSnippet` form was removed instead of being preserved as dead UI code. `MenuManager.swift` reduced from `11,317` to `11,159` lines in this slice (`-158` net); the focused catalog and dialog owners are `159` and `92` lines.
+- focused catalog/editing/UI verification is `15/15` PASS. Final full regression is `149/149` PASS (`35` XCTest + `114` Swift Testing across `23` suites), with `0` failed and `0` skipped tests.
+- SwiftLint reports `306` warnings / `0` serious violations across `90` files; the final 10,000-item FTS benchmark passed at `0.89 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `1020.73 ms`, and `git diff --check` passes.
+
+P4.1 remains open only for broader panel/settings layout ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership now have focused components outside the giant coordinator.
 
 ## P4.2 Dependency audit
 
