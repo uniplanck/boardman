@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, and horizontal navigation extractions accepted (2026-08-25).**
+**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, and panel paste orchestration extractions accepted (2026-08-25).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -428,7 +428,16 @@ Second accepted extraction:
 - `MenuManager.swift` reduced again from `12,594` to `12,518` lines in this slice (`-76` net) while the new shared model is `70` lines and the focused navigation policy is `49` lines.
 - focused SearchQuery plus Entitlement/interaction verification completed with `xcodebuild` exit code `0`; the earlier direct presentation-model SearchQuery run was `6/6` PASS. SwiftLint observed `319` warnings / `0` serious in this slice.
 
-P4.1 remains open. Timestamp actions, paste orchestration, larger layout/presentation ownership, and demo/screenshot fixture ownership remain to be extracted.
+Third accepted extraction:
+
+- `BoardManPanelPasteCoordinator.swift` now owns panel paste-target capture/restoration, Chromium activation settling, history/snippet paste dispatch, confirmed usage-count updates, target cleanup, and paste-first timestamp shortcut sequencing.
+- `MenuManager` no longer owns the previous-frontmost-app / editable-target / focus-target state or the direct history/snippet/timestamp paste handlers; panel callbacks now hide the panel and delegate the action to the coordinator.
+- `MenuManager.swift` reduced from `12,518` to `12,295` lines in this slice (`-223` net), while the focused paste coordinator is `250` lines.
+- paste/focus/timestamp focused verification: `24/24` PASS across `PasteCountInputServiceTests` and `BoardManInteractionRuleTests`.
+- full regression after the reliability-sensitive extraction: XCTest `35/35` PASS, Swift Testing `99/99` PASS across `16` suites, SwiftLint `319` warnings / `0` serious.
+- full regression retained the 10,000-item FTS benchmark at `1.21 ms / 1 hit` and the 10,000-history + 1,000-template migration benchmark passed.
+
+P4.1 remains open for larger layout/presentation ownership and demo/screenshot fixture ownership. The major behavioral coordinators for search, horizontal navigation, and panel paste/timestamp dispatch are now outside `MenuManager.swift`.
 
 ## P4.2 Dependency audit
 
