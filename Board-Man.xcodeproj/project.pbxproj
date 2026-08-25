@@ -30,6 +30,7 @@
 		C6B1A1272FCE000100B0A001 /* BoardManTimestampInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1262FCE000100B0A001 /* BoardManTimestampInteraction.swift */; };
 		C6B1A12B2FCE000100B0A001 /* BoardManPanelAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */; };
 		C6B1A12F2FCE000100B0A001 /* BoardManHistoryPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */; };
+		C6B1A1332FCE000100B0A001 /* BoardManPanelHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */; };
 		C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */; };
 		C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */; };
 		C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */; };
@@ -186,6 +187,7 @@
 		C6B1A1262FCE000100B0A001 /* BoardManTimestampInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManTimestampInteraction.swift; sourceTree = "<group>"; };
 		C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelAppearance.swift; sourceTree = "<group>"; };
 		C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManHistoryPresentation.swift; sourceTree = "<group>"; };
+		C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelHeader.swift; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpgradeRoute.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
@@ -347,6 +349,7 @@
 				C6B1A1262FCE000100B0A001 /* BoardManTimestampInteraction.swift */,
 				C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */,
 				C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */,
+				C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */,
 				C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */,
 				C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */,
 				C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */,
@@ -798,6 +801,7 @@
 				C6B1A1272FCE000100B0A001 /* BoardManTimestampInteraction.swift in Sources */,
 				C6B1A12B2FCE000100B0A001 /* BoardManPanelAppearance.swift in Sources */,
 				C6B1A12F2FCE000100B0A001 /* BoardManHistoryPresentation.swift in Sources */,
+				C6B1A1332FCE000100B0A001 /* BoardManPanelHeader.swift in Sources */,
 				C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */,
 				C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */,
 				C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */,

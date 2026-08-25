@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, and history presentation extractions accepted (2026-08-26).**
+**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, history presentation, and panel header presentation extractions accepted (2026-08-26).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -458,7 +458,14 @@ Sixth accepted extraction:
 - `MenuManager.swift` reduced from `11,885` to `11,627` lines in this slice (`-258` net). The focused owners are `204` and `56` lines respectively; their dedicated tests are `31` and `26` lines.
 - focused appearance/history/interaction verification is `15/15` PASS. Full regression is XCTest `35/35` PASS plus Swift Testing `107/107` across `20` suites; SwiftLint reports `316` warnings / `0` serious violations across `82` files; `git diff --check` passes.
 
-P4.1 remains open for the larger template and layout/presentation ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance, and history presentation rules now have focused owners outside the giant coordinator.
+Seventh accepted extraction:
+
+- `BoardManPanelHeader.swift` now owns the History/Templates header tab buttons and tab bar, including hover tracking, selection state, tab layout, accessibility labels, and selected/hover visual presentation.
+- the extraction is behavior-preserving: the 182-line header implementation moved verbatim out of `MenuManager.swift`; the panel continues to instantiate and coordinate the same `BoardManHeaderTabBar` API.
+- `MenuManager.swift` reduced from `11,627` to `11,445` lines in this slice (`-182` net), while the focused header owner is `183` lines.
+- focused `BoardManUIRegressionTests` verification is `10/10` PASS. Full regression is `142/142` PASS (`35` XCTest + `107` Swift Testing), SwiftLint reports `316` warnings / `0` serious violations across `83` files, and `git diff --check` passes.
+
+P4.1 remains open for the larger template and layout/presentation ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance, history presentation, and panel header presentation now have focused owners outside the giant coordinator.
 
 ## P4.2 Dependency audit
 
