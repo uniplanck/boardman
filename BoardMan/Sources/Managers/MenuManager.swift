@@ -6784,35 +6784,41 @@ class BoardManPanel: NSPanel {
         }
 
         func placeGeneralSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(generalSectionLabel, originX: originX, originY: originY, width: width)
-            launchOnLoginButton?.frame = NSRect(x: originX, y: originY - 38, width: width, height: 20)
-            inputPasteCommandButton?.frame = NSRect(x: originX, y: originY - 70, width: width, height: 20)
-            placeLabeledRow(label: languageLabel, control: languagePopup, originX: originX, originY: originY - 112, width: width)
-            maxHistorySizeLabel?.frame = NSRect(x: originX, y: originY - 157, width: fieldLabelWidth, height: 16)
-            let visibleHistoryX = originX + fieldLabelWidth + 12
-            maxHistoryDecreaseButton?.frame = NSRect(x: visibleHistoryX, y: originY - 164, width: 30, height: rowH)
-            maxHistorySizeValueLabel?.frame = NSRect(x: visibleHistoryX + 36, y: originY - 164, width: 82, height: rowH)
-            maxHistoryIncreaseButton?.frame = NSRect(x: visibleHistoryX + 124, y: originY - 164, width: 30, height: rowH)
-            placeLabeledRow(label: statusItemLabel, control: statusItemPopup, originX: originX, originY: originY - 204, width: width)
+            let layout = BoardManGeneralSettingsLayoutPolicy.generalSection(
+                originX: originX,
+                originY: originY,
+                width: width,
+                rowHeight: rowH,
+                labelWidth: fieldLabelWidth
+            )
+            generalSectionLabel?.frame = layout.sectionHeaderFrame
+            launchOnLoginButton?.frame = layout.launchOnLoginFrame
+            inputPasteCommandButton?.frame = layout.inputPasteCommandFrame
+            languageLabel?.frame = layout.languageLabelFrame
+            languagePopup?.frame = layout.languageControlFrame
+            maxHistorySizeLabel?.frame = layout.maxHistoryLabelFrame
+            maxHistoryDecreaseButton?.frame = layout.maxHistoryDecreaseFrame
+            maxHistorySizeValueLabel?.frame = layout.maxHistoryValueFrame
+            maxHistoryIncreaseButton?.frame = layout.maxHistoryIncreaseFrame
+            statusItemLabel?.frame = layout.statusItemLabelFrame
+            statusItemPopup?.frame = layout.statusItemControlFrame
         }
 
         func placeShortcutSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(shortcutSectionLabel, originX: originX, originY: originY, width: width)
-            let shortcutRowHeight: CGFloat = 50
-            let clearWidth: CGFloat = 60
-            let recordWidth: CGFloat = min(176, max(128, floor(width * 0.34)))
-            let textWidth = max(110, width - recordWidth - clearWidth - 24)
-            for (index, row) in globalShortcutRows.enumerated() {
-                let rowY = originY - 34 - CGFloat(index) * shortcutRowHeight
-                row.titleLabel.frame = NSRect(x: originX, y: rowY + 20, width: textWidth, height: 16)
-                row.detailLabel.frame = NSRect(x: originX, y: rowY + 4, width: textWidth, height: 14)
-                row.recordView.frame = NSRect(x: originX + textWidth + 8, y: rowY + 6, width: recordWidth, height: 30)
-                row.clearButton.frame = NSRect(x: originX + textWidth + recordWidth + 16, y: rowY + 6, width: clearWidth, height: 30)
+            let layout = BoardManGeneralSettingsLayoutPolicy.shortcutSection(
+                originX: originX,
+                originY: originY,
+                width: width,
+                rowCount: globalShortcutRows.count
+            )
+            shortcutSectionLabel?.frame = layout.sectionHeaderFrame
+            for (row, rowLayout) in zip(globalShortcutRows, layout.rows) {
+                row.titleLabel.frame = rowLayout.titleFrame
+                row.detailLabel.frame = rowLayout.detailFrame
+                row.recordView.frame = rowLayout.recordFrame
+                row.clearButton.frame = rowLayout.clearFrame
             }
-            shortcutStatusLabel?.frame = NSRect(x: originX,
-                                                y: originY - 34 - CGFloat(globalShortcutRows.count) * shortcutRowHeight - 2,
-                                                width: width,
-                                                height: 16)
+            shortcutStatusLabel?.frame = layout.statusFrame
         }
 
         func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
