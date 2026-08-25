@@ -6,21 +6,25 @@
 
 import Cocoa
 import Foundation
-import RealmSwift
 
 final class PasteCountStore {
 
     static let shared = PasteCountStore()
 
     private let defaults: UserDefaults
+    private let store: BoardManStore
     private let lock = NSRecursiveLock(name: "com.uniplanck.BoardMan.PasteCountStore")
     private let persistenceQueue = DispatchQueue(label: "com.uniplanck.BoardMan.PasteCountStore.persistence", qos: .utility)
     private let persistenceDelay: TimeInterval = 0.45
     private var cachedCounts: [String: NSNumber]
     private var pendingPersistence: DispatchWorkItem?
 
-    init(defaults: UserDefaults = AppEnvironment.current.defaults) {
+    init(
+        defaults: UserDefaults = AppEnvironment.current.defaults,
+        store: BoardManStore = BoardManStores.authoritative
+    ) {
         self.defaults = defaults
+        self.store = store
         self.cachedCounts = defaults.dictionary(forKey: Constants.UserDefaults.pasteCounts) as? [String: NSNumber] ?? [:]
     }
 
@@ -61,20 +65,24 @@ final class PasteCountStore {
     }
 
     func keyForLatestClip(matching string: String) -> String? {
-        let realm = try! Realm()
-
-        guard let clip = latestTextClip(in: realm, matching: string) else {
+        let textTypes = [
+            NSPasteboard.PasteboardType.string.rawValue,
+            NSPasteboard.PasteboardType.deprecatedString.rawValue,
+            NSPasteboard.PasteboardType.deprecatedRTF.rawValue,
+            NSPasteboard.PasteboardType.deprecatedRTFD.rawValue
+        ]
+        guard let clip = store.latestClip(
+            title: storedTitle(forText: string),
+            primaryTypes: textTypes
+        ) else {
             return nil
         }
-
-        return markUsedAndReturnKey(for: clip, in: realm)
+        return markUsedAndReturnKey(for: clip)
     }
 
     func keyForLatestImageClip(matching image: NSImage) -> String? {
         guard let targetFingerprint = Self.imageFingerprint(for: image) else { return nil }
-        let realm = try! Realm()
-        let candidates = realm.objects(BoardManClip.self)
-            .sorted(byKeyPath: #keyPath(BoardManClip.updateTime), ascending: false)
+        let candidates = store.clipsSortedByUpdateTimeDescending()
             .filter { self.isImageClip($0) }
             .prefix(120)
 
@@ -85,7 +93,7 @@ final class PasteCountStore {
                   Self.imageFingerprint(for: archivedImage) == targetFingerprint else {
                 continue
             }
-            return markUsedAndReturnKey(for: clip, in: realm)
+            return markUsedAndReturnKey(for: clip)
         }
         return nil
     }
@@ -100,21 +108,11 @@ final class PasteCountStore {
     }
 
     @discardableResult
-    func markUsed(clip: BoardManClip, in realm: Realm) -> Bool {
-        guard !clip.isInvalidated else { return false }
-
-        let unixTime = Int(Date().timeIntervalSince1970)
-        do {
-            try realm.write {
-                guard !clip.isInvalidated else { return }
-                clip.updateTime = unixTime
-            }
-            // Realm observation already marks the panel data stale. The count-change
-            // notification is reserved for actual count mutations to avoid duplicate UI work.
-            return true
-        } catch {
-            return false
-        }
+    func markUsed(clip: BoardManClip) -> Bool {
+        return store.updateClipUsage(
+            identifier: clip.dataHash,
+            updateTime: Int(Date().timeIntervalSince1970)
+        )
     }
 
     @discardableResult
@@ -167,25 +165,9 @@ final class PasteCountStore {
         defaults.set(snapshot, forKey: Constants.UserDefaults.pasteCounts)
     }
 
-    private func markUsedAndReturnKey(for clip: BoardManClip, in realm: Realm) -> String? {
+    private func markUsedAndReturnKey(for clip: BoardManClip) -> String? {
         let pasteCountKey = key(for: clip)
-        return markUsed(clip: clip, in: realm) ? pasteCountKey : nil
-    }
-
-    private func latestTextClip(in realm: Realm, matching string: String) -> BoardManClip? {
-        // Manual Cmd+V count must stay fast: use Realm metadata only.
-        // Reading every archived BoardManClipData file blocks UI on large histories.
-        let storedTitle = storedTitle(forText: string)
-        let textTypes = [
-            NSPasteboard.PasteboardType.string.rawValue,
-            NSPasteboard.PasteboardType.deprecatedString.rawValue,
-            NSPasteboard.PasteboardType.deprecatedRTF.rawValue,
-            NSPasteboard.PasteboardType.deprecatedRTFD.rawValue
-        ]
-        return realm.objects(BoardManClip.self)
-            .filter("title == %@ AND primaryType IN %@", storedTitle, textTypes)
-            .sorted(byKeyPath: #keyPath(BoardManClip.updateTime), ascending: false)
-            .first
+        return markUsed(clip: clip) ? pasteCountKey : nil
     }
 
     private func storedTitle(forText string: String) -> String {

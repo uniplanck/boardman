@@ -51,81 +51,57 @@ extension BoardManFolder {
     }
 
     func mergeSnippet(_ snippet: BoardManSnippet) {
-        let realm = try! Realm()
-        guard let folder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: identifier) else { return }
-        let copySnippet = BoardManSnippet(value: snippet)
-        folder.realm?.transaction { folder.snippets.append(copySnippet) }
+        let store = BoardManStores.authoritative
+        let copy = BoardManSnippet(value: snippet)
+        copy.index = store.folder(identifier: identifier)?.snippets.count ?? 0
+        store.upsertSnippet(copy, folderIdentifier: identifier)
     }
 
     func insertSnippet(_ snippet: BoardManSnippet, index: Int) {
-        let realm = try! Realm()
-        guard let folder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: identifier) else { return }
-        guard let savedSnippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: snippet.identifier) else { return }
-        folder.realm?.transaction { folder.snippets.insert(savedSnippet, at: index) }
-        folder.rearrangesSnippetIndex()
+        let store = BoardManStores.authoritative
+        var identifiers = store.folder(identifier: identifier)?.snippets.map(\.identifier) ?? []
+        identifiers.removeAll { $0 == snippet.identifier }
+        let insertionIndex = min(max(0, index), identifiers.count)
+        identifiers.insert(snippet.identifier, at: insertionIndex)
+        store.moveSnippet(identifier: snippet.identifier, toFolderIdentifier: identifier, index: insertionIndex)
+        store.reorderSnippets(identifiers, folderIdentifier: identifier)
     }
 
     func removeSnippet(_ snippet: BoardManSnippet) {
-        let realm = try! Realm()
-        guard let folder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: identifier) else { return }
-        guard let savedSnippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: snippet.identifier),
-              let index = folder.snippets.index(of: savedSnippet) else { return }
-        folder.realm?.transaction { folder.snippets.remove(at: index) }
-        folder.rearrangesSnippetIndex()
+        let store = BoardManStores.authoritative
+        var identifiers = store.folder(identifier: identifier)?.snippets.map(\.identifier) ?? []
+        identifiers.removeAll { $0 == snippet.identifier }
+        store.moveSnippet(identifier: snippet.identifier, toFolderIdentifier: nil, index: snippet.index)
+        store.reorderSnippets(identifiers, folderIdentifier: identifier)
     }
 
     static func create() -> BoardManFolder {
-        let realm = try! Realm()
         let folder = BoardManFolder()
         folder.title = "untitled folder"
-        let lastFolder = realm.objects(BoardManFolder.self)
-            .sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
-            .last
-        folder.index = (lastFolder?.index ?? -1) + 1
+        folder.index = (BoardManStores.authoritative.foldersSortedByIndex().last?.index ?? -1) + 1
         return folder
     }
 
     func merge() {
-        let realm = try! Realm()
-        if let folder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: identifier) {
-            folder.realm?.transaction {
-                folder.index = index
-                folder.enable = enable
-                folder.title = title
-            }
-        } else {
-            let copyFolder = BoardManFolder(value: self)
-            realm.transaction { realm.add(copyFolder, update: .all) }
-        }
+        BoardManStores.authoritative.upsertFolder(self)
     }
 
     func remove() {
-        let realm = try! Realm()
-        guard let folder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: identifier) else { return }
-        folder.realm?.transaction { folder.realm?.delete(folder.snippets) }
-        folder.realm?.transaction { folder.realm?.delete(folder) }
+        BoardManStores.authoritative.deleteFolder(identifier: identifier)
     }
 
     static func rearrangesIndex(_ folders: [BoardManFolder]) {
-        for (index, folder) in folders.enumerated() {
+        folders.enumerated().forEach { index, folder in
             if folder.realm == nil { folder.index = index }
-            let realm = try! Realm()
-            guard let savedFolder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: folder.identifier) else { return }
-            savedFolder.realm?.transaction {
-                savedFolder.index = index
-            }
         }
+        BoardManStores.authoritative.reorderFolders(folders.map(\.identifier))
     }
 
     func rearrangesSnippetIndex() {
-        for (index, snippet) in snippets.enumerated() {
+        snippets.enumerated().forEach { index, snippet in
             if snippet.realm == nil { snippet.index = index }
-            let realm = try! Realm()
-            guard let savedSnippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: snippet.identifier) else { return }
-            savedSnippet.realm?.transaction {
-                savedSnippet.index = index
-            }
         }
+        BoardManStores.authoritative.reorderSnippets(snippets.map(\.identifier), folderIdentifier: identifier)
     }
 }
 

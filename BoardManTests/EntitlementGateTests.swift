@@ -894,9 +894,7 @@ struct PasteCountInputServiceTests {
 
     @Test
     func recentUseOrderDoesNotOverwriteCopyOrder() throws {
-        var configuration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        configuration.objectTypes = [BoardManClip.self]
-        let realm = try Realm(configuration: configuration)
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
         let defaultsSuite = "BoardManHistoryOrderTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: defaultsSuite))
         defer { defaults.removePersistentDomain(forName: defaultsSuite) }
@@ -911,21 +909,14 @@ struct PasteCountInputServiceTests {
         newerClip.createdTime = 2_000
         newerClip.updateTime = 200
 
-        try realm.write {
-            realm.add([olderClip, newerClip])
-        }
+        store.upsertClip(olderClip)
+        store.upsertClip(newerClip)
 
-        #expect(realm.objects(BoardManClip.self)
-            .sorted(byKeyPath: #keyPath(BoardManClip.createdTime), ascending: false)
-            .first?.dataHash == "newer")
-        #expect(PasteCountStore(defaults: defaults).markUsed(clip: olderClip, in: realm))
-        #expect(olderClip.createdTime == 1_000)
-        #expect(realm.objects(BoardManClip.self)
-            .sorted(byKeyPath: #keyPath(BoardManClip.updateTime), ascending: false)
-            .first?.dataHash == "older")
-        #expect(realm.objects(BoardManClip.self)
-            .sorted(byKeyPath: #keyPath(BoardManClip.createdTime), ascending: false)
-            .first?.dataHash == "newer")
+        #expect(store.clipsSortedByCreatedTimeDescending().first?.dataHash == "newer")
+        #expect(PasteCountStore(defaults: defaults, store: store).markUsed(clip: olderClip))
+        #expect(store.clip(identifier: olderClip.dataHash)?.createdTime == 1_000)
+        #expect(store.clipsSortedByUpdateTimeDescending().first?.dataHash == "older")
+        #expect(store.clipsSortedByCreatedTimeDescending().first?.dataHash == "newer")
     }
 
     @Test
@@ -1199,17 +1190,14 @@ final class BoardManInteractionRuleTests {
 
     @Test
     func snippetDraftPersistenceUpdatesTitleContentAndEnabledStates() throws {
-        let configuration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        let realm = try Realm(configuration: configuration)
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
         let snippet = BoardManSnippet()
-        snippet.title = "Before"
-        snippet.content = "old"
-        snippet.enable = false
         let folder = BoardManFolder()
-        folder.title = "Commands"
         folder.enable = false
-        folder.snippets.append(snippet)
-        try realm.write { realm.add(folder) }
+        store.upsertFolder(folder)
+        store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
+        let editableSnippet = try #require(store.snippet(identifier: snippet.identifier))
+        let editableFolder = try #require(store.folder(identifier: folder.identifier))
 
         BoardManPanel.persistSnippetDraft(
             title: "tmux",
@@ -1217,14 +1205,14 @@ final class BoardManInteractionRuleTests {
             snippetEnabled: true,
             folderEnabled: true,
             canEditFolder: true,
-            snippet: snippet,
-            folder: folder,
-            realm: realm
+            snippet: editableSnippet,
+            folder: editableFolder,
+            store: store
         )
-        #expect(snippet.title == "tmux")
-        #expect(snippet.content == "tmux new -A -s")
-        #expect(snippet.enable)
-        #expect(folder.enable)
+        #expect(editableSnippet.title == "tmux")
+        #expect(editableSnippet.content == "tmux new -A -s")
+        #expect(editableSnippet.enable)
+        #expect(editableFolder.enable)
 
         BoardManPanel.persistSnippetDraft(
             title: "free edit",
@@ -1232,17 +1220,17 @@ final class BoardManInteractionRuleTests {
             snippetEnabled: false,
             folderEnabled: false,
             canEditFolder: false,
-            snippet: snippet,
-            folder: folder,
-            realm: realm
+            snippet: editableSnippet,
+            folder: editableFolder,
+            store: store
         )
-        #expect(snippet.title == "free edit")
-        #expect(!snippet.enable)
-        #expect(folder.enable, "Free editing must not mutate Pro-only folder state.")
-
-        BoardManPanel.persistSnippetTitle("Renamed", snippet: snippet, realm: realm)
-        #expect(snippet.title == "Renamed")
-        #expect(snippet.content == "echo free")
+        #expect(editableFolder.enable, "Free editing must not mutate Pro-only folder state.")
+        BoardManPanel.persistSnippetTitle("Renamed", snippet: editableSnippet, store: store)
+        let persistedSnippet = try #require(store.snippet(identifier: snippet.identifier))
+        #expect(persistedSnippet.title == "Renamed")
+        #expect(persistedSnippet.content == "echo free")
+        #expect(!persistedSnippet.enable)
+        #expect(store.folder(identifier: folder.identifier)?.enable == true)
     }
 
     @Test

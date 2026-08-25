@@ -15,7 +15,6 @@ import Sparkle
 import RxCocoa
 import RxSwift
 import ServiceManagement
-import RealmSwift
 
 @NSApplicationMain
 class AppDelegate: NSObject, NSMenuItemValidation {
@@ -44,15 +43,20 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     override func awakeFromNib() {
         super.awakeFromNib()
         BoardManClipData.registerLegacyArchiveAliases()
-        // Migrate Realm
-        Realm.migration()
+        // Prepare the legacy schema only inside the migration compatibility boundary.
+        BoardManHistoryPersistenceBootstrap.prepareLegacyRealmSchema()
+        let historyBootstrap = BoardManHistoryPersistenceBootstrap.bootstrap()
+        if historyBootstrap.shouldStartRealmShadowReplication {
+            BoardManSQLiteShadowReplicator.shared.start()
+        } else {
+            BoardManSQLiteShadowReplicator.shared.stop()
+        }
     }
 
     // MARK: - NSMenuItem Validation
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(AppDelegate.clearAllHistory) {
-            let realm = try! Realm()
-            return !realm.objects(BoardManClip.self).isEmpty
+            return BoardManStores.authoritative.hasClips
         }
         return true
     }
@@ -158,8 +162,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
             NSSound.beep()
             return
         }
-        let realm = try! Realm()
-        guard let clip = realm.object(ofType: BoardManClip.self, forPrimaryKey: primaryKey) else {
+        guard let clip = BoardManStores.authoritative.clip(identifier: primaryKey) else {
             BoardManRuntimeSupport.sendDiagnosticLog("Cannot fetch clip data")
             NSSound.beep()
             return
@@ -168,7 +171,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
         let didPaste = AppEnvironment.current.pasteService.paste(with: clip)
         if didPaste {
             let pasteCountKey = PasteCountStore.shared.key(for: clip)
-            PasteCountStore.shared.markUsed(clip: clip, in: realm)
+            PasteCountStore.shared.markUsed(clip: clip)
             PasteCountStore.shared.increment(forKey: pasteCountKey)
         }
     }
@@ -180,8 +183,7 @@ class AppDelegate: NSObject, NSMenuItemValidation {
             NSSound.beep()
             return
         }
-        let realm = try! Realm()
-        guard let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: primaryKey) else {
+        guard let snippet = BoardManStores.authoritative.snippet(identifier: primaryKey) else {
             BoardManRuntimeSupport.sendDiagnosticLog("Cannot fetch snippet data")
             NSSound.beep()
             return

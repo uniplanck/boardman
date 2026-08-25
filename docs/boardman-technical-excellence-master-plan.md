@@ -1,9 +1,9 @@
 # Board-Man Technical Excellence Master Plan
 
-Status: authoritative roadmap; Phase 1 ACTIVE
+Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 next
 Created: 2026-08-21
-Baseline refreshed: 2026-08-24
-Execution rule: **Phase 0 must be completed and accepted before Phase 1 begins. Phase 0 is now PASS / CLOSED.**
+Baseline refreshed: 2026-08-25
+Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED and Phase 3 is the next implementation phase.**
 
 ## 1. Purpose
 
@@ -239,6 +239,8 @@ Performance CI should fail only after baselines are stable enough to avoid flaky
 
 # Phase 2 — Persistence modernization: Realm → SQLiteData
 
+**Execution status: PASS / CLOSED as of 2026-08-25. SQLiteData is the verified cutover backend; Realm remains only inside the explicit legacy/model compatibility boundary during the rollback-support window.**
+
 **Goal: Board-Man-owned, explicit, searchable, inspectable, migration-safe storage.**
 
 ## P2.1 Introduce `BoardManStore`
@@ -301,17 +303,27 @@ Never delete the legacy DB during the first successful migration.
 
 ## P2.4 SQLiteData acceptance gate
 
-- [ ] no normal runtime service imports RealmSwift,
-- [ ] no direct `Realm()` calls outside legacy importer/tests,
-- [ ] every supported legacy fixture migrates successfully,
-- [ ] forced interruption/relaunch resumes or safely restarts migration,
-- [ ] corrupted legacy data fails safely without replacing a valid destination,
-- [ ] row/relationship/hash verification passes,
-- [ ] large-profile migration benchmark is recorded,
-- [ ] SQLite backup/restore smoke test passes,
-- [ ] app behavior tests pass using only SQLiteData.
+- [x] no normal runtime service imports RealmSwift,
+- [x] no direct `Realm()` calls outside legacy importer/backend compatibility code and tests,
+- [x] every currently supported legacy fixture path migrates successfully, including the schema-7 compatibility fixture and current history/template structures,
+- [x] forced interruption/relaunch resumes or safely restarts migration,
+- [x] corrupt manifests and same-count/wrong-digest destinations fail closed without switching the authoritative backend,
+- [x] row/relationship/hash verification passes,
+- [x] large-profile migration benchmark is recorded,
+- [x] SQLite backup/restore smoke test passes,
+- [x] app behavior tests pass using only SQLiteData.
 
-Realm can be removed as a dependency only after this gate.
+### P2 closure evidence — 2026-08-25
+
+- `BoardManStore` and a retained-reference `BoardManStoreRouter` own normal persistence access; normal services/controllers no longer create Realm connections directly.
+- `SQLiteBoardManStore` covers history, templates/folders, relationships, ordering, usage timestamps, backup, and restore. The project pins `sqlite-data` `1.11.0` exactly.
+- migration prepares an immutable legacy Realm backup, imports into a temporary SQLite candidate, verifies counts/relationships/SHA-256 digest, then performs manifest-backed cutover with resume/fail-closed behavior.
+- SQLite backup/restore uses the GRDB online backup API and preserves history, folders, snippets, relationships, and private `0600` database permissions.
+- focused SQLite-authoritative runtime behavior verifies create/save/rename/move/delete flows through `BoardManFolder` and `BoardManSnippet` with detached compatibility objects.
+- large migration fixture: 10,000 history items + 100 folders + 1,000 snippets; verified candidate size `1,515,520` bytes. Focused migration observation was `824.13 ms`; full-suite observations varied under host load, so this is recorded as benchmark evidence rather than a hard SLO.
+- closure regression: XCTest store/migration tests `21/21` PASS and Swift Testing `98/98` PASS across `16` suites; SwiftLint reported `0` serious violations.
+
+Realm dependency removal is now permitted by the gate, but is intentionally deferred until the documented legacy rollback/compatibility window can be retired without data-loss risk.
 
 # Phase 3 — Search and information retrieval superiority
 

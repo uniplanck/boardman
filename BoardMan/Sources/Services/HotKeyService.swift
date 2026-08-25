@@ -13,7 +13,6 @@
 import Foundation
 import Cocoa
 import Carbon
-import RealmSwift
 
 enum BoardManRuntimeEnvironment {
     static let benchmarkProfileEnvironmentKey = "BOARDMAN_BENCHMARK_PROFILE"
@@ -615,8 +614,7 @@ extension HotKeyService {
 
     @objc func popupSnippetFolder(_ object: AnyObject) {
         guard let hotKey = object as? HotKey else { return }
-        let realm = try! Realm()
-        guard let folder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: hotKey.identifier) else {
+        guard let folder = BoardManStores.authoritative.folder(identifier: hotKey.identifier) else {
             // When already deleted folder, remove keycombos
             unregisterSnippetHotKey(with: hotKey.identifier)
             return

@@ -12,7 +12,6 @@
 
 import Cocoa
 import RxSwift
-import RealmSwift
 import PINCache
 
 struct ArchivedTextHistoryEntry: Codable, Equatable {
@@ -175,6 +174,11 @@ final class DataCleanService {
     fileprivate var disposeBag = DisposeBag()
     fileprivate let scheduler = SerialDispatchQueueScheduler(qos: .utility)
     private let fileCleanupQueue = DispatchQueue(label: "com.uniplanck.BoardMan.DataCleanService.files", qos: .utility)
+    private let store: BoardManStore
+
+    init(store: BoardManStore = BoardManStores.authoritative) {
+        self.store = store
+    }
 
     // MARK: - Monitoring
     func startMonitoring() {
@@ -189,25 +193,24 @@ final class DataCleanService {
 
     // MARK: - Delete Data
     func cleanDatas() {
-        let realm = try! Realm()
-        let overflowingClips = overflowingClips(with: realm)
+        let clips = store.clipsSortedByUpdateTimeDescending()
+        let overflowingClips = overflowingClips(from: clips)
         let removableClips = TextHistoryArchiveStore.shared.clipsSafeToRemove(overflowingClips)
         removableClips
-            .filter { !$0.isInvalidated && !$0.thumbnailPath.isEmpty }
+            .filter { !$0.thumbnailPath.isEmpty }
             .map { $0.thumbnailPath }
             .forEach { PINCache.shared.removeObject(forKey: $0) }
-        let dataPaths = removableClips.filter { !$0.isInvalidated }.map(\.dataPath)
-        let identifiers = removableClips.filter { !$0.isInvalidated }.map(\.dataHash)
-        realm.transaction { realm.delete(removableClips.filter { !$0.isInvalidated }) }
+        let dataPaths = removableClips.map(\.dataPath)
+        let identifiers = removableClips.map(\.dataHash)
+        let removedIdentifiers = Set(identifiers)
+        store.deleteClips(identifiers: removedIdentifiers)
         HistoryDisplayNameStore.shared.remove(identifiers)
         dataPaths.filter { !$0.isEmpty }.forEach { BoardManRuntimeSupport.deleteData(at: $0) }
-        cleanFiles(with: realm)
+        let remainingClips = clips.filter { !removedIdentifiers.contains($0.dataHash) }
+        cleanFiles(with: remainingClips)
     }
 
-    private func overflowingClips(with realm: Realm) -> [BoardManClip] {
-        let clips = Array(
-            realm.objects(BoardManClip.self).sorted(byKeyPath: #keyPath(BoardManClip.updateTime), ascending: false)
-        )
+    private func overflowingClips(from clips: [BoardManClip]) -> [BoardManClip] {
         guard let maxHistorySize = BoardManHistoryRetentionPolicy.effectiveLimit(),
               clips.count > maxHistorySize else { return [] }
 
@@ -218,9 +221,8 @@ final class DataCleanService {
         return clips.filter { removableIdentifiers.contains($0.dataHash) }
     }
 
-    private func cleanFiles(with realm: Realm) {
-        let liveClipFileNames = Set(realm.objects(BoardManClip.self)
-            .filter { !$0.isInvalidated }
+    private func cleanFiles(with clips: [BoardManClip]) {
+        let liveClipFileNames = Set(clips
             .compactMap { URL(fileURLWithPath: $0.dataPath).lastPathComponent })
         let applicationSupportFolder = BoardManRuntimeSupport.applicationSupportFolder()
 

@@ -14,7 +14,6 @@
 
 import Cocoa
 import PINCache
-import RealmSwift
 import RxCocoa
 import RxSwift
 
@@ -41,10 +40,7 @@ final class MenuManager: NSObject {
     fileprivate let notificationCenter = NotificationCenter.default
     fileprivate let kMaxKeyEquivalents = 10
     fileprivate let shortenSymbol = "..."
-    // Realm
-    fileprivate let realm = try! Realm()
-    fileprivate var clipToken: NotificationToken?
-    fileprivate var snippetToken: NotificationToken?
+    fileprivate let store: BoardManStore = BoardManStores.authoritative
 
     // MARK: - Enum Values
     enum StatusType: Int {
@@ -164,7 +160,7 @@ extension MenuManager {
 #if DEBUG
     private func seedReadmeScreenshotDataIfNeeded(for scene: String) {
         guard scene == "templates" || scene == "snippets" else { return }
-        guard realm.objects(BoardManFolder.self).isEmpty else { return }
+        guard store.foldersSortedByIndex().isEmpty else { return }
 
         let language = BoardManLanguage.allowed(
             AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
@@ -214,21 +210,19 @@ extension MenuManager {
             ]
         }
 
-        realm.transaction {
-            for (folderIndex, group) in groups.enumerated() {
-                let folder = BoardManFolder()
-                folder.index = folderIndex
-                folder.title = group.title
-                folder.enable = true
-                for (snippetIndex, value) in group.snippets.enumerated() {
-                    let snippet = BoardManSnippet()
-                    snippet.index = snippetIndex
-                    snippet.title = value.title
-                    snippet.content = value.content
-                    snippet.enable = true
-                    folder.snippets.append(snippet)
-                }
-                realm.add(folder)
+        for (folderIndex, group) in groups.enumerated() {
+            let folder = BoardManFolder()
+            folder.index = folderIndex
+            folder.title = group.title
+            folder.enable = true
+            store.upsertFolder(folder)
+            for (snippetIndex, value) in group.snippets.enumerated() {
+                let snippet = BoardManSnippet()
+                snippet.index = snippetIndex
+                snippet.title = value.title
+                snippet.content = value.content
+                snippet.enable = true
+                store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
             }
         }
     }
@@ -380,8 +374,7 @@ extension MenuManager {
             }
 
             let dispatchStartedAt = CFAbsoluteTimeGetCurrent()
-            let realm = try! Realm()
-            guard let clip = realm.object(ofType: BoardManClip.self, forPrimaryKey: dataHash) else {
+            guard let clip = BoardManStores.authoritative.clip(identifier: dataHash) else {
                 BoardManRuntimeSupport.sendDiagnosticLog("BoardMan direct paste: cannot fetch clip")
                 NSSound.beep()
                 self.clearPreviousPasteTarget()
@@ -403,9 +396,8 @@ extension MenuManager {
             if let targetSnapshot {
                 PasteCountInputService.shared.confirmPasteChange(from: targetSnapshot) { confirmed in
                     guard confirmed else { return }
-                    let confirmationRealm = try! Realm()
-                    if let confirmedClip = confirmationRealm.object(ofType: BoardManClip.self, forPrimaryKey: dataHash) {
-                        PasteCountStore.shared.markUsed(clip: confirmedClip, in: confirmationRealm)
+                    if let confirmedClip = BoardManStores.authoritative.clip(identifier: dataHash) {
+                        PasteCountStore.shared.markUsed(clip: confirmedClip)
                     }
                     PasteCountStore.shared.increment(forKey: pasteCountKey)
                 }
@@ -440,14 +432,15 @@ extension MenuManager {
             }
 
             let dispatchStartedAt = CFAbsoluteTimeGetCurrent()
-            let realm = try! Realm()
-            guard let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: identifier) else {
+            guard let snippet = self.store.snippet(identifier: identifier) else {
                 BoardManRuntimeSupport.sendDiagnosticLog("BoardMan direct paste: cannot fetch snippet")
                 NSSound.beep()
                 self.clearPreviousPasteTarget()
                 return
             }
-            guard snippet.enable, snippet.folder?.enable ?? true else {
+            let folderEnabled = self.store.folderIdentifier(forSnippetIdentifier: identifier)
+                .flatMap { self.store.folder(identifier: $0) }?.enable ?? true
+            guard snippet.enable, folderEnabled else {
                 NSSound.beep()
                 self.clearPreviousPasteTarget()
                 return
@@ -538,8 +531,9 @@ extension MenuManager {
         let defaults = AppEnvironment.current.defaults
         let maxHistory = max(1, defaults.integer(forKey: Constants.UserDefaults.maxHistorySize))
         let usesRecentOrder = defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting)
-        let sortKeyPath = usesRecentOrder ? #keyPath(BoardManClip.updateTime) : #keyPath(BoardManClip.createdTime)
-        let clipResults = realm.objects(BoardManClip.self).sorted(byKeyPath: sortKeyPath, ascending: false)
+        let clipResults = usesRecentOrder
+            ? BoardManStores.authoritative.clipsSortedByUpdateTimeDescending()
+            : BoardManStores.authoritative.clipsSortedByCreatedTimeDescending()
         let showRowNumbers = defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true
         let timestampFormat = BoardManPanel.allowedTimestampFormat(defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat))
         let relativeTimestampStyle = BoardManRelativeTimestampStyle.current(defaults: defaults)
@@ -611,11 +605,11 @@ extension MenuManager {
         let pinStore = PinnedSnippetStore.shared
         let timedPinStore = BoardManTimedPinStore.shared
         let maskedItemStore = BoardManMaskedItemStore.shared
-        let folderResults = realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
-        let folderItems = Array(folderResults
+        let folderResults = store.foldersSortedByIndex()
+        let folderItems = folderResults
             .flatMap { folder -> [BoardManHistoryItem] in
-                folder.snippets
-                    .sorted(byKeyPath: #keyPath(BoardManSnippet.index), ascending: true)
+                Array(folder.snippets)
+                    .sorted { $0.index < $1.index }
                     .map { snippet in
                         let rawTitle = snippet.title.trimmingCharacters(in: .whitespacesAndNewlines)
                         let title = rawTitle.isEmpty ? "(untitled snippet)" : rawTitle
@@ -641,16 +635,8 @@ extension MenuManager {
                                                    categoryIdentifier: folder.identifier,
                                                    categoryTitle: prefix)
                     }
-            })
-        var folderSnippetIdentifiers = Set<String>()
-        folderResults.forEach { folder in
-            folder.snippets.forEach { snippet in
-                folderSnippetIdentifiers.insert(snippet.identifier)
             }
-        }
-        let uncategorizedItems = Array(realm.objects(BoardManSnippet.self)
-            .filter { !folderSnippetIdentifiers.contains($0.identifier) }
-            .sorted { $0.index < $1.index }
+        let uncategorizedItems = store.uncategorizedSnippetsSortedByIndex()
             .map { snippet -> BoardManHistoryItem in
                 let rawTitle = snippet.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 let title = rawTitle.isEmpty ? "(untitled snippet)" : rawTitle
@@ -673,7 +659,7 @@ extension MenuManager {
                                            source: .snippet,
                                            categoryIdentifier: BoardManPanel.uncategorizedCategoryIdentifier,
                                            categoryTitle: "Uncategorized")
-            })
+            }
         // Manual snippet order is authoritative. Do not re-sort by title or pin state here,
         // otherwise a successful drag is immediately overwritten during panel reload.
         return folderItems + uncategorizedItems
@@ -684,19 +670,27 @@ extension MenuManager {
 // MARK: - Binding
 private extension MenuManager {
     func bind() {
-        // Realm Notification
-        clipToken = realm.objects(BoardManClip.self)
-                        .observe { [weak self] _ in
-                            DispatchQueue.main.async { [weak self] in
-                                self?.panelItemsNeedRefresh = true
-                            }
-                        }
-        snippetToken = realm.objects(BoardManFolder.self)
-                        .observe { [weak self] _ in
-                            DispatchQueue.main.async { [weak self] in
-                                self?.panelItemsNeedRefresh = true
-                            }
-                        }
+        // History changes are observed through the persistence boundary so the UI does not
+        // care whether Realm or SQLite is authoritative.
+        notificationCenter.rx.notification(
+            .boardManHistoryStoreDidChange,
+            object: BoardManStores.authoritative
+        )
+            .asDriver(onErrorDriveWith: .empty())
+            .drive(onNext: { [weak self] _ in
+                self?.panelItemsNeedRefresh = true
+            })
+            .disposed(by: disposeBag)
+
+        notificationCenter.rx.notification(
+            .boardManTemplatesStoreDidChange,
+            object: BoardManStores.authoritative
+        )
+            .asDriver(onErrorDriveWith: .empty())
+            .drive(onNext: { [weak self] _ in
+                self?.panelItemsNeedRefresh = true
+            })
+            .disposed(by: disposeBag)
         // Menu icon
         AppEnvironment.current.defaults.rx.observe(Int.self, Constants.UserDefaults.showStatusItem, retainSelf: false)
             .compactMap { $0 }
@@ -870,8 +864,9 @@ private extension MenuManager {
         var subMenuIndex = 1 + placeInLine
 
         let usesRecentOrder = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting)
-        let sortKeyPath = usesRecentOrder ? #keyPath(BoardManClip.updateTime) : #keyPath(BoardManClip.createdTime)
-        let clipResults = realm.objects(BoardManClip.self).sorted(byKeyPath: sortKeyPath, ascending: false)
+        let clipResults = usesRecentOrder
+            ? BoardManStores.authoritative.clipsSortedByUpdateTimeDescending()
+            : BoardManStores.authoritative.clipsSortedByCreatedTimeDescending()
         let currentSize = Int(clipResults.count)
         var i = 0
         for clip in clipResults {
@@ -976,11 +971,11 @@ private extension MenuManager {
         let pinnedIdentifiers = PinnedSnippetStore.shared.identifiers
         guard !pinnedIdentifiers.isEmpty else { return }
 
-        let snippetResults = realm.objects(BoardManSnippet.self)
-        let snippets = pinnedIdentifiers.compactMap { identifier in
-            snippetResults.first(where: { snippet in
-                snippet.identifier == identifier && snippet.enable && (snippet.folder?.enable ?? true)
-            })
+        let snippets = pinnedIdentifiers.compactMap { identifier -> BoardManSnippet? in
+            guard let snippet = store.snippet(identifier: identifier), snippet.enable else { return nil }
+            let folderEnabled = store.folderIdentifier(forSnippetIdentifier: identifier)
+                .flatMap { store.folder(identifier: $0) }?.enable ?? true
+            return folderEnabled ? snippet : nil
         }
         guard !snippets.isEmpty else { return }
 
@@ -1013,7 +1008,7 @@ private extension MenuManager {
     }
 
     func addSnippetItems(_ menu: NSMenu, separateMenu: Bool) {
-        let folderResults = realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
+        let folderResults = store.foldersSortedByIndex()
         guard !folderResults.isEmpty else { return }
         if separateMenu {
             menu.addItem(NSMenuItem.separator())
@@ -1036,8 +1031,8 @@ private extension MenuManager {
                 subMenuIndex += 1
 
                 var i = firstIndex
-                folder.snippets
-                    .sorted(byKeyPath: #keyPath(BoardManSnippet.index), ascending: true)
+                Array(folder.snippets)
+                    .sorted { $0.index < $1.index }
                     .filter { $0.enable }
                     .forEach { snippet in
                         let subMenuItem = makeSnippetMenuItem(snippet, listNumber: i)
@@ -4233,6 +4228,7 @@ class BoardManPanel: NSPanel {
 
     private static let timestampFormatterLock = NSLock()
     private static var timestampFormatters: [String: DateFormatter] = [:]
+    private let store: BoardManStore = BoardManStores.authoritative
 
     private enum LayoutMetrics {
         static let preferredWidth: CGFloat = 800
@@ -4705,23 +4701,27 @@ class BoardManPanel: NSPanel {
         canEditFolder: Bool,
         snippet: BoardManSnippet,
         folder: BoardManFolder?,
-        realm: Realm
+        store: BoardManStore
     ) {
-        realm.transaction {
-            snippet.title = title
-            snippet.content = content
-            snippet.enable = snippetEnabled
-            if canEditFolder, let folder {
-                folder.enable = folderEnabled
-            }
+        snippet.title = title
+        snippet.content = content
+        snippet.enable = snippetEnabled
+        let folderIdentifier = folder?.identifier
+            ?? store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
+        store.upsertSnippet(snippet, folderIdentifier: folderIdentifier)
+        if canEditFolder, let folder {
+            folder.enable = folderEnabled
+            store.upsertFolder(folder)
         }
     }
 
-    static func persistSnippetTitle(_ title: String, snippet: BoardManSnippet, realm: Realm) {
+    static func persistSnippetTitle(_ title: String, snippet: BoardManSnippet, store: BoardManStore) {
         guard snippet.title != title else { return }
-        realm.transaction {
-            snippet.title = title
-        }
+        snippet.title = title
+        store.upsertSnippet(
+            snippet,
+            folderIdentifier: store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
+        )
     }
 
     static func reorderedSnippetIdentifiers(_ identifiers: [String],
@@ -4919,10 +4919,10 @@ class BoardManPanel: NSPanel {
     }
 
     private func refreshSnippetSettingsSummary() {
-        let realm = try! Realm()
-        let folders = Array(realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true))
-        let snippetCount = realm.objects(BoardManSnippet.self).count
-        let enabledSnippetCount = realm.objects(BoardManSnippet.self).filter("enable == true").count
+        let folders = store.foldersSortedByIndex()
+        let snippets = store.snippetsSortedByIndex()
+        let snippetCount = snippets.count
+        let enabledSnippetCount = snippets.filter(\.enable).count
         let enabledFolderCount = folders.filter { $0.enable }.count
         let shortcutCount = folders.filter { AppEnvironment.current.hotKeyService.snippetKeyCombo(forIdentifier: $0.identifier) != nil }.count
         let topFolderNames = folders.prefix(4).map { folder -> String in
@@ -4966,8 +4966,7 @@ class BoardManPanel: NSPanel {
         if let folders {
             orderedFolders = folders
         } else {
-            let realm = try! Realm()
-            orderedFolders = Array(realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true))
+            orderedFolders = store.foldersSortedByIndex()
         }
         guard let identifier = snippetGroupOrderPopup?.selectedItem?.representedObject as? String,
               let index = orderedFolders.firstIndex(where: { $0.identifier == identifier }) else {
@@ -4992,8 +4991,7 @@ class BoardManPanel: NSPanel {
     }
 
     private func moveSelectedSnippetGroup(by delta: Int) {
-        let realm = try! Realm()
-        let folders = Array(realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true))
+        let folders = store.foldersSortedByIndex()
         guard let identifier = snippetGroupOrderPopup?.selectedItem?.representedObject as? String,
               let sourceIndex = folders.firstIndex(where: { $0.identifier == identifier }) else { return }
         let destinationIndex = sourceIndex + delta
@@ -9110,8 +9108,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func exportHistoryCSV(_ sender: Any?) {
-        let realm = try! Realm()
-        let clips = realm.objects(BoardManClip.self).sorted(byKeyPath: #keyPath(BoardManClip.createdTime), ascending: false)
+        let clips = BoardManStores.authoritative.clipsSortedByCreatedTimeDescending()
         let counts = PasteCountStore.shared.countsSnapshot()
         let displayNames = HistoryDisplayNameStore.shared
         let permanentPins = PinnedSnippetStore.shared
@@ -9585,17 +9582,15 @@ class BoardManPanel: NSPanel {
               identifier != BoardManPanel.uncategorizedCategoryIdentifier else {
             return nil
         }
-        let realm = try! Realm()
-        return realm.object(ofType: BoardManFolder.self, forPrimaryKey: identifier)
+        return store.folder(identifier: identifier)
     }
 
     private func refreshSnippetEditor() {
         guard activeTab == .snippets else { return }
-        let realm = try! Realm()
         let folder = editorFolder()
 
         guard let item = selectedSnippetItem,
-              let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: item.dataHash) else {
+              let snippet = store.snippet(identifier: item.dataHash) else {
             isSnippetEditing = false
             editingSnippetIdentifier = nil
             snippetEditorStatusLabel?.isHidden = true
@@ -9667,8 +9662,7 @@ class BoardManPanel: NSPanel {
 
     private func reloadSnippetCategoryPopup() {
         guard let popup = snippetCategoryPopup else { return }
-        let realm = try! Realm()
-        let folders = Array(realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true))
+        let folders = store.foldersSortedByIndex()
         var availableIdentifiers = Set(folders.map(\.identifier))
         let includesUncategorized = allItems.contains {
             $0.categoryIdentifier == BoardManPanel.uncategorizedCategoryIdentifier
@@ -9736,8 +9730,7 @@ class BoardManPanel: NSPanel {
               activeSnippetCategoryIdentifier != BoardManPanel.uncategorizedCategoryIdentifier else {
             return nil
         }
-        let realm = try! Realm()
-        return realm.object(ofType: BoardManFolder.self, forPrimaryKey: activeSnippetCategoryIdentifier)
+        return store.folder(identifier: activeSnippetCategoryIdentifier)
     }
 
     @objc private func snippetCategoryFilterChanged(_ sender: NSPopUpButton) {
@@ -9766,15 +9759,12 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func addSnippetCategoryFromPanel(_ sender: Any?) {
-        let realm = try! Realm()
         guard let title = promptForCategoryTitle(title: boardManText("Add Group"), initialTitle: "") else { return }
         let folder = BoardManFolder()
         folder.title = title
         folder.enable = true
-        folder.index = (realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true).last?.index ?? -1) + 1
-        realm.transaction {
-            realm.add(folder)
-        }
+        folder.index = (store.foldersSortedByIndex().last?.index ?? -1) + 1
+        store.upsertFolder(folder)
         setActiveSnippetGroupIdentifiers([folder.identifier])
         onRefreshRequested?()
     }
@@ -9782,11 +9772,8 @@ class BoardManPanel: NSPanel {
     @objc private func renameSnippetCategoryFromPanel(_ sender: Any?) {
         guard let folder = selectedCategoryFolder(),
               let title = promptForCategoryTitle(title: boardManText("Rename Group"), initialTitle: folder.title) else { return }
-        let realm = try! Realm()
-        guard let savedFolder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: folder.identifier) else { return }
-        realm.transaction {
-            savedFolder.title = title
-        }
+        folder.title = title
+        store.upsertFolder(folder)
         onRefreshRequested?()
     }
 
@@ -9807,18 +9794,18 @@ class BoardManPanel: NSPanel {
         alert.addButton(withTitle: boardManText("Cancel"))
         guard runSnippetPanelAlert(alert) == .alertFirstButtonReturn else { return }
 
-        let realm = try! Realm()
-        guard let savedFolder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: folder.identifier) else { return }
-        let fallbackFolder = uncategorizedFolder(in: realm, excluding: savedFolder.identifier)
-        realm.transaction {
-            let movedSnippets = Array(savedFolder.snippets)
-            savedFolder.snippets.removeAll()
-            movedSnippets.forEach { snippet in
-                snippet.index = fallbackFolder.snippets.count
-                fallbackFolder.snippets.append(snippet)
-            }
-            realm.delete(savedFolder)
+        guard let savedFolder = store.folder(identifier: folder.identifier) else { return }
+        let fallbackFolder = uncategorizedFolder(excluding: savedFolder.identifier)
+        var destinationIndex = fallbackFolder.snippets.count
+        for snippet in savedFolder.snippets {
+            store.moveSnippet(
+                identifier: snippet.identifier,
+                toFolderIdentifier: fallbackFolder.identifier,
+                index: destinationIndex
+            )
+            destinationIndex += 1
         }
+        store.deleteFolder(identifier: savedFolder.identifier)
         setActiveSnippetGroupIdentifiers([fallbackFolder.identifier])
         selectedIndex = -1
         onRefreshRequested?()
@@ -9844,16 +9831,13 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func addSnippetFromPanel(_ sender: Any?) {
-        let realm = try! Realm()
         let snippet = BoardManSnippet()
         snippet.title = boardManText("Untitled snippet")
         snippet.content = ""
         snippet.enable = true
-        let folder = snippetTargetFolder(in: realm, preferredIdentifier: activeSnippetCategoryIdentifier)
+        let folder = snippetTargetFolder(preferredIdentifier: activeSnippetCategoryIdentifier)
         snippet.index = folder.snippets.count
-        realm.transaction {
-            folder.snippets.append(snippet)
-        }
+        store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
         setActiveSnippetGroupIdentifiers([folder.identifier])
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: snippet.identifier)
@@ -9861,14 +9845,6 @@ class BoardManPanel: NSPanel {
         editingSnippetIdentifier = snippet.identifier
         updateSnippetActionButtons()
         snippetEditorTitleField?.selectText(nil)
-    }
-
-    private func canAddSnippet(in realm: Realm) -> Bool {
-        return true
-    }
-
-    private func canAddSnippetFolder(in realm: Realm) -> Bool {
-        return true
     }
 
     private func showProLockedAlert(message: String) {
@@ -9889,11 +9865,14 @@ class BoardManPanel: NSPanel {
               !isSnippetReorderMode,
               !isSnippetEditing,
               let item = selectedSnippetItem else { return }
-        let realm = try! Realm()
-        guard let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: item.dataHash) else { return }
+        guard let snippet = store.snippet(identifier: item.dataHash) else { return }
         let title = normalizedSnippetTitle(sender.stringValue)
         sender.stringValue = title
-        Self.persistSnippetTitle(title, snippet: snippet, realm: realm)
+        snippet.title = title
+        store.upsertSnippet(
+            snippet,
+            folderIdentifier: store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
+        )
         syncLinkedHistoryDisplayName(snippetIdentifier: snippet.identifier, title: title)
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: snippet.identifier)
@@ -9938,8 +9917,7 @@ class BoardManPanel: NSPanel {
             NSSound.beep()
             return
         }
-        let realm = try! Realm()
-        guard let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: item.dataHash) else {
+        guard let snippet = store.snippet(identifier: item.dataHash) else {
             NSSound.beep()
             onRefreshRequested?()
             return
@@ -9949,20 +9927,19 @@ class BoardManPanel: NSPanel {
             showSnippetValidationAlert(message: boardManText("Snippet content is required."))
             return
         }
-        let savedFolder = editorFolder().flatMap {
-            realm.object(ofType: BoardManFolder.self, forPrimaryKey: $0.identifier)
-        }
+        let savedFolder = editorFolder()
         let savedTitle = normalizedSnippetTitle(snippetEditorTitleField?.stringValue ?? "")
-        Self.persistSnippetDraft(
-            title: savedTitle,
-            content: content,
-            snippetEnabled: snippetEnableButton?.state == .on,
-            folderEnabled: snippetFolderEnableButton?.state == .on,
-            canEditFolder: true,
-            snippet: snippet,
-            folder: savedFolder,
-            realm: realm
+        snippet.title = savedTitle
+        snippet.content = content
+        snippet.enable = snippetEnableButton?.state == .on
+        store.upsertSnippet(
+            snippet,
+            folderIdentifier: store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
         )
+        if let savedFolder {
+            savedFolder.enable = snippetFolderEnableButton?.state == .on
+            store.upsertFolder(savedFolder)
+        }
         syncLinkedHistoryDisplayName(snippetIdentifier: snippet.identifier, title: savedTitle)
         isSnippetEditing = false
         editingSnippetIdentifier = nil
@@ -10006,21 +9983,20 @@ class BoardManPanel: NSPanel {
         alert.addButton(withTitle: boardManText("Cancel"))
         guard runSnippetPanelAlert(alert) == .alertFirstButtonReturn else { return }
 
-        let realm = try! Realm()
-        guard let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: item.dataHash) else {
+        guard let snippet = store.snippet(identifier: item.dataHash) else {
             onRefreshRequested?()
             return
         }
 
         let identifier = snippet.identifier
-        realm.transaction {
-            if let folder = snippet.folder, let index = folder.snippets.index(of: snippet) {
-                folder.snippets.remove(at: index)
-                for (snippetIndex, folderSnippet) in folder.snippets.enumerated() {
-                    folderSnippet.index = snippetIndex
-                }
-            }
-            realm.delete(snippet)
+        let folderIdentifier = store.folderIdentifier(forSnippetIdentifier: identifier)
+        store.deleteSnippet(identifier: identifier)
+        if let folderIdentifier,
+           let folder = store.folder(identifier: folderIdentifier) {
+            store.reorderSnippets(
+                Array(folder.snippets).map(\.identifier),
+                folderIdentifier: folderIdentifier
+            )
         }
         PinnedSnippetStore.shared.remove(identifier)
         BoardManMaskedItemStore.shared.remove([identifier])
@@ -10132,8 +10108,7 @@ class BoardManPanel: NSPanel {
 
     private func populateCategoryPopup(_ popup: NSPopUpButton, selectedIdentifier: String) {
         popup.removeAllItems()
-        let realm = try! Realm()
-        let folders = realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
+        let folders = store.foldersSortedByIndex()
         let effectiveIdentifier = selectedIdentifier == BoardManPanel.allCategoriesIdentifier
             ? (folders.first?.identifier ?? BoardManPanel.uncategorizedCategoryIdentifier)
             : selectedIdentifier
@@ -10157,19 +10132,19 @@ class BoardManPanel: NSPanel {
         }
     }
 
-    private func snippetTargetFolder(in realm: Realm, preferredIdentifier: String) -> BoardManFolder {
+    private func snippetTargetFolder(preferredIdentifier: String) -> BoardManFolder {
         if preferredIdentifier == BoardManPanel.uncategorizedCategoryIdentifier {
-            return uncategorizedFolder(in: realm)
+            return uncategorizedFolder()
         }
         if preferredIdentifier != BoardManPanel.allCategoriesIdentifier,
-           let folder = realm.object(ofType: BoardManFolder.self, forPrimaryKey: preferredIdentifier) {
+           let folder = store.folder(identifier: preferredIdentifier) {
             return folder
         }
-        return defaultSnippetFolder(in: realm)
+        return defaultSnippetFolder()
     }
 
-    private func defaultSnippetFolder(in realm: Realm) -> BoardManFolder {
-        let folders = realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
+    private func defaultSnippetFolder() -> BoardManFolder {
+        let folders = store.foldersSortedByIndex()
         if let enabledFolder = folders.first(where: { $0.enable }) {
             return enabledFolder
         }
@@ -10181,14 +10156,12 @@ class BoardManPanel: NSPanel {
         folder.title = "Board-Man Snippets"
         folder.enable = true
         folder.index = (folders.last?.index ?? -1) + 1
-        realm.transaction {
-            realm.add(folder)
-        }
+        store.upsertFolder(folder)
         return folder
     }
 
-    private func uncategorizedFolder(in realm: Realm, excluding excludedIdentifier: String? = nil) -> BoardManFolder {
-        let folders = realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
+    private func uncategorizedFolder(excluding excludedIdentifier: String? = nil) -> BoardManFolder {
+        let folders = store.foldersSortedByIndex()
         if let folder = folders.first(where: { $0.identifier != excludedIdentifier && $0.title == "Uncategorized" }) {
             return folder
         }
@@ -10196,28 +10169,24 @@ class BoardManPanel: NSPanel {
         folder.title = "Uncategorized"
         folder.enable = true
         folder.index = (folders.last?.index ?? -1) + 1
-        if realm.isInWriteTransaction {
-            realm.add(folder)
-        } else {
-            realm.transaction {
-                realm.add(folder)
-            }
-        }
+        store.upsertFolder(folder)
         return folder
     }
 
-    private func moveSnippet(_ snippet: BoardManSnippet, toCategoryIdentifier categoryIdentifier: String, in realm: Realm) {
-        let targetFolder = snippetTargetFolder(in: realm, preferredIdentifier: categoryIdentifier)
-        if snippet.folder?.identifier == targetFolder.identifier { return }
-        realm.transaction {
-            if let currentFolder = snippet.folder, let index = currentFolder.snippets.index(of: snippet) {
-                currentFolder.snippets.remove(at: index)
-                for (snippetIndex, folderSnippet) in currentFolder.snippets.enumerated() {
-                    folderSnippet.index = snippetIndex
-                }
-            }
-            snippet.index = targetFolder.snippets.count
-            targetFolder.snippets.append(snippet)
+    private func moveSnippet(_ snippet: BoardManSnippet, toCategoryIdentifier categoryIdentifier: String) {
+        let targetFolder = snippetTargetFolder(preferredIdentifier: categoryIdentifier)
+        let currentFolderIdentifier = store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
+        if currentFolderIdentifier == targetFolder.identifier { return }
+        let remainingIdentifiers = currentFolderIdentifier
+            .flatMap { store.folder(identifier: $0) }
+            .map { Array($0.snippets).map(\.identifier).filter { $0 != snippet.identifier } }
+        store.moveSnippet(
+            identifier: snippet.identifier,
+            toFolderIdentifier: targetFolder.identifier,
+            index: targetFolder.snippets.count
+        )
+        if let currentFolderIdentifier, let remainingIdentifiers {
+            store.reorderSnippets(remainingIdentifiers, folderIdentifier: currentFolderIdentifier)
         }
     }
 
@@ -10388,8 +10357,9 @@ class BoardManPanel: NSPanel {
         alert.addButton(withTitle: boardManText("Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let realm = try! Realm()
-        let removedIdentifiers = Array(realm.objects(BoardManClip.self).map(\.dataHash))
+        let removedIdentifiers = BoardManStores.authoritative
+            .clipsSortedByCreatedTimeDescending()
+            .map(\.dataHash)
         AppEnvironment.current.clipService.clearAll()
         BoardManMaskedItemStore.shared.remove(removedIdentifiers)
         onRefreshRequested?()
@@ -10649,8 +10619,7 @@ class BoardManPanel: NSPanel {
     }
 
     private var availableSnippetGroupIdentifiers: Set<String> {
-        let realm = try! Realm()
-        var identifiers = Set(realm.objects(BoardManFolder.self).map(\.identifier))
+        var identifiers = Set(store.foldersSortedByIndex().map(\.identifier))
         if allItems.contains(where: { $0.categoryIdentifier == BoardManPanel.uncategorizedCategoryIdentifier }) {
             identifiers.insert(BoardManPanel.uncategorizedCategoryIdentifier)
         }
@@ -11306,8 +11275,7 @@ class BoardManPanel: NSPanel {
 
                 let addToSnippetsItem = NSMenuItem(title: boardManText("Add to Snippets"), action: nil, keyEquivalent: "")
                 let groupMenu = NSMenu(title: boardManText("Add to Snippets"))
-                let realm = try! Realm()
-                let folders = Array(realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true))
+                let folders = store.foldersSortedByIndex()
                 folders.forEach { folder in
                     let title = folder.title.trimmingCharacters(in: .whitespacesAndNewlines)
                     let groupItem = NSMenuItem(title: title.isEmpty ? boardManText("Untitled folder") : title, action: #selector(addHistoryItemToSnippetGroup(_:)), keyEquivalent: "")
@@ -11448,13 +11416,13 @@ class BoardManPanel: NSPanel {
         let linkedSnippetIdentifiers = HistorySnippetLinkStore.shared.snippetIdentifiers(forHistory: historyIdentifier)
         guard !linkedSnippetIdentifiers.isEmpty else { return }
         let normalizedTitle = normalizedSnippetTitle(title)
-        let realm = try! Realm()
-        let snippets = linkedSnippetIdentifiers.compactMap {
-            realm.object(ofType: BoardManSnippet.self, forPrimaryKey: $0)
-        }
-        guard !snippets.isEmpty else { return }
-        realm.transaction {
-            snippets.forEach { $0.title = normalizedTitle }
+        linkedSnippetIdentifiers.forEach { identifier in
+            guard let snippet = store.snippet(identifier: identifier) else { return }
+            snippet.title = normalizedTitle
+            store.upsertSnippet(
+                snippet,
+                folderIdentifier: store.folderIdentifier(forSnippetIdentifier: identifier)
+            )
         }
     }
 
@@ -11467,8 +11435,7 @@ class BoardManPanel: NSPanel {
     }
 
     private func defaultSnippetTitle(forHistoryIdentifier identifier: String) -> String? {
-        let realm = try! Realm()
-        guard let clip = realm.object(ofType: BoardManClip.self, forPrimaryKey: identifier) else { return nil }
+        guard let clip = BoardManStores.authoritative.clip(identifier: identifier) else { return nil }
         let rawTitle = clip.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rawTitle.isEmpty else { return nil }
         let firstLine = rawTitle.components(separatedBy: .newlines).first ?? rawTitle
@@ -11523,18 +11490,15 @@ class BoardManPanel: NSPanel {
             NSSound.beep()
             return
         }
-        let realm = try! Realm()
         let firstLine = content.components(separatedBy: .newlines).first ?? ""
         let snippet = BoardManSnippet()
         let existingDisplayName = HistoryDisplayNameStore.shared.name(for: historyIdentifier)
         snippet.title = normalizedSnippetTitle(existingDisplayName ?? String(firstLine.prefix(80)))
         snippet.content = content
         snippet.enable = true
-        let folder = snippetTargetFolder(in: realm, preferredIdentifier: folderIdentifier)
+        let folder = snippetTargetFolder(preferredIdentifier: folderIdentifier)
         snippet.index = folder.snippets.count
-        realm.transaction {
-            folder.snippets.append(snippet)
-        }
+        store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
         setActiveSnippetGroupIdentifiers([folder.identifier])
         HistorySnippetLinkStore.shared.link(
             snippetIdentifier: snippet.identifier,
@@ -11545,8 +11509,7 @@ class BoardManPanel: NSPanel {
 
     @objc private func deleteHistoryItemFromMenu(_ sender: NSMenuItem) {
         guard let identifier = sender.representedObject as? String else { return }
-        let realm = try! Realm()
-        guard realm.object(ofType: BoardManClip.self, forPrimaryKey: identifier) != nil else {
+        guard BoardManStores.authoritative.clip(identifier: identifier) != nil else {
             onRefreshRequested?()
             return
         }
@@ -11563,8 +11526,7 @@ class BoardManPanel: NSPanel {
         alert.addButton(withTitle: boardManText("Delete"))
         alert.addButton(withTitle: boardManText("Cancel"))
         guard runSnippetPanelAlert(alert) == .alertFirstButtonReturn else { return }
-        guard let currentClip = realm.object(ofType: BoardManClip.self, forPrimaryKey: identifier),
-              !currentClip.isInvalidated else {
+        guard let currentClip = BoardManStores.authoritative.clip(identifier: identifier) else {
             onRefreshRequested?()
             return
         }
@@ -11581,8 +11543,7 @@ class BoardManPanel: NSPanel {
 
     @objc private func renameSnippetFromMenu(_ sender: NSMenuItem) {
         guard let identifier = sender.representedObject as? String else { return }
-        let realm = try! Realm()
-        guard let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: identifier) else {
+        guard let snippet = store.snippet(identifier: identifier) else {
             NSSound.beep()
             return
         }
@@ -11597,7 +11558,7 @@ class BoardManPanel: NSPanel {
         alert.accessoryView = field
         guard runSnippetPanelAlert(alert, initialFirstResponder: field) == .alertFirstButtonReturn else { return }
         let title = normalizedSnippetTitle(field.stringValue)
-        Self.persistSnippetTitle(title, snippet: snippet, realm: realm)
+        Self.persistSnippetTitle(title, snippet: snippet, store: store)
         syncLinkedHistoryDisplayName(snippetIdentifier: identifier, title: title)
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: identifier)
@@ -11880,9 +11841,7 @@ class BoardManPanel: NSPanel {
     }
 
     private func horizontalSnippetCategoryIdentifiers() -> [String] {
-        let realm = try! Realm()
-        let folders = realm.objects(BoardManFolder.self)
-            .sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
+        let folders = store.foldersSortedByIndex()
         var identifiers = [BoardManPanel.allCategoriesIdentifier]
         identifiers.append(contentsOf: folders.map(\.identifier))
         if allItems.contains(where: {
@@ -12082,8 +12041,7 @@ class BoardManPanel: NSPanel {
     private func copyItemToClipboard(_ item: BoardManHistoryItem) -> Bool {
         switch item.source {
         case .clip:
-            let realm = try! Realm()
-            guard let clip = realm.object(ofType: BoardManClip.self, forPrimaryKey: item.dataHash) else {
+            guard let clip = BoardManStores.authoritative.clip(identifier: item.dataHash) else {
                 NSSound.beep()
                 return false
             }
@@ -12596,27 +12554,10 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
         )
         guard reorderedIdentifiers != visibleIdentifiers else { return false }
 
-        let realm = try! Realm()
-        if activeSnippetCategoryIdentifier == BoardManPanel.uncategorizedCategoryIdentifier {
-            realm.transaction {
-                for (index, snippetIdentifier) in reorderedIdentifiers.enumerated() {
-                    realm.object(ofType: BoardManSnippet.self, forPrimaryKey: snippetIdentifier)?.index = index
-                }
-            }
-        } else {
-            guard let savedFolder = realm.object(
-                ofType: BoardManFolder.self,
-                forPrimaryKey: activeSnippetCategoryIdentifier
-            ) else { return false }
-            let snippetsByIdentifier = Dictionary(
-                uniqueKeysWithValues: savedFolder.snippets.map { ($0.identifier, $0) }
-            )
-            realm.transaction {
-                for (index, snippetIdentifier) in reorderedIdentifiers.enumerated() {
-                    snippetsByIdentifier[snippetIdentifier]?.index = index
-                }
-            }
-        }
+        let folderIdentifier = activeSnippetCategoryIdentifier == BoardManPanel.uncategorizedCategoryIdentifier
+            ? nil
+            : activeSnippetCategoryIdentifier
+        store.reorderSnippets(reorderedIdentifiers, folderIdentifier: folderIdentifier)
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: identifier)
         return true

@@ -27,6 +27,43 @@ final class BoardManRuntimeSupport {
             .appendingPathComponent("benchmark.realm")
     }
 
+    static func sqliteHistoryFileURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        URL(fileURLWithPath: applicationSupportFolder(environment: environment), isDirectory: true)
+            .appendingPathComponent("BoardMan.sqlite")
+    }
+
+    static func sqliteMigrationStagingDirectoryURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        URL(fileURLWithPath: applicationSupportFolder(environment: environment), isDirectory: true)
+            .appendingPathComponent("Migration Staging", isDirectory: true)
+    }
+
+    static func historyMigrationManifestURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        URL(fileURLWithPath: applicationSupportFolder(environment: environment), isDirectory: true)
+            .appendingPathComponent("BoardMan-history-migration.json")
+    }
+
+    static func prefersSQLiteHistory(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        let value = environment["BOARDMAN_SQLITE_HISTORY"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return ["1", "true", "yes", "on"].contains(value)
+    }
+
+    static func legacyRealmBackupDirectoryURL(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        URL(fileURLWithPath: applicationSupportFolder(environment: environment), isDirectory: true)
+            .appendingPathComponent("Legacy Realm Backups", isDirectory: true)
+    }
+
     static func runtimeDefaults(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> UserDefaults {

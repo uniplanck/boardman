@@ -25,6 +25,12 @@ struct BoardManRuntimeEnvironmentTests {
             BoardManRuntimeSupport.benchmarkRealmFileURL(environment: benchmarkEnvironment)?
                 .path.hasSuffix("benchmark.realm") == true
         )
+        let normalSQLite = BoardManRuntimeSupport.sqliteHistoryFileURL(environment: [:])
+        let benchmarkSQLite = BoardManRuntimeSupport.sqliteHistoryFileURL(environment: benchmarkEnvironment)
+        #expect(normalSQLite != benchmarkSQLite)
+        #expect(normalSQLite.path.hasSuffix("BoardMan.sqlite"))
+        #expect(benchmarkSQLite.path.contains("Benchmark/BoardMan.sqlite"))
+
         #expect(
             BoardManRuntimeSupport.performanceLogDirectory(environment: benchmarkEnvironment)
                 .path.hasSuffix("Board-Man Benchmark")

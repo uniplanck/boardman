@@ -36,15 +36,13 @@ final class BoardManSnippet: Object {
 
 extension BoardManSnippet {
     func merge() {
-        let realm = try! Realm()
-        let copySnippet = BoardManSnippet(value: self)
-        realm.transaction { realm.add(copySnippet, update: .all) }
+        let store = BoardManStores.authoritative
+        let folderIdentifier = folder?.identifier ?? store.folderIdentifier(forSnippetIdentifier: identifier)
+        store.upsertSnippet(self, folderIdentifier: folderIdentifier)
     }
 
     func remove() {
-        let realm = try! Realm()
-        guard let snippet = realm.object(ofType: BoardManSnippet.self, forPrimaryKey: identifier) else { return }
-        snippet.realm?.transaction { snippet.realm?.delete(snippet) }
+        BoardManStores.authoritative.deleteSnippet(identifier: identifier)
     }
 }
 

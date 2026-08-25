@@ -10,6 +10,7 @@
 		C576AD7C2FBD345000B71213 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = C576AD7B2FBD345000B71213 /* Localizable.xcstrings */; };
 		C5A6BA742FBC5A6E00C8B9EB /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C5A6BA732FBC5A6E00C8B9EB /* Sparkle */; };
 		C5D220A82FBD2655005CD45E /* RealmSwift in Frameworks */ = {isa = PBXBuildFile; productRef = C5D220A72FBD2655005CD45E /* RealmSwift */; };
+		C6B1A10F2FCE000100B0A001 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = C6B1A10E2FCE000100B0A001 /* SQLiteData */; };
 		C5D76D9E2FBA939E0083839F /* RxCocoa in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76D9D2FBA939E0083839F /* RxCocoa */; };
 		C5D76DA02FBA939E0083839F /* RxSwift in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76D9F2FBA939E0083839F /* RxSwift */; };
 		C5D76DA52FBA98A90083839F /* AEXML in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76DA42FBA98A90083839F /* AEXML */; };
@@ -20,6 +21,10 @@
 		C6B1A1022FCE000100B0A001 /* BoardManKeyCombo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1032FCE000100B0A001 /* BoardManKeyCombo.swift */; };
 		C6B1A1042FCE000100B0A001 /* BoardManHotKeyRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */; };
 		C6B1A1062FCE000100B0A001 /* BoardManShortcutRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1072FCE000100B0A001 /* BoardManShortcutRecordView.swift */; };
+		C6B1A10A2FCE000100B0A001 /* BoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1092FCE000100B0A001 /* BoardManStore.swift */; };
+		C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */; };
+		C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */; };
+		C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */; };
 		FA08EDF81D1FED7D000D1D13 /* HotKeyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */; };
 		FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CE71DDCC61600AC9052 /* ClipService.swift */; };
 		FA0D5CFA1DDCC61600AC9052 /* BoardManUpgradeRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */; };
@@ -84,6 +89,7 @@
 		FA0D5CF81DDCC61600AC9052 /* EntitlementGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */; };
 		B0A1B00226A8240000000001 /* BoardManPerformanceBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */; };
 		B0A1B00426A8240000000001 /* BoardManRuntimeEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */; };
+		C6B1A10C2FCE000100B0A001 /* BoardManStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */; };
 		FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */; };
 		FAC0DCE91DE15FD900309C49 /* DataCleanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCE81DE15FD900309C49 /* DataCleanService.swift */; };
 		FAC0DCEF1DE3255E00309C49 /* NSImage+NSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCEE1DE3255E00309C49 /* NSImage+NSColor.swift */; };
@@ -157,6 +163,7 @@
 		C6B1A1032FCE000100B0A001 /* BoardManKeyCombo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManKeyCombo.swift; sourceTree = "<group>"; };
 		C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManHotKeyRegistry.swift; sourceTree = "<group>"; };
 		C6B1A1072FCE000100B0A001 /* BoardManShortcutRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManShortcutRecordView.swift; sourceTree = "<group>"; };
+		C6B1A1092FCE000100B0A001 /* BoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManStore.swift; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpgradeRoute.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
@@ -213,6 +220,10 @@
 		FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EntitlementGateTests.swift; sourceTree = "<group>"; };
 		B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPerformanceBaselineTests.swift; sourceTree = "<group>"; };
 		B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManRuntimeEnvironmentTests.swift; sourceTree = "<group>"; };
+		C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManStoreTests.swift; sourceTree = "<group>"; };
+		C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteBoardManStore.swift; sourceTree = "<group>"; };
+		C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSQLiteShadowReplicator.swift; sourceTree = "<group>"; };
+		C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManLegacyHistoryImporter.swift; sourceTree = "<group>"; };
 		FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
 		FAAA885C1E6853B80088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManServicesPreferenceViewController.xib; sourceTree = "<group>"; };
 		FAAA88621E6858030088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManServicesPreferenceViewController.strings; sourceTree = "<group>"; };
@@ -257,6 +268,7 @@
 				C5D76D9E2FBA939E0083839F /* RxCocoa in Frameworks */,
 				FAC43E231B35DFC800C06102 /* Foundation.framework in Frameworks */,
 				C5D220A82FBD2655005CD45E /* RealmSwift in Frameworks */,
+				C6B1A10F2FCE000100B0A001 /* SQLiteData in Frameworks */,
 				C5A6BA742FBC5A6E00C8B9EB /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -298,6 +310,10 @@
 				C6B1A1012FCE000100B0A001 /* BoardManScreenshotObserver.swift */,
 				C6B1A1032FCE000100B0A001 /* BoardManKeyCombo.swift */,
 				C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */,
+				C6B1A1092FCE000100B0A001 /* BoardManStore.swift */,
+				C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */,
+				C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */,
+				C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */,
 				FA0D5CE71DDCC61600AC9052 /* ClipService.swift */,
 				FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */,
 				FA0D5CF51DDCC61600AC9052 /* LicenseActivationClient.swift */,
@@ -537,6 +553,7 @@
 				FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */,
 				B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */,
 				B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */,
+				C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */,
 				FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */,
 				FA6167911D3ABEB10049FA14 /* FolderTests.swift */,
 				FA6167951D3ACDD80049FA14 /* SnippetTests.swift */,
@@ -639,6 +656,7 @@
 				C5D76DA92FBA9D2E0083839F /* XCRemoteSwiftPackageReference "SwiftHEXColors" */,
 				C5A6BA722FBC5A6E00C8B9EB /* XCRemoteSwiftPackageReference "Sparkle" */,
 				C5D220A62FBD2655005CD45E /* XCRemoteSwiftPackageReference "realm-swift" */,
+				C6B1A10D2FCE000100B0A001 /* XCRemoteSwiftPackageReference "sqlite-data" */,
 			);
 			productRefGroup = FAC43DC71B35D8B100C06102 /* Products */;
 			projectDirPath = "";
@@ -729,6 +747,10 @@
 				FA1DB5141DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.swift in Sources */,
 				FA1DB4BC1DDCB452007F95C8 /* Realm+NoCatch.swift in Sources */,
 				FA1DB4B91DDCB452007F95C8 /* NSMenuItem+Initialize.swift in Sources */,
+				C6B1A10A2FCE000100B0A001 /* BoardManStore.swift in Sources */,
+				C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */,
+				C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */,
+				C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */,
 				FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */,
 				FA0D5CEE1DDCC61600AC9052 /* Entitlement.swift in Sources */,
 				FA0D5CF61DDCC61600AC9052 /* LicenseActivationClient.swift in Sources */,
@@ -777,6 +799,7 @@
 				FA0D5CF81DDCC61600AC9052 /* EntitlementGateTests.swift in Sources */,
 				B0A1B00226A8240000000001 /* BoardManPerformanceBaselineTests.swift in Sources */,
 				B0A1B00426A8240000000001 /* BoardManRuntimeEnvironmentTests.swift in Sources */,
+				C6B1A10C2FCE000100B0A001 /* BoardManStoreTests.swift in Sources */,
 				FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */,
 				FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */,
 			);
@@ -1174,6 +1197,14 @@
 				minimumVersion = 2.9.6;
 			};
 		};
+		C6B1A10D2FCE000100B0A001 /* XCRemoteSwiftPackageReference "sqlite-data" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
+			requirement = {
+				kind = exactVersion;
+				version = 1.11.0;
+			};
+		};
 		C5D220A62FBD2655005CD45E /* XCRemoteSwiftPackageReference "realm-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/realm/realm-swift";
@@ -1226,6 +1257,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C5A6BA722FBC5A6E00C8B9EB /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		C6B1A10E2FCE000100B0A001 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C6B1A10D2FCE000100B0A001 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
 		};
 		C5D220A72FBD2655005CD45E /* RealmSwift */ = {
 			isa = XCSwiftPackageProductDependency;

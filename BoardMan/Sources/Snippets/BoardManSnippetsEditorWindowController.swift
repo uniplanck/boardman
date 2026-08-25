@@ -11,7 +11,6 @@
 //
 
 import Cocoa
-import RealmSwift
 import AEXML
 
 final class BoardManSnippetsEditorWindowController: NSWindowController {
@@ -67,12 +66,7 @@ final class BoardManSnippetsEditorWindowController: NSWindowController {
         if #available(OSX 10.10, *) {
             self.window?.titlebarAppearsTransparent = true
         }
-        // HACK: Copy as an object that does not put under Realm management.
-        // https://github.com/realm/realm-cocoa/issues/1734
-        let realm = try! Realm()
-        folders = realm.objects(BoardManFolder.self)
-                    .sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
-                    .map { $0.deepCopy() }
+        folders = BoardManStores.authoritative.foldersSortedByIndex()
         outlineView.reloadData()
         // Select first folder
         if let folder = folders.first {
@@ -169,8 +163,8 @@ extension BoardManSnippetsEditorWindowController {
         guard let data = try? Data(contentsOf: url) else { return }
 
         do {
-            let realm = try! Realm()
-            let lastFolder = realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true).last
+            let store = BoardManStores.authoritative
+            let lastFolder = store.foldersSortedByIndex().last
             var folderIndex = (lastFolder?.index ?? -1) + 1
             // Create Document
             var options = AEXMLOptions()
@@ -180,13 +174,10 @@ extension BoardManSnippetsEditorWindowController {
                 .children
                 .forEach { folderElement in
                     let folder = BoardManFolder()
-                    // Title
                     folder.title = folderElement[Constants.Xml.titleElement].value ?? "untitled folder"
-                    // Index
                     folder.index = folderIndex
-                    // Sync DB
-                    realm.transaction { realm.add(folder) }
-                    // Snippet
+                    store.upsertFolder(folder)
+
                     var snippetIndex = 0
                     folderElement[Constants.Xml.snippetsElement][Constants.Xml.snippetElement]
                         .all?
@@ -195,15 +186,12 @@ extension BoardManSnippetsEditorWindowController {
                             snippet.title = snippetElement[Constants.Xml.titleElement].value ?? "untitled snippet"
                             snippet.content = snippetElement[Constants.Xml.contentElement].value ?? ""
                             snippet.index = snippetIndex
-                            realm.transaction { folder.snippets.append(snippet) }
-                            // Increment snippet index
+                            store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
+                            folder.snippets.append(snippet)
                             snippetIndex += 1
                         }
-                    // Increment folder index
                     folderIndex += 1
-                    // Add folder
-                    let copyFolder = folder.deepCopy()
-                    folders.append(copyFolder)
+                    folders.append(folder)
                 }
             outlineView.reloadData()
         } catch {
@@ -215,16 +203,15 @@ extension BoardManSnippetsEditorWindowController {
         let xmlDocument = AEXMLDocument()
         let rootElement = xmlDocument.addChild(name: Constants.Xml.rootElement)
 
-        let realm = try! Realm()
-        let folders = realm.objects(BoardManFolder.self).sorted(byKeyPath: #keyPath(BoardManFolder.index), ascending: true)
+        let folders = BoardManStores.authoritative.foldersSortedByIndex()
         folders.forEach { folder in
             let folderElement = rootElement.addChild(name: Constants.Xml.folderElement)
 
             folderElement.addChild(name: Constants.Xml.titleElement, value: folder.title)
 
             let snippetsElement = folderElement.addChild(name: Constants.Xml.snippetsElement)
-            folder.snippets
-                .sorted(byKeyPath: #keyPath(BoardManSnippet.index), ascending: true)
+            Array(folder.snippets)
+                .sorted { $0.index < $1.index }
                 .forEach { snippet in
                     let snippetElement = snippetsElement.addChild(name: Constants.Xml.snippetElement)
                     snippetElement.addChild(name: Constants.Xml.titleElement, value: snippet.title)

@@ -5,7 +5,6 @@
 
 import AppKit
 import Carbon
-import RealmSwift
 
 struct PasteTargetSnapshot {
     let processIdentifier: pid_t
@@ -506,13 +505,11 @@ final class PasteCountInputService {
             return false
         }
 
-        let realm = try! Realm()
         let counts = PasteCountStore.shared.countsSnapshot()
         sequentialPasteLock.lock()
         let pending = pendingSequentialHashes
         sequentialPasteLock.unlock()
-        let clips = realm.objects(BoardManClip.self)
-            .sorted(byKeyPath: #keyPath(BoardManClip.createdTime), ascending: false)
+        let clips = BoardManStores.authoritative.clipsSortedByCreatedTimeDescending()
         guard let clip = clips.first(where: {
             !pending.contains($0.dataHash) && PasteCountStore.shared.count(for: $0, in: counts) == 0
         }) else {
@@ -539,9 +536,8 @@ final class PasteCountInputService {
                 self.log("unused sequence confirmation failed")
                 return
             }
-            let confirmationRealm = try! Realm()
-            if let confirmedClip = confirmationRealm.object(ofType: BoardManClip.self, forPrimaryKey: dataHash) {
-                PasteCountStore.shared.markUsed(clip: confirmedClip, in: confirmationRealm)
+            if let confirmedClip = BoardManStores.authoritative.clip(identifier: dataHash) {
+                PasteCountStore.shared.markUsed(clip: confirmedClip)
             }
             PasteCountStore.shared.increment(forKey: pasteCountKey)
             self.log("unused sequence confirmation success")

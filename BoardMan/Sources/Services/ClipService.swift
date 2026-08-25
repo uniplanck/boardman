@@ -12,7 +12,6 @@
 
 import Foundation
 import Cocoa
-import RealmSwift
 import PINCache
 import RxSwift
 import RxCocoa
@@ -28,12 +27,17 @@ final class ClipService {
     fileprivate var disposeBag = DisposeBag()
     fileprivate var ignoredPasteboardChangeCount: Int?
     fileprivate var ignoredPasteboardFingerprint: Int?
+    private let store: BoardManStore
     private let livePlainTextTypeRawValues: Set<String> = [
         NSPasteboard.PasteboardType.string.rawValue,
         NSPasteboard.PasteboardType.deprecatedString.rawValue,
         "public.utf16-external-plain-text",
         "public.utf16-plain-text"
     ]
+
+    init(store: BoardManStore = BoardManStores.authoritative) {
+        self.store = store
+    }
 
     deinit {
         pasteboardTimer?.cancel()
@@ -73,8 +77,7 @@ final class ClipService {
     }
 
     func clearAll() {
-        let realm = try! Realm()
-        let clips = Array(realm.objects(BoardManClip.self))
+        let clips = store.clipsSortedByUpdateTimeDescending()
         let deletableClips = clips.filter { !PinnedSnippetStore.shared.isPinned($0.dataHash) }
 
         // Pinned history is durable until the user explicitly unpins it.
@@ -82,20 +85,18 @@ final class ClipService {
             .filter { !$0.thumbnailPath.isEmpty }
             .map { $0.thumbnailPath }
             .forEach { PINCache.shared.removeObject(forKey: $0) }
-        realm.transaction { realm.delete(deletableClips.filter { !$0.isInvalidated }) }
+        store.deleteClips(identifiers: Set(deletableClips.map(\.dataHash)))
         AppEnvironment.current.dataCleanService.cleanDatas()
     }
 
     func delete(with clip: BoardManClip) {
         guard !PinnedSnippetStore.shared.isPinned(clip.dataHash) else { return }
-        let realm = try! Realm()
         // Delete saved images
         let path = clip.thumbnailPath
         if !path.isEmpty {
             PINCache.shared.removeObject(forKey: path)
         }
-        // Delete Realm
-        realm.transaction { realm.delete(clip) }
+        store.deleteClip(identifier: clip.dataHash)
     }
 
     func incrementChangeCount() {
@@ -216,12 +217,9 @@ extension ClipService {
     }
 
     fileprivate func save(with data: BoardManClipData, detectedAt: CFAbsoluteTime? = nil) {
-        let realm = try! Realm()
         // Copy already copied history
         let isCopySameHistory = AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.copySameHistory)
-        if realm.object(ofType: BoardManClip.self, forPrimaryKey: "\(data.hash)") != nil, !isCopySameHistory { return }
-        // Don't save invalidated clip
-        if let clip = realm.object(ofType: BoardManClip.self, forPrimaryKey: "\(data.hash)"), clip.isInvalidated { return }
+        if store.clip(identifier: "\(data.hash)") != nil, !isCopySameHistory { return }
 
         // Don't save empty string history
         if data.isOnlyStringType && data.stringValue.isEmpty { return }
@@ -254,13 +252,10 @@ extension ClipService {
                 clip.thumbnailPath = "\(unixTime)"
                 clip.isColorCode = true
             }
-            // Save Realm and .data file
-            let dispatchRealm = try! Realm()
+            // Save persistent record and .data file.
             if BoardManRuntimeSupport.prepareDirectory(at: BoardManRuntimeSupport.applicationSupportFolder()) {
                 if NSKeyedArchiver.archiveRootObject(data, toFile: savedPath) {
-                    dispatchRealm.transaction {
-                        dispatchRealm.add(clip, update: .all)
-                    }
+                    self.store.upsertClip(clip)
                     if let detectedAt {
                         PasteCountInputService.shared.logBoardManPerformance(
                             "clipboard_capture_to_queryable",
@@ -268,19 +263,17 @@ extension ClipService {
                             details: "type=\(clip.primaryType.isEmpty ? "unknown" : clip.primaryType)"
                         )
                     }
-                    self.trimHistoryIfNeeded(in: dispatchRealm)
+                    self.trimHistoryIfNeeded()
                 }
             }
         }
     }
 
-    private func trimHistoryIfNeeded(in realm: Realm) {
+    private func trimHistoryIfNeeded() {
         guard let limit = BoardManHistoryRetentionPolicy.effectiveLimit(),
               limit > 0 else { return }
 
-        let clips = Array(
-            realm.objects(BoardManClip.self).sorted(byKeyPath: #keyPath(BoardManClip.updateTime), ascending: false)
-        )
+        let clips = store.clipsSortedByUpdateTimeDescending()
         guard clips.count > limit else { return }
 
         let removableIdentifiers = PinnedSnippetStore.shared.oldestUnpinnedIdentifiers(
@@ -290,15 +283,13 @@ extension ClipService {
         let overflowingClips = clips.filter { removableIdentifiers.contains($0.dataHash) }
         let removableClips = TextHistoryArchiveStore.shared.clipsSafeToRemove(overflowingClips)
         removableClips
-            .filter { !$0.isInvalidated && !$0.thumbnailPath.isEmpty }
+            .filter { !$0.thumbnailPath.isEmpty }
             .map { $0.thumbnailPath }
             .forEach { PINCache.shared.removeObject(forKey: $0) }
-        let dataPaths = removableClips.filter { !$0.isInvalidated }.map(\.dataPath)
-        let identifiers = removableClips.filter { !$0.isInvalidated }.map(\.dataHash)
+        let dataPaths = removableClips.map(\.dataPath)
+        let identifiers = removableClips.map(\.dataHash)
 
-        realm.transaction {
-            realm.delete(removableClips.filter { !$0.isInvalidated })
-        }
+        store.deleteClips(identifiers: Set(identifiers))
         HistoryDisplayNameStore.shared.remove(identifiers)
         dataPaths.filter { !$0.isEmpty }.forEach { BoardManRuntimeSupport.deleteData(at: $0) }
     }
