@@ -1163,16 +1163,6 @@ final class BoardManInteractionRuleTests {
         #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 3) == -1)
         #expect(BoardManPanel.tabDelta(horizontalDelta: 10, verticalDelta: 0) == nil)
         #expect(BoardManPanel.tabDelta(horizontalDelta: 30, verticalDelta: 28) == nil)
-        #expect(BoardManPanel.shouldBeginEditorContainerClick(
-            isSnippetTab: true,
-            isEditing: false,
-            hasSelection: true
-        ))
-        #expect(!BoardManPanel.shouldBeginEditorContainerClick(
-            isSnippetTab: true,
-            isEditing: true,
-            hasSelection: true
-        ))
         #expect(BoardManPanel.usesStackedHistorySettingsLayout(width: 519))
         #expect(!BoardManPanel.usesStackedHistorySettingsLayout(width: 520))
         #expect(BoardManPanel.usesStackedAppearanceSettingsLayout(width: 469))
@@ -1189,51 +1179,6 @@ final class BoardManInteractionRuleTests {
             hasHighlight: false,
             hasUsedAppearance: true
         ) == .selected)
-    }
-
-    @Test
-    func snippetDraftPersistenceUpdatesTitleContentAndEnabledStates() throws {
-        let store = try SQLiteBoardManStore.inMemoryForTesting()
-        let snippet = BoardManSnippet()
-        let folder = BoardManFolder()
-        folder.enable = false
-        store.upsertFolder(folder)
-        store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
-        let editableSnippet = try #require(store.snippet(identifier: snippet.identifier))
-        let editableFolder = try #require(store.folder(identifier: folder.identifier))
-
-        BoardManPanel.persistSnippetDraft(
-            title: "tmux",
-            content: "tmux new -A -s",
-            snippetEnabled: true,
-            folderEnabled: true,
-            canEditFolder: true,
-            snippet: editableSnippet,
-            folder: editableFolder,
-            store: store
-        )
-        #expect(editableSnippet.title == "tmux")
-        #expect(editableSnippet.content == "tmux new -A -s")
-        #expect(editableSnippet.enable)
-        #expect(editableFolder.enable)
-
-        BoardManPanel.persistSnippetDraft(
-            title: "free edit",
-            content: "echo free",
-            snippetEnabled: false,
-            folderEnabled: false,
-            canEditFolder: false,
-            snippet: editableSnippet,
-            folder: editableFolder,
-            store: store
-        )
-        #expect(editableFolder.enable, "Free editing must not mutate Pro-only folder state.")
-        BoardManPanel.persistSnippetTitle("Renamed", snippet: editableSnippet, store: store)
-        let persistedSnippet = try #require(store.snippet(identifier: snippet.identifier))
-        #expect(persistedSnippet.title == "Renamed")
-        #expect(persistedSnippet.content == "echo free")
-        #expect(!persistedSnippet.enable)
-        #expect(store.folder(identifier: folder.identifier)?.enable == true)
     }
 
     @Test
@@ -1257,25 +1202,6 @@ final class BoardManInteractionRuleTests {
 
         store.unlinkHistory("history-1")
         #expect(store.historyIdentifier(forSnippet: "snippet-b") == nil)
-    }
-
-    @Test
-    func snippetReorderingMovesIdentifiersWithoutLosingItems() {
-        #expect(BoardManPanel.reorderedSnippetIdentifiers(
-            ["a", "b", "c"],
-            moving: "a",
-            to: 3
-        ) == ["b", "c", "a"])
-        #expect(BoardManPanel.reorderedSnippetIdentifiers(
-            ["a", "b", "c"],
-            moving: "c",
-            to: 0
-        ) == ["c", "a", "b"])
-        #expect(BoardManPanel.reorderedSnippetIdentifiers(
-            ["a", "b", "c"],
-            moving: "missing",
-            to: 1
-        ) == ["a", "b", "c"])
     }
 
     @Test

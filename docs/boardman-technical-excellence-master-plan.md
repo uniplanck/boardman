@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, history presentation, and panel header presentation extractions accepted (2026-08-26).**
+**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, history presentation, panel header presentation, and snippet editing policy extractions accepted (2026-08-26).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -465,7 +465,15 @@ Seventh accepted extraction:
 - `MenuManager.swift` reduced from `11,627` to `11,445` lines in this slice (`-182` net), while the focused header owner is `183` lines.
 - focused `BoardManUIRegressionTests` verification is `10/10` PASS. Full regression is `142/142` PASS (`35` XCTest + `107` Swift Testing), SwiftLint reports `316` warnings / `0` serious violations across `83` files, and `git diff --check` passes.
 
-P4.1 remains open for the larger template and layout/presentation ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance, history presentation, and panel header presentation now have focused owners outside the giant coordinator.
+Eighth accepted extraction:
+
+- `BoardManSnippetEditingPolicy.swift` now owns snippet editor-container entry eligibility, draft/title persistence, bounded folder-enable mutation, and drag-reorder identifier policy instead of leaving those rules as static helpers inside `BoardManPanel`.
+- the live `saveSelectedSnippetFromPanel` path now calls the same focused persistence policy exercised by tests; this removes the previous split where `persistSnippetDraft` existed only for tests while production duplicated the save behavior inline.
+- `MenuManager.swift` reduced from `11,445` to `11,393` lines in this slice (`-52` net). The focused policy owner is `63` lines.
+- snippet policy tests moved out of the oversized `BoardManInteractionRuleTests` into dedicated `BoardManSnippetEditingPolicyTests.swift`; the interaction suite dropped to `328` body lines instead of suppressing the lint gate.
+- focused snippet-policy + UI verification is `13/13` PASS. Full regression is `143/143` PASS (`35` XCTest + `108` Swift Testing across `21` suites); SwiftLint reports `315` warnings / `0` serious violations across `85` files; the 10,000-item FTS benchmark remained `1.40 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed, and `git diff --check` passes.
+
+P4.1 remains open for the larger template presentation/editor UI and layout ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance, history presentation, panel header presentation, and snippet editing policy now have focused owners outside the giant coordinator.
 
 ## P4.2 Dependency audit
 

@@ -3580,59 +3580,6 @@ class BoardManPanel: NSPanel {
         return horizontalDelta < 0 ? 1 : -1
     }
 
-    static func shouldBeginEditorContainerClick(
-        isSnippetTab: Bool,
-        isEditing: Bool,
-        hasSelection: Bool
-    ) -> Bool {
-        return isSnippetTab && !isEditing && hasSelection
-    }
-
-    static func persistSnippetDraft(
-        title: String,
-        content: String,
-        snippetEnabled: Bool,
-        folderEnabled: Bool,
-        canEditFolder: Bool,
-        snippet: BoardManSnippet,
-        folder: BoardManFolder?,
-        store: BoardManStore
-    ) {
-        snippet.title = title
-        snippet.content = content
-        snippet.enable = snippetEnabled
-        let folderIdentifier = folder?.identifier
-            ?? store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
-        store.upsertSnippet(snippet, folderIdentifier: folderIdentifier)
-        if canEditFolder, let folder {
-            folder.enable = folderEnabled
-            store.upsertFolder(folder)
-        }
-    }
-
-    static func persistSnippetTitle(_ title: String, snippet: BoardManSnippet, store: BoardManStore) {
-        guard snippet.title != title else { return }
-        snippet.title = title
-        store.upsertSnippet(
-            snippet,
-            folderIdentifier: store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
-        )
-    }
-
-    static func reorderedSnippetIdentifiers(_ identifiers: [String],
-                                            moving identifier: String,
-                                            to destinationRow: Int) -> [String] {
-        guard let sourceIndex = identifiers.firstIndex(of: identifier) else { return identifiers }
-        var reordered = identifiers
-        let moved = reordered.remove(at: sourceIndex)
-        var targetIndex = max(0, min(destinationRow, reordered.count))
-        if destinationRow > sourceIndex {
-            targetIndex = max(0, min(destinationRow - 1, reordered.count))
-        }
-        reordered.insert(moved, at: targetIndex)
-        return reordered
-    }
-
     static func quickPanelSize() -> NSSize {
         return NSSize(width: 680, height: 260)
     }
@@ -8725,17 +8672,18 @@ class BoardManPanel: NSPanel {
         }
         let savedFolder = editorFolder()
         let savedTitle = normalizedSnippetTitle(snippetEditorTitleField?.stringValue ?? "")
-        snippet.title = savedTitle
-        snippet.content = content
-        snippet.enable = snippetEnableButton?.state == .on
-        store.upsertSnippet(
-            snippet,
-            folderIdentifier: store.folderIdentifier(forSnippetIdentifier: snippet.identifier)
+        BoardManSnippetEditingPolicy.persist(
+            draft: BoardManSnippetDraft(
+                title: savedTitle,
+                content: content,
+                snippetEnabled: snippetEnableButton?.state == .on,
+                folderEnabled: snippetFolderEnableButton?.state == .on,
+                canEditFolder: savedFolder != nil
+            ),
+            snippet: snippet,
+            folder: savedFolder,
+            store: store
         )
-        if let savedFolder {
-            savedFolder.enable = snippetFolderEnableButton?.state == .on
-            store.upsertFolder(savedFolder)
-        }
         syncLinkedHistoryDisplayName(snippetIdentifier: snippet.identifier, title: savedTitle)
         isSnippetEditing = false
         editingSnippetIdentifier = nil
@@ -10393,7 +10341,7 @@ class BoardManPanel: NSPanel {
         alert.accessoryView = field
         guard runSnippetPanelAlert(alert, initialFirstResponder: field) == .alertFirstButtonReturn else { return }
         let title = normalizedSnippetTitle(field.stringValue)
-        Self.persistSnippetTitle(title, snippet: snippet, store: store)
+        BoardManSnippetEditingPolicy.persistTitle(title, snippet: snippet, store: store)
         syncLinkedHistoryDisplayName(snippetIdentifier: identifier, title: title)
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: identifier)
@@ -11298,7 +11246,7 @@ extension BoardManPanel: NSGestureRecognizerDelegate {
                titleField.frame.insetBy(dx: -4, dy: -4).contains(gestureRecognizer.location(in: editorView)) {
                 return false
             }
-            return Self.shouldBeginEditorContainerClick(
+            return BoardManSnippetEditingPolicy.shouldBeginEditorContainerClick(
                 isSnippetTab: activeTab == .snippets,
                 isEditing: isSnippetEditing,
                 hasSelection: selectedSnippetItem != nil
@@ -11368,7 +11316,7 @@ extension BoardManPanel: NSTableViewDataSource, NSTableViewDelegate {
                   item.categoryIdentifier == activeSnippetCategoryIdentifier else { return nil }
             return item.dataHash
         }
-        let reorderedIdentifiers = Self.reorderedSnippetIdentifiers(
+        let reorderedIdentifiers = BoardManSnippetEditingPolicy.reorderedIdentifiers(
             visibleIdentifiers,
             moving: identifier,
             to: destinationRow

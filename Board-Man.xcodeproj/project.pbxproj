@@ -31,6 +31,7 @@
 		C6B1A12B2FCE000100B0A001 /* BoardManPanelAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */; };
 		C6B1A12F2FCE000100B0A001 /* BoardManHistoryPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */; };
 		C6B1A1332FCE000100B0A001 /* BoardManPanelHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */; };
+		C6B1A1352FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1342FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift */; };
 		C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */; };
 		C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */; };
 		C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */; };
@@ -105,6 +106,7 @@
 		C6B1A1292FCE000100B0A001 /* BoardManTimestampPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1282FCE000100B0A001 /* BoardManTimestampPresentationTests.swift */; };
 		C6B1A12D2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A12C2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift */; };
 		C6B1A1312FCE000100B0A001 /* BoardManHistoryPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1302FCE000100B0A001 /* BoardManHistoryPresentationTests.swift */; };
+		C6B1A1372FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1362FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift */; };
 		FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */; };
 		FAC0DCE91DE15FD900309C49 /* DataCleanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCE81DE15FD900309C49 /* DataCleanService.swift */; };
 		FAC0DCEF1DE3255E00309C49 /* NSImage+NSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCEE1DE3255E00309C49 /* NSImage+NSColor.swift */; };
@@ -188,6 +190,7 @@
 		C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelAppearance.swift; sourceTree = "<group>"; };
 		C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManHistoryPresentation.swift; sourceTree = "<group>"; };
 		C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelHeader.swift; sourceTree = "<group>"; };
+		C6B1A1342FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetEditingPolicy.swift; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpgradeRoute.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
@@ -251,6 +254,7 @@
 		C6B1A1282FCE000100B0A001 /* BoardManTimestampPresentationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManTimestampPresentationTests.swift; sourceTree = "<group>"; };
 		C6B1A12C2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPanelAppearanceTests.swift; sourceTree = "<group>"; };
 		C6B1A1302FCE000100B0A001 /* BoardManHistoryPresentationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManHistoryPresentationTests.swift; sourceTree = "<group>"; };
+		C6B1A1362FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetEditingPolicyTests.swift; sourceTree = "<group>"; };
 		C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteBoardManStore.swift; sourceTree = "<group>"; };
 		C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSQLiteShadowReplicator.swift; sourceTree = "<group>"; };
 		C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManLegacyHistoryImporter.swift; sourceTree = "<group>"; };
@@ -350,6 +354,7 @@
 				C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */,
 				C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */,
 				C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */,
+				C6B1A1342FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift */,
 				C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */,
 				C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */,
 				C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */,
@@ -599,6 +604,7 @@
 				C6B1A1282FCE000100B0A001 /* BoardManTimestampPresentationTests.swift */,
 				C6B1A12C2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift */,
 				C6B1A1302FCE000100B0A001 /* BoardManHistoryPresentationTests.swift */,
+				C6B1A1362FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift */,
 				FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */,
 				FA6167911D3ABEB10049FA14 /* FolderTests.swift */,
 				FA6167951D3ACDD80049FA14 /* SnippetTests.swift */,
@@ -802,6 +808,7 @@
 				C6B1A12B2FCE000100B0A001 /* BoardManPanelAppearance.swift in Sources */,
 				C6B1A12F2FCE000100B0A001 /* BoardManHistoryPresentation.swift in Sources */,
 				C6B1A1332FCE000100B0A001 /* BoardManPanelHeader.swift in Sources */,
+				C6B1A1352FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift in Sources */,
 				C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */,
 				C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */,
 				C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */,
@@ -860,6 +867,7 @@
 				C6B1A1292FCE000100B0A001 /* BoardManTimestampPresentationTests.swift in Sources */,
 				C6B1A12D2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift in Sources */,
 				C6B1A1312FCE000100B0A001 /* BoardManHistoryPresentationTests.swift in Sources */,
+				C6B1A1372FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift in Sources */,
 				FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */,
 				FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */,
 			);
