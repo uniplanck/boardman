@@ -123,64 +123,109 @@ final class SQLiteBoardManStore: BoardManStore {
         }
     }
 
-    func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit] {
-        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedQuery.isEmpty, limit > 0,
-              let matchExpression = Self.ftsMatchExpression(for: normalizedQuery) else {
-            return []
-        }
-        let prefixPattern = Self.likePrefixPattern(for: normalizedQuery)
+    func search(_ request: BoardManSearchRequest, limit: Int) -> [BoardManSearchHit] {
+        guard limit > 0 else { return [] }
+        let normalizedQuery = request.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matchExpression = normalizedQuery.isEmpty ? nil : Self.ftsMatchExpression(for: normalizedQuery)
+        if !normalizedQuery.isEmpty, matchExpression == nil { return [] }
+
         return try! database.read { db in
-            let baseSQL = """
-                SELECT identifier, source,
-                       CASE
-                           WHEN lower(?) IN (
-                               lower(title), lower(content), lower(filePaths), lower(urls),
-                               lower(sourceApplicationName), lower(sourceApplicationBundleID), lower(folderTitle)
-                           ) THEN 0
-                           WHEN lower(title) LIKE lower(?) ESCAPE '\\'
-                             OR lower(content) LIKE lower(?) ESCAPE '\\'
-                             OR lower(filePaths) LIKE lower(?) ESCAPE '\\'
-                             OR lower(urls) LIKE lower(?) ESCAPE '\\'
-                             OR lower(sourceApplicationName) LIKE lower(?) ESCAPE '\\'
-                             OR lower(sourceApplicationBundleID) LIKE lower(?) ESCAPE '\\'
-                             OR lower(folderTitle) LIKE lower(?) ESCAPE '\\' THEN 1
-                           ELSE 2
-                       END AS matchClass,
-                       bm25(
-                           boardman_search_fts,
-                           0.0, 0.0, 6.0, 2.5, 3.0, 3.0, 2.0, 2.0, 1.0, 3.0
-                       ) AS relevance
-                FROM boardman_search_fts
-                WHERE boardman_search_fts MATCH ?
-                """
-            let commonArguments: [DatabaseValueConvertible?] = [
-                normalizedQuery,
-                prefixPattern, prefixPattern, prefixPattern, prefixPattern,
-                prefixPattern, prefixPattern, prefixPattern,
-                matchExpression,
-            ]
-            let rows: [Row]
-            switch scope {
-            case .all:
-                rows = try Row.fetchAll(
-                    db,
-                    sql: baseSQL + " ORDER BY matchClass ASC, relevance ASC, identifier ASC LIMIT ?",
-                    arguments: StatementArguments(commonArguments + [limit])
-                )
-            case .history:
-                rows = try Row.fetchAll(
-                    db,
-                    sql: baseSQL + " AND source = ? ORDER BY matchClass ASC, relevance ASC, identifier ASC LIMIT ?",
-                    arguments: StatementArguments(commonArguments + [BoardManSearchSource.history.rawValue, limit])
-                )
-            case .snippets:
-                rows = try Row.fetchAll(
-                    db,
-                    sql: baseSQL + " AND source = ? ORDER BY matchClass ASC, relevance ASC, identifier ASC LIMIT ?",
-                    arguments: StatementArguments(commonArguments + [BoardManSearchSource.snippet.rawValue, limit])
-                )
+            var whereClauses = [String]()
+            var whereArguments = [DatabaseValueConvertible?]()
+            if let matchExpression {
+                whereClauses.append("boardman_search_fts MATCH ?")
+                whereArguments.append(matchExpression)
             }
+            switch request.scope {
+            case .all:
+                break
+            case .history:
+                whereClauses.append("source = ?")
+                whereArguments.append(BoardManSearchSource.history.rawValue)
+            case .snippets:
+                whereClauses.append("source = ?")
+                whereArguments.append(BoardManSearchSource.snippet.rawValue)
+            }
+
+            if !request.itemTypes.isEmpty {
+                whereClauses.append("source = ?")
+                whereArguments.append(BoardManSearchSource.history.rawValue)
+                let typeClauses = request.itemTypes
+                    .sorted { $0.rawValue < $1.rawValue }
+                    .map(Self.searchTypeSQLCondition)
+                whereClauses.append("(\(typeClauses.joined(separator: " OR ")))")
+            }
+            if let sourceApplication = request.sourceApplication {
+                let pattern = Self.likeContainsPattern(for: sourceApplication)
+                whereClauses.append("source = ?")
+                whereArguments.append(BoardManSearchSource.history.rawValue)
+                whereClauses.append(
+                    "(lower(sourceApplicationName) LIKE lower(?) ESCAPE '\\' OR lower(sourceApplicationBundleID) LIKE lower(?) ESCAPE '\\')"
+                )
+                whereArguments.append(pattern)
+                whereArguments.append(pattern)
+            }
+            if let after = request.copiedAfterMilliseconds {
+                whereClauses.append("source = ?")
+                whereArguments.append(BoardManSearchSource.history.rawValue)
+                whereClauses.append(
+                    "identifier IN (SELECT dataHash FROM history_items WHERE createdTime >= ?)"
+                )
+                whereArguments.append(after)
+            }
+            if let before = request.copiedBeforeMilliseconds {
+                whereClauses.append("source = ?")
+                whereArguments.append(BoardManSearchSource.history.rawValue)
+                whereClauses.append(
+                    "identifier IN (SELECT dataHash FROM history_items WHERE createdTime < ?)"
+                )
+                whereArguments.append(before)
+            }
+
+            let whereSQL = whereClauses.isEmpty ? "" : " WHERE " + whereClauses.joined(separator: " AND ")
+            let selectSQL: String
+            var selectArguments = [DatabaseValueConvertible?]()
+            if normalizedQuery.isEmpty {
+                selectSQL = """
+                    SELECT identifier, source, 2 AS matchClass, 0.0 AS relevance
+                    FROM boardman_search_fts
+                    """
+            } else {
+                let prefixPattern = Self.likePrefixPattern(for: normalizedQuery)
+                selectSQL = """
+                    SELECT identifier, source,
+                           CASE
+                               WHEN lower(?) IN (
+                                   lower(title), lower(content), lower(filePaths), lower(urls),
+                                   lower(sourceApplicationName), lower(sourceApplicationBundleID), lower(folderTitle)
+                               ) THEN 0
+                               WHEN lower(title) LIKE lower(?) ESCAPE '\\'
+                                 OR lower(content) LIKE lower(?) ESCAPE '\\'
+                                 OR lower(filePaths) LIKE lower(?) ESCAPE '\\'
+                                 OR lower(urls) LIKE lower(?) ESCAPE '\\'
+                                 OR lower(sourceApplicationName) LIKE lower(?) ESCAPE '\\'
+                                 OR lower(sourceApplicationBundleID) LIKE lower(?) ESCAPE '\\'
+                                 OR lower(folderTitle) LIKE lower(?) ESCAPE '\\' THEN 1
+                               ELSE 2
+                           END AS matchClass,
+                           bm25(
+                               boardman_search_fts,
+                               0.0, 0.0, 6.0, 2.5, 3.0, 3.0, 2.0, 2.0, 1.0, 3.0
+                           ) AS relevance
+                    FROM boardman_search_fts
+                    """
+                selectArguments = [
+                    normalizedQuery,
+                    prefixPattern, prefixPattern, prefixPattern, prefixPattern,
+                    prefixPattern, prefixPattern, prefixPattern,
+                ]
+            }
+
+            let rows = try Row.fetchAll(
+                db,
+                sql: selectSQL + whereSQL + " ORDER BY matchClass ASC, relevance ASC, identifier ASC LIMIT ?",
+                arguments: StatementArguments(selectArguments + whereArguments + [limit])
+            )
             return rows.compactMap { row in
                 guard let source = BoardManSearchSource(rawValue: row["source"]) else { return nil }
                 return BoardManSearchHit(
@@ -662,10 +707,46 @@ extension SQLiteBoardManStore {
     }
 
     private static func likePrefixPattern(for query: String) -> String {
+        escapedLikePattern(query) + "%"
+    }
+
+    private static func likeContainsPattern(for query: String) -> String {
+        "%" + escapedLikePattern(query) + "%"
+    }
+
+    private static func escapedLikePattern(_ query: String) -> String {
         query
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "%", with: "\\%")
-            .replacingOccurrences(of: "_", with: "\\_") + "%"
+            .replacingOccurrences(of: "_", with: "\\_")
+    }
+
+    private static func searchTypeSQLCondition(_ type: BoardManSearchItemType) -> String {
+        switch type {
+        case .text:
+            return """
+                (COALESCE(content, '') <> '' AND COALESCE(filePaths, '') = '' AND COALESCE(urls, '') = ''
+                 AND lower(metadata) NOT LIKE '%image%' AND lower(metadata) NOT LIKE '%png%'
+                 AND lower(metadata) NOT LIKE '%tiff%' AND lower(metadata) NOT LIKE '%jpeg%'
+                 AND lower(metadata) NOT LIKE '%jpg%' AND lower(metadata) NOT LIKE '%gif%'
+                 AND lower(metadata) NOT LIKE '%bmp%')
+                """
+        case .image:
+            return """
+                (lower(metadata) LIKE '%image%' OR lower(metadata) LIKE '%png%'
+                 OR lower(metadata) LIKE '%tiff%' OR lower(metadata) LIKE '%jpeg%'
+                 OR lower(metadata) LIKE '%jpg%' OR lower(metadata) LIKE '%gif%'
+                 OR lower(metadata) LIKE '%bmp%')
+                """
+        case .url:
+            return """
+                (COALESCE(urls, '') <> '' OR (lower(metadata) LIKE '%url%' AND lower(metadata) NOT LIKE '%file%'))
+                """
+        case .file:
+            return """
+                (COALESCE(filePaths, '') <> '' OR lower(metadata) LIKE '%file-url%' OR lower(metadata) LIKE '%filenames%')
+                """
+        }
     }
 
     private static func deleteSearchItem(

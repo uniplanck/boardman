@@ -10971,7 +10971,23 @@ class BoardManPanel: NSPanel {
     }
 
     private func applyCurrentFilter() {
-        let query = (searchField?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let rawQuery = (searchField?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let defaultSearchScope: BoardManSearchScope = activeTab == .snippets ? .snippets : .all
+        let parsedSearch = BoardManSearchQueryParser.parse(rawQuery, defaultScope: defaultSearchScope)
+        let searchRequest = parsedSearch.request
+        if searchRequest.scope != defaultSearchScope {
+            switch searchRequest.scope {
+            case .history where activeTab != .history:
+                activateTab(.history)
+                return
+            case .snippets where activeTab != .snippets:
+                activateTab(.snippets)
+                return
+            case .all, .history, .snippets:
+                break
+            }
+        }
+        let query = searchRequest.text.lowercased()
         let tabbedItems: [BoardManHistoryItem]
         switch activeTab {
         case .history:
@@ -11019,22 +11035,36 @@ class BoardManPanel: NSPanel {
                 .joined(separator: "\n")
             return !hideRules.contains { $0.matches(searchableText) }
         }
+        let scopedVisibleItems = visibleItems.filter { item in
+            switch searchRequest.scope {
+            case .all:
+                return true
+            case .history:
+                return item.source == .clip
+            case .snippets:
+                return item.source == .snippet
+            }
+        }
+        let eligibleVisibleItems = parsedSearch.pinnedOnly
+            ? scopedVisibleItems.filter(\.isPinned)
+            : scopedVisibleItems
+        let hasExplicitSearch = !query.isEmpty || searchRequest.hasStoreFilters
+            || parsedSearch.pinnedOnly || searchRequest.scope != defaultSearchScope
         let searchedItems: [BoardManHistoryItem]
-        if query.isEmpty {
-            searchedItems = visibleItems
+        if !hasExplicitSearch || (query.isEmpty && !searchRequest.hasStoreFilters) {
+            searchedItems = eligibleVisibleItems
         } else {
             let startedAt = CFAbsoluteTimeGetCurrent()
-            let scope: BoardManSearchScope = activeTab == .snippets ? .snippets : .all
             #if DEBUG
-            let hits = benchmarkIsolationForTesting
-                ? benchmarkSearchHits(query: query, items: visibleItems, scope: scope)
-                : store.search(query, scope: scope, limit: max(1, allItems.count))
+            let hits = benchmarkIsolationForTesting && !searchRequest.hasStoreFilters
+                ? benchmarkSearchHits(query: query, items: eligibleVisibleItems, scope: searchRequest.scope)
+                : store.search(searchRequest, limit: max(1, allItems.count))
             #else
-            let hits = store.search(query, scope: scope, limit: max(1, allItems.count))
+            let hits = store.search(searchRequest, limit: max(1, allItems.count))
             #endif
             var visibleBySearchKey: [String: BoardManHistoryItem] = [:]
             var visibleOrderBySearchKey: [String: Int] = [:]
-            for (order, item) in visibleItems.enumerated() {
+            for (order, item) in eligibleVisibleItems.enumerated() {
                 let source: BoardManSearchSource?
                 switch item.source {
                 case .clip: source = .history
@@ -11063,7 +11093,7 @@ class BoardManPanel: NSPanel {
 
             // Custom display names remain in UserDefaults for compatibility. Convert their
             // exact/prefix/contains match into the same deterministic ranking path as FTS hits.
-            if activeTab == .history {
+            if activeTab == .history, !query.isEmpty, !searchRequest.hasStoreFilters {
                 for (identifier, matchClass) in HistoryDisplayNameStore.shared.searchMatches(for: query) {
                     let key = "\(BoardManSearchSource.history.rawValue):\(identifier)"
                     guard let item = visibleBySearchKey[key],
@@ -11093,7 +11123,7 @@ class BoardManPanel: NSPanel {
             PasteCountInputService.shared.logBoardManPerformance(
                 "search_query",
                 startedAt: startedAt,
-                details: "chars=\(query.count) indexed_hits=\(hits.count) visible_hits=\(searchedItems.count)"
+                details: "chars=\(query.count) filters=\(searchRequest.hasStoreFilters ? 1 : 0) indexed_hits=\(hits.count) visible_hits=\(searchedItems.count)"
             )
         }
         historyItems = isQuickMode ? Array(searchedItems.prefix(Self.quickItemLimit)) : searchedItems

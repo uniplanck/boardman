@@ -1,9 +1,9 @@
 # Board-Man Technical Excellence Master Plan
 
-Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 Core (P3.1-P3.2) PASS / CLOSED, P3.3 next
+Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 PASS / CLOSED, Phase 4 next
 Created: 2026-08-21
 Baseline refreshed: 2026-08-25
-Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 Core (P3.1-P3.2) is PASS / CLOSED and P3.3 query capability is next.**
+Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 search and information retrieval (P3.1-P3.3) is PASS / CLOSED. Phase 4 structural decomposition and dependency reduction is next.**
 
 ## 1. Purpose
 
@@ -373,17 +373,22 @@ P3 Core acceptance evidence: `BoardManStoreTests` 29/29 PASS; full regression 98
 
 ## P3.3 Query capability
 
-**Implementation status: NEXT.**
+**Implementation status: PASS / CLOSED (2026-08-25).**
 
-Candidate additions after core ranking is stable:
+Structured query tokens are parsed into a typed `BoardManSearchRequest` and executed at the Store/SQLite boundary rather than by reintroducing full-array Swift filtering:
 
-- type filters (`text`, `image`, `url`, `file`),
-- source app filter,
-- date/range filter,
-- pinned-only,
-- template-only/history-only,
-- fuzzy typo tolerance only if latency remains within SLO,
-- command-like query tokens if UX testing supports them.
+- `type:text|image|url|file`,
+- `app:<name-or-bundle-substring>` including quoted values such as `app:"Google Chrome"`,
+- `after:YYYY-MM-DD`,
+- `before:YYYY-MM-DD`,
+- `is:pinned`,
+- `in:history|templates`.
+
+Free-text terms and structured filters can be combined, and store-backed filters can run without a text term. Unknown or invalid tokens remain literal query text instead of being silently discarded. Pin state remains owned by the existing pin stores rather than being duplicated into SQLite. Explicit `in:` scope tokens also switch the panel into the matching History/Templates action context before results are shown, so paste/edit/delete behavior cannot operate under the wrong tab semantics.
+
+P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regression XCTest `34/34` PASS plus Swift Testing `98/98` PASS across `16` suites; SwiftLint `320` warnings / `0` serious; final 10,000-history FTS observation `1.22 ms / 1 hit`. Fuzzy typo tolerance remains intentionally deferred because it was only a conditional candidate and is not required for Phase 3 closure while deterministic indexed search remains well within observed latency expectations.
+
+**Phase 3 overall: PASS / CLOSED.**
 
 # Phase 4 — Structural decomposition and dependency reduction
 

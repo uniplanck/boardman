@@ -87,10 +87,173 @@ enum BoardManSearchSource: String, Sendable, Hashable {
     case snippet
 }
 
-enum BoardManSearchScope: Sendable {
+enum BoardManSearchScope: Sendable, Equatable {
     case all
     case history
     case snippets
+}
+
+enum BoardManSearchItemType: String, Sendable, Hashable, CaseIterable {
+    case text
+    case image
+    case url
+    case file
+
+    func matches(primaryType: String) -> Bool {
+        let value = primaryType.lowercased()
+        switch self {
+        case .text:
+            return value.contains("text") || value.contains("string") || value.contains("rtf") || value.contains("html")
+        case .image:
+            return value.contains("image") || value.contains("png") || value.contains("tiff")
+                || value.contains("jpeg") || value.contains("jpg") || value.contains("gif") || value.contains("bmp")
+        case .url:
+            return value.contains("url") && !value.contains("file")
+        case .file:
+            return value.contains("file-url") || value.contains("filenames")
+        }
+    }
+}
+
+struct BoardManSearchRequest: Sendable, Equatable {
+    let text: String
+    let scope: BoardManSearchScope
+    let itemTypes: Set<BoardManSearchItemType>
+    let sourceApplication: String?
+    let copiedAfterMilliseconds: Int?
+    let copiedBeforeMilliseconds: Int?
+
+    init(
+        text: String,
+        scope: BoardManSearchScope,
+        itemTypes: Set<BoardManSearchItemType> = [],
+        sourceApplication: String? = nil,
+        copiedAfterMilliseconds: Int? = nil,
+        copiedBeforeMilliseconds: Int? = nil
+    ) {
+        self.text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.scope = scope
+        self.itemTypes = itemTypes
+        self.sourceApplication = sourceApplication?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.copiedAfterMilliseconds = copiedAfterMilliseconds
+        self.copiedBeforeMilliseconds = copiedBeforeMilliseconds
+    }
+
+    var hasStoreFilters: Bool {
+        !itemTypes.isEmpty || sourceApplication != nil
+            || copiedAfterMilliseconds != nil || copiedBeforeMilliseconds != nil
+    }
+}
+
+struct BoardManParsedSearchQuery: Sendable, Equatable {
+    let request: BoardManSearchRequest
+    let pinnedOnly: Bool
+}
+
+enum BoardManSearchQueryParser {
+    static func parse(_ rawQuery: String, defaultScope: BoardManSearchScope) -> BoardManParsedSearchQuery {
+        var scope = defaultScope
+        var itemTypes = Set<BoardManSearchItemType>()
+        var sourceApplication: String?
+        var copiedAfterMilliseconds: Int?
+        var copiedBeforeMilliseconds: Int?
+        var pinnedOnly = false
+        var textTokens = [String]()
+
+        for token in tokenize(rawQuery) {
+            let lowercased = token.lowercased()
+            if lowercased == "is:pinned" {
+                pinnedOnly = true
+                continue
+            }
+            if let value = value(after: "in:", in: token) {
+                switch value.lowercased() {
+                case "history": scope = .history
+                case "template", "templates", "snippet", "snippets": scope = .snippets
+                case "all": scope = .all
+                default: textTokens.append(token)
+                }
+                continue
+            }
+            if let value = value(after: "type:", in: token),
+               let itemType = BoardManSearchItemType(rawValue: value.lowercased()) {
+                itemTypes.insert(itemType)
+                continue
+            }
+            if let value = value(after: "app:", in: token), !value.isEmpty {
+                sourceApplication = value
+                continue
+            }
+            if let value = value(after: "after:", in: token),
+               let milliseconds = startOfDayMilliseconds(value) {
+                copiedAfterMilliseconds = milliseconds
+                continue
+            }
+            if let value = value(after: "before:", in: token),
+               let milliseconds = startOfDayMilliseconds(value) {
+                copiedBeforeMilliseconds = milliseconds
+                continue
+            }
+            textTokens.append(token)
+        }
+
+        return BoardManParsedSearchQuery(
+            request: BoardManSearchRequest(
+                text: textTokens.joined(separator: " "),
+                scope: scope,
+                itemTypes: itemTypes,
+                sourceApplication: sourceApplication,
+                copiedAfterMilliseconds: copiedAfterMilliseconds,
+                copiedBeforeMilliseconds: copiedBeforeMilliseconds
+            ),
+            pinnedOnly: pinnedOnly
+        )
+    }
+
+    private static func value(after prefix: String, in token: String) -> String? {
+        guard token.count > prefix.count,
+              token.lowercased().hasPrefix(prefix) else { return nil }
+        return String(token.dropFirst(prefix.count))
+    }
+
+    private static func tokenize(_ rawQuery: String) -> [String] {
+        var tokens = [String]()
+        var current = ""
+        var isQuoted = false
+        for character in rawQuery {
+            if character == "\"" {
+                isQuoted.toggle()
+                continue
+            }
+            if character.isWhitespace && !isQuoted {
+                if !current.isEmpty {
+                    tokens.append(current)
+                    current = ""
+                }
+            } else {
+                current.append(character)
+            }
+        }
+        if !current.isEmpty {
+            tokens.append(current)
+        }
+        return tokens
+    }
+
+    private static func startOfDayMilliseconds(_ value: String) -> Int? {
+        let parts = value.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        guard let date = calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])) else {
+            return nil
+        }
+        return Int(date.timeIntervalSince1970 * 1_000)
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 struct BoardManSearchHit: Sendable, Equatable {
@@ -158,7 +321,7 @@ protocol BoardManStore: AnyObject {
     func clipsSortedByUpdateTimeDescending() -> [BoardManClip]
     func clipsSortedByCreatedTimeDescending() -> [BoardManClip]
     func latestClip(title: String, primaryTypes: [String]) -> BoardManClip?
-    func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit]
+    func search(_ request: BoardManSearchRequest, limit: Int) -> [BoardManSearchHit]
     func historyClipsMissingSearchMetadata(limit: Int) -> [BoardManClip]
     func upsertHistorySearchMetadata(identifier: String, metadata: BoardManHistorySearchMetadata)
     @discardableResult func updateClipUsage(identifier: String, updateTime: Int) -> Bool
@@ -217,8 +380,8 @@ final class BoardManStoreRouter: BoardManStore {
         currentBackend().latestClip(title: title, primaryTypes: primaryTypes)
     }
 
-    func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit] {
-        currentBackend().search(query, scope: scope, limit: limit)
+    func search(_ request: BoardManSearchRequest, limit: Int) -> [BoardManSearchHit] {
+        currentBackend().search(request, limit: limit)
     }
 
     func historyClipsMissingSearchMetadata(limit: Int) -> [BoardManClip] {
@@ -409,18 +572,36 @@ extension BoardManStore {
     }
 
     func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit] {
-        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !normalizedQuery.isEmpty, limit > 0 else { return [] }
+        guard !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return [] }
+        return search(BoardManSearchRequest(text: query, scope: scope), limit: limit)
+    }
+
+    func search(_ request: BoardManSearchRequest, limit: Int) -> [BoardManSearchHit] {
+        let normalizedQuery = request.text.lowercased()
+        guard limit > 0 else { return [] }
 
         var candidates: [(hit: BoardManSearchHit, order: Int)] = []
         var order = 0
 
-        if scope != .snippets {
+        if request.scope != .snippets, request.sourceApplication == nil {
             for clip in clipsSortedByUpdateTimeDescending() {
-                guard let matchClass = BoardManSearchMatcher.matchClass(
+                if !request.itemTypes.isEmpty,
+                   !request.itemTypes.contains(where: { $0.matches(primaryType: clip.primaryType) }) {
+                    continue
+                }
+                if let after = request.copiedAfterMilliseconds, clip.createdTime < after { continue }
+                if let before = request.copiedBeforeMilliseconds, clip.createdTime >= before { continue }
+                let matchClass: Int
+                if normalizedQuery.isEmpty {
+                    matchClass = 2
+                } else if let matched = BoardManSearchMatcher.matchClass(
                     query: normalizedQuery,
                     fields: [clip.title, clip.primaryType]
-                ) else { continue }
+                ) {
+                    matchClass = matched
+                } else {
+                    continue
+                }
                 candidates.append((
                     BoardManSearchHit(
                         identifier: clip.dataHash,
@@ -434,16 +615,25 @@ extension BoardManStore {
             }
         }
 
-        if scope != .history {
+        let hasHistoryOnlyFilters = !request.itemTypes.isEmpty || request.sourceApplication != nil
+            || request.copiedAfterMilliseconds != nil || request.copiedBeforeMilliseconds != nil
+        if request.scope != .history, !hasHistoryOnlyFilters {
             let folders = foldersSortedByIndex()
             var groupedIdentifiers = Set<String>()
             for folder in folders {
                 for snippet in folder.snippets {
                     groupedIdentifiers.insert(snippet.identifier)
-                    guard let matchClass = BoardManSearchMatcher.matchClass(
+                    let matchClass: Int
+                    if normalizedQuery.isEmpty {
+                        matchClass = 2
+                    } else if let matched = BoardManSearchMatcher.matchClass(
                         query: normalizedQuery,
                         fields: [snippet.title, snippet.content, folder.title]
-                    ) else { continue }
+                    ) {
+                        matchClass = matched
+                    } else {
+                        continue
+                    }
                     candidates.append((
                         BoardManSearchHit(
                             identifier: snippet.identifier,
@@ -457,10 +647,17 @@ extension BoardManStore {
                 }
             }
             for snippet in uncategorizedSnippetsSortedByIndex() where !groupedIdentifiers.contains(snippet.identifier) {
-                guard let matchClass = BoardManSearchMatcher.matchClass(
+                let matchClass: Int
+                if normalizedQuery.isEmpty {
+                    matchClass = 2
+                } else if let matched = BoardManSearchMatcher.matchClass(
                     query: normalizedQuery,
                     fields: [snippet.title, snippet.content, "Uncategorized"]
-                ) else { continue }
+                ) {
+                    matchClass = matched
+                } else {
+                    continue
+                }
                 candidates.append((
                     BoardManSearchHit(
                         identifier: snippet.identifier,
