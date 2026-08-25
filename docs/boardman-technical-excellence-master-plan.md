@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, and timestamp presentation/interaction extractions accepted (2026-08-26).**
+**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, and history presentation extractions accepted (2026-08-26).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -451,7 +451,14 @@ Fifth accepted extraction:
 - `MenuManager.swift` reduced from `12,157` to `11,885` lines in this slice (`-272` net). The timestamp presentation owner is `269` lines and the interaction/shortcut owner is `53` lines.
 - focused paste/interaction/timestamp verification is `27/27` PASS. Full regression is XCTest `35/35` PASS plus Swift Testing `103/103` across `18` suites; SwiftLint reports `319` warnings / `0` serious violations; `git diff --check` passes.
 
-P4.1 remains open for the larger panel/history/template presentation ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, and timestamp formatting/interaction rules now have focused owners outside the giant coordinator.
+Sixth accepted extraction:
+
+- `BoardManPanelAppearance.swift` now owns panel appearance mode, UI style, font-family resolution, theme presets, visual-effect material, and deterministic tint/row/edge/shadow color policies.
+- `BoardManHistoryPresentation.swift` now owns history usage-filter labels/filter semantics, pin badge presentation, and inline image-position policy rather than leaving these display rules inside the giant coordinator.
+- `MenuManager.swift` reduced from `11,885` to `11,627` lines in this slice (`-258` net). The focused owners are `204` and `56` lines respectively; their dedicated tests are `31` and `26` lines.
+- focused appearance/history/interaction verification is `15/15` PASS. Full regression is XCTest `35/35` PASS plus Swift Testing `107/107` across `20` suites; SwiftLint reports `316` warnings / `0` serious violations across `82` files; `git diff --check` passes.
+
+P4.1 remains open for the larger template and layout/presentation ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance, and history presentation rules now have focused owners outside the giant coordinator.
 
 ## P4.2 Dependency audit
 
