@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, history presentation, panel header presentation, and snippet editing policy extractions accepted (2026-08-26).**
+**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, history presentation, panel header presentation, snippet editing policy, and snippet presentation extractions accepted (2026-08-26).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -473,7 +473,15 @@ Eighth accepted extraction:
 - snippet policy tests moved out of the oversized `BoardManInteractionRuleTests` into dedicated `BoardManSnippetEditingPolicyTests.swift`; the interaction suite dropped to `328` body lines instead of suppressing the lint gate.
 - focused snippet-policy + UI verification is `13/13` PASS. Full regression is `143/143` PASS (`35` XCTest + `108` Swift Testing across `21` suites); SwiftLint reports `315` warnings / `0` serious violations across `85` files; the 10,000-item FTS benchmark remained `1.40 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed, and `git diff --check` passes.
 
-P4.1 remains open for the larger template presentation/editor UI and layout ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance, history presentation, panel header presentation, and snippet editing policy now have focused owners outside the giant coordinator.
+Ninth accepted extraction:
+
+- `BoardManSnippetPresentation.swift` now owns snippet/template editor layout geometry, editor field/read-only state, reorder-mode labels/hints, active-group normalization, and group-summary presentation as deterministic policy rather than mixing those decisions into `BoardManPanel`.
+- `MenuManager.swift` now applies those calculated states to AppKit controls while retaining UI event, dialog, and storage orchestration. Active editing still preserves unsaved field values, reorder mode remains read-only, and an empty selection preserves the historical folder-toggle behavior.
+- `MenuManager.swift` reduced from `11,393` to `11,317` lines in this slice (`-76` net). The focused presentation owner is `187` lines with a dedicated `140`-line test suite.
+- new snippet presentation + editing policy verification is `7/7` PASS. The first combined UI run exposed one existing sheet-visibility timing failure; the isolated `BoardManUIRegressionTests` rerun passed `10/10`, including the same filter-sheet case, and the final full regression passed `147/147` (`35` XCTest + `112` Swift Testing across `22` suites).
+- SwiftLint reports `307` warnings / `0` serious violations across `87` files; the 10,000-item FTS benchmark improved in this run to `1.00 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `1280.81 ms`, and `git diff --check` passes.
+
+P4.1 remains open for snippet/category CRUD dialog orchestration and broader panel/settings layout ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance, history presentation, panel header presentation, snippet editing policy, and snippet presentation now have focused owners outside the giant coordinator.
 
 ## P4.2 Dependency audit
 

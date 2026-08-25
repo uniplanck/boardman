@@ -6585,89 +6585,31 @@ class BoardManPanel: NSPanel {
     }
 
     private func layoutSnippetEditorControls(width: CGFloat, height: CGFloat) {
-        let inset: CGFloat = width < 330 ? 14 : 18
-        let contentWidth = max(120, width - (inset * 2))
-        let topY = height - inset
-
-        let titleLabelHeight: CGFloat = 17
-        let titleFieldHeight = LayoutMetrics.controlHeight
-        let titleLabelToFieldGap: CGFloat = 4
-        let titleFieldToToggleGap: CGFloat = 18
-        let toggleHeight: CGFloat = 22
-        let toggleToContentLabelGap: CGFloat = 16
-        let contentLabelHeight: CGFloat = 17
-        let contentLabelToEditorGap: CGFloat = 10
-
-        let titleLabelY = topY - titleLabelHeight
-        let titleFieldY = titleLabelY - titleLabelToFieldGap - titleFieldHeight
-        let toggleY = titleFieldY - titleFieldToToggleGap - toggleHeight
-        let contentLabelY = toggleY - toggleToContentLabelGap - contentLabelHeight
-        let contentTop = contentLabelY - contentLabelToEditorGap
-
-        snippetEditorTitleLabel?.frame = NSIntegralRect(NSRect(
-            x: inset,
-            y: titleLabelY,
-            width: contentWidth,
-            height: titleLabelHeight
-        ))
-        snippetEditorTitleField?.frame = NSIntegralRect(NSRect(
-            x: inset,
-            y: titleFieldY,
-            width: contentWidth,
-            height: titleFieldHeight
-        ))
+        let layout = BoardManSnippetPresentation.editorLayout(
+            width: width,
+            height: height,
+            controlHeight: LayoutMetrics.controlHeight,
+            actionButtonHeight: LayoutMetrics.actionButtonHeight
+        )
+        snippetEditorTitleLabel?.frame = layout.titleLabelFrame
+        snippetEditorTitleField?.frame = layout.titleFieldFrame
         snippetEditorStatusLabel?.isHidden = true
         snippetEditorStatusLabel?.frame = .zero
-
-        let toggleGap: CGFloat = 8
-        let toggleWidth = max(104, floor((contentWidth - toggleGap) / 2))
-        snippetFolderEnableButton?.frame = NSIntegralRect(NSRect(
-            x: inset,
-            y: toggleY,
-            width: toggleWidth,
-            height: toggleHeight
-        ))
-        snippetEnableButton?.frame = NSIntegralRect(NSRect(
-            x: inset + toggleWidth + toggleGap,
-            y: toggleY,
-            width: toggleWidth,
-            height: toggleHeight
-        ))
-
-        snippetEditorContentLabel?.frame = NSIntegralRect(NSRect(
-            x: inset,
-            y: contentLabelY,
-            width: contentWidth,
-            height: contentLabelHeight
-        ))
-        let contentBottom = inset + LayoutMetrics.actionButtonHeight + 14
-        let contentHeight = max(90, contentTop - contentBottom)
-        snippetEditorScrollView?.frame = NSIntegralRect(NSRect(
-            x: inset,
-            y: contentBottom,
-            width: contentWidth,
-            height: contentHeight
-        ))
-        snippetEditorTextView?.minSize = NSSize(width: 0, height: contentHeight)
-        snippetEditorTextView?.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        snippetFolderEnableButton?.frame = layout.folderEnableFrame
+        snippetEnableButton?.frame = layout.snippetEnableFrame
+        snippetEditorContentLabel?.frame = layout.contentLabelFrame
+        snippetEditorScrollView?.frame = layout.contentFrame
+        snippetEditorTextView?.minSize = NSSize(width: 0, height: layout.contentFrame.height)
+        snippetEditorTextView?.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         snippetEditorTextView?.isVerticallyResizable = true
         snippetEditorTextView?.isHorizontallyResizable = false
-        snippetEditorTextView?.textContainer?.containerSize = NSSize(width: contentWidth, height: CGFloat.greatestFiniteMagnitude)
+        snippetEditorTextView?.textContainer?.containerSize = layout.contentContainerSize
         snippetEditorTextView?.textContainer?.widthTracksTextView = true
-        let actionGap: CGFloat = 10
-        let actionWidth = max(80, floor((contentWidth - actionGap) / 2))
-        snippetSaveButton?.frame = NSIntegralRect(NSRect(
-            x: inset,
-            y: inset,
-            width: actionWidth,
-            height: LayoutMetrics.actionButtonHeight
-        ))
-        snippetCancelEditButton?.frame = NSIntegralRect(NSRect(
-            x: inset + actionWidth + actionGap,
-            y: inset,
-            width: actionWidth,
-            height: LayoutMetrics.actionButtonHeight
-        ))
+        snippetSaveButton?.frame = layout.saveFrame
+        snippetCancelEditButton?.frame = layout.cancelFrame
     }
 
     fileprivate func synchronizeListGeometry(frameWidth: CGFloat? = nil, height: CGFloat? = nil) {
@@ -8267,30 +8209,23 @@ class BoardManPanel: NSPanel {
 
     private func updateSnippetModeUI() {
         guard activeTab == .snippets else { return }
-        let hasReorderableCategory = activeSnippetCategoryIdentifier != BoardManPanel.allCategoriesIdentifier
-        let snippetCount = historyItems.filter { $0.source == .snippet }.count
-        let canReorder = hasReorderableCategory && snippetCount > 1 && !isSnippetEditing
-        if !canReorder {
-            isSnippetReorderMode = false
-        }
-        itemLongPressGesture?.isEnabled = !isSnippetReorderMode
-        itemLongPressGesture?.delaysPrimaryMouseButtonEvents = !isSnippetReorderMode
-        snippetReorderModeButton?.isEnabled = canReorder || isSnippetReorderMode
-        snippetReorderModeButton?.state = isSnippetReorderMode ? .on : .off
-        snippetReorderModeButton?.title = boardManText(isSnippetReorderMode ? "Reordering" : "Reorder")
-        snippetReorderModeButton?.toolTip = hasReorderableCategory
-            ? boardManText("Reorder mode: drag the handle on the left")
-            : boardManText("Select a group to reorder")
-        if isSnippetReorderMode {
-            snippetInteractionHintLabel?.stringValue = boardManText("Reorder mode: drag the handle on the left")
-            snippetInteractionHintLabel?.textColor = themeAccentColor
+        let presentation = BoardManSnippetPresentation.reorderState(
+            hasReorderableCategory: activeSnippetCategoryIdentifier != BoardManPanel.allCategoriesIdentifier,
+            snippetCount: historyItems.filter { $0.source == .snippet }.count,
+            isEditing: isSnippetEditing,
+            requestedReorderMode: isSnippetReorderMode
+        )
+        isSnippetReorderMode = presentation.isReordering
+        itemLongPressGesture?.isEnabled = !presentation.isReordering
+        itemLongPressGesture?.delaysPrimaryMouseButtonEvents = !presentation.isReordering
+        snippetReorderModeButton?.isEnabled = presentation.buttonEnabled
+        snippetReorderModeButton?.state = presentation.isReordering ? .on : .off
+        snippetReorderModeButton?.title = presentation.buttonTitle
+        snippetReorderModeButton?.toolTip = presentation.toolTip
+        snippetInteractionHintLabel?.stringValue = presentation.hint
+        snippetInteractionHintLabel?.textColor = presentation.emphasizesHint ? themeAccentColor : .secondaryLabelColor
+        if presentation.emphasizesHint {
             snippetInteractionHintLabel?.font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        } else if !hasReorderableCategory {
-            snippetInteractionHintLabel?.stringValue = boardManText("Select a group to reorder")
-            snippetInteractionHintLabel?.textColor = .secondaryLabelColor
-        } else {
-            snippetInteractionHintLabel?.stringValue = boardManText("Hover a snippet, then click the preview to edit • ⌘C Copy • ⌘P Pin")
-            snippetInteractionHintLabel?.textColor = .secondaryLabelColor
         }
     }
 
@@ -8331,46 +8266,45 @@ class BoardManPanel: NSPanel {
     private func refreshSnippetEditor() {
         guard activeTab == .snippets else { return }
         let folder = editorFolder()
+        let presentation: BoardManSnippetEditorState
+        var isEditingSelection = false
 
-        guard let item = selectedSnippetItem,
-              let snippet = store.snippet(identifier: item.dataHash) else {
+        if let item = selectedSnippetItem,
+           let snippet = store.snippet(identifier: item.dataHash) {
+            isEditingSelection = isSnippetEditing && editingSnippetIdentifier == item.dataHash
+            if isSnippetEditing && !isEditingSelection {
+                isSnippetEditing = false
+                editingSnippetIdentifier = nil
+            }
+            presentation = BoardManSnippetPresentation.editorState(
+                selection: BoardManSnippetEditorSelection(
+                    title: snippet.title,
+                    content: snippet.content,
+                    snippetEnabled: snippet.enable,
+                    folderEnabled: folder?.enable ?? false
+                ),
+                isEditingSelection: isEditingSelection,
+                isReorderMode: isSnippetReorderMode
+            )
+        } else {
             isSnippetEditing = false
             editingSnippetIdentifier = nil
-            snippetEditorStatusLabel?.isHidden = true
-            snippetEditorStatusLabel?.stringValue = ""
-            snippetEditorStatusLabel?.layer?.backgroundColor = NSColor.clear.cgColor
-            snippetEditorView?.layer?.borderWidth = 1
-            snippetEditorView?.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.55).cgColor
-            snippetEditorTitleField?.stringValue = ""
-            snippetEditorTextView?.string = ""
-            snippetEnableButton?.state = .off
-            snippetEditorTitleField?.isEnabled = false
-            snippetEditorTitleField?.isEditable = false
-            snippetEditorTitleField?.isSelectable = false
-            snippetEditorTextView?.isEditable = false
-            snippetEditorTextView?.isSelectable = false
-            return
+            presentation = .empty
         }
 
-        let isEditingSelection = isSnippetEditing && editingSnippetIdentifier == item.dataHash
-        if isSnippetEditing && !isEditingSelection {
-            isSnippetEditing = false
-            editingSnippetIdentifier = nil
+        if presentation.shouldRefreshValues {
+            snippetEditorTitleField?.stringValue = presentation.title
+            snippetEditorTextView?.string = presentation.content
+            snippetEnableButton?.state = presentation.snippetEnabled ? .on : .off
+            if let folderEnabled = presentation.folderEnabled {
+                snippetFolderEnableButton?.state = folderEnabled ? .on : .off
+            }
         }
-
-        if !isEditingSelection {
-            snippetEditorTitleField?.stringValue = snippet.title
-            snippetEditorTextView?.string = snippet.content
-            snippetEnableButton?.state = snippet.enable ? .on : .off
-            snippetFolderEnableButton?.state = (folder?.enable ?? false) ? .on : .off
-        }
-        let canEditSelection = isEditingSelection && !isSnippetReorderMode
-        snippetEditorTitleField?.isEnabled = !isSnippetReorderMode
-        snippetEditorTitleField?.isEditable = canEditSelection
-        snippetEditorTitleField?.isSelectable = canEditSelection
-        snippetEditorTextView?.isEditable = canEditSelection
-        snippetEditorTextView?.isSelectable = true
-
+        snippetEditorTitleField?.isEnabled = presentation.titleEnabled
+        snippetEditorTitleField?.isEditable = presentation.titleEditable
+        snippetEditorTitleField?.isSelectable = presentation.titleSelectable
+        snippetEditorTextView?.isEditable = presentation.contentEditable
+        snippetEditorTextView?.isSelectable = presentation.contentSelectable
         snippetEditorStatusLabel?.isHidden = true
         snippetEditorStatusLabel?.stringValue = ""
         snippetEditorStatusLabel?.layer?.backgroundColor = NSColor.clear.cgColor
@@ -8388,35 +8322,25 @@ class BoardManPanel: NSPanel {
             : BoardManPanel.allCategoriesIdentifier
     }
 
-    private func snippetGroupSummaryTitle(folders: [BoardManFolder]) -> String {
-        guard !activeSnippetGroupIdentifiers.isEmpty else { return boardManText("All Groups") }
-        if activeSnippetGroupIdentifiers.count == 1,
-           let identifier = activeSnippetGroupIdentifiers.first {
-            if identifier == BoardManPanel.uncategorizedCategoryIdentifier {
-                return boardManText("Uncategorized")
-            }
-            if let folder = folders.first(where: { $0.identifier == identifier }) {
-                let title = folder.title.trimmingCharacters(in: .whitespacesAndNewlines)
-                return title.isEmpty ? boardManText("Untitled folder") : title
-            }
-        }
-        return String(format: boardManText("%d Groups"), activeSnippetGroupIdentifiers.count)
-    }
-
     private func reloadSnippetCategoryPopup() {
         guard let popup = snippetCategoryPopup else { return }
         let folders = store.foldersSortedByIndex()
-        var availableIdentifiers = Set(folders.map(\.identifier))
         let includesUncategorized = allItems.contains {
             $0.categoryIdentifier == BoardManPanel.uncategorizedCategoryIdentifier
         }
-        if includesUncategorized {
-            availableIdentifiers.insert(BoardManPanel.uncategorizedCategoryIdentifier)
-        }
-        setActiveSnippetGroupIdentifiers(activeSnippetGroupIdentifiers.intersection(availableIdentifiers))
+        setActiveSnippetGroupIdentifiers(BoardManSnippetPresentation.validGroupIdentifiers(
+            activeIdentifiers: activeSnippetGroupIdentifiers,
+            folders: folders,
+            includesUncategorized: includesUncategorized,
+            uncategorizedIdentifier: BoardManPanel.uncategorizedCategoryIdentifier
+        ))
 
         popup.removeAllItems()
-        popup.addItem(withTitle: snippetGroupSummaryTitle(folders: folders))
+        popup.addItem(withTitle: BoardManSnippetPresentation.groupSummaryTitle(
+            activeIdentifiers: activeSnippetGroupIdentifiers,
+            folders: folders,
+            uncategorizedIdentifier: BoardManPanel.uncategorizedCategoryIdentifier
+        ))
         popup.lastItem?.representedObject = "__boardman_group_summary__"
         popup.lastItem?.isEnabled = false
         popup.menu?.addItem(.separator())
