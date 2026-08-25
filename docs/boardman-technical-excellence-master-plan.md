@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, and panel paste orchestration extractions accepted (2026-08-25).**
+**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, and README/demo fixture extractions accepted (2026-08-25).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -437,7 +437,14 @@ Third accepted extraction:
 - full regression after the reliability-sensitive extraction: XCTest `35/35` PASS, Swift Testing `99/99` PASS across `16` suites, SwiftLint `319` warnings / `0` serious.
 - full regression retained the 10,000-item FTS benchmark at `1.21 ms / 1 hit` and the 10,000-history + 1,000-template migration benchmark passed.
 
-P4.1 remains open for larger layout/presentation ownership and demo/screenshot fixture ownership. The major behavioral coordinators for search, horizontal navigation, and panel paste/timestamp dispatch are now outside `MenuManager.swift`.
+Fourth accepted extraction:
+
+- `BoardManReadmeScreenshotCoordinator.swift` now owns DEBUG-only README/demo screenshot request parsing, deterministic template fixture seeding, scene preparation, and atomic PNG capture/write behavior.
+- `MenuManager` now only delegates the screenshot request with its panel reload callback; screenshot environment parsing, demo data ownership, panel scene preparation, and file export are no longer embedded in the menu/panel coordinator.
+- `MenuManager.swift` reduced from `12,295` to `12,157` lines in this slice (`-138` net), while the focused screenshot coordinator is `181` lines.
+- screenshot parsing moved into its own `BoardManReadmeScreenshotCoordinatorTests` suite rather than expanding the already-large interaction suite; focused screenshot + interaction verification is `12/12` PASS and the build-time SwiftLint gate returned to `0` serious violations.
+
+P4.1 remains open for the larger layout/presentation ownership still embedded in `MenuManager.swift`. The major behavioral coordinators for search, horizontal navigation, panel paste/timestamp dispatch, and README/demo fixture generation are now outside the giant coordinator.
 
 ## P4.2 Dependency audit
 

@@ -29,6 +29,7 @@ final class MenuManager: NSObject {
     fileprivate var currentStatusType: StatusType?
     fileprivate var boardManPanel: BoardManPanel?
     fileprivate let panelPasteCoordinator = BoardManPanelPasteCoordinator()
+    fileprivate let readmeScreenshotCoordinator = BoardManReadmeScreenshotCoordinator()
     fileprivate var panelItemsNeedRefresh = true
     // Icon Cache
     fileprivate let folderIcon = NSImage(resource: .iconFolder)
@@ -121,101 +122,10 @@ extension MenuManager {
     }
 
     private func scheduleReadmeScreenshotIfRequested(_ panel: BoardManPanel) {
-#if DEBUG
-        let environment = ProcessInfo.processInfo.environment
-        guard let outputPath = environment["BOARDMAN_SCREENSHOT_OUTPUT"], !outputPath.isEmpty else { return }
-
-        let scene = environment["BOARDMAN_SCREENSHOT_SCENE"]?.lowercased() ?? "history"
-        let requestedWidth = environment["BOARDMAN_SCREENSHOT_WIDTH"]
-            .flatMap(Double.init)
-            .map { CGFloat($0) }
-        let requestedHeight = environment["BOARDMAN_SCREENSHOT_HEIGHT"]
-            .flatMap(Double.init)
-            .map { CGFloat($0) }
-
-        // Prewarming can occur before all deterministic clipboard samples are seeded. Reload the
-        // isolated profile immediately before capture so every README scene reflects the complete
-        // demo history rather than the first item observed during prewarm.
-        seedReadmeScreenshotDataIfNeeded(for: scene)
-        reloadBoardManPanelItems(panel)
-        panel.prepareReadmeScreenshot(scene: scene, width: requestedWidth, height: requestedHeight)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak panel] in
-            panel?.writeReadmeScreenshot(to: outputPath)
-        }
-#endif
-    }
-
-#if DEBUG
-    private func seedReadmeScreenshotDataIfNeeded(for scene: String) {
-        guard scene == "templates" || scene == "snippets" else { return }
-        guard store.foldersSortedByIndex().isEmpty else { return }
-
-        let language = BoardManLanguage.allowed(
-            AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
-        ).resolved
-        let groups: [(title: String, snippets: [(title: String, content: String)])]
-        if language == .japanese {
-            groups = [
-                (
-                    "返信",
-                    [
-                        ("確認返信", "確認しました。本日中にご連絡します。"),
-                        ("日程調整", "候補日時を3つお送りします。")
-                    ]
-                ),
-                (
-                    "開発",
-                    [
-                        ("Git状態", "git status --short --branch"),
-                        ("リリース確認", "テスト・署名・更新内容を確認する")
-                    ]
-                ),
-                (
-                    "リンク",
-                    [("Board-Man", "https://github.com/uniplanck/boardman")]
-                )
-            ]
-        } else {
-            groups = [
-                (
-                    "Replies",
-                    [
-                        ("Review reply", "Thanks — I’ll review this today."),
-                        ("Scheduling", "I’ll send three candidate times.")
-                    ]
-                ),
-                (
-                    "Development",
-                    [
-                        ("Git status", "git status --short --branch"),
-                        ("Release check", "Review tests, signing, and release notes")
-                    ]
-                ),
-                (
-                    "Links",
-                    [("Board-Man", "https://github.com/uniplanck/boardman")]
-                )
-            ]
-        }
-
-        for (folderIndex, group) in groups.enumerated() {
-            let folder = BoardManFolder()
-            folder.index = folderIndex
-            folder.title = group.title
-            folder.enable = true
-            store.upsertFolder(folder)
-            for (snippetIndex, value) in group.snippets.enumerated() {
-                let snippet = BoardManSnippet()
-                snippet.index = snippetIndex
-                snippet.title = value.title
-                snippet.content = value.content
-                snippet.enable = true
-                store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
-            }
+        readmeScreenshotCoordinator.scheduleIfRequested(panel: panel) { [weak self] panel in
+            self?.reloadBoardManPanelItems(panel)
         }
     }
-#endif
 
     func prewarmBoardManPanel() {
         guard boardManPanel == nil else { return }
@@ -8518,8 +8428,12 @@ class BoardManPanel: NSPanel {
         return selectedIndex
     }
 
-    func selectItemForTesting(at index: Int) {
+    func selectItem(at index: Int) {
         setSelectedIndex(index)
+    }
+
+    func selectItemForTesting(at index: Int) {
+        selectItem(at: index)
     }
 
     func setSnippetGroupIdentifiersForTesting(_ identifiers: Set<String>) {
@@ -8553,58 +8467,6 @@ class BoardManPanel: NSPanel {
         return historyItems.map(\.dataHash)
     }
 
-    fileprivate func prepareReadmeScreenshot(scene: String, width: CGFloat?, height: CGFloat?) {
-        var targetFrame = frame
-        if let width {
-            targetFrame.size.width = max(600, width)
-        }
-        if let height {
-            targetFrame.size.height = max(500, height)
-        }
-        if targetFrame.size != frame.size {
-            setFrame(targetFrame, display: false, animate: false)
-        }
-
-        switch scene {
-        case "settings":
-            selectSettingsTab()
-        case "templates", "snippets":
-            openSnippetsManagerMode(categoryIdentifier: nil)
-            if !historyItems.isEmpty {
-                setSelectedIndex(0)
-            }
-        default:
-            selectHistoryTab()
-        }
-        layoutPanelSubviews()
-        contentView?.layoutSubtreeIfNeeded()
-    }
-
-    fileprivate func writeReadmeScreenshot(to path: String) {
-        guard let contentView else { return }
-        contentView.layoutSubtreeIfNeeded()
-        displayIfNeeded()
-
-        let captureBounds = contentView.bounds
-        guard captureBounds.width > 0,
-              captureBounds.height > 0,
-              let representation = contentView.bitmapImageRepForCachingDisplay(in: captureBounds) else {
-            return
-        }
-        contentView.cacheDisplay(in: captureBounds, to: representation)
-        guard let pngData = representation.representation(using: .png, properties: [:]) else { return }
-
-        let outputURL = URL(fileURLWithPath: path)
-        do {
-            try FileManager.default.createDirectory(
-                at: outputURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try pngData.write(to: outputURL, options: .atomic)
-        } catch {
-            NSLog("Board-Man README screenshot export failed: %@", error.localizedDescription)
-        }
-    }
 #endif
 
     private var configuredTimestampInteraction: BoardManTimestampInteraction {

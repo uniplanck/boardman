@@ -25,6 +25,7 @@
 		C6B1A1192FCE000100B0A001 /* BoardManSearchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */; };
 		C6B1A11D2FCE000100B0A001 /* BoardManPanelNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A11C2FCE000100B0A001 /* BoardManPanelNavigation.swift */; };
 		C6B1A11F2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A11E2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift */; };
+		C6B1A1212FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1202FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift */; };
 		C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */; };
 		C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */; };
 		C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */; };
@@ -95,6 +96,7 @@
 		B0A1B00426A8240000000001 /* BoardManRuntimeEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */; };
 		C6B1A10C2FCE000100B0A001 /* BoardManStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */; };
 		C6B1A1172FCE000100B0A001 /* BoardManSearchQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1162FCE000100B0A001 /* BoardManSearchQueryTests.swift */; };
+		C6B1A1232FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1222FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift */; };
 		FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */; };
 		FAC0DCE91DE15FD900309C49 /* DataCleanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCE81DE15FD900309C49 /* DataCleanService.swift */; };
 		FAC0DCEF1DE3255E00309C49 /* NSImage+NSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCEE1DE3255E00309C49 /* NSImage+NSColor.swift */; };
@@ -172,6 +174,7 @@
 		C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSearchCoordinator.swift; sourceTree = "<group>"; };
 		C6B1A11C2FCE000100B0A001 /* BoardManPanelNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelNavigation.swift; sourceTree = "<group>"; };
 		C6B1A11E2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelPasteCoordinator.swift; sourceTree = "<group>"; };
+		C6B1A1202FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManReadmeScreenshotCoordinator.swift; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpgradeRoute.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
@@ -231,6 +234,7 @@
 		B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManRuntimeEnvironmentTests.swift; sourceTree = "<group>"; };
 		C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManStoreTests.swift; sourceTree = "<group>"; };
 		C6B1A1162FCE000100B0A001 /* BoardManSearchQueryTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSearchQueryTests.swift; sourceTree = "<group>"; };
+		C6B1A1222FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManReadmeScreenshotCoordinatorTests.swift; sourceTree = "<group>"; };
 		C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteBoardManStore.swift; sourceTree = "<group>"; };
 		C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSQLiteShadowReplicator.swift; sourceTree = "<group>"; };
 		C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManLegacyHistoryImporter.swift; sourceTree = "<group>"; };
@@ -324,6 +328,7 @@
 				C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */,
 				C6B1A11C2FCE000100B0A001 /* BoardManPanelNavigation.swift */,
 				C6B1A11E2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift */,
+				C6B1A1202FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift */,
 				C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */,
 				C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */,
 				C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */,
@@ -569,6 +574,7 @@
 				B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */,
 				C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */,
 				C6B1A1162FCE000100B0A001 /* BoardManSearchQueryTests.swift */,
+				C6B1A1222FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift */,
 				FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */,
 				FA6167911D3ABEB10049FA14 /* FolderTests.swift */,
 				FA6167951D3ACDD80049FA14 /* SnippetTests.swift */,
@@ -766,6 +772,7 @@
 				C6B1A1192FCE000100B0A001 /* BoardManSearchCoordinator.swift in Sources */,
 				C6B1A11D2FCE000100B0A001 /* BoardManPanelNavigation.swift in Sources */,
 				C6B1A11F2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift in Sources */,
+				C6B1A1212FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift in Sources */,
 				C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */,
 				C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */,
 				C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */,
@@ -820,6 +827,7 @@
 				B0A1B00426A8240000000001 /* BoardManRuntimeEnvironmentTests.swift in Sources */,
 				C6B1A10C2FCE000100B0A001 /* BoardManStoreTests.swift in Sources */,
 				C6B1A1172FCE000100B0A001 /* BoardManSearchQueryTests.swift in Sources */,
+				C6B1A1232FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift in Sources */,
 				FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */,
 				FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */,
 			);
