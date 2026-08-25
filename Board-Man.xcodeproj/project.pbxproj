@@ -22,6 +22,7 @@
 		C6B1A1042FCE000100B0A001 /* BoardManHotKeyRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */; };
 		C6B1A1062FCE000100B0A001 /* BoardManShortcutRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1072FCE000100B0A001 /* BoardManShortcutRecordView.swift */; };
 		C6B1A10A2FCE000100B0A001 /* BoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1092FCE000100B0A001 /* BoardManStore.swift */; };
+		C6B1A1192FCE000100B0A001 /* BoardManSearchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */; };
 		C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */; };
 		C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */; };
 		C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */; };
@@ -165,6 +166,7 @@
 		C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManHotKeyRegistry.swift; sourceTree = "<group>"; };
 		C6B1A1072FCE000100B0A001 /* BoardManShortcutRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManShortcutRecordView.swift; sourceTree = "<group>"; };
 		C6B1A1092FCE000100B0A001 /* BoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManStore.swift; sourceTree = "<group>"; };
+		C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSearchCoordinator.swift; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpgradeRoute.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
@@ -313,6 +315,7 @@
 				C6B1A1032FCE000100B0A001 /* BoardManKeyCombo.swift */,
 				C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */,
 				C6B1A1092FCE000100B0A001 /* BoardManStore.swift */,
+				C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */,
 				C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */,
 				C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */,
 				C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */,
@@ -751,6 +754,7 @@
 				FA1DB4BC1DDCB452007F95C8 /* Realm+NoCatch.swift in Sources */,
 				FA1DB4B91DDCB452007F95C8 /* NSMenuItem+Initialize.swift in Sources */,
 				C6B1A10A2FCE000100B0A001 /* BoardManStore.swift in Sources */,
+				C6B1A1192FCE000100B0A001 /* BoardManSearchCoordinator.swift in Sources */,
 				C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */,
 				C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */,
 				C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */,

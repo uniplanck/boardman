@@ -1,9 +1,9 @@
 # Board-Man Technical Excellence Master Plan
 
-Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 PASS / CLOSED, Phase 4 next
+Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 PASS / CLOSED, Phase 4 ACTIVE
 Created: 2026-08-21
 Baseline refreshed: 2026-08-25
-Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 search and information retrieval (P3.1-P3.3) is PASS / CLOSED. Phase 4 structural decomposition and dependency reduction is next.**
+Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 search and information retrieval (P3.1-P3.3) is PASS / CLOSED. Phase 4 structural decomposition and dependency reduction is ACTIVE.**
 
 ## 1. Purpose
 
@@ -396,6 +396,8 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
+**Implementation status: ACTIVE — first extraction accepted (2026-08-25).**
+
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
 Move ownership into focused components such as:
@@ -410,6 +412,16 @@ Move ownership into focused components such as:
 - demo/screenshot fixtures.
 
 Target guideline: normal production files should generally stay below ~600 lines and focused types below ~300 lines, but cohesion is more important than mechanically hitting a number.
+
+First accepted extraction:
+
+- `BoardManSearchCoordinator.swift` now owns search scope/pinned eligibility, indexed lookup, benchmark fallback lookup, visible-item/hit correlation, custom history display-name compatibility, and deterministic rank application.
+- `HistoryDisplayNameStore` moved out of `MenuManager.swift` into the same search boundary; `BoardManPanel` retains tab candidate selection, hide/usage filters, scope-driven tab context, UI state, and rendering.
+- `MenuManager.swift` reduced from `12,774` to `12,594` lines in this slice (`-180` net) while the new focused coordinator file is `271` lines.
+- direct coordinator regression verifies that custom display names remain searchable even when the SQLite FTS index has no matching payload text.
+- acceptance evidence: SearchQuery focused tests `6/6` PASS; full XCTest `35/35` PASS; Swift Testing `98/98` PASS across `16` suites; SwiftLint `320` warnings / `0` serious; 10,000-item FTS observation `1.18 ms / 1 hit`.
+
+P4.1 remains open. Presentation models (`BoardManHistoryItem` / `BoardManPanelItemSource`) still live in `MenuManager.swift`, and tab/navigation, timestamp actions, layout/presentation, paste orchestration, and fixture ownership remain to be extracted.
 
 ## P4.2 Dependency audit
 

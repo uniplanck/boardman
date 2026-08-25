@@ -43,6 +43,34 @@ final class BoardManSearchQueryTests: XCTestCase {
         XCTAssertEqual(panel.activePanelTabForTesting, "history")
     }
 
+    func testCoordinatorPreservesDisplayNameCompatibilityOutsideIndex() throws {
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
+        let suiteName = "BoardManSearchCoordinatorTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let displayNameStore = HistoryDisplayNameStore(defaults: defaults)
+        let clip = makeClip(identifier: "display-name", title: "Opaque payload")
+        store.upsertClip(clip)
+        store.upsertHistorySearchMetadata(
+            identifier: clip.dataHash,
+            metadata: BoardManHistorySearchMetadata(text: "Opaque payload")
+        )
+        displayNameStore.setName("Quarterly Invoice", for: clip.dataHash)
+
+        let coordinator = BoardManSearchCoordinator(store: store, displayNameStore: displayNameStore)
+        let resolution = coordinator.resolve(
+            parsedSearch: BoardManSearchQueryParser.parse("invoice", defaultScope: .all),
+            defaultScope: .all,
+            visibleItems: [makeHistoryItem(identifier: clip.dataHash, title: clip.title)],
+            totalItemCount: 1,
+            includeHistoryDisplayNames: true
+        )
+
+        XCTAssertTrue(resolution.performedSearch)
+        XCTAssertEqual(resolution.indexedHitCount, 0)
+        XCTAssertEqual(resolution.items.map(\.dataHash), [clip.dataHash])
+    }
+
     func testSQLiteStructuredSearchFiltersTypeAppAndCopyDate() throws {
         let store = try SQLiteBoardManStore.inMemoryForTesting()
         let augustStart = try XCTUnwrap(
@@ -113,6 +141,28 @@ final class BoardManSearchQueryTests: XCTestCase {
         XCTAssertEqual(
             store.search(BoardManSearchRequest(text: "", scope: .snippets), limit: 10).map(\.identifier),
             [snippet.identifier]
+        )
+    }
+
+    private func makeHistoryItem(identifier: String, title: String) -> BoardManHistoryItem {
+        BoardManHistoryItem(
+            title: title,
+            primaryTitle: title,
+            compactTitle: title,
+            metadataText: "",
+            timestampText: "",
+            countText: "",
+            previewTitle: title,
+            dataHash: identifier,
+            imageDataPath: "",
+            inlineThumbnail: nil,
+            pasteCount: 0,
+            isPinned: false,
+            isMasked: false,
+            isEnabled: true,
+            source: .clip,
+            categoryIdentifier: nil,
+            categoryTitle: nil
         )
     }
 
