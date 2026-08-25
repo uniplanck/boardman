@@ -2220,6 +2220,48 @@ extension BoardManUIRegressionTests {
     }
 
     @Test
+    func horizontalNavigationPolicyBoundsHistoryAllAndSnippetGroups() {
+        let categories = ["all", "first", "second"]
+
+        #expect(BoardManPanelNavigationPolicy.target(
+            activeTab: .history,
+            activeSnippetGroupIdentifiers: [],
+            snippetCategoryIdentifiers: categories,
+            delta: 1
+        ) == .snippets(categoryIdentifier: "all"))
+        #expect(BoardManPanelNavigationPolicy.target(
+            activeTab: .snippets,
+            activeSnippetGroupIdentifiers: [],
+            snippetCategoryIdentifiers: categories,
+            delta: 1
+        ) == .snippets(categoryIdentifier: "first"))
+        #expect(BoardManPanelNavigationPolicy.target(
+            activeTab: .snippets,
+            activeSnippetGroupIdentifiers: ["first"],
+            snippetCategoryIdentifiers: categories,
+            delta: 1
+        ) == .snippets(categoryIdentifier: "second"))
+        #expect(BoardManPanelNavigationPolicy.target(
+            activeTab: .snippets,
+            activeSnippetGroupIdentifiers: ["second"],
+            snippetCategoryIdentifiers: categories,
+            delta: 1
+        ) == nil)
+        #expect(BoardManPanelNavigationPolicy.target(
+            activeTab: .snippets,
+            activeSnippetGroupIdentifiers: [],
+            snippetCategoryIdentifiers: categories,
+            delta: -1
+        ) == .history)
+        #expect(BoardManPanelNavigationPolicy.target(
+            activeTab: .settings,
+            activeSnippetGroupIdentifiers: [],
+            snippetCategoryIdentifiers: categories,
+            delta: 1
+        ) == nil)
+    }
+
+    @Test
     func horizontalArrowNavigationMovesThroughHistoryAllAndSnippetGroups() throws {
         let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
         Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)

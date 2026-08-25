@@ -2109,42 +2109,6 @@ func boardManText(_ english: String) -> String {
     }
 }
 
-fileprivate enum BoardManPanelTab: Int, CaseIterable {
-    case history = 0
-    case snippets
-    case settings
-
-    var title: String { title(compact: false) }
-
-    func title(compact: Bool) -> String {
-        switch self {
-        case .history:
-            return boardManText("History")
-        case .snippets:
-            guard compact else { return boardManText("Snippets") }
-            let language = BoardManLanguage.allowed(
-                AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
-            ).resolved
-            switch language {
-            case .japanese: return "定型"
-            case .simplifiedChinese: return "模板"
-            case .korean: return "문구"
-            case .system, .english: return "Text"
-            }
-        case .settings:
-            return boardManText("Settings")
-        }
-    }
-
-    var emptyMessage: String {
-        switch self {
-        case .history: return boardManText("No clipboard history yet")
-        case .snippets: return boardManText("No snippets yet")
-        case .settings: return ""
-        }
-    }
-}
-
 fileprivate enum BoardManInlineSettingsCategory: Int, CaseIterable {
     case general, view, history, snippets, privacy, updates, license
 
@@ -2547,12 +2511,6 @@ enum BoardManThemePreset: String, CaseIterable {
     }
 }
 
-enum BoardManPanelItemSource {
-    case clip
-    case snippet
-    case favorite
-}
-
 fileprivate enum BoardManHideRuleMode: String, Codable, CaseIterable {
     case contains
     case startsWith
@@ -2946,26 +2904,6 @@ fileprivate final class BoardManProLockedControlView: NSView {
         }
         view.subviews.forEach { setEnabled(enabled, in: $0) }
     }
-}
-
-struct BoardManHistoryItem {
-    let title: String
-    let primaryTitle: String
-    let compactTitle: String
-    let metadataText: String
-    let timestampText: String
-    let countText: String
-    let previewTitle: String
-    let dataHash: String
-    let imageDataPath: String
-    let inlineThumbnail: NSImage?
-    let pasteCount: Int
-    let isPinned: Bool
-    let isMasked: Bool
-    let isEnabled: Bool
-    let source: BoardManPanelItemSource
-    let categoryIdentifier: String?
-    let categoryTitle: String?
 }
 
 private final class BoardManHistoryTableView: NSTableView {
@@ -11780,33 +11718,19 @@ class BoardManPanel: NSPanel {
     }
 
     private func moveHorizontalNavigation(delta: Int) {
-        guard delta != 0, activeTab != .settings else { return }
-
-        let snippetCategories = horizontalSnippetCategoryIdentifiers()
-        let currentIndex: Int
-        switch activeTab {
+        let target = BoardManPanelNavigationPolicy.target(
+            activeTab: activeTab,
+            activeSnippetGroupIdentifiers: activeSnippetGroupIdentifiers,
+            snippetCategoryIdentifiers: horizontalSnippetCategoryIdentifiers(),
+            delta: delta
+        )
+        switch target {
         case .history:
-            currentIndex = 0
-        case .snippets:
-            if activeSnippetGroupIdentifiers.isEmpty {
-                currentIndex = 1
-            } else if activeSnippetGroupIdentifiers.count == 1,
-                      let identifier = activeSnippetGroupIdentifiers.first,
-                      let categoryIndex = snippetCategories.firstIndex(of: identifier) {
-                currentIndex = categoryIndex + 1
-            } else {
-                currentIndex = 1
-            }
-        case .settings:
-            return
-        }
-
-        let nextIndex = min(snippetCategories.count, max(0, currentIndex + delta))
-        guard nextIndex != currentIndex else { return }
-        if nextIndex == 0 {
             activateTab(.history)
-        } else {
-            openSnippetsManagerMode(categoryIdentifier: snippetCategories[nextIndex - 1])
+        case .snippets(let categoryIdentifier):
+            openSnippetsManagerMode(categoryIdentifier: categoryIdentifier)
+        case nil:
+            break
         }
     }
 

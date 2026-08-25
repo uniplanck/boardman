@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — first extraction accepted (2026-08-25).**
+**Implementation status: ACTIVE — search, shared presentation model, and horizontal navigation extractions accepted (2026-08-25).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -421,7 +421,14 @@ First accepted extraction:
 - direct coordinator regression verifies that custom display names remain searchable even when the SQLite FTS index has no matching payload text.
 - acceptance evidence: SearchQuery focused tests `6/6` PASS; full XCTest `35/35` PASS; Swift Testing `98/98` PASS across `16` suites; SwiftLint `320` warnings / `0` serious; 10,000-item FTS observation `1.18 ms / 1 hit`.
 
-P4.1 remains open. Presentation models (`BoardManHistoryItem` / `BoardManPanelItemSource`) still live in `MenuManager.swift`, and tab/navigation, timestamp actions, layout/presentation, paste orchestration, and fixture ownership remain to be extracted.
+Second accepted extraction:
+
+- `BoardManPanelItem.swift` now owns the shared `BoardManHistoryItem`, `BoardManPanelItemSource`, and `BoardManPanelTab` presentation types that were previously buried inside `MenuManager.swift` despite being used by search, benchmarks, interaction tests, and panel rendering.
+- `BoardManPanelNavigation.swift` now owns the pure horizontal navigation policy for History → Templates All → persisted template groups, including non-wrapping edge behavior and Settings no-op behavior. `BoardManPanel` now applies the returned navigation target instead of calculating the transition inline.
+- `MenuManager.swift` reduced again from `12,594` to `12,518` lines in this slice (`-76` net) while the new shared model is `70` lines and the focused navigation policy is `49` lines.
+- focused SearchQuery plus Entitlement/interaction verification completed with `xcodebuild` exit code `0`; the earlier direct presentation-model SearchQuery run was `6/6` PASS. SwiftLint observed `319` warnings / `0` serious in this slice.
+
+P4.1 remains open. Timestamp actions, paste orchestration, larger layout/presentation ownership, and demo/screenshot fixture ownership remain to be extracted.
 
 ## P4.2 Dependency audit
 
