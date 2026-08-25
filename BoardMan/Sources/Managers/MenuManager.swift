@@ -1588,7 +1588,7 @@ func boardManText(_ english: String) -> String {
     }
 }
 
-fileprivate enum BoardManInlineSettingsCategory: Int, CaseIterable {
+enum BoardManInlineSettingsCategory: Int, CaseIterable {
     case general, view, history, snippets, privacy, updates, license
 
     var title: String {
@@ -3125,22 +3125,7 @@ class BoardManPanel: NSPanel {
     private let store: BoardManStore = BoardManStores.authoritative
     private lazy var searchCoordinator = BoardManSearchCoordinator(store: store)
 
-    private enum LayoutMetrics {
-        static let preferredWidth: CGFloat = 800
-        static let minimumWidth: CGFloat = 640
-        static let outerMargin: CGFloat = 18
-        static let compactOuterMargin: CGFloat = 14
-        static let controlHeight: CGFloat = 30
-        static let actionButtonHeight: CGFloat = 30
-        static let settingsLabelWidth: CGFloat = 84
-        static let settingsColumnGap: CGFloat = 22
-        static let horizontalGap: CGFloat = 10
-        static let settingsInset: CGFloat = 26
-        static let cardCornerRadius: CGFloat = 14
-        static let sidebarSymbolLeadingInset: CGFloat = 8
-        static let historyRowHeight: CGFloat = 62
-        static let compactHistoryRowHeight: CGFloat = 46
-    }
+    private typealias LayoutMetrics = BoardManPanelLayoutMetrics
 
     private var glassBackgroundView: NSVisualEffectView?
     private var searchField: NSSearchField?
@@ -3567,11 +3552,11 @@ class BoardManPanel: NSPanel {
     }
 
     static func usesStackedHistorySettingsLayout(width: CGFloat) -> Bool {
-        return width < 520
+        BoardManPanelLayoutPolicy.usesStackedHistorySettingsLayout(width: width)
     }
 
     static func usesStackedAppearanceSettingsLayout(width: CGFloat) -> Bool {
-        return width < 470
+        BoardManPanelLayoutPolicy.usesStackedAppearanceSettingsLayout(width: width)
     }
 
     static func tabDelta(horizontalDelta: CGFloat, verticalDelta: CGFloat) -> Int? {
@@ -6410,177 +6395,113 @@ class BoardManPanel: NSPanel {
 
     private func layoutPanelSubviews() {
         guard let contentView = contentView else { return }
-        let bounds = contentView.bounds
-        let isCompact = bounds.width < 720
-        let margin = isQuickMode ? 12 : (isCompact ? LayoutMetrics.compactOuterMargin : LayoutMetrics.outerMargin)
-        let width = bounds.width - (margin * 2)
-        let headerY = isQuickMode ? bounds.height - 42 : bounds.height - 70
         let isSettings = activeTab == .settings && !isQuickMode
-        let gearWidth: CGFloat = 36
-        let gearGap: CGFloat = isCompact ? 8 : 12
-        let tabsWidth: CGFloat = isCompact ? 190 : min(250, max(216, floor(width * 0.31)))
-        let tabsFrame = NSIntegralRect(NSRect(x: margin, y: headerY, width: tabsWidth, height: 36))
-        headerTabBar?.frame = tabsFrame
+        let layout = BoardManPanelLayoutPolicy.panelLayout(
+            bounds: contentView.bounds,
+            isQuickMode: isQuickMode,
+            activeTab: activeTab,
+            activeSettingsCategory: activeSettingsCategory,
+            appearanceAdvancedExpanded: appearanceAdvancedExpanded,
+            searchIntrinsicHeight: searchField?.intrinsicContentSize.height ?? 30
+        )
+
+        headerTabBar?.frame = layout.tabsFrame
         headerTabBar?.isHidden = isQuickMode
-        applyResponsiveTabPresentation(isCompact: isCompact)
+        applyResponsiveTabPresentation(isCompact: layout.isCompact)
         settingsButton?.isHidden = isQuickMode
-        settingsButton?.frame = NSIntegralRect(NSRect(
-            x: margin + width - gearWidth,
-            y: headerY,
-            width: gearWidth,
-            height: 36
-        ))
+        settingsButton?.frame = layout.settingsButtonFrame
         updateSettingsButtonAppearance()
 
         searchField?.isHidden = isSettings || isQuickMode
-        let showsSnippetButtons = activeTab == .snippets && !isSettings && !isQuickMode
-        let snippetButtonGap: CGFloat = isCompact ? 6 : 8
-        let snippetButtonWidths: [CGFloat] = isCompact ? [58, 64, 64] : [70, 72, 72]
-        let snippetButtonsWidth = showsSnippetButtons ? snippetButtonWidths.reduce(0, +) + (snippetButtonGap * 2) : 0
-        let headerGap: CGFloat = isCompact ? 10 : 14
-        let rightX = margin + tabsWidth + headerGap
-        let rightEdge = margin + width - gearWidth - gearGap
-        let rightWidth = max(0, rightEdge - rightX)
-        let searchWidth = max(78,
-                              rightWidth - snippetButtonsWidth - (showsSnippetButtons ? headerGap : 0))
-        let searchHeight = min(32, max(28, ceil(searchField?.intrinsicContentSize.height ?? 30)))
-        let searchFrame = NSIntegralRect(NSRect(
-            x: rightX,
-            y: floor(tabsFrame.midY - (searchHeight / 2)),
-            width: searchWidth,
-            height: searchHeight
-        ))
-        searchField?.frame = searchFrame
-        searchField?.placeholderString = boardManText(searchWidth < 230 ? "Search" : "Search clipboard history and snippets")
-        snippetAddButton?.isHidden = !showsSnippetButtons
-        snippetEditButton?.isHidden = !showsSnippetButtons
-        snippetDeleteButton?.isHidden = !showsSnippetButtons
-        if showsSnippetButtons {
-            let buttonY = headerY + 3
-            var buttonX = rightX + searchWidth + headerGap
-            snippetAddButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[0], height: LayoutMetrics.actionButtonHeight)
-            buttonX += snippetButtonWidths[0] + snippetButtonGap
-            snippetEditButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[1], height: LayoutMetrics.actionButtonHeight)
-            buttonX += snippetButtonWidths[1] + snippetButtonGap
-            snippetDeleteButton?.frame = NSRect(x: buttonX, y: buttonY, width: snippetButtonWidths[2], height: LayoutMetrics.actionButtonHeight)
+        searchField?.frame = layout.searchFrame
+        searchField?.placeholderString = boardManText(
+            layout.usesCompactSearchPlaceholder ? "Search" : "Search clipboard history and snippets"
+        )
+        let snippetButtons = [snippetAddButton, snippetEditButton, snippetDeleteButton]
+        snippetButtons.forEach { $0?.isHidden = !layout.showsSnippetButtons }
+        for (button, frame) in zip(snippetButtons, layout.snippetButtonFrames) {
+            button?.frame = frame
         }
         updateSnippetActionButtons()
 
-        let contentTop = isQuickMode ? bounds.height - 18 : headerY - 24
-        let showsHistoryToolbar = activeTab == .history && !isSettings
-        historyUsageFilterControl?.isHidden = !showsHistoryToolbar
-        historySortButton?.isHidden = !showsHistoryToolbar
-        historyConditionButton?.isHidden = !showsHistoryToolbar
-        historySavedFilterPopup?.isHidden = !showsHistoryToolbar
-        let historyToolbarHeight: CGFloat = 30
-        let historyToolbarY = isQuickMode ? bounds.height - 52 : contentTop - 34
-        if showsHistoryToolbar {
-            let filterWidth: CGFloat = 118
-            historyUsageFilterControl?.frame = NSIntegralRect(NSRect(x: margin, y: historyToolbarY, width: filterWidth, height: historyToolbarHeight))
+        historyUsageFilterControl?.isHidden = !layout.showsHistoryToolbar
+        historySortButton?.isHidden = !layout.showsHistoryToolbar
+        historyConditionButton?.isHidden = !layout.showsHistoryToolbar
+        historySavedFilterPopup?.isHidden = !layout.showsHistoryToolbar
+        if layout.showsHistoryToolbar {
+            historyUsageFilterControl?.frame = layout.historyUsageFilterFrame
             if let filter = historyUsageFilterControl {
-                let segmentWidth = floor(filterWidth / CGFloat(max(1, filter.segmentCount)))
+                let segmentWidth = floor(layout.historyUsageFilterFrame.width / CGFloat(max(1, filter.segmentCount)))
                 for segment in 0..<filter.segmentCount {
                     filter.setWidth(segmentWidth, forSegment: segment)
                 }
             }
-            historySortButton?.frame = NSIntegralRect(NSRect(x: margin + filterWidth + 10, y: historyToolbarY, width: 34, height: historyToolbarHeight))
-            historyConditionButton?.frame = NSIntegralRect(NSRect(x: margin + filterWidth + 54, y: historyToolbarY, width: 34, height: historyToolbarHeight))
-            let savedFilterX = margin + filterWidth + 100
-            historySavedFilterPopup?.frame = NSIntegralRect(NSRect(
-                x: savedFilterX,
-                y: historyToolbarY,
-                width: max(140, min(isCompact ? 166 : 220, margin + width - savedFilterX)),
-                height: historyToolbarHeight
-            ))
+            historySortButton?.frame = layout.historySortFrame
+            historyConditionButton?.frame = layout.historyConditionFrame
+            historySavedFilterPopup?.frame = layout.historySavedFilterFrame
         }
 
-        let sidebarWidth: CGFloat = min(184, max(160, floor(width * 0.25)))
-        let settingsGap: CGFloat = 16
-        let settingsContentX = margin + sidebarWidth + settingsGap
-        let settingsContentWidth = max(260, width - sidebarWidth - settingsGap)
         settingsSidebarView?.isHidden = !isSettings
-        settingsSidebarView?.frame = NSRect(x: margin, y: 28, width: sidebarWidth, height: max(220, contentTop - 28))
-        layoutSettingsSidebar(width: sidebarWidth, height: max(220, contentTop - 28))
-        let settingsViewportHeight = max(220, contentTop - 28)
-        let settingsFrame = NSIntegralRect(NSRect(
-            x: settingsContentX,
-            y: 28,
-            width: settingsContentWidth,
-            height: settingsViewportHeight
-        ))
-        settingsBackgroundView?.isHidden = !isSettings
-        settingsBackgroundView?.frame = settingsFrame
-        settingsScrollView?.isHidden = !isSettings
-        settingsScrollView?.frame = settingsFrame
-        let documentHeight = settingsDocumentHeight(
-            viewportHeight: settingsViewportHeight,
-            contentWidth: settingsContentWidth
+        settingsSidebarView?.frame = layout.settingsSidebarFrame
+        layoutSettingsSidebar(
+            width: layout.settingsSidebarFrame.width,
+            height: layout.settingsSidebarFrame.height
         )
-        settingsDocumentView?.frame = NSRect(x: 0, y: 0, width: settingsContentWidth, height: documentHeight)
-        layoutInlineSettingsControls(margin: 0, width: settingsContentWidth, topY: documentHeight, isVisible: isSettings)
+        settingsBackgroundView?.isHidden = !isSettings
+        settingsBackgroundView?.frame = layout.settingsFrame
+        settingsScrollView?.isHidden = !isSettings
+        settingsScrollView?.frame = layout.settingsFrame
+        settingsDocumentView?.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: layout.settingsFrame.width,
+            height: layout.settingsDocumentHeight
+        )
+        layoutInlineSettingsControls(
+            margin: 0,
+            width: layout.settingsFrame.width,
+            topY: layout.settingsDocumentHeight,
+            isVisible: isSettings
+        )
         if isSettings, shouldScrollSettingsToTop, let scroll = settingsScrollView {
-            let topOrigin = max(0, documentHeight - scroll.contentView.bounds.height)
+            let topOrigin = max(0, layout.settingsDocumentHeight - scroll.contentView.bounds.height)
             scroll.contentView.scroll(to: NSPoint(x: 0, y: topOrigin))
             scroll.reflectScrolledClipView(scroll.contentView)
             shouldScrollSettingsToTop = false
         }
+
         footerNote?.isHidden = true
         scrollView?.isHidden = isSettings
-        let showsSnippetCategories = activeTab == .snippets && !isSettings
-        snippetEditorView?.isHidden = !showsSnippetCategories
-        let categoryRowY = contentTop - 38
-        let snippetInteractionRowY = categoryRowY - 40
-        let listTop: CGFloat
-        if showsSnippetCategories {
-            listTop = snippetInteractionRowY - 12
-        } else if showsHistoryToolbar {
-            listTop = historyToolbarY - 16
-        } else {
-            listTop = contentTop
+        snippetEditorView?.isHidden = !layout.showsSnippetCategories
+        let snippetCategoryControls: [NSView?] = [
+            snippetCategoryLabel, snippetCategoryPopup, snippetCategoryAddButton,
+            snippetCategoryRenameButton, snippetCategoryDeleteButton,
+            snippetInteractionHintLabel, snippetReorderModeButton
+        ]
+        snippetCategoryControls.forEach { $0?.isHidden = !layout.showsSnippetCategories }
+        if layout.showsSnippetCategories {
+            snippetCategoryLabel?.frame = layout.snippetCategoryLabelFrame
+            snippetCategoryPopup?.frame = layout.snippetCategoryPopupFrame
+            let categoryButtons = [snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton]
+            for (button, frame) in zip(categoryButtons, layout.snippetCategoryButtonFrames) {
+                button?.frame = frame
+            }
+            snippetInteractionHintLabel?.frame = layout.snippetInteractionHintFrame
+            snippetReorderModeButton?.frame = layout.snippetReorderFrame
         }
-        let listBottom: CGFloat = isQuickMode ? 12 : 24
-        let listHeight = isQuickMode ? max(1, listTop - listBottom) : max(190, listTop - 28)
-        [snippetCategoryLabel, snippetCategoryPopup, snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton, snippetInteractionHintLabel, snippetReorderModeButton].forEach {
-            $0?.isHidden = !showsSnippetCategories
-        }
-        if showsSnippetCategories {
-            snippetCategoryLabel?.frame = NSRect(x: margin, y: categoryRowY + 6, width: 64, height: 17)
-            let categoryButtonGap: CGFloat = isCompact ? 6 : 8
-            let categoryButtonWidths: [CGFloat] = isCompact ? [82, 88, 82] : [94, 108, 98]
-            let actionWidth = categoryButtonWidths.reduce(0, +) + (categoryButtonGap * 2)
-            let popupWidth = max(120, width - 64 - 12 - actionWidth - 12)
-            snippetCategoryPopup?.frame = NSRect(x: margin + 76, y: categoryRowY, width: popupWidth, height: LayoutMetrics.controlHeight)
-            var categoryButtonX = margin + 76 + popupWidth + 12
-            snippetCategoryAddButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[0], height: LayoutMetrics.controlHeight)
-            categoryButtonX += categoryButtonWidths[0] + categoryButtonGap
-            snippetCategoryRenameButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[1], height: LayoutMetrics.controlHeight)
-            categoryButtonX += categoryButtonWidths[1] + categoryButtonGap
-            snippetCategoryDeleteButton?.frame = NSRect(x: categoryButtonX, y: categoryRowY, width: categoryButtonWidths[2], height: LayoutMetrics.controlHeight)
 
-            let reorderWidth: CGFloat = 118
-            snippetInteractionHintLabel?.frame = NSRect(
-                x: margin,
-                y: snippetInteractionRowY + 6,
-                width: max(120, width - reorderWidth - 14),
-                height: 17
-            )
-            snippetReorderModeButton?.frame = NSRect(
-                x: margin + width - reorderWidth,
-                y: snippetInteractionRowY,
-                width: reorderWidth,
-                height: LayoutMetrics.controlHeight
+        scrollView?.frame = layout.listFrame
+        if layout.showsSnippetCategories {
+            snippetEditorView?.frame = layout.snippetEditorFrame
+            layoutSnippetEditorControls(
+                width: layout.snippetEditorFrame.width,
+                height: layout.snippetEditorFrame.height
             )
         }
-        let listFrameHeight = listHeight
-        let editorGap: CGFloat = showsSnippetCategories ? 8 : 0
-        let editorWidth = showsSnippetCategories ? min(360, max(300, floor(width * 0.42))) : 0
-        let listWidth = max(180, width - editorWidth - editorGap)
-        scrollView?.frame = NSRect(x: margin, y: listBottom, width: listWidth, height: listFrameHeight)
-        if showsSnippetCategories {
-            snippetEditorView?.frame = NSRect(x: margin + listWidth + editorGap, y: 24, width: editorWidth, height: listFrameHeight)
-            layoutSnippetEditorControls(width: editorWidth, height: listFrameHeight)
-        }
-        synchronizeListGeometry(frameWidth: listWidth, height: listFrameHeight)
+        synchronizeListGeometry(
+            frameWidth: layout.listFrame.width,
+            height: layout.listFrame.height
+        )
         hidePreviewBubble()
     }
 
@@ -6673,35 +6594,23 @@ class BoardManPanel: NSPanel {
     }
 
     private func settingsDocumentHeight(viewportHeight: CGFloat, contentWidth: CGFloat) -> CGFloat {
-        let appearanceContentWidth = max(240, contentWidth - (LayoutMetrics.settingsInset * 2))
-        let stacksAppearanceCards = Self.usesStackedAppearanceSettingsLayout(width: appearanceContentWidth)
-        let requiredHeight: CGFloat
-        switch activeSettingsCategory {
-        case .general: requiredHeight = 790
-        case .view:
-            if stacksAppearanceCards {
-                requiredHeight = appearanceAdvancedExpanded ? 1_720 : 1_360
-            } else {
-                requiredHeight = appearanceAdvancedExpanded ? 1_280 : 1_020
-            }
-        case .history: requiredHeight = 730
-        case .snippets: requiredHeight = 640
-        case .privacy: requiredHeight = 690
-        case .updates: requiredHeight = 390
-        case .license: requiredHeight = 650
-        }
-        return max(viewportHeight, requiredHeight)
+        BoardManPanelLayoutPolicy.settingsDocumentHeight(
+            viewportHeight: viewportHeight,
+            contentWidth: contentWidth,
+            category: activeSettingsCategory,
+            appearanceAdvancedExpanded: appearanceAdvancedExpanded
+        )
     }
 
     private func layoutSettingsSidebar(width: CGFloat, height: CGFloat) {
         guard let sidebar = settingsSidebarView else { return }
-        let inset: CGFloat = 12
-        let buttonHeight: CGFloat = 42
-        let gap: CGFloat = 6
-        var currentY = height - inset - buttonHeight
-        for button in settingsCategoryButtons {
-            button.frame = NSRect(x: inset, y: currentY, width: max(80, width - (inset * 2)), height: buttonHeight)
-            currentY -= buttonHeight + gap
+        let frames = BoardManPanelLayoutPolicy.settingsSidebarButtonFrames(
+            width: width,
+            height: height,
+            count: settingsCategoryButtons.count
+        )
+        for (button, frame) in zip(settingsCategoryButtons, frames) {
+            button.frame = frame
         }
         sidebar.needsLayout = true
         updateSettingsSidebarSelection()

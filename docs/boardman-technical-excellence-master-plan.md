@@ -489,7 +489,15 @@ Tenth accepted extraction:
 - focused catalog/editing/UI verification is `15/15` PASS. Final full regression is `149/149` PASS (`35` XCTest + `114` Swift Testing across `23` suites), with `0` failed and `0` skipped tests.
 - SwiftLint reports `306` warnings / `0` serious violations across `90` files; the final 10,000-item FTS benchmark passed at `0.89 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `1020.73 ms`, and `git diff --check` passes.
 
-P4.1 remains open only for broader panel/settings layout ownership still embedded in `MenuManager.swift`. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership now have focused components outside the giant coordinator.
+Eleventh accepted extraction:
+
+- `BoardManPanelLayoutPolicy.swift` now owns high-level panel geometry as deterministic data: header/search/settings-button frames, snippet action/category/list/editor allocation, History toolbar geometry, settings viewport/sidebar/document sizing, and compact/stacked breakpoints.
+- `MenuManager.swift` now applies the calculated frames to AppKit controls instead of recomputing the same layout inline. Existing `BoardManSnippetPresentation` remains the owner of snippet-editor-internal geometry, so the new owner does not absorb unrelated responsibilities.
+- `MenuManager.swift` reduced from `11,159` to `11,068` lines in this slice (`-91` net). The panel layout policy is `325` lines with a dedicated `108`-line deterministic test suite.
+- focused panel-layout + UI verification is `14/14` PASS. Final full regression is `153/153` PASS (`35` XCTest + `118` Swift Testing across `24` suites), with `0` failed and `0` skipped tests.
+- SwiftLint reports `307` warnings / `0` serious violations across `92` files; the final 10,000-item FTS benchmark passed at `0.45 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `848.94 ms`, and `git diff --check` passes.
+
+P4.1 remains open only for per-category settings-control geometry still embedded in `layoutInlineSettingsControls` inside `MenuManager.swift`. High-level panel geometry, settings viewport/sidebar sizing, search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership now have focused components outside the giant coordinator.
 
 ## P4.2 Dependency audit
 
