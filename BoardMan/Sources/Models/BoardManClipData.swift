@@ -11,7 +11,13 @@
 //
 
 import Cocoa
-import SwiftHEXColors
+
+private struct BoardManHexColorComponents {
+    let red: UInt64
+    let green: UInt64
+    let blue: UInt64
+    let alpha: UInt64
+}
 
 final class BoardManClipData: NSObject {
 
@@ -92,8 +98,58 @@ final class BoardManClipData: NSObject {
         return nil
     }
     var colorCodeImage: NSImage? {
-        guard let color = NSColor(hexString: stringValue) else { return nil }
+        guard let color = Self.color(fromHexString: stringValue) else { return nil }
         return NSImage.create(with: color, size: NSSize(width: 20, height: 20))
+    }
+
+    static func color(fromHexString value: String) -> NSColor? {
+        let hex = value.hasPrefix("#") ? String(value.dropFirst()) : value
+        guard let rawValue = UInt64(hex, radix: 16) else { return nil }
+
+        let components: BoardManHexColorComponents
+        switch hex.count {
+        case 3:
+            components = BoardManHexColorComponents(
+                red: duplicateHexNibble((rawValue & 0xF00) >> 8),
+                green: duplicateHexNibble((rawValue & 0x0F0) >> 4),
+                blue: duplicateHexNibble(rawValue & 0x00F),
+                alpha: 0xFF
+            )
+        case 4:
+            components = BoardManHexColorComponents(
+                red: duplicateHexNibble((rawValue & 0xF000) >> 12),
+                green: duplicateHexNibble((rawValue & 0x0F00) >> 8),
+                blue: duplicateHexNibble((rawValue & 0x00F0) >> 4),
+                alpha: duplicateHexNibble(rawValue & 0x000F)
+            )
+        case 6:
+            components = BoardManHexColorComponents(
+                red: (rawValue & 0xFF0000) >> 16,
+                green: (rawValue & 0x00FF00) >> 8,
+                blue: rawValue & 0x0000FF,
+                alpha: 0xFF
+            )
+        case 8:
+            components = BoardManHexColorComponents(
+                red: (rawValue & 0xFF000000) >> 24,
+                green: (rawValue & 0x00FF0000) >> 16,
+                blue: (rawValue & 0x0000FF00) >> 8,
+                alpha: rawValue & 0x000000FF
+            )
+        default:
+            return nil
+        }
+
+        return NSColor(
+            red: CGFloat(components.red) / 255.0,
+            green: CGFloat(components.green) / 255.0,
+            blue: CGFloat(components.blue) / 255.0,
+            alpha: CGFloat(components.alpha) / 255.0
+        )
+    }
+
+    private static func duplicateHexNibble(_ value: UInt64) -> UInt64 {
+        (value << 4) + value
     }
 
     var boardManTextValue: String {

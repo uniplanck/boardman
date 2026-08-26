@@ -13,8 +13,6 @@
 import Foundation
 import Cocoa
 import PINCache
-import RxSwift
-import RxCocoa
 
 final class ClipService {
 
@@ -22,9 +20,10 @@ final class ClipService {
     fileprivate var cachedChangeCount = 0
     fileprivate var storeTypes = [String: NSNumber]()
     fileprivate let monitorQueue = DispatchQueue(label: "com.uniplanck.BoardMan.ClipService.pasteboard", qos: .utility)
+    fileprivate let persistenceQueue = DispatchQueue(label: "com.uniplanck.BoardMan.ClipService.persistence", qos: .utility)
     fileprivate var pasteboardTimer: DispatchSourceTimer?
     fileprivate let lock = NSRecursiveLock(name: "com.uniplanck.BoardMan.ClipUpdatable")
-    fileprivate var disposeBag = DisposeBag()
+    fileprivate var defaultsObserver: NSObjectProtocol?
     fileprivate var ignoredPasteboardChangeCount: Int?
     fileprivate var ignoredPasteboardFingerprint: Int?
     private let store: BoardManStore
@@ -41,12 +40,13 @@ final class ClipService {
 
     deinit {
         pasteboardTimer?.cancel()
+        if let defaultsObserver {
+            NotificationCenter.default.removeObserver(defaultsObserver)
+        }
     }
 
     // MARK: - Clips
     func startMonitoring() {
-        disposeBag = DisposeBag()
-        storeTypes = AppEnvironment.current.defaults.dictionary(forKey: Constants.UserDefaults.storeTypes) as? [String: NSNumber] ?? AppDelegate.storeTypesDictinary()
         lock.lock()
         cachedChangeCount = NSPasteboard.general.changeCount
         lock.unlock()
@@ -62,18 +62,27 @@ final class ClipService {
         pasteboardTimer = timer
         timer.resume()
 
-        // Store types
-        AppEnvironment.current.defaults.rx
-            .observe([String: NSNumber].self, Constants.UserDefaults.storeTypes)
-            .compactMap { $0 }
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] storeTypes in
-                guard let self else { return }
-                self.lock.lock()
-                self.storeTypes = storeTypes
-                self.lock.unlock()
-            })
-            .disposed(by: disposeBag)
+        if let defaultsObserver {
+            NotificationCenter.default.removeObserver(defaultsObserver)
+        }
+        let defaults = AppEnvironment.current.defaults
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: defaults,
+            queue: nil
+        ) { [weak self, weak defaults] _ in
+            guard let self, let defaults else { return }
+            self.refreshStoreTypes(from: defaults)
+        }
+        refreshStoreTypes(from: defaults)
+    }
+
+    private func refreshStoreTypes(from defaults: UserDefaults) {
+        let types = defaults.dictionary(forKey: Constants.UserDefaults.storeTypes) as? [String: NSNumber]
+            ?? AppDelegate.storeTypesDictinary()
+        lock.lock()
+        storeTypes = types
+        lock.unlock()
     }
 
     func clearAll() {
@@ -255,31 +264,37 @@ extension ClipService {
             sourceApplicationBundleID: sourceApplication?.bundleIdentifier ?? ""
         )
 
-        DispatchQueue.main.async {
-            // Save thumbnail image
-            if let thumbnailImage = data.thumbnailImage {
-                PINCache.shared.setObjectAsync(thumbnailImage, forKey: "\(unixTime)", completion: nil)
-                clip.thumbnailPath = "\(unixTime)"
-            }
-            if let colorCodeImage = data.colorCodeImage {
-                PINCache.shared.setObjectAsync(colorCodeImage, forKey: "\(unixTime)", completion: nil)
-                clip.thumbnailPath = "\(unixTime)"
-                clip.isColorCode = true
-            }
-            // Save persistent record and .data file.
-            if BoardManRuntimeSupport.prepareDirectory(at: BoardManRuntimeSupport.applicationSupportFolder()) {
-                if NSKeyedArchiver.archiveRootObject(data, toFile: savedPath) {
-                    self.store.upsertClip(clip)
-                    self.store.upsertHistorySearchMetadata(identifier: clip.dataHash, metadata: searchMetadata)
-                    if let detectedAt {
-                        PasteCountInputService.shared.logBoardManPerformance(
-                            "clipboard_capture_to_queryable",
-                            startedAt: detectedAt,
-                            details: "type=\(clip.primaryType.isEmpty ? "unknown" : clip.primaryType)"
-                        )
-                    }
-                    self.trimHistoryIfNeeded()
+        persistenceQueue.async { [weak self] in
+            guard let self else { return }
+            autoreleasepool {
+                assert(!Thread.isMainThread, "Clipboard persistence must never run on the main thread")
+
+                // Thumbnail generation, archive encoding, and database writes are deliberately
+                // serialized away from AppKit presentation work.
+                if let thumbnailImage = data.thumbnailImage {
+                    PINCache.shared.setObjectAsync(thumbnailImage, forKey: "\(unixTime)", completion: nil)
+                    clip.thumbnailPath = "\(unixTime)"
                 }
+                if let colorCodeImage = data.colorCodeImage {
+                    PINCache.shared.setObjectAsync(colorCodeImage, forKey: "\(unixTime)", completion: nil)
+                    clip.thumbnailPath = "\(unixTime)"
+                    clip.isColorCode = true
+                }
+                guard BoardManRuntimeSupport.prepareDirectory(
+                    at: BoardManRuntimeSupport.applicationSupportFolder()
+                ), NSKeyedArchiver.archiveRootObject(data, toFile: savedPath) else {
+                    return
+                }
+
+                self.store.upsertClip(clip, searchMetadata: searchMetadata)
+                if let detectedAt {
+                    PasteCountInputService.shared.logBoardManPerformance(
+                        "clipboard_capture_to_queryable",
+                        startedAt: detectedAt,
+                        details: "type=\(clip.primaryType.isEmpty ? "unknown" : clip.primaryType)"
+                    )
+                }
+                self.trimHistoryIfNeeded()
             }
         }
     }

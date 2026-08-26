@@ -12,8 +12,6 @@
 
 import Cocoa
 import Sparkle
-import RxCocoa
-import RxSwift
 import ServiceManagement
 
 @NSApplicationMain
@@ -23,7 +21,15 @@ class AppDelegate: NSObject, NSMenuItemValidation {
     private(set) var updaterController: SPUStandardUpdaterController?
     private lazy var screenshotObserver = BoardManScreenshotObserver()
     private var screenshotObserverThread: Thread?
-    private let disposeBag = DisposeBag()
+    private var defaultsObserver: NSObjectProtocol?
+    private var lastObservedLoginItem: Bool?
+    private var lastObservedScreenshotEnabled: Bool?
+
+    deinit {
+        if let defaultsObserver {
+            NotificationCenter.default.removeObserver(defaultsObserver)
+        }
+    }
 
     static func shouldStartRuntimeServices(
         environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -337,29 +343,36 @@ extension AppDelegate: NSApplicationDelegate {
 // MARK: - Bind
 private extension AppDelegate {
     func bind() {
-        // Login Item
-        AppEnvironment.current.defaults.rx.observe(Bool.self, Constants.UserDefaults.loginItem, retainSelf: false)
-            .compactMap { $0 }
-            .subscribe(onNext: { [weak self] _ in
-                self?.reflectLoginItemState()
-            })
-            .disposed(by: disposeBag)
-        // Observe Screenshot
-        let observerScreenshot = AppEnvironment.current.defaults.rx.observe(Bool.self, Constants.Beta.observerScreenshot, retainSelf: false)
-            .compactMap { $0 }
-            .share(replay: 1)
-        observerScreenshot
-            .subscribe(onNext: { [weak self] enabled in
-                self?.screenshotObserver.isEnabled = enabled
-            })
-            .disposed(by: disposeBag)
-        observerScreenshot
-            .filter { $0 }
-            .take(1)
-            .subscribe(onNext: { [weak self] _ in
-                self?.startScreenshotObserverIfNeeded()
-            })
-            .disposed(by: disposeBag)
+        if let defaultsObserver {
+            NotificationCenter.default.removeObserver(defaultsObserver)
+        }
+        let defaults = AppEnvironment.current.defaults
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: defaults,
+            queue: .main
+        ) { [weak self, weak defaults] _ in
+            guard let self, let defaults else { return }
+            self.refreshObservedDefaults(from: defaults)
+        }
+        refreshObservedDefaults(from: defaults, force: true)
+    }
+
+    func refreshObservedDefaults(from defaults: UserDefaults, force: Bool = false) {
+        let loginItem = defaults.bool(forKey: Constants.UserDefaults.loginItem)
+        if force || loginItem != lastObservedLoginItem {
+            lastObservedLoginItem = loginItem
+            reflectLoginItemState()
+        }
+
+        let screenshotEnabled = defaults.bool(forKey: Constants.Beta.observerScreenshot)
+        if force || screenshotEnabled != lastObservedScreenshotEnabled {
+            lastObservedScreenshotEnabled = screenshotEnabled
+            screenshotObserver.isEnabled = screenshotEnabled
+            if screenshotEnabled {
+                startScreenshotObserverIfNeeded()
+            }
+        }
     }
 
     func startScreenshotObserverIfNeeded() {

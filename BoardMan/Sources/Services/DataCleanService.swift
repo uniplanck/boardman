@@ -11,7 +11,6 @@
 //
 
 import Cocoa
-import RxSwift
 import PINCache
 
 struct ArchivedTextHistoryEntry: Codable, Equatable {
@@ -171,8 +170,7 @@ extension BoardManClip {
 final class DataCleanService {
 
     // MARK: - Properties
-    fileprivate var disposeBag = DisposeBag()
-    fileprivate let scheduler = SerialDispatchQueueScheduler(qos: .utility)
+    fileprivate var cleanupTimer: DispatchSourceTimer?
     private let fileCleanupQueue = DispatchQueue(label: "com.uniplanck.BoardMan.DataCleanService.files", qos: .utility)
     private let store: BoardManStore
 
@@ -180,15 +178,24 @@ final class DataCleanService {
         self.store = store
     }
 
+    deinit {
+        cleanupTimer?.cancel()
+    }
+
     // MARK: - Monitoring
     func startMonitoring() {
-        disposeBag = DisposeBag()
-        // Clean datas every 30 minutes
-        Observable<Int>.interval(.seconds(60 * 30), scheduler: scheduler)
-            .subscribe(onNext: { [weak self] _ in
-                self?.cleanDatas()
-            })
-            .disposed(by: disposeBag)
+        cleanupTimer?.cancel()
+        let timer = DispatchSource.makeTimerSource(queue: fileCleanupQueue)
+        timer.schedule(
+            deadline: .now() + .seconds(60 * 30),
+            repeating: .seconds(60 * 30),
+            leeway: .seconds(30)
+        )
+        timer.setEventHandler { [weak self] in
+            self?.cleanDatas()
+        }
+        cleanupTimer = timer
+        timer.resume()
     }
 
     // MARK: - Delete Data

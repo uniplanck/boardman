@@ -11,11 +11,7 @@
 		C5A6BA742FBC5A6E00C8B9EB /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C5A6BA732FBC5A6E00C8B9EB /* Sparkle */; };
 		C5D220A82FBD2655005CD45E /* RealmSwift in Frameworks */ = {isa = PBXBuildFile; productRef = C5D220A72FBD2655005CD45E /* RealmSwift */; };
 		C6B1A10F2FCE000100B0A001 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = C6B1A10E2FCE000100B0A001 /* SQLiteData */; };
-		C5D76D9E2FBA939E0083839F /* RxCocoa in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76D9D2FBA939E0083839F /* RxCocoa */; };
-		C5D76DA02FBA939E0083839F /* RxSwift in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76D9F2FBA939E0083839F /* RxSwift */; };
-		C5D76DA52FBA98A90083839F /* AEXML in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76DA42FBA98A90083839F /* AEXML */; };
 		C5D76DA82FBA9C150083839F /* PINCache in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76DA72FBA9C150083839F /* PINCache */; };
-		C5D76DAB2FBA9D2E0083839F /* SwiftHEXColors in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76DAA2FBA9D2E0083839F /* SwiftHEXColors */; };
 		C5F1B7331FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F1B7321FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift */; };
 		C6B1A1002FCE000100B0A001 /* BoardManScreenshotObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1012FCE000100B0A001 /* BoardManScreenshotObserver.swift */; };
 		C6B1A1022FCE000100B0A001 /* BoardManKeyCombo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1032FCE000100B0A001 /* BoardManKeyCombo.swift */; };
@@ -126,6 +122,9 @@
 		C6B1A1542FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */; };
 		C6B1A1582FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */; };
 		C6B1A15C2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */; };
+		C6B1A1602FCE000100B0A001 /* BoardManClipDataColorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1612FCE000100B0A001 /* BoardManClipDataColorTests.swift */; };
+		C6B1A1622FCE000100B0A001 /* BoardManSnippetXMLCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1632FCE000100B0A001 /* BoardManSnippetXMLCodec.swift */; };
+		C6B1A1642FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1652FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift */; };
 		FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */; };
 		FAC0DCE91DE15FD900309C49 /* DataCleanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCE81DE15FD900309C49 /* DataCleanService.swift */; };
 		FAC0DCEF1DE3255E00309C49 /* NSImage+NSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCEE1DE3255E00309C49 /* NSImage+NSColor.swift */; };
@@ -293,6 +292,9 @@
 		C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPrivacySettingsLayoutTests.swift; sourceTree = "<group>"; };
 		C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManLicenseSettingsLayoutTests.swift; sourceTree = "<group>"; };
 		C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManAppearanceSettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A1612FCE000100B0A001 /* BoardManClipDataColorTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManClipDataColorTests.swift; sourceTree = "<group>"; };
+		C6B1A1632FCE000100B0A001 /* BoardManSnippetXMLCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetXMLCodec.swift; sourceTree = "<group>"; };
+		C6B1A1652FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetXMLCodecTests.swift; sourceTree = "<group>"; };
 		C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteBoardManStore.swift; sourceTree = "<group>"; };
 		C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSQLiteShadowReplicator.swift; sourceTree = "<group>"; };
 		C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManLegacyHistoryImporter.swift; sourceTree = "<group>"; };
@@ -330,14 +332,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C5D76DAB2FBA9D2E0083839F /* SwiftHEXColors in Frameworks */,
 				FAC43E291B35DFDA00C06102 /* Cocoa.framework in Frameworks */,
 				FAC43E271B35DFD300C06102 /* Carbon.framework in Frameworks */,
-				C5D76DA52FBA98A90083839F /* AEXML in Frameworks */,
 				C5D76DA82FBA9C150083839F /* PINCache in Frameworks */,
 				FAC43E251B35DFD000C06102 /* AppKit.framework in Frameworks */,
-				C5D76DA02FBA939E0083839F /* RxSwift in Frameworks */,
-				C5D76D9E2FBA939E0083839F /* RxCocoa in Frameworks */,
 				FAC43E231B35DFC800C06102 /* Foundation.framework in Frameworks */,
 				C5D220A82FBD2655005CD45E /* RealmSwift in Frameworks */,
 				C6B1A10F2FCE000100B0A001 /* SQLiteData in Frameworks */,
@@ -403,6 +401,7 @@
 				C6B1A1532FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift */,
 				C6B1A1572FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift */,
 				C6B1A15B2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift */,
+				C6B1A1632FCE000100B0A001 /* BoardManSnippetXMLCodec.swift */,
 				C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */,
 				C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */,
 				C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */,
@@ -662,6 +661,8 @@
 				C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */,
 				C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */,
 				C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */,
+				C6B1A1612FCE000100B0A001 /* BoardManClipDataColorTests.swift */,
+				C6B1A1652FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift */,
 				FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */,
 				FA6167911D3ABEB10049FA14 /* FolderTests.swift */,
 				FA6167951D3ACDD80049FA14 /* SnippetTests.swift */,
@@ -758,10 +759,7 @@
 			mainGroup = FAC43DBD1B35D8B100C06102;
 			packageReferences = (
 				C5A4B2002FC9D76000B71510 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */,
-				C5D76D9C2FBA939E0083839F /* XCRemoteSwiftPackageReference "RxSwift" */,
-				C5D76DA32FBA98A90083839F /* XCRemoteSwiftPackageReference "AEXML" */,
 				C5D76DA62FBA9C140083839F /* XCRemoteSwiftPackageReference "pincache" */,
-				C5D76DA92FBA9D2E0083839F /* XCRemoteSwiftPackageReference "SwiftHEXColors" */,
 				C5A6BA722FBC5A6E00C8B9EB /* XCRemoteSwiftPackageReference "Sparkle" */,
 				C5D220A62FBD2655005CD45E /* XCRemoteSwiftPackageReference "realm-swift" */,
 				C6B1A10D2FCE000100B0A001 /* XCRemoteSwiftPackageReference "sqlite-data" */,
@@ -876,6 +874,7 @@
 				C6B1A1522FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift in Sources */,
 				C6B1A1562FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift in Sources */,
 				C6B1A15A2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift in Sources */,
+				C6B1A1622FCE000100B0A001 /* BoardManSnippetXMLCodec.swift in Sources */,
 				C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */,
 				C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */,
 				C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */,
@@ -944,6 +943,8 @@
 				C6B1A1542FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift in Sources */,
 				C6B1A1582FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift in Sources */,
 				C6B1A15C2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift in Sources */,
+				C6B1A1602FCE000100B0A001 /* BoardManClipDataColorTests.swift in Sources */,
+				C6B1A1642FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift in Sources */,
 				FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */,
 				FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */,
 			);
@@ -1357,36 +1358,12 @@
 				version = 10.7.2;
 			};
 		};
-		C5D76D9C2FBA939E0083839F /* XCRemoteSwiftPackageReference "RxSwift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ReactiveX/RxSwift";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 6.10.2;
-			};
-		};
-		C5D76DA32FBA98A90083839F /* XCRemoteSwiftPackageReference "AEXML" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/tadija/AEXML";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 4.7.0;
-			};
-		};
 		C5D76DA62FBA9C140083839F /* XCRemoteSwiftPackageReference "pincache" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pinterest/pincache";
 			requirement = {
 				kind = upToNextMinorVersion;
 				minimumVersion = 3.0.4;
-			};
-		};
-		C5D76DA92FBA9D2E0083839F /* XCRemoteSwiftPackageReference "SwiftHEXColors" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/thii/SwiftHEXColors";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 1.4.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -1412,30 +1389,10 @@
 			package = C5D220A62FBD2655005CD45E /* XCRemoteSwiftPackageReference "realm-swift" */;
 			productName = RealmSwift;
 		};
-		C5D76D9D2FBA939E0083839F /* RxCocoa */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D76D9C2FBA939E0083839F /* XCRemoteSwiftPackageReference "RxSwift" */;
-			productName = RxCocoa;
-		};
-		C5D76D9F2FBA939E0083839F /* RxSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D76D9C2FBA939E0083839F /* XCRemoteSwiftPackageReference "RxSwift" */;
-			productName = RxSwift;
-		};
-		C5D76DA42FBA98A90083839F /* AEXML */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D76DA32FBA98A90083839F /* XCRemoteSwiftPackageReference "AEXML" */;
-			productName = AEXML;
-		};
 		C5D76DA72FBA9C150083839F /* PINCache */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C5D76DA62FBA9C140083839F /* XCRemoteSwiftPackageReference "pincache" */;
 			productName = PINCache;
-		};
-		C5D76DAA2FBA9D2E0083839F /* SwiftHEXColors */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D76DA92FBA9D2E0083839F /* XCRemoteSwiftPackageReference "SwiftHEXColors" */;
-			productName = SwiftHEXColors;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -265,28 +265,7 @@ final class SQLiteBoardManStore: BoardManStore {
                 sql: "SELECT 1 FROM history_items WHERE dataHash = ? LIMIT 1",
                 arguments: [identifier]
             ) != nil else { return }
-            try db.execute(
-                sql: """
-                    INSERT INTO history_search_metadata (
-                        dataHash, content, filePaths, urls,
-                        sourceApplicationName, sourceApplicationBundleID
-                    ) VALUES (?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(dataHash) DO UPDATE SET
-                        content = excluded.content,
-                        filePaths = excluded.filePaths,
-                        urls = excluded.urls,
-                        sourceApplicationName = excluded.sourceApplicationName,
-                        sourceApplicationBundleID = excluded.sourceApplicationBundleID
-                    """,
-                arguments: [
-                    identifier,
-                    metadata.text,
-                    metadata.filePathsSearchText,
-                    metadata.urlsSearchText,
-                    metadata.sourceApplicationName,
-                    metadata.sourceApplicationBundleID,
-                ]
-            )
+            try Self.writeHistorySearchMetadata(identifier: identifier, metadata: metadata, in: db)
             try Self.refreshHistorySearchIndex(identifier: identifier, in: db)
         }
     }
@@ -310,6 +289,16 @@ final class SQLiteBoardManStore: BoardManStore {
         let snapshot = BoardManClipSnapshot(clip)
         try! database.write { db in
             try Self.upsert(snapshot, in: db)
+            try Self.refreshHistorySearchIndex(identifier: snapshot.dataHash, in: db)
+        }
+        postHistoryDidChange()
+    }
+
+    func upsertClip(_ clip: BoardManClip, searchMetadata: BoardManHistorySearchMetadata?) {
+        let snapshot = BoardManClipSnapshot(clip)
+        try! database.write { db in
+            try Self.upsert(snapshot, in: db)
+            if let searchMetadata { try Self.writeHistorySearchMetadata(identifier: snapshot.dataHash, metadata: searchMetadata, in: db) }
             try Self.refreshHistorySearchIndex(identifier: snapshot.dataHash, in: db)
         }
         postHistoryDidChange()
@@ -356,7 +345,6 @@ final class SQLiteBoardManStore: BoardManStore {
         postHistoryDidChange()
     }
 }
-
 extension SQLiteBoardManStore {
     func folder(identifier: String) -> BoardManFolder? {
         try! database.read { db in
@@ -651,6 +639,20 @@ extension SQLiteBoardManStore {
                 snapshot.thumbnailPath,
                 snapshot.isColorCode,
             ]
+        )
+    }
+
+    private static func writeHistorySearchMetadata(identifier: String, metadata: BoardManHistorySearchMetadata, in db: Database) throws {
+        try db.execute(
+            sql: """
+                INSERT INTO history_search_metadata (dataHash, content, filePaths, urls, sourceApplicationName, sourceApplicationBundleID)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(dataHash) DO UPDATE SET
+                    content = excluded.content, filePaths = excluded.filePaths, urls = excluded.urls,
+                    sourceApplicationName = excluded.sourceApplicationName,
+                    sourceApplicationBundleID = excluded.sourceApplicationBundleID
+                """,
+            arguments: [identifier, metadata.text, metadata.filePathsSearchText, metadata.urlsSearchText, metadata.sourceApplicationName, metadata.sourceApplicationBundleID]
         )
     }
 

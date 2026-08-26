@@ -5,25 +5,17 @@
 
 import AppKit
 import Foundation
-import RxCocoa
-import RxSwift
 
 final class ExcludeAppService {
     fileprivate(set) var applications: [BoardManApplicationInfo]
-    fileprivate var frontApplication = BehaviorRelay<NSRunningApplication?>(value: nil)
-    fileprivate var disposeBag = DisposeBag()
 
     init(applications: [BoardManApplicationInfo]) {
         self.applications = applications
     }
 
     func startMonitoring() {
-        disposeBag = DisposeBag()
-        NSWorkspace.shared.notificationCenter.rx
-            .notification(NSWorkspace.didActivateApplicationNotification)
-            .map { $0.userInfo?["NSWorkspaceApplicationKey"] as? NSRunningApplication }
-            .bind(to: frontApplication)
-            .disposed(by: disposeBag)
+        // NSWorkspace already owns the authoritative frontmost-application state.
+        // No retained observation stream is required for point-in-time exclusion checks.
     }
 
     func frontProcessIsExcludedApplication() -> Bool {
@@ -39,7 +31,7 @@ final class ExcludeAppService {
     }
 
     private func currentFrontApplication() -> NSRunningApplication? {
-        return frontApplication.value ?? NSWorkspace.shared.frontmostApplication
+        NSWorkspace.shared.frontmostApplication
     }
 
     func add(with appInfo: BoardManApplicationInfo) {

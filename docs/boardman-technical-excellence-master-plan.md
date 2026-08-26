@@ -543,35 +543,36 @@ Seventeenth accepted extraction:
 
 ## P4.2 Dependency audit
 
-For each external dependency, document:
+**Implementation status: PASS / CLOSED — dependency audit and low-value dependency removal accepted (2026-08-26).**
 
-- why it exists,
-- binary/runtime cost,
-- maintenance/activity,
-- APIs used,
-- difficulty of replacement,
-- whether Apple frameworks or a small Board-Man implementation are safer.
+The audit removed external packages only where Board-Man can own a smaller, deterministic boundary without sacrificing compatibility or persistence behavior:
 
-Remove dependencies with weak value. Do not replace reliable libraries with custom code solely for dependency-count vanity.
+- **SwiftHEXColors — removed.** Its single production use was `BoardManClipData` hex-color parsing. A native parser now preserves the previous 3/4/6/8-digit formats, optional `#`, RGBA semantics, and malformed-input rejection, with dedicated compatibility tests.
+- **AEXML — removed.** Its only production owner was legacy snippet XML import/export. `BoardManSnippetXMLCodec` now uses Foundation `XMLDocument` and preserves the established XML header, element ordering, whitespace, empty-element shape, entity escaping, and newline encoding. Dedicated encode/decode/round-trip tests protect the interchange format.
+- **RxSwift / RxCocoa — removed.** The remaining five production consumers only needed notifications, defaults observation, frontmost-application state, and a periodic timer. They now use `NotificationCenter`, `UserDefaults.didChangeNotification`, direct `NSWorkspace.frontmostApplication`, and `DispatchSourceTimer`. The package/products were removed from the Xcode project and SwiftPM resolution, and the next build removed stale Rx bundles from the generated app/test products.
 
-Likely high-value reviews include:
+The remaining four direct package families are intentionally retained because removing them would currently reduce reliability or duplicate substantial infrastructure:
 
-- RxSwift/RxCocoa usage versus native Observation/Combine/callbacks in the remaining surface,
-- PINCache usage versus bounded native cache/storage needs,
-- AEXML if legacy-only,
-- SwiftHEXColors if trivial to own,
-- any framework retained only because historical code once needed it.
+- **PINCache — retain.** It owns asynchronous memory/disk thumbnail caching used by capture, panel rendering, menu rendering, and cleanup. A plain `NSCache` replacement would lose relaunch persistence; a custom disk cache would add more code and recovery risk than it removes.
+- **RealmSwift — retain as compatibility infrastructure only.** SQLiteData is the authoritative runtime store, but Realm still provides legacy migration, recovery, rollback/shadow compatibility, and legacy model decoding. Retire it only after an explicit compatibility-sunset gate proves old user data no longer needs that path.
+- **Sparkle — retain.** It remains the dedicated application update infrastructure and is not duplicated by Board-Man.
+- **SQLiteData — retain.** It is the authoritative persistence/search foundation established in Phase 2/3.
 
-Sparkle may remain if it is the best update solution; the objective is quality, not zero dependencies.
+Acceptance evidence: SwiftHEXColors focused compatibility + clipboard verification `15/15` PASS; AEXML replacement focused XML/color/snippet verification `7/7` PASS; Rx removal focused runtime/paste/hotkey/UI verification `37/37` PASS. Final full regression is `172/172` PASS (`35` XCTest + `137` Swift Testing across `32` suites), with `0` failed and `0` skipped tests. SwiftLint reports `267` warnings / `0` serious violations across `107` files; the final 10,000-item FTS benchmark passed at `0.54 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `858.93 ms`, and the removed dependency names no longer appear in production sources, direct Xcode package/product references, or `Package.resolved`.
+
+**P4.2 overall: PASS / CLOSED.** P4.3 concurrency and main-thread discipline is the remaining Phase 4 work.
 
 ## P4.3 Concurrency and main-thread discipline
 
-- isolate pasteboard polling/capture away from UI work,
-- batch/coalesce DB writes,
-- keep thumbnail/image decoding off the main thread,
-- cancel superseded search work,
-- make store access concurrency rules explicit,
-- use Instruments/Time Profiler evidence before introducing actors/tasks broadly.
+Implementation status: **PASS / CLOSED (2026-08-26)**.
+
+- pasteboard observation already ran on a utility queue; post-capture persistence now has its own serial utility `persistenceQueue`, keeping thumbnail/color-preview generation, PINCache writes, payload archiving, SQLite/Realm persistence, performance logging, and retention cleanup off the main thread. A debug assertion makes accidental main-thread persistence fail fast.
+- clipboard capture now uses the combined `upsertClip(_:searchMetadata:)` store boundary. SQLite writes the history row plus supplemental search metadata in one `DatabaseQueue` transaction and refreshes FTS once instead of performing two transactions and two index refreshes.
+- `BoardManStore` now documents the queue-safety contract explicitly: implementations own their synchronization and return detached model objects. Realm compatibility reads already open per-call Realm instances and detach returned models; SQLite synchronization remains inside its database writer.
+- search remains intentionally synchronous. The final 10,000-history FTS gate is `0.82 ms / 1 hit`, so there is no long-lived asynchronous search job to supersede or cancel. `BoardManSearchCoordinator` records that async cancellation should only be introduced if profiling demonstrates a real need rather than adding actor/task machinery for decoration.
+- storage/paste focused verification is `42/42` PASS. Final full regression is `172/172` PASS (`35` XCTest + `137` Swift Testing across `32` suites), including the combined SQLite metadata-write search path and the complete UI regression suite. SwiftLint reports `268` warnings / `0` serious violations across `107` files; the 10,000-history + 1,000-template migration benchmark passed at `940.92 ms`, and `git diff --check` passes.
+
+**P4.3 overall: PASS / CLOSED. Phase 4 overall: PASS / CLOSED.** The next technical-excellence work starts at Phase 5 reliability, recovery, and privacy hardening.
 
 # Phase 5 — Reliability, recovery, and privacy hardening
 

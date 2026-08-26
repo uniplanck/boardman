@@ -129,10 +129,9 @@ final class BoardManStoreTests: XCTestCase {
     func testSQLiteFTS5SearchesSupplementalHistoryMetadataAndTracksReplacement() throws {
         let store = try SQLiteBoardManStore.inMemoryForTesting()
         let clip = makeClip(identifier: "metadata-history", updateTime: 1, title: "Attachment")
-        store.upsertClip(clip)
-        store.upsertHistorySearchMetadata(
-            identifier: clip.dataHash,
-            metadata: BoardManHistorySearchMetadata(
+        store.upsertClip(
+            clip,
+            searchMetadata: BoardManHistorySearchMetadata(
                 text: "Quarterly launch checklist",
                 filePaths: ["/Users/example/Documents/Launch Plan.pdf"],
                 urls: ["https://docs.example.test/releases/board-man"],

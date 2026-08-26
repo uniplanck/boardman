@@ -153,6 +153,8 @@ final class BoardManSearchCoordinator {
             )
         }
 
+        // Keep indexed search synchronous while the 10k-item FTS gate remains sub-millisecond.
+        // There is no long-lived search task to supersede or cancel; add async cancellation only if profiling justifies it.
         let hits: [BoardManSearchHit]
         #if DEBUG
         if benchmarkIsolation && !request.hasStoreFilters {

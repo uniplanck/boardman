@@ -314,6 +314,9 @@ extension Notification.Name {
     static let boardManTemplatesStoreDidChange = Notification.Name("BoardManTemplatesStoreDidChange")
 }
 
+/// Persistence implementations may be called from Board-Man utility queues.
+/// Implementations must keep their own storage synchronization internal and return detached
+/// model objects so callers never carry thread-confined Realm/SQLite state across queues.
 protocol BoardManStore: AnyObject {
     var hasClips: Bool { get }
 
@@ -326,6 +329,7 @@ protocol BoardManStore: AnyObject {
     func upsertHistorySearchMetadata(identifier: String, metadata: BoardManHistorySearchMetadata)
     @discardableResult func updateClipUsage(identifier: String, updateTime: Int) -> Bool
     func upsertClip(_ clip: BoardManClip)
+    func upsertClip(_ clip: BoardManClip, searchMetadata: BoardManHistorySearchMetadata?)
     func deleteClip(identifier: String)
     func deleteClips(identifiers: Set<String>)
 
@@ -403,6 +407,11 @@ final class BoardManStoreRouter: BoardManStore {
 
     func upsertClip(_ clip: BoardManClip) {
         currentBackend().upsertClip(clip)
+        postHistoryDidChange()
+    }
+
+    func upsertClip(_ clip: BoardManClip, searchMetadata: BoardManHistorySearchMetadata?) {
+        currentBackend().upsertClip(clip, searchMetadata: searchMetadata)
         postHistoryDidChange()
     }
 
@@ -569,6 +578,13 @@ extension BoardManStore {
 
     func upsertHistorySearchMetadata(identifier: String, metadata: BoardManHistorySearchMetadata) {
         // The legacy compatibility backend has no supplemental search metadata table.
+    }
+
+    func upsertClip(_ clip: BoardManClip, searchMetadata: BoardManHistorySearchMetadata?) {
+        upsertClip(clip)
+        if let searchMetadata {
+            upsertHistorySearchMetadata(identifier: clip.dataHash, metadata: searchMetadata)
+        }
     }
 
     func search(_ query: String, scope: BoardManSearchScope, limit: Int) -> [BoardManSearchHit] {

@@ -14,8 +14,6 @@
 
 import Cocoa
 import PINCache
-import RxCocoa
-import RxSwift
 
 final class MenuManager: NSObject {
 
@@ -35,8 +33,12 @@ final class MenuManager: NSObject {
     fileprivate let folderIcon = NSImage(resource: .iconFolder)
     fileprivate let snippetIcon = NSImage(resource: .iconText)
     // Other
-    fileprivate let disposeBag = DisposeBag()
     fileprivate let notificationCenter = NotificationCenter.default
+    fileprivate var notificationObservers = [NSObjectProtocol]()
+    fileprivate var defaultsObserver: NSObjectProtocol?
+    fileprivate var lastObservedStatusItem: Int?
+    fileprivate var lastObservedReorderClips: Bool?
+    fileprivate var lastObservedMaxHistorySize: Int?
     fileprivate let kMaxKeyEquivalents = 10
     fileprivate let shortenSymbol = "..."
     fileprivate let store: BoardManStore = BoardManStores.authoritative
@@ -53,6 +55,10 @@ final class MenuManager: NSObject {
         folderIcon.size = NSSize(width: 15, height: 13)
         snippetIcon.isTemplate = true
         snippetIcon.size = NSSize(width: 12, height: 13)
+    }
+
+    deinit {
+        removeBindingObservers()
     }
 
     func setup() {
@@ -357,81 +363,92 @@ extension MenuManager {
 // MARK: - Binding
 private extension MenuManager {
     func bind() {
+        removeBindingObservers()
+
         // History changes are observed through the persistence boundary so the UI does not
         // care whether Realm or SQLite is authoritative.
-        notificationCenter.rx.notification(
-            .boardManHistoryStoreDidChange,
-            object: BoardManStores.authoritative
-        )
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] _ in
-                self?.panelItemsNeedRefresh = true
-            })
-            .disposed(by: disposeBag)
+        notificationObservers.append(notificationCenter.addObserver(
+            forName: .boardManHistoryStoreDidChange,
+            object: BoardManStores.authoritative,
+            queue: .main
+        ) { [weak self] _ in
+            self?.panelItemsNeedRefresh = true
+        })
+        notificationObservers.append(notificationCenter.addObserver(
+            forName: .boardManTemplatesStoreDidChange,
+            object: BoardManStores.authoritative,
+            queue: .main
+        ) { [weak self] _ in
+            self?.panelItemsNeedRefresh = true
+        })
+        notificationObservers.append(notificationCenter.addObserver(
+            forName: Notification.Name(rawValue: Constants.Notification.closeSnippetEditor),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.panelItemsNeedRefresh = true
+        })
+        notificationObservers.append(notificationCenter.addObserver(
+            forName: Notification.Name(rawValue: Constants.Notification.boardManTimedPinDidChange),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.panelItemsNeedRefresh = true
+            if let panel = self.boardManPanel, panel.isVisible {
+                self.reloadBoardManPanelItems(panel)
+            }
+        })
+        notificationObservers.append(notificationCenter.addObserver(
+            forName: Notification.Name(rawValue: Constants.Notification.pasteCountDidChange),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.panelItemsNeedRefresh = true
+        })
 
-        notificationCenter.rx.notification(
-            .boardManTemplatesStoreDidChange,
-            object: BoardManStores.authoritative
-        )
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] _ in
-                self?.panelItemsNeedRefresh = true
-            })
-            .disposed(by: disposeBag)
-        // Menu icon
-        AppEnvironment.current.defaults.rx.observe(Int.self, Constants.UserDefaults.showStatusItem, retainSelf: false)
-            .compactMap { $0 }
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] key in
-                let type = StatusType(rawValue: key) ?? .black
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    self?.changeStatusItem(type)
-                }
-            })
-            .disposed(by: disposeBag)
-        // Sort clips
-        AppEnvironment.current.defaults.rx.observe(Bool.self, Constants.UserDefaults.reorderClipsAfterPasting, options: [.new], retainSelf: false)
-            .compactMap { $0 }
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] _ in
-                self?.panelItemsNeedRefresh = true
-            })
-            .disposed(by: disposeBag)
-        // Edit snippets
-        notificationCenter.rx.notification(Notification.Name(rawValue: Constants.Notification.closeSnippetEditor))
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] _ in
-                self?.panelItemsNeedRefresh = true
-            })
-            .disposed(by: disposeBag)
-        notificationCenter.rx.notification(Notification.Name(rawValue: Constants.Notification.boardManTimedPinDidChange))
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] _ in
-                guard let self else { return }
-                self.panelItemsNeedRefresh = true
-                if let panel = self.boardManPanel, panel.isVisible {
-                    self.reloadBoardManPanelItems(panel)
-                }
-            })
-            .disposed(by: disposeBag)
-        notificationCenter.rx.notification(Notification.Name(rawValue: Constants.Notification.pasteCountDidChange))
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] _ in
-                self?.panelItemsNeedRefresh = true
-            })
-            .disposed(by: disposeBag)
+        let defaults = AppEnvironment.current.defaults
+        defaultsObserver = notificationCenter.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: defaults,
+            queue: .main
+        ) { [weak self, weak defaults] _ in
+            guard let self, let defaults else { return }
+            self.refreshObservedDefaults(from: defaults)
+        }
+        refreshObservedDefaults(from: defaults, force: true)
+    }
 
-        // The status menu is static and is built on-demand on right click. Legacy status menu
-        // appearance preferences no longer need a dozen live KVO subscriptions. Only history
-        // size can change the panel's data set outside the panel itself.
-        AppEnvironment.current.defaults.rx.observe(Int.self, Constants.UserDefaults.maxHistorySize, options: [.new], retainSelf: false)
-            .compactMap { $0 }
-            .distinctUntilChanged()
-            .asDriver(onErrorDriveWith: .empty())
-            .drive(onNext: { [weak self] _ in
-                self?.panelItemsNeedRefresh = true
-            })
-            .disposed(by: disposeBag)
+    func removeBindingObservers() {
+        notificationObservers.forEach(notificationCenter.removeObserver)
+        notificationObservers.removeAll()
+        if let defaultsObserver {
+            notificationCenter.removeObserver(defaultsObserver)
+            self.defaultsObserver = nil
+        }
+    }
+
+    func refreshObservedDefaults(from defaults: UserDefaults, force: Bool = false) {
+        let statusItemValue = defaults.integer(forKey: Constants.UserDefaults.showStatusItem)
+        if force || statusItemValue != lastObservedStatusItem {
+            lastObservedStatusItem = statusItemValue
+            let type = StatusType(rawValue: statusItemValue) ?? .black
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                self?.changeStatusItem(type)
+            }
+        }
+
+        let reorderClips = defaults.bool(forKey: Constants.UserDefaults.reorderClipsAfterPasting)
+        if force || reorderClips != lastObservedReorderClips {
+            lastObservedReorderClips = reorderClips
+            panelItemsNeedRefresh = true
+        }
+
+        let maxHistorySize = defaults.integer(forKey: Constants.UserDefaults.maxHistorySize)
+        if force || maxHistorySize != lastObservedMaxHistorySize {
+            lastObservedMaxHistorySize = maxHistorySize
+            panelItemsNeedRefresh = true
+        }
     }
 }
 

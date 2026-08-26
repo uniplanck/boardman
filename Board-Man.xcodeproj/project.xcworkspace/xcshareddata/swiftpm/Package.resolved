@@ -2,15 +2,6 @@
   "originHash" : "d574fb96c91479e174b3fddc438d3431bcd823507db4b2309bee15e04a7f8f67",
   "pins" : [
     {
-      "identity" : "aexml",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tadija/AEXML",
-      "state" : {
-        "revision" : "db806756c989760b35108146381535aec231092b",
-        "version" : "4.7.0"
-      }
-    },
-    {
       "identity" : "combine-schedulers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/pointfreeco/combine-schedulers",
@@ -62,15 +53,6 @@
       "state" : {
         "revision" : "ae8e646590396dfc13c1abbf8aa2e48c43766dce",
         "version" : "10.7.2"
-      }
-    },
-    {
-      "identity" : "rxswift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ReactiveX/RxSwift",
-      "state" : {
-        "revision" : "132aea4f236ccadc51590b38af0357a331d51fa2",
-        "version" : "6.10.2"
       }
     },
     {
@@ -188,15 +170,6 @@
       "state" : {
         "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
         "version" : "603.0.2"
-      }
-    },
-    {
-      "identity" : "swifthexcolors",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/thii/SwiftHEXColors",
-      "state" : {
-        "revision" : "1f886cb20fedda14a5ac75efd09bc99c95b43a18",
-        "version" : "1.4.1"
       }
     },
     {

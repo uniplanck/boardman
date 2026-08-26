@@ -11,7 +11,6 @@
 //
 
 import Cocoa
-import AEXML
 
 final class BoardManSnippetsEditorWindowController: NSWindowController {
 
@@ -166,33 +165,25 @@ extension BoardManSnippetsEditorWindowController {
             let store = BoardManStores.authoritative
             let lastFolder = store.foldersSortedByIndex().last
             var folderIndex = (lastFolder?.index ?? -1) + 1
-            // Create Document
-            var options = AEXMLOptions()
-            options.parserSettings.shouldTrimWhitespace = false
-            let xmlDocument = try AEXMLDocument(xml: data, options: options)
-            xmlDocument[Constants.Xml.rootElement]
-                .children
-                .forEach { folderElement in
-                    let folder = BoardManFolder()
-                    folder.title = folderElement[Constants.Xml.titleElement].value ?? "untitled folder"
-                    folder.index = folderIndex
-                    store.upsertFolder(folder)
+            let importedFolders = try BoardManSnippetXMLCodec.decode(data)
 
-                    var snippetIndex = 0
-                    folderElement[Constants.Xml.snippetsElement][Constants.Xml.snippetElement]
-                        .all?
-                        .forEach { snippetElement in
-                            let snippet = BoardManSnippet()
-                            snippet.title = snippetElement[Constants.Xml.titleElement].value ?? "untitled snippet"
-                            snippet.content = snippetElement[Constants.Xml.contentElement].value ?? ""
-                            snippet.index = snippetIndex
-                            store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
-                            folder.snippets.append(snippet)
-                            snippetIndex += 1
-                        }
-                    folderIndex += 1
-                    folders.append(folder)
+            importedFolders.forEach { importedFolder in
+                let folder = BoardManFolder()
+                folder.title = importedFolder.title
+                folder.index = folderIndex
+                store.upsertFolder(folder)
+
+                importedFolder.snippets.enumerated().forEach { snippetIndex, importedSnippet in
+                    let snippet = BoardManSnippet()
+                    snippet.title = importedSnippet.title
+                    snippet.content = importedSnippet.content
+                    snippet.index = snippetIndex
+                    store.upsertSnippet(snippet, folderIdentifier: folder.identifier)
+                    folder.snippets.append(snippet)
                 }
+                folderIndex += 1
+                folders.append(folder)
+            }
             outlineView.reloadData()
         } catch {
             NSSound.beep()
@@ -200,24 +191,17 @@ extension BoardManSnippetsEditorWindowController {
     }
 
     @IBAction private func exportSnippetButtonTapped(_ sender: AnyObject) {
-        let xmlDocument = AEXMLDocument()
-        let rootElement = xmlDocument.addChild(name: Constants.Xml.rootElement)
-
-        let folders = BoardManStores.authoritative.foldersSortedByIndex()
-        folders.forEach { folder in
-            let folderElement = rootElement.addChild(name: Constants.Xml.folderElement)
-
-            folderElement.addChild(name: Constants.Xml.titleElement, value: folder.title)
-
-            let snippetsElement = folderElement.addChild(name: Constants.Xml.snippetsElement)
-            Array(folder.snippets)
-                .sorted { $0.index < $1.index }
-                .forEach { snippet in
-                    let snippetElement = snippetsElement.addChild(name: Constants.Xml.snippetElement)
-                    snippetElement.addChild(name: Constants.Xml.titleElement, value: snippet.title)
-                    snippetElement.addChild(name: Constants.Xml.contentElement, value: snippet.content)
-                }
+        let exportFolders = BoardManStores.authoritative.foldersSortedByIndex().map { folder in
+            BoardManSnippetXMLFolder(
+                title: folder.title,
+                snippets: Array(folder.snippets)
+                    .sorted { $0.index < $1.index }
+                    .map { snippet in
+                        BoardManSnippetXMLItem(title: snippet.title, content: snippet.content)
+                    }
+            )
         }
+        let data = BoardManSnippetXMLCodec.encode(exportFolders)
 
         let panel = NSSavePanel()
         panel.accessoryView = nil
@@ -230,7 +214,6 @@ extension BoardManSnippetsEditorWindowController {
 
         if returnCode != NSApplication.ModalResponse.OK { return }
 
-        guard let data = xmlDocument.xml.data(using: String.Encoding.utf8) else { return }
         guard let url = panel.url else { return }
 
         do {
