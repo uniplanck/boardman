@@ -512,7 +512,20 @@ Thirteenth accepted extraction:
 - focused Snippets-layout + UI verification passed before the final gate, and final full regression is `157/157` PASS (`35` XCTest + `122` Swift Testing across `26` suites), with `0` failed and `0` skipped tests.
 - SwiftLint reports `309` warnings / `0` serious violations across `96` files, and `git diff --check` passes.
 
-P4.1 remains open for the remaining per-category settings geometry inside `layoutInlineSettingsControls`: Appearance/View, History, Privacy, Updates, and License. General and Snippets settings plus high-level panel geometry are now externally owned and directly testable. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership also remain outside the giant coordinator.
+Fourteenth accepted extraction:
+
+- `BoardManHistorySettingsLayout.swift` now owns deterministic History-settings geometry, including the four History behavior toggles, long-press/timestamp interaction rows, responsive timestamp-shortcut recording and delay controls, timed-pin preset/duration controls, and export/clear actions.
+- `MenuManager.swift` now applies those frames to AppKit controls rather than owning the responsive calculations. The focused layout owner is `282` lines with a dedicated `52`-line test suite; the History slice reduced `MenuManager.swift` from `11,064` to `10,922` lines (`-142` net).
+- focused History-layout + UI verification is `13/13` PASS.
+
+Fifteenth accepted extraction:
+
+- `BoardManPrivacySettingsLayout.swift` now owns deterministic Privacy, Stored Types, and hide-rule Filter geometry, including the two-column stored-type grid and responsive filter mode/text/action allocation.
+- `MenuManager.swift` retains concrete controls and visibility/event wiring only. The focused privacy owner is `155` lines with a dedicated `60`-line test suite; after the History + Privacy slices `MenuManager.swift` is `10,915` lines.
+- the first Privacy gate intentionally failed closed when SwiftLint flagged an 8-element helper tuple as a serious `large_tuple` violation; the helper was replaced with a focused `FilterFrames` struct before tests were accepted. Combined History + Privacy + UI focused verification is `16/16` PASS.
+- final full regression is `163/163` PASS (`35` XCTest + `128` Swift Testing across `28` suites), with `0` failed and `0` skipped tests. SwiftLint reports `292` warnings / `0` serious violations across `100` files; the 10,000-item FTS benchmark passed at `1.72 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `2520.65 ms`, and `git diff --check` passes.
+
+P4.1 remains open for the remaining per-category settings geometry inside `layoutInlineSettingsControls`: Appearance/View, Updates, and License. General, Snippets, History, Privacy, and high-level panel geometry are now externally owned and directly testable. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership also remain outside the giant coordinator.
 
 ## P4.2 Dependency audit
 

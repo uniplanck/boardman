@@ -7130,184 +7130,42 @@ class BoardManPanel: NSPanel {
         }
 
         func placeHistorySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(historySectionLabel, originX: originX, originY: originY, width: width)
-            dedupeButton?.frame = NSRect(x: originX, y: originY - 42, width: width, height: 20)
-            reuseTopButton?.frame = NSRect(x: originX, y: originY - 78, width: width, height: 20)
-            overwriteSameHistoryButton?.frame = NSRect(x: originX, y: originY - 114, width: width, height: 20)
-            skipPinnedNavigationButton?.frame = NSRect(x: originX, y: originY - 150, width: width, height: 20)
-
-            let compactLabelWidth: CGFloat = min(104, max(78, floor(width * 0.24)))
-            placeLabeledRow(
-                label: longPressActionLabel,
-                control: longPressActionPopup,
-                originX: originX,
-                originY: originY - 198,
-                width: width,
-                labelWidth: compactLabelWidth
-            )
-            placeLabeledRow(
-                label: timestampInteractionLabel,
-                control: timestampInteractionPopup,
-                originX: originX,
-                originY: originY - 240,
-                width: width,
-                labelWidth: compactLabelWidth
-            )
-            timestampShortcutEnabledButton?.frame = NSRect(
-                x: originX,
-                y: originY - 282,
-                width: width,
-                height: 20
-            )
-
-            let stacksShortcut = Self.usesStackedHistorySettingsLayout(width: width)
-            let shortcutRecordY: CGFloat
-            let delayRowY: CGFloat
-            let pinLabelY: CGFloat
-            if stacksShortcut {
-                timestampShortcutLabel?.frame = NSIntegralRect(NSRect(
-                    x: originX,
-                    y: originY - 302,
+            let layout = BoardManHistorySettingsLayoutPolicy.layout(
+                BoardManHistorySettingsLayoutInput(
+                    originX: originX,
+                    originY: originY,
                     width: width,
-                    height: 16
-                ))
-                shortcutRecordY = originY - 336
-                timestampShortcutRecordView?.frame = NSIntegralRect(NSRect(
-                    x: originX,
-                    y: shortcutRecordY,
-                    width: width,
-                    height: rowH
-                ))
-                delayRowY = originY - 370
-                pinLabelY = originY - 392
-            } else {
-                timestampShortcutLabel?.frame = NSIntegralRect(NSRect(
-                    x: originX,
-                    y: originY - 324,
-                    width: compactLabelWidth,
-                    height: 16
-                ))
-                shortcutRecordY = originY - 331
-                timestampShortcutRecordView?.frame = NSIntegralRect(NSRect(
-                    x: originX + compactLabelWidth + 12,
-                    y: shortcutRecordY,
-                    width: max(128, width - compactLabelWidth - 12),
-                    height: rowH
-                ))
-                delayRowY = originY - 373
-                pinLabelY = originY - 396
-            }
-
-            let delayLabelWidth: CGFloat = stacksShortcut ? 48 : compactLabelWidth
-            timestampShortcutDelayLabel?.frame = NSIntegralRect(NSRect(
-                x: originX,
-                y: delayRowY + 7,
-                width: delayLabelWidth,
-                height: 16
-            ))
-            let shortcutDelayX = originX + delayLabelWidth + 12
-            let secondsWidth: CGFloat = 44
-            let adjustmentWidth: CGFloat = 30
-            let delayFieldWidth: CGFloat = min(82, max(58, floor(width * 0.18)))
-            timestampShortcutDelayDecreaseButton?.frame = NSIntegralRect(NSRect(
-                x: shortcutDelayX,
-                y: delayRowY,
-                width: adjustmentWidth,
-                height: rowH
-            ))
-            timestampShortcutDelayField?.frame = NSIntegralRect(NSRect(
-                x: shortcutDelayX + adjustmentWidth + 6,
-                y: delayRowY,
-                width: delayFieldWidth,
-                height: rowH
-            ))
-            timestampShortcutDelayIncreaseButton?.frame = NSIntegralRect(NSRect(
-                x: shortcutDelayX + adjustmentWidth + delayFieldWidth + 12,
-                y: delayRowY,
-                width: adjustmentWidth,
-                height: rowH
-            ))
-            timestampShortcutSecondsLabel?.frame = NSIntegralRect(NSRect(
-                x: shortcutDelayX + (adjustmentWidth * 2) + delayFieldWidth + 24,
-                y: delayRowY + 7,
-                width: secondsWidth,
-                height: 16
-            ))
-
-            timedPinDurationLabel?.frame = NSIntegralRect(NSRect(
-                x: originX,
-                y: pinLabelY,
-                width: width,
-                height: 16
-            ))
-            let presetRowY = pinLabelY - 34
-            let presetButtonWidth: CGFloat = 34
-            let presetGap: CGFloat = 6
-            let presetWidth = max(
-                112,
-                width - (presetButtonWidth * 2) - (presetGap * 2)
+                    controlHeight: rowH,
+                    actionButtonHeight: LayoutMetrics.actionButtonHeight
+                )
             )
-            timedPinPresetPopup?.frame = NSIntegralRect(NSRect(
-                x: originX,
-                y: presetRowY,
-                width: presetWidth,
-                height: rowH
-            ))
-            timedPinPresetAddButton?.frame = NSIntegralRect(NSRect(
-                x: originX + presetWidth + presetGap,
-                y: presetRowY,
-                width: presetButtonWidth,
-                height: rowH
-            ))
-            timedPinPresetRemoveButton?.frame = NSIntegralRect(NSRect(
-                x: originX + presetWidth + presetGap + presetButtonWidth + presetGap,
-                y: presetRowY,
-                width: presetButtonWidth,
-                height: rowH
-            ))
-
-            let durationRowY = presetRowY - 36
-            let durationValueWidth: CGFloat = min(96, max(72, floor(width * 0.22)))
-            timedPinDurationDecreaseButton?.frame = NSIntegralRect(NSRect(
-                x: originX,
-                y: durationRowY,
-                width: 30,
-                height: rowH
-            ))
-            timedPinDurationValueLabel?.frame = NSIntegralRect(NSRect(
-                x: originX + 36,
-                y: durationRowY,
-                width: durationValueWidth,
-                height: rowH
-            ))
-            timedPinDurationIncreaseButton?.frame = NSIntegralRect(NSRect(
-                x: originX + durationValueWidth + 42,
-                y: durationRowY,
-                width: 30,
-                height: rowH
-            ))
-            let unitX = originX + durationValueWidth + 84
-            timedPinDurationUnitPopup?.frame = NSIntegralRect(NSRect(
-                x: unitX,
-                y: durationRowY,
-                width: max(92, width - (unitX - originX)),
-                height: rowH
-            ))
-
-            let actionY = durationRowY - 50
-            let exportWidth = min(176, max(132, floor(width * 0.42)))
-            exportHistoryCSVButton?.frame = NSRect(
-                x: originX,
-                y: actionY,
-                width: exportWidth,
-                height: LayoutMetrics.actionButtonHeight
-            )
-            clearHistoryButton?.frame = NSRect(
-                x: originX + exportWidth + 10,
-                y: actionY,
-                width: min(104, max(84, width - exportWidth - 10)),
-                height: LayoutMetrics.actionButtonHeight
-            )
+            historySectionLabel?.frame = layout.sectionHeaderFrame
+            dedupeButton?.frame = layout.dedupeFrame
+            reuseTopButton?.frame = layout.reuseTopFrame
+            overwriteSameHistoryButton?.frame = layout.overwriteSameHistoryFrame
+            skipPinnedNavigationButton?.frame = layout.skipPinnedNavigationFrame
+            longPressActionLabel?.frame = layout.longPressLabelFrame
+            longPressActionPopup?.frame = layout.longPressPopupFrame
+            timestampInteractionLabel?.frame = layout.timestampInteractionLabelFrame
+            timestampInteractionPopup?.frame = layout.timestampInteractionPopupFrame
+            timestampShortcutEnabledButton?.frame = layout.timestampShortcutEnabledFrame
+            timestampShortcutLabel?.frame = layout.timestampShortcutLabelFrame
+            timestampShortcutRecordView?.frame = layout.timestampShortcutRecordFrame
+            timestampShortcutDelayLabel?.frame = layout.timestampShortcutDelayLabelFrame
+            timestampShortcutDelayDecreaseButton?.frame = layout.timestampShortcutDelayDecreaseFrame
+            timestampShortcutDelayField?.frame = layout.timestampShortcutDelayFieldFrame
+            timestampShortcutDelayIncreaseButton?.frame = layout.timestampShortcutDelayIncreaseFrame
+            timestampShortcutSecondsLabel?.frame = layout.timestampShortcutSecondsFrame
+            timedPinDurationLabel?.frame = layout.timedPinDurationLabelFrame
+            timedPinPresetPopup?.frame = layout.timedPinPresetFrame
+            timedPinPresetAddButton?.frame = layout.timedPinPresetAddFrame
+            timedPinPresetRemoveButton?.frame = layout.timedPinPresetRemoveFrame
+            timedPinDurationDecreaseButton?.frame = layout.timedPinDurationDecreaseFrame
+            timedPinDurationValueLabel?.frame = layout.timedPinDurationValueFrame
+            timedPinDurationIncreaseButton?.frame = layout.timedPinDurationIncreaseFrame
+            timedPinDurationUnitPopup?.frame = layout.timedPinDurationUnitFrame
+            exportHistoryCSVButton?.frame = layout.exportHistoryFrame
+            clearHistoryButton?.frame = layout.clearHistoryFrame
         }
 
         func placeSnippetSettingsSection(originX: CGFloat, originY: CGFloat, width: CGFloat, scrollHeight: CGFloat) {
@@ -7339,40 +7197,35 @@ class BoardManPanel: NSPanel {
             manageSnippetsButton?.frame = layout.manageButtonFrame
         }
 
-        func placePrivacySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(privacySectionLabel, originX: originX, originY: originY, width: width)
-            hideMaskedPreviewButton?.frame = NSRect(x: originX, y: originY - 38, width: width, height: 20)
-            hideMaskedTitleButton?.frame = NSRect(x: originX, y: originY - 68, width: width, height: 20)
-            excludedAppsSummaryLabel?.frame = NSRect(x: originX, y: originY - 104, width: width, height: 18)
-            excludedAppsButton?.frame = NSRect(x: originX, y: originY - 144, width: min(178, width), height: rowH)
-        }
-
-        func placeStoredTypesSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(storedTypesSectionLabel, originX: originX, originY: originY, width: width)
-            let buttonWidth = max(72, floor((width - 8) / 2))
-            for (index, button) in storedTypeButtons.enumerated() {
-                let column = index % 2
-                let row = index / 2
-                button.frame = NSRect(x: originX + CGFloat(column) * (buttonWidth + 8),
-                                      y: originY - rowGap - CGFloat(row * 24),
-                                      width: buttonWidth,
-                                      height: 18)
+        func placePrivacySettings(originX: CGFloat, originY: CGFloat, width: CGFloat) {
+            let layout = BoardManPrivacySettingsLayoutPolicy.layout(
+                BoardManPrivacySettingsLayoutInput(
+                    originX: originX,
+                    originY: originY,
+                    width: width,
+                    storedTypeCount: storedTypeButtons.count,
+                    controlHeight: rowH,
+                    rowGap: rowGap
+                )
+            )
+            privacySectionLabel?.frame = layout.privacyHeaderFrame
+            hideMaskedPreviewButton?.frame = layout.hideMaskedPreviewFrame
+            hideMaskedTitleButton?.frame = layout.hideMaskedTitleFrame
+            excludedAppsSummaryLabel?.frame = layout.excludedAppsSummaryFrame
+            excludedAppsButton?.frame = layout.excludedAppsButtonFrame
+            storedTypesSectionLabel?.frame = layout.storedTypesHeaderFrame
+            for (button, frame) in zip(storedTypeButtons, layout.storedTypeFrames) {
+                button.frame = frame
             }
-        }
-
-        func placeFiltersSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(filterSectionLabel, originX: originX, originY: originY, width: width)
-            let addWidth: CGFloat = 52
-            let modeWidth = min(112, max(92, floor(width * 0.34)))
-            let textWidth = max(96, width - modeWidth - addWidth - 16)
-            hideRuleModePopup?.frame = NSRect(x: originX, y: originY - rowGap - 6, width: modeWidth, height: rowH)
-            hideRuleTextField?.frame = NSRect(x: originX + modeWidth + 8, y: originY - rowGap - 4, width: textWidth, height: rowH)
-            addHideRuleButton?.frame = NSRect(x: originX + modeWidth + textWidth + 16, y: originY - rowGap - 6, width: addWidth, height: rowH)
-            removeLastHideRuleButton?.frame = NSRect(x: originX, y: originY - (rowGap * 2) - 8, width: 100, height: rowH)
-            clearHideRulesButton?.frame = NSRect(x: originX + 108, y: originY - (rowGap * 2) - 8, width: 64, height: rowH)
-            hideRulesSummaryLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 2, width: width, height: 18)
-            hideRulesExamplesLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 22, width: width, height: 18)
-            hideRulesNoteLabel?.frame = NSRect(x: originX, y: originY - (rowGap * 3) - 42, width: width, height: 18)
+            filterSectionLabel?.frame = layout.filterHeaderFrame
+            hideRuleModePopup?.frame = layout.hideRuleModeFrame
+            hideRuleTextField?.frame = layout.hideRuleTextFrame
+            addHideRuleButton?.frame = layout.addHideRuleFrame
+            removeLastHideRuleButton?.frame = layout.removeLastHideRuleFrame
+            clearHideRulesButton?.frame = layout.clearHideRulesFrame
+            hideRulesSummaryLabel?.frame = layout.hideRulesSummaryFrame
+            hideRulesExamplesLabel?.frame = layout.hideRulesExamplesFrame
+            hideRulesNoteLabel?.frame = layout.hideRulesNoteFrame
         }
 
         func placeLabsSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
@@ -7424,9 +7277,7 @@ class BoardManPanel: NSPanel {
         case .privacy:
             show(privacyControls)
             storedTypeButtons.forEach { $0.isHidden = false }
-            placePrivacySection(originX: leftX, originY: firstY, width: columnWidth)
-            placeStoredTypesSection(originX: leftX, originY: firstY - 190, width: columnWidth)
-            placeFiltersSection(originX: leftX, originY: firstY - 364, width: columnWidth)
+            placePrivacySettings(originX: leftX, originY: firstY, width: columnWidth)
         case .updates:
             show(updatesControls)
             placeUpdatesSection(originX: leftX, originY: firstY, width: columnWidth)
