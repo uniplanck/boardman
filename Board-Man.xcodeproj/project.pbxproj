@@ -40,6 +40,8 @@
 		C6B1A14A2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A14B2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift */; };
 		C6B1A14E2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A14F2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift */; };
 		C6B1A1522FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1532FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift */; };
+		C6B1A1562FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1572FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift */; };
+		C6B1A15A2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A15B2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift */; };
 		C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */; };
 		C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */; };
 		C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */; };
@@ -122,6 +124,8 @@
 		C6B1A14C2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A14D2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift */; };
 		C6B1A1502FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1512FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift */; };
 		C6B1A1542FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */; };
+		C6B1A1582FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */; };
+		C6B1A15C2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */; };
 		FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */; };
 		FAC0DCE91DE15FD900309C49 /* DataCleanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCE81DE15FD900309C49 /* DataCleanService.swift */; };
 		FAC0DCEF1DE3255E00309C49 /* NSImage+NSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCEE1DE3255E00309C49 /* NSImage+NSColor.swift */; };
@@ -214,6 +218,8 @@
 		C6B1A14B2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetSettingsLayout.swift; sourceTree = "<group>"; };
 		C6B1A14F2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManHistorySettingsLayout.swift; sourceTree = "<group>"; };
 		C6B1A1532FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPrivacySettingsLayout.swift; sourceTree = "<group>"; };
+		C6B1A1572FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManLicenseSettingsLayout.swift; sourceTree = "<group>"; };
+		C6B1A15B2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManAppearanceSettingsLayout.swift; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpgradeRoute.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
@@ -285,6 +291,8 @@
 		C6B1A14D2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetSettingsLayoutTests.swift; sourceTree = "<group>"; };
 		C6B1A1512FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManHistorySettingsLayoutTests.swift; sourceTree = "<group>"; };
 		C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPrivacySettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManLicenseSettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManAppearanceSettingsLayoutTests.swift; sourceTree = "<group>"; };
 		C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteBoardManStore.swift; sourceTree = "<group>"; };
 		C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSQLiteShadowReplicator.swift; sourceTree = "<group>"; };
 		C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManLegacyHistoryImporter.swift; sourceTree = "<group>"; };
@@ -393,6 +401,8 @@
 				C6B1A14B2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift */,
 				C6B1A14F2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift */,
 				C6B1A1532FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift */,
+				C6B1A1572FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift */,
+				C6B1A15B2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift */,
 				C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */,
 				C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */,
 				C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */,
@@ -650,6 +660,8 @@
 				C6B1A14D2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift */,
 				C6B1A1512FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift */,
 				C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */,
+				C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */,
+				C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */,
 				FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */,
 				FA6167911D3ABEB10049FA14 /* FolderTests.swift */,
 				FA6167951D3ACDD80049FA14 /* SnippetTests.swift */,
@@ -862,6 +874,8 @@
 				C6B1A14A2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift in Sources */,
 				C6B1A14E2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift in Sources */,
 				C6B1A1522FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift in Sources */,
+				C6B1A1562FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift in Sources */,
+				C6B1A15A2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift in Sources */,
 				C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */,
 				C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */,
 				C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */,
@@ -928,6 +942,8 @@
 				C6B1A14C2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift in Sources */,
 				C6B1A1502FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift in Sources */,
 				C6B1A1542FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift in Sources */,
+				C6B1A1582FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift in Sources */,
+				C6B1A15C2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift in Sources */,
 				FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */,
 				FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */,
 			);

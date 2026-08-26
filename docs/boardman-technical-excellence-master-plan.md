@@ -396,7 +396,7 @@ P3.3 acceptance evidence: `BoardManSearchQueryTests` `5/5` PASS; final full regr
 
 ## P4.1 Break up giant coordinators
 
-**Implementation status: ACTIVE — search, shared presentation model, horizontal navigation, panel paste orchestration, README/demo fixture, timestamp presentation/interaction, panel appearance, history presentation, panel header presentation, snippet editing policy/presentation, and snippet catalog/dialog orchestration extractions accepted (2026-08-26).**
+**Implementation status: CLOSED — all planned P4.1 ownership boundaries and per-category settings geometry extractions accepted (2026-08-26).**
 
 Decompose `MenuManager` and other oversized files by behavior, not arbitrary line count.
 
@@ -525,7 +525,21 @@ Fifteenth accepted extraction:
 - the first Privacy gate intentionally failed closed when SwiftLint flagged an 8-element helper tuple as a serious `large_tuple` violation; the helper was replaced with a focused `FilterFrames` struct before tests were accepted. Combined History + Privacy + UI focused verification is `16/16` PASS.
 - final full regression is `163/163` PASS (`35` XCTest + `128` Swift Testing across `28` suites), with `0` failed and `0` skipped tests. SwiftLint reports `292` warnings / `0` serious violations across `100` files; the 10,000-item FTS benchmark passed at `1.72 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `2520.65 ms`, and `git diff --check` passes.
 
-P4.1 remains open for the remaining per-category settings geometry inside `layoutInlineSettingsControls`: Appearance/View, Updates, and License. General, Snippets, History, Privacy, and high-level panel geometry are now externally owned and directly testable. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership also remain outside the giant coordinator.
+Sixteenth accepted extraction:
+
+- `BoardManLicenseSettingsLayout.swift` now owns deterministic License geometry for plan/state/limits, activation-key entry, activation status, upgrade action, Pro-locked controls, and license-state notes/examples.
+- Updates geometry was deliberately folded into the existing high-level `BoardManPanelLayoutPolicy` instead of creating a one-purpose file: the updates preference view now receives a deterministic centered frame from the same settings-layout owner.
+- focused License + panel-layout + UI verification is `16/16` PASS before the final Appearance slice.
+
+Seventeenth accepted extraction:
+
+- `BoardManAppearanceSettingsLayout.swift` now owns the complete deterministic Appearance/View settings geometry: preview, layout, timestamp, usage, theme, inline-image controls, advanced relative-timestamp controls, custom color/opacity rows, and text/image preview scaling in both regular and stacked layouts.
+- `MenuManager.swift` now only applies the calculated AppKit frames, manages hide/show and enabled state, updates the advanced disclosure title/icon, and refreshes the preview. Appearance geometry itself is no longer calculated inside the giant coordinator.
+- the focused Appearance owner is `331` lines with a dedicated deterministic test suite. The Appearance slice reduced `MenuManager.swift` from `10,921` to `10,719` lines (`-202` net); across P4.1 the giant coordinator fell from `12,774` to `10,719` lines (`-2,055` net) while behavior moved into directly testable owners.
+- final focused Appearance + License + panel-layout + UI verification is `18/18` PASS. Final full regression is `167/167` PASS (`35` XCTest + `132` Swift Testing across `30` suites), with `0` failed and `0` skipped tests.
+- SwiftLint reports `266` warnings / `0` serious violations across `104` files; the final 10,000-item FTS benchmark passed at `0.53 ms / 1 hit`, the 10,000-history + 1,000-template migration benchmark passed at `887.66 ms`, and `git diff --check` passes.
+
+**P4.1 overall: PASS / CLOSED.** General, Snippets, History, Privacy, License, Updates, Appearance/View, and high-level panel geometry are externally owned and directly testable. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership likewise remain outside the giant coordinator.
 
 ## P4.2 Dependency audit
 

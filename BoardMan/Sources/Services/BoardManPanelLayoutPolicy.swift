@@ -315,6 +315,21 @@ enum BoardManPanelLayoutPolicy {
         }
     }
 
+    static func updatesPreferenceFrame(
+        originX: CGFloat,
+        originY: CGFloat,
+        width: CGFloat,
+        preferredWidth: CGFloat
+    ) -> NSRect {
+        let updatesWidth = min(width, preferredWidth)
+        return NSRect(
+            x: originX + floor((width - updatesWidth) / 2),
+            y: originY - 174,
+            width: updatesWidth,
+            height: 174
+        )
+    }
+
     static func usesStackedHistorySettingsLayout(width: CGFloat) -> Bool {
         width < 520
     }

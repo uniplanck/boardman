@@ -100,6 +100,13 @@ final class BoardManPanelLayoutPolicyTests {
         #expect(frames.count == BoardManInlineSettingsCategory.allCases.count)
         #expect(frames.first?.maxY == 488)
         #expect(frames.last?.minY ?? -1 >= 0)
+        let updatesFrame = BoardManPanelLayoutPolicy.updatesPreferenceFrame(
+            originX: 24,
+            originY: 620,
+            width: 500,
+            preferredWidth: 320
+        )
+        #expect(updatesFrame == NSRect(x: 114, y: 446, width: 320, height: 174))
         #expect(BoardManPanelLayoutPolicy.usesStackedHistorySettingsLayout(width: 519))
         #expect(!BoardManPanelLayoutPolicy.usesStackedHistorySettingsLayout(width: 520))
         #expect(BoardManPanelLayoutPolicy.usesStackedAppearanceSettingsLayout(width: 469))

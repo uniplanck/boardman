@@ -6823,14 +6823,6 @@ class BoardManPanel: NSPanel {
 
         func placeViewSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
             viewSectionLabel?.isHidden = true
-            let cardGap: CGFloat = 14
-            let columnGap: CGFloat = 14
-            let stacksCards = Self.usesStackedAppearanceSettingsLayout(width: width)
-            let halfWidth = stacksCards ? width : max(188, floor((width - columnGap) / 2))
-            let rightX = stacksCards ? originX : originX + halfWidth + columnGap
-            let compactLabelWidth: CGFloat = stacksCards ? 82 : 64
-            let cardInset: CGFloat = 16
-
             let advancedControls: [NSView?] = [
                 relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
                 relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
@@ -6840,218 +6832,58 @@ class BoardManPanel: NSPanel {
                 textPreviewScaleLabel, textPreviewScaleSlider, textPreviewScaleValueLabel,
                 imagePreviewScaleLabel, imagePreviewScaleSlider, imagePreviewScaleValueLabel, previewScaleProNoteLabel
             ]
+            let layout = BoardManAppearanceSettingsLayoutPolicy.layout(
+                BoardManAppearanceSettingsLayoutInput(
+                    originX: originX,
+                    originY: originY,
+                    width: width,
+                    controlHeight: rowH,
+                    advancedExpanded: appearanceAdvancedExpanded
+                )
+            )
 
-            let previewHeight: CGFloat = 172
-            let previewY = originY - previewHeight
-            let previewInset: CGFloat = 22
-            appearancePreviewCard?.frame = NSIntegralRect(NSRect(x: originX, y: previewY, width: width, height: previewHeight))
+            func apply(_ row: BoardManAppearanceLabeledRowLayout, label: NSTextField?, control: NSView?) {
+                label?.frame = row.labelFrame
+                control?.frame = row.controlFrame
+            }
+
+            appearancePreviewCard?.frame = layout.previewCardFrame
             appearancePreviewCard?.needsLayout = true
-            appearancePreviewView?.frame = NSIntegralRect(NSRect(
-                x: originX + previewInset,
-                y: previewY + 18,
-                width: max(160, width - (previewInset * 2)),
-                height: previewHeight - 70
-            ))
-
-            let layoutCardHeight: CGFloat = stacksCards ? 218 : 218
-            let timestampCardHeight: CGFloat = layoutCardHeight
-            let layoutCardY = previewY - cardGap - layoutCardHeight
-            let timestampCardY = stacksCards
-                ? layoutCardY - cardGap - timestampCardHeight
-                : layoutCardY
-            appearanceLayoutCard?.frame = NSIntegralRect(NSRect(
-                x: originX,
-                y: layoutCardY,
-                width: halfWidth,
-                height: layoutCardHeight
-            ))
-            appearanceTimestampCard?.frame = NSIntegralRect(NSRect(
-                x: rightX,
-                y: timestampCardY,
-                width: halfWidth,
-                height: timestampCardHeight
-            ))
+            appearancePreviewView?.frame = layout.previewFrame
+            appearanceLayoutCard?.frame = layout.layoutCardFrame
+            appearanceTimestampCard?.frame = layout.timestampCardFrame
             appearanceLayoutCard?.needsLayout = true
             appearanceTimestampCard?.needsLayout = true
+            rowNumbersButton?.frame = layout.rowNumbersFrame
+            apply(layout.uiStyle, label: uiStyleLabel, control: uiStylePopup)
+            itemTextScaleLabel?.frame = layout.itemTextScale.labelFrame
+            itemTextScaleDecreaseButton?.frame = layout.itemTextScale.decreaseFrame
+            itemTextScaleField?.frame = layout.itemTextScale.valueFrame
+            itemTextScaleIncreaseButton?.frame = layout.itemTextScale.increaseFrame
+            heightControlLabel?.frame = layout.heightControl.labelFrame
+            heightDecreaseButton?.frame = layout.heightControl.decreaseFrame
+            heightLabel?.frame = layout.heightControl.valueFrame
+            heightIncreaseButton?.frame = layout.heightControl.increaseFrame
+            apply(layout.timestamp, label: timestampLabel, control: timestampPopup)
+            apply(layout.timestampPosition, label: timestampPositionLabel, control: timestampPositionPopup)
 
-            let layoutX = originX + cardInset
-            let layoutWidth = halfWidth - (cardInset * 2)
-            rowNumbersButton?.frame = NSIntegralRect(NSRect(
-                x: layoutX,
-                y: layoutCardY + layoutCardHeight - 80,
-                width: layoutWidth,
-                height: 20
-            ))
-            placeLabeledRow(
-                label: uiStyleLabel,
-                control: uiStylePopup,
-                originX: layoutX,
-                originY: layoutCardY + layoutCardHeight - 120,
-                width: layoutWidth,
-                labelWidth: compactLabelWidth
-            )
-            let textScaleY = layoutCardY + layoutCardHeight - 162
-            itemTextScaleLabel?.frame = NSIntegralRect(NSRect(
-                x: layoutX,
-                y: textScaleY + 7,
-                width: compactLabelWidth,
-                height: 16
-            ))
-            let textScaleControlX = layoutX + compactLabelWidth + 12
-            let textScaleValueWidth: CGFloat = max(52, min(58, layoutWidth - compactLabelWidth - 94))
-            itemTextScaleDecreaseButton?.frame = NSIntegralRect(NSRect(
-                x: textScaleControlX,
-                y: textScaleY,
-                width: 28,
-                height: rowH
-            ))
-            itemTextScaleField?.frame = NSIntegralRect(NSRect(
-                x: textScaleControlX + 34,
-                y: textScaleY,
-                width: textScaleValueWidth,
-                height: rowH
-            ))
-            itemTextScaleIncreaseButton?.frame = NSIntegralRect(NSRect(
-                x: textScaleControlX + 40 + textScaleValueWidth,
-                y: textScaleY,
-                width: 28,
-                height: rowH
-            ))
-            heightControlLabel?.frame = NSIntegralRect(NSRect(
-                x: layoutX,
-                y: layoutCardY + 11,
-                width: compactLabelWidth,
-                height: 16
-            ))
-            let heightControlX = layoutX + compactLabelWidth + 12
-            let heightValueWidth: CGFloat = max(52, min(68, layoutWidth - compactLabelWidth - 94))
-            heightDecreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX, y: layoutCardY + 4, width: 28, height: rowH))
-            heightLabel?.frame = NSIntegralRect(NSRect(x: heightControlX + 34, y: layoutCardY + 4, width: heightValueWidth, height: rowH))
-            heightIncreaseButton?.frame = NSIntegralRect(NSRect(x: heightControlX + 40 + heightValueWidth, y: layoutCardY + 4, width: 28, height: rowH))
-
-            let timestampX = rightX + cardInset
-            let timestampWidth = halfWidth - (cardInset * 2)
-            placeLabeledRow(
-                label: timestampLabel,
-                control: timestampPopup,
-                originX: timestampX,
-                originY: timestampCardY + timestampCardHeight - 94,
-                width: timestampWidth,
-                labelWidth: compactLabelWidth
-            )
-            placeLabeledRow(
-                label: timestampPositionLabel,
-                control: timestampPositionPopup,
-                originX: timestampX,
-                originY: timestampCardY + timestampCardHeight - 134,
-                width: timestampWidth,
-                labelWidth: compactLabelWidth
-            )
-
-            let usageCardHeight: CGFloat = 292
-            let themeCardHeight: CGFloat = 292
-            let usageCardY = (stacksCards ? timestampCardY : layoutCardY) - cardGap - usageCardHeight
-            let themeCardY = stacksCards
-                ? usageCardY - cardGap - themeCardHeight
-                : usageCardY
-            appearanceUsageCard?.frame = NSIntegralRect(NSRect(
-                x: originX,
-                y: usageCardY,
-                width: halfWidth,
-                height: usageCardHeight
-            ))
-            appearanceThemeCard?.frame = NSIntegralRect(NSRect(
-                x: rightX,
-                y: themeCardY,
-                width: halfWidth,
-                height: themeCardHeight
-            ))
+            appearanceUsageCard?.frame = layout.usageCardFrame
+            appearanceThemeCard?.frame = layout.themeCardFrame
             appearanceUsageCard?.needsLayout = true
             appearanceThemeCard?.needsLayout = true
-
-            let usageX = originX + cardInset
-            let usageWidth = halfWidth - (cardInset * 2)
-            usageCountButton?.frame = NSIntegralRect(NSRect(
-                x: usageX,
-                y: usageCardY + usageCardHeight - 82,
-                width: usageWidth,
-                height: 20
-            ))
-            placeLabeledRow(
-                label: usageStyleLabel,
-                control: usageStylePopup,
-                originX: usageX,
-                originY: usageCardY + usageCardHeight - 124,
-                width: usageWidth,
-                labelWidth: compactLabelWidth
-            )
-            placeLabeledRow(
-                label: usedItemStyleLabel,
-                control: usedItemStylePopup,
-                originX: usageX,
-                originY: usageCardY + usageCardHeight - 164,
-                width: usageWidth,
-                labelWidth: compactLabelWidth
-            )
-            placeLabeledRow(
-                label: pinLabelStyleLabel,
-                control: pinLabelStylePopup,
-                originX: usageX,
-                originY: usageCardY + usageCardHeight - 204,
-                width: usageWidth,
-                labelWidth: compactLabelWidth
-            )
-            showInlineImagesButton?.frame = NSIntegralRect(NSRect(
-                x: usageX,
-                y: usageCardY + usageCardHeight - 236,
-                width: usageWidth,
-                height: 20
-            ))
-            placeLabeledRow(
-                label: inlineImagePositionLabel,
-                control: inlineImagePositionPopup,
-                originX: usageX,
-                originY: usageCardY + 10,
-                width: usageWidth,
-                labelWidth: compactLabelWidth
-            )
+            usageCountButton?.frame = layout.usageCountFrame
+            apply(layout.usageStyle, label: usageStyleLabel, control: usageStylePopup)
+            apply(layout.usedItemStyle, label: usedItemStyleLabel, control: usedItemStylePopup)
+            apply(layout.pinLabelStyle, label: pinLabelStyleLabel, control: pinLabelStylePopup)
+            showInlineImagesButton?.frame = layout.showInlineImagesFrame
+            apply(layout.inlineImagePosition, label: inlineImagePositionLabel, control: inlineImagePositionPopup)
             inlineImagePositionPopup?.isEnabled = showInlineImagesButton?.state == .on
+            apply(layout.themePreset, label: themePresetLabel, control: themePresetPopup)
+            apply(layout.appearanceMode, label: appearanceModeLabel, control: appearanceModePopup)
+            apply(layout.fontChoice, label: fontChoiceLabel, control: fontChoicePopup)
+            themeLightenButton?.frame = layout.themeLightenFrame
 
-            let themeX = rightX + cardInset
-            let themeWidth = halfWidth - (cardInset * 2)
-            placeLabeledRow(
-                label: themePresetLabel,
-                control: themePresetPopup,
-                originX: themeX,
-                originY: themeCardY + themeCardHeight - 86,
-                width: themeWidth,
-                labelWidth: compactLabelWidth
-            )
-            placeLabeledRow(
-                label: appearanceModeLabel,
-                control: appearanceModePopup,
-                originX: themeX,
-                originY: themeCardY + themeCardHeight - 126,
-                width: themeWidth,
-                labelWidth: compactLabelWidth
-            )
-            placeLabeledRow(
-                label: fontChoiceLabel,
-                control: fontChoicePopup,
-                originX: themeX,
-                originY: themeCardY + themeCardHeight - 166,
-                width: themeWidth,
-                labelWidth: compactLabelWidth
-            )
-            themeLightenButton?.frame = NSIntegralRect(NSRect(
-                x: themeX,
-                y: themeCardY + 7,
-                width: themeWidth,
-                height: 20
-            ))
-
-            let toggleY = (stacksCards ? themeCardY : usageCardY) - 36
-            appearanceAdvancedButton?.frame = NSIntegralRect(NSRect(x: originX, y: toggleY, width: min(210, width), height: 26))
+            appearanceAdvancedButton?.frame = layout.advancedToggleFrame
             appearanceAdvancedButton?.title = boardManText(
                 appearanceAdvancedExpanded ? "Hide advanced settings" : "Show advanced settings"
             )
@@ -7060,7 +6892,7 @@ class BoardManPanel: NSPanel {
                 accessibilityDescription: nil
             )
 
-            guard appearanceAdvancedExpanded else {
+            guard let advanced = layout.advanced else {
                 appearanceAdvancedCard?.isHidden = true
                 advancedControls.forEach { $0?.isHidden = true }
                 refreshAppearancePreview()
@@ -7068,64 +6900,30 @@ class BoardManPanel: NSPanel {
             }
 
             appearanceAdvancedCard?.isHidden = false
-            advancedControls.forEach { $0?.isHidden = false }
-            let advancedHeight: CGFloat = 350
-            let advancedY = toggleY - cardGap - advancedHeight
-            appearanceAdvancedCard?.frame = NSIntegralRect(NSRect(x: originX, y: advancedY, width: width, height: advancedHeight))
+            appearanceAdvancedCard?.frame = advanced.cardFrame
             appearanceAdvancedCard?.needsLayout = true
-
-            let advancedX = originX + cardInset
-            let advancedWidth = width - (cardInset * 2)
-            let advancedHalfWidth = max(180, floor((advancedWidth - columnGap) / 2))
-            let advancedRightX = advancedX + advancedHalfWidth + columnGap
-            placeLabeledRow(label: relativeNumberLabel, control: relativeNumberPopup,
-                            originX: advancedX, originY: advancedY + advancedHeight - 92,
-                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeUnitLabel, control: relativeUnitPopup,
-                            originX: advancedRightX, originY: advancedY + advancedHeight - 92,
-                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeSuffixLabel, control: relativeSuffixPopup,
-                            originX: advancedX, originY: advancedY + advancedHeight - 132,
-                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
-            placeLabeledRow(label: relativeNowLabel, control: relativeNowPopup,
-                            originX: advancedRightX, originY: advancedY + advancedHeight - 132,
-                            width: advancedHalfWidth, labelWidth: compactLabelWidth)
-
-            func placeColorRow(label: NSTextField?, well: NSColorWell?, slider: NSSlider?, originX: CGFloat, originY: CGFloat, rowWidth: CGFloat) {
-                let labelWidth: CGFloat = min(78, max(58, floor(rowWidth * 0.27)))
-                let wellWidth: CGFloat = 40
-                label?.frame = NSIntegralRect(NSRect(x: originX, y: originY + 6, width: labelWidth, height: 16))
-                well?.frame = NSIntegralRect(NSRect(x: originX + labelWidth + 8, y: originY, width: wellWidth, height: rowH))
-                slider?.frame = NSIntegralRect(NSRect(
-                    x: originX + labelWidth + wellWidth + 18,
-                    y: originY + 3,
-                    width: max(42, rowWidth - labelWidth - wellWidth - 18),
-                    height: 24
-                ))
-            }
-            placeColorRow(label: customAccentLabel, well: customAccentColorWell, slider: customAccentOpacitySlider,
-                          originX: advancedX, originY: advancedY + advancedHeight - 180, rowWidth: advancedHalfWidth)
-            placeColorRow(label: customPanelLabel, well: customPanelColorWell, slider: customPanelOpacitySlider,
-                          originX: advancedRightX, originY: advancedY + advancedHeight - 180, rowWidth: advancedHalfWidth)
-            placeColorRow(label: customUsedColorLabel, well: customUsedColorWell, slider: customUsedOpacitySlider,
-                          originX: advancedX, originY: advancedY + advancedHeight - 220, rowWidth: advancedHalfWidth)
-            resetCustomColorsButton?.frame = NSIntegralRect(NSRect(
-                x: advancedRightX,
-                y: advancedY + advancedHeight - 222,
-                width: min(150, advancedHalfWidth),
-                height: LayoutMetrics.actionButtonHeight
-            ))
-
-            func placePreviewScaleRow(label: NSTextField?, slider: NSSlider?, value: NSTextField?, rowY: CGFloat) {
-                label?.frame = NSIntegralRect(NSRect(x: advancedX, y: rowY + 7, width: 104, height: 16))
-                slider?.frame = NSIntegralRect(NSRect(x: advancedX + 116, y: rowY + 3, width: max(120, advancedWidth - 192), height: 24))
-                value?.frame = NSIntegralRect(NSRect(x: advancedX + advancedWidth - 64, y: rowY, width: 64, height: rowH))
-            }
-            placePreviewScaleRow(label: textPreviewScaleLabel, slider: textPreviewScaleSlider,
-                                 value: textPreviewScaleValueLabel, rowY: advancedY + 74)
-            placePreviewScaleRow(label: imagePreviewScaleLabel, slider: imagePreviewScaleSlider,
-                                 value: imagePreviewScaleValueLabel, rowY: advancedY + 34)
-            previewScaleProNoteLabel?.frame = NSIntegralRect(NSRect(x: advancedX, y: advancedY + 4, width: advancedWidth, height: 28))
+            advancedControls.forEach { $0?.isHidden = false }
+            apply(advanced.relativeNumber, label: relativeNumberLabel, control: relativeNumberPopup)
+            apply(advanced.relativeUnit, label: relativeUnitLabel, control: relativeUnitPopup)
+            apply(advanced.relativeSuffix, label: relativeSuffixLabel, control: relativeSuffixPopup)
+            apply(advanced.relativeNow, label: relativeNowLabel, control: relativeNowPopup)
+            customAccentLabel?.frame = advanced.customAccent.labelFrame
+            customAccentColorWell?.frame = advanced.customAccent.colorWellFrame
+            customAccentOpacitySlider?.frame = advanced.customAccent.sliderFrame
+            customPanelLabel?.frame = advanced.customPanel.labelFrame
+            customPanelColorWell?.frame = advanced.customPanel.colorWellFrame
+            customPanelOpacitySlider?.frame = advanced.customPanel.sliderFrame
+            customUsedColorLabel?.frame = advanced.customUsed.labelFrame
+            customUsedColorWell?.frame = advanced.customUsed.colorWellFrame
+            customUsedOpacitySlider?.frame = advanced.customUsed.sliderFrame
+            resetCustomColorsButton?.frame = advanced.resetCustomColorsFrame
+            textPreviewScaleLabel?.frame = advanced.textPreviewScale.labelFrame
+            textPreviewScaleSlider?.frame = advanced.textPreviewScale.sliderFrame
+            textPreviewScaleValueLabel?.frame = advanced.textPreviewScale.valueFrame
+            imagePreviewScaleLabel?.frame = advanced.imagePreviewScale.labelFrame
+            imagePreviewScaleSlider?.frame = advanced.imagePreviewScale.sliderFrame
+            imagePreviewScaleValueLabel?.frame = advanced.imagePreviewScale.valueFrame
+            previewScaleProNoteLabel?.frame = advanced.previewScaleProNoteFrame
             refreshAppearancePreview()
         }
 
@@ -7234,28 +7032,34 @@ class BoardManPanel: NSPanel {
         }
 
         func placeLicenseSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            placeHeader(licenseSectionLabel, originX: originX, originY: originY, width: width)
-            licensePlanLabel?.frame = NSRect(x: originX, y: originY - 34, width: width, height: 18)
-            licenseStateLabel?.frame = NSRect(x: originX, y: originY - 58, width: width, height: 18)
-            licenseLimitsLabel?.frame = NSRect(x: originX, y: originY - 82, width: width, height: 18)
-            let buttonWidth: CGFloat = 106
-            let upgradeWidth: CGFloat = min(126, width)
-            let fieldWidth = max(120, width - buttonWidth - 12)
-            licenseKeyField?.frame = NSRect(x: originX, y: originY - 124, width: fieldWidth, height: rowH)
-            licenseActivateButton?.frame = NSRect(x: originX + fieldWidth + 12, y: originY - 126, width: buttonWidth, height: rowH)
-            licenseActivationStatusLabel?.frame = NSRect(x: originX, y: originY - 166, width: width, height: 34)
-            licenseUpgradeButton?.frame = NSRect(x: originX, y: originY - 208, width: upgradeWidth, height: rowH)
-            licenseProLockedControlView?.frame = NSRect(x: originX, y: originY - 352, width: width, height: 126)
-            licenseMockNoteLabel?.frame = NSRect(x: originX, y: originY - 400, width: width, height: 42)
-            licenseStateExamplesLabel?.frame = NSRect(x: originX, y: originY - 436, width: width, height: 28)
+            let layout = BoardManLicenseSettingsLayoutPolicy.layout(
+                BoardManLicenseSettingsLayoutInput(
+                    originX: originX,
+                    originY: originY,
+                    width: width,
+                    controlHeight: rowH
+                )
+            )
+            licenseSectionLabel?.frame = layout.sectionHeaderFrame
+            licensePlanLabel?.frame = layout.planFrame
+            licenseStateLabel?.frame = layout.stateFrame
+            licenseLimitsLabel?.frame = layout.limitsFrame
+            licenseKeyField?.frame = layout.keyFieldFrame
+            licenseActivateButton?.frame = layout.activateFrame
+            licenseActivationStatusLabel?.frame = layout.activationStatusFrame
+            licenseUpgradeButton?.frame = layout.upgradeFrame
+            licenseProLockedControlView?.frame = layout.proLockedFrame
+            licenseMockNoteLabel?.frame = layout.mockNoteFrame
+            licenseStateExamplesLabel?.frame = layout.stateExamplesFrame
         }
 
         func placeUpdatesSection(originX: CGFloat, originY: CGFloat, width: CGFloat) {
-            let updatesWidth = min(width, updatesPreferenceView?.frame.width ?? width)
-            updatesPreferenceView?.frame = NSRect(x: originX + floor((width - updatesWidth) / 2),
-                                                  y: originY - 174,
-                                                  width: updatesWidth,
-                                                  height: 174)
+            updatesPreferenceView?.frame = BoardManPanelLayoutPolicy.updatesPreferenceFrame(
+                originX: originX,
+                originY: originY,
+                width: width,
+                preferredWidth: updatesPreferenceView?.frame.width ?? width
+            )
         }
 
         refreshLicenseSummary()
