@@ -7310,43 +7310,33 @@ class BoardManPanel: NSPanel {
             )
         }
 
-        func layoutSnippetShortcutRows(width: CGFloat) {
-            let rowHeight: CGFloat = 42
-            let documentHeight = max(CGFloat(snippetShortcutRows.count) * rowHeight, snippetShortcutScrollView?.bounds.height ?? 0)
-            snippetShortcutDocumentView?.frame = NSRect(x: 0, y: 0, width: width, height: documentHeight)
-
-            for (index, row) in snippetShortcutRows.enumerated() {
-                let rowOriginY = documentHeight - CGFloat(index + 1) * rowHeight
-                let clearWidth: CGFloat = 52
-                let recordWidth: CGFloat = min(150, max(112, width * 0.32))
-                let textWidth = max(80, width - recordWidth - clearWidth - 20)
-                row.titleLabel.frame = NSRect(x: 0, y: rowOriginY + 22, width: textWidth, height: 15)
-                row.detailLabel.frame = NSRect(x: 0, y: rowOriginY + 6, width: textWidth, height: 14)
-                row.recordView.frame = NSRect(x: textWidth + 8, y: rowOriginY + 7, width: recordWidth, height: 28)
-                row.clearButton.frame = NSRect(x: textWidth + recordWidth + 16, y: rowOriginY + 7, width: clearWidth, height: 28)
-            }
-        }
-
         func placeSnippetSettingsSection(originX: CGFloat, originY: CGFloat, width: CGFloat, scrollHeight: CGFloat) {
-            let minimumBottomInset: CGFloat = 28
-            let contentHeight = max(80, CGFloat(max(1, snippetShortcutRows.count)) * 42 + 8)
-            let availableHeight = max(80, originY - 286 - minimumBottomInset)
-            let safeScrollHeight = max(80, min(scrollHeight, min(280, min(contentHeight, availableHeight))))
-            placeHeader(snippetSettingsSectionLabel, originX: originX, originY: originY, width: width)
-            snippetSummaryLabel?.frame = NSRect(x: originX, y: originY - 42, width: width, height: 20)
-            snippetFoldersLabel?.frame = NSRect(x: originX, y: originY - 74, width: width, height: 20)
-            snippetGroupProNoteLabel?.frame = NSRect(x: originX, y: originY - 106, width: width, height: 30)
-            let moveButtonWidth: CGFloat = 92
-            let moveGap: CGFloat = 8
-            let orderPopupWidth = max(120, width - (moveButtonWidth * 2) - (moveGap * 2))
-            snippetGroupOrderPopup?.frame = NSRect(x: originX, y: originY - 146, width: orderPopupWidth, height: rowH)
-            snippetGroupMoveUpButton?.frame = NSRect(x: originX + orderPopupWidth + moveGap, y: originY - 146, width: moveButtonWidth, height: rowH)
-            snippetGroupMoveDownButton?.frame = NSRect(x: originX + orderPopupWidth + moveGap + moveButtonWidth + moveGap, y: originY - 146, width: moveButtonWidth, height: rowH)
-            snippetShortcutsLabel?.frame = NSRect(x: originX, y: originY - 184, width: width, height: 20)
-            snippetShortcutScrollView?.frame = NSRect(x: originX, y: originY - 196 - safeScrollHeight, width: width, height: safeScrollHeight)
-            layoutSnippetShortcutRows(width: width)
-            let manageButtonY = originY - 196 - safeScrollHeight - LayoutMetrics.actionButtonHeight - 14
-            manageSnippetsButton?.frame = NSRect(x: originX, y: manageButtonY, width: min(156, width), height: LayoutMetrics.actionButtonHeight)
+            let layout = BoardManSnippetSettingsLayoutPolicy.layout(
+                originX: originX,
+                originY: originY,
+                width: width,
+                requestedScrollHeight: scrollHeight,
+                shortcutCount: snippetShortcutRows.count,
+                controlHeight: rowH,
+                actionButtonHeight: LayoutMetrics.actionButtonHeight
+            )
+            snippetSettingsSectionLabel?.frame = layout.sectionHeaderFrame
+            snippetSummaryLabel?.frame = layout.summaryFrame
+            snippetFoldersLabel?.frame = layout.foldersFrame
+            snippetGroupProNoteLabel?.frame = layout.proNoteFrame
+            snippetGroupOrderPopup?.frame = layout.groupOrderFrame
+            snippetGroupMoveUpButton?.frame = layout.moveUpFrame
+            snippetGroupMoveDownButton?.frame = layout.moveDownFrame
+            snippetShortcutsLabel?.frame = layout.shortcutsLabelFrame
+            snippetShortcutScrollView?.frame = layout.shortcutScrollFrame
+            snippetShortcutDocumentView?.frame = layout.shortcutDocumentFrame
+            for (row, rowLayout) in zip(snippetShortcutRows, layout.shortcutRows) {
+                row.titleLabel.frame = rowLayout.titleFrame
+                row.detailLabel.frame = rowLayout.detailFrame
+                row.recordView.frame = rowLayout.recordFrame
+                row.clearButton.frame = rowLayout.clearFrame
+            }
+            manageSnippetsButton?.frame = layout.manageButtonFrame
         }
 
         func placePrivacySection(originX: CGFloat, originY: CGFloat, width: CGFloat) {

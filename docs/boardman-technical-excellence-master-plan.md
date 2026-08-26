@@ -504,7 +504,15 @@ Twelfth accepted extraction:
 - dedicated `BoardManGeneralSettingsLayoutTests.swift` covers ordering, column bounds, responsive shortcut allocation, and status placement. Focused General-layout + UI verification is `12/12` PASS.
 - final full regression is `155/155` PASS (`35` XCTest + `120` Swift Testing across `25` suites), with `0` failed and `0` skipped tests. SwiftLint reports `309` warnings / `0` serious violations across `94` files, and `git diff --check` passes.
 
-P4.1 remains open for the remaining per-category settings geometry inside `layoutInlineSettingsControls`: Appearance/View, History, Snippets, Privacy, Updates, and License. General settings plus high-level panel geometry are now externally owned and directly testable. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership also remain outside the giant coordinator.
+Thirteenth accepted extraction:
+
+- `BoardManSnippetSettingsLayout.swift` now owns deterministic Snippets-settings geometry: group-order controls, shortcut scroll/document sizing, per-shortcut title/detail/record/clear frames, and the Manage Snippets action placement.
+- `MenuManager.swift` retains only the concrete AppKit controls and applies the layout result. The extraction removes duplicate scroll/document calculations while preserving the existing shortcut-row order and responsive width behavior.
+- the focused layout owner is `116` lines with a dedicated `46`-line test suite. `MenuManager.swift` is `11,064` lines after this slice.
+- focused Snippets-layout + UI verification passed before the final gate, and final full regression is `157/157` PASS (`35` XCTest + `122` Swift Testing across `26` suites), with `0` failed and `0` skipped tests.
+- SwiftLint reports `309` warnings / `0` serious violations across `96` files, and `git diff --check` passes.
+
+P4.1 remains open for the remaining per-category settings geometry inside `layoutInlineSettingsControls`: Appearance/View, History, Privacy, Updates, and License. General and Snippets settings plus high-level panel geometry are now externally owned and directly testable. Search, horizontal navigation, paste/timestamp dispatch, README/demo fixture generation, timestamp formatting/interaction, panel appearance/history/header presentation, and snippet editing/presentation/catalog/dialog ownership also remain outside the giant coordinator.
 
 ## P4.2 Dependency audit
 
