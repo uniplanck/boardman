@@ -439,6 +439,38 @@ final class CommercialLicenseBoundaryTests {
         )
         #expect(verifier.verify(token, context: wrongDevice) == .invalid(.deviceMismatch))
 
+        let wrongBundle = SignedLicenseTokenVerificationContext(
+            deviceID: deviceID,
+            bundleID: "com.example.NotBoardMan",
+            verificationDate: Date()
+        )
+        #expect(verifier.verify(token, context: wrongBundle) == .invalid(.bundleMismatch))
+
+        let unsupportedVersion = try makeOwnerToken(
+            privateKey: privateKey,
+            deviceID: deviceID,
+            tokenVersion: 2
+        )
+        #expect(verifier.verify(unsupportedVersion, context: context) == .invalid(.claimMismatch))
+
+        let restrictedLifetime = try makeOwnerToken(
+            privateKey: privateKey,
+            deviceID: deviceID,
+            limits: [
+                "max_history_items": 1,
+                "max_pinned_items": 1,
+                "max_snippet_items": 1,
+                "max_snippet_folders": 1
+            ]
+        )
+        if case .verified(let payload) = verifier.verify(restrictedLifetime, context: context) {
+            let snapshot = payload.entitlementSnapshot(lastVerifiedAt: Date())
+            #expect(snapshot.limits == .lifetimeDefault)
+            #expect(snapshot.canUse(.advancedSearch))
+        } else {
+            Issue.record("Expected the signed Lifetime token to normalize local limits.")
+        }
+
         let tampered = token + "x"
         #expect(verifier.verify(tampered, context: context) == .invalid(.signatureInvalid))
     }
@@ -493,6 +525,16 @@ final class CommercialLicenseBoundaryTests {
         )
         #expect(config.activationURL?.absoluteString == "https://billing.example.test/base/v1/licenses/activate")
 
+        let insecureRemote = BoardManCommercialServiceConfiguration(
+            baseURL: URL(string: "http://licenses.example.test")
+        )
+        #expect(insecureRemote.baseURL == nil)
+
+        let localDevelopment = BoardManCommercialServiceConfiguration(
+            baseURL: URL(string: "http://127.0.0.1:8787")
+        )
+        #expect(localDevelopment.activationURL?.absoluteString == "http://127.0.0.1:8787/v1/licenses/activate")
+
         let unconfigured = BoardManCommercialServiceConfiguration.current(
             environment: [:],
             infoDictionary: [:]
@@ -519,6 +561,9 @@ final class CommercialLicenseBoundaryTests {
         let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
         let permissions = attributes[.posixPermissions] as? NSNumber
         #expect(permissions?.intValue == 0o600)
+        let directoryAttributes = try FileManager.default.attributesOfItem(atPath: directoryURL.path)
+        let directoryPermissions = directoryAttributes[.posixPermissions] as? NSNumber
+        #expect(directoryPermissions?.intValue == 0o700)
     }
 
     @Test
@@ -535,14 +580,199 @@ final class CommercialLicenseBoundaryTests {
         #expect(secondID == firstID)
     }
 
+    @Test
+    func activationCoordinatorStoresAndAppliesVerifiedLifetimeToken() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManActivationCoordinatorTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let identity = LocalDeviceIdentityService(fileURL: root.appendingPathComponent("device-id"))
+        let deviceID = identity.deviceID()
+        let privateKey = P256.Signing.PrivateKey()
+        let rawToken = try makeOwnerToken(privateKey: privateKey, deviceID: deviceID)
+        let client = RecordingLicenseActivationClient(
+            response: LicenseActivationResponse(
+                status: .activated,
+                message: "Lifetime license activated.",
+                signedToken: rawToken
+            )
+        )
+        let store = MemoryLicenseTokenStore()
+        let entitlementService = EntitlementService(snapshot: .freeDefault)
+        let verificationDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let coordinator = LicenseActivationCoordinator(
+            client: client,
+            verifier: P256SignedLicenseTokenVerifier(
+                publicKeyBase64: privateKey.publicKey.x963Representation.base64EncodedString()
+            ),
+            tokenStore: store,
+            entitlementService: entitlementService,
+            deviceIdentity: identity,
+            bundleID: "com.uniplanck.BoardMan",
+            clientVersion: "9.9.9",
+            now: { verificationDate }
+        )
+
+        let result = await coordinator.activate(licenseKey: "  LIFETIME-CODE  ")
+
+        #expect(result.status == .activated)
+        #expect(result.signedToken == nil)
+        #expect(store.storedToken?.rawValue == rawToken)
+        #expect(entitlementService.currentSnapshot.plan == .ownerLifetime)
+        #expect(entitlementService.currentSnapshot.licenseState == .ownerLifetime)
+        #expect(entitlementService.currentSnapshot.lastVerifiedAt == verificationDate)
+        #expect(entitlementService.currentSnapshot.licenseMetadata?.licenseKeyMasked == "****TEST")
+        #expect(entitlementService.currentSnapshot.licenseMetadata?.licenseKeyMasked != "OWNER-TEST")
+        #expect(entitlementService.currentSnapshot.licenseMetadata?.deviceIdMasked == "****\(deviceID.suffix(4))")
+        #expect(client.receivedRequest?.licenseKey == "LIFETIME-CODE")
+        #expect(client.receivedRequest?.localDeviceID == deviceID)
+        #expect(client.receivedRequest?.bundleID == "com.uniplanck.BoardMan")
+        #expect(client.receivedRequest?.clientVersion == "9.9.9")
+    }
+
+    @Test
+    func activationCoordinatorRejectsLegacyProTokenForNewActivation() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManLegacyActivationRejectionTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let identity = LocalDeviceIdentityService(fileURL: root.appendingPathComponent("device-id"))
+        let deviceID = identity.deviceID()
+        let privateKey = P256.Signing.PrivateKey()
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let rawToken = try makeProToken(
+            privateKey: privateKey,
+            deviceID: deviceID,
+            state: .proActive,
+            expiration: now.addingTimeInterval(3_600)
+        )
+        let client = RecordingLicenseActivationClient(
+            response: LicenseActivationResponse(
+                status: .activated,
+                message: "Legacy token returned.",
+                signedToken: rawToken
+            )
+        )
+        let store = MemoryLicenseTokenStore()
+        let entitlementService = EntitlementService(snapshot: .freeDefault)
+        let coordinator = LicenseActivationCoordinator(
+            client: client,
+            verifier: P256SignedLicenseTokenVerifier(
+                publicKeyBase64: privateKey.publicKey.x963Representation.base64EncodedString()
+            ),
+            tokenStore: store,
+            entitlementService: entitlementService,
+            deviceIdentity: identity,
+            bundleID: "com.uniplanck.BoardMan",
+            clientVersion: "9.9.9",
+            now: { now }
+        )
+
+        let result = await coordinator.activate(licenseKey: "LEGACY-PRO-CODE")
+
+        #expect(result.status == .verificationFailed)
+        #expect(store.storedToken == nil)
+        #expect(entitlementService.currentSnapshot.licenseState == .free)
+    }
+
+    @Test
+    func activationCoordinatorRejectsActivatedResponseWithoutToken() async {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManMissingActivationTokenTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = MemoryLicenseTokenStore()
+        let coordinator = LicenseActivationCoordinator(
+            client: RecordingLicenseActivationClient(
+                response: LicenseActivationResponse(status: .activated, message: "Activated without token.")
+            ),
+            verifier: StubSignedLicenseTokenVerifier(mode: .parseOnly),
+            tokenStore: store,
+            entitlementService: EntitlementService(snapshot: .freeDefault),
+            deviceIdentity: LocalDeviceIdentityService(fileURL: root.appendingPathComponent("device-id")),
+            bundleID: "com.uniplanck.BoardMan",
+            clientVersion: "9.9.9"
+        )
+
+        let result = await coordinator.activate(licenseKey: "LIFETIME-CODE")
+
+        #expect(result.status == .verificationFailed)
+        #expect(store.storedToken == nil)
+    }
+
+    @Test
+    func bootstrapRestoresVerifiedLifetimeTokenWithoutNetwork() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManOfflineLicenseBootstrapTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let suiteName = "BoardManOfflineLicenseBootstrapTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let identity = LocalDeviceIdentityService(fileURL: root.appendingPathComponent("device-id"))
+        let deviceID = identity.deviceID()
+        let privateKey = P256.Signing.PrivateKey()
+        let rawToken = try makeOwnerToken(privateKey: privateKey, deviceID: deviceID)
+        let store = MemoryLicenseTokenStore(loadedToken: rawToken)
+        let entitlementService = EntitlementService(snapshot: .freeDefault)
+        let verificationDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let bootstrap = LicenseBootstrapService(
+            tokenStore: store,
+            verifier: P256SignedLicenseTokenVerifier(
+                publicKeyBase64: privateKey.publicKey.x963Representation.base64EncodedString()
+            ),
+            entitlementService: entitlementService,
+            deviceIdentity: identity,
+            bundleID: "com.uniplanck.BoardMan",
+            now: { verificationDate },
+            diagnosticDefaults: defaults
+        )
+
+        #expect(bootstrap.restoreEntitlement())
+        #expect(entitlementService.currentSnapshot.plan == .ownerLifetime)
+        #expect(entitlementService.currentSnapshot.licenseState == .ownerLifetime)
+        #expect(entitlementService.currentSnapshot.lastVerifiedAt == verificationDate)
+        #expect(entitlementService.currentSnapshot.licenseMetadata?.licenseKeyMasked == "****TEST")
+        #expect(defaults.string(forKey: "BoardManDiagnosticEntitlementStatus") == "verified")
+    }
+
+    private final class RecordingLicenseActivationClient: LicenseActivationClient {
+        let response: LicenseActivationResponse
+        var receivedRequest: LicenseActivationRequest?
+
+        init(response: LicenseActivationResponse) {
+            self.response = response
+        }
+
+        func activate(_ request: LicenseActivationRequest) async -> LicenseActivationResponse {
+            receivedRequest = request
+            return response
+        }
+    }
+
+    private final class MemoryLicenseTokenStore: LicenseTokenStoring {
+        var loadedToken: String?
+        var storedToken: SignedLicenseToken?
+
+        init(loadedToken: String? = nil) {
+            self.loadedToken = loadedToken
+        }
+
+        func loadSignedLicenseToken() -> String? {
+            return loadedToken ?? storedToken?.rawValue
+        }
+
+        func storeVerifiedSignedLicenseToken(_ token: SignedLicenseToken) throws {
+            storedToken = token
+        }
+    }
+
     private func makeOwnerToken(privateKey: P256.Signing.PrivateKey,
-                                deviceID: String) throws -> String {
+                                deviceID: String,
+                                tokenVersion: Int = 1,
+                                limits: [String: Int]? = nil) throws -> String {
         let header = try JSONSerialization.data(withJSONObject: [
             "alg": "ES256",
             "kid": "test-owner-v1",
             "typ": "JWT"
         ], options: [.sortedKeys])
-        let payload = try JSONSerialization.data(withJSONObject: [
+        var payloadObject: [String: Any] = [
             "license_id": "OWNER-TEST",
             "license_kind": "ownerLifetime",
             "plan": "ownerLifetime",
@@ -554,8 +784,10 @@ final class CommercialLicenseBoundaryTests {
             "is_lifetime": true,
             "device_id": deviceID,
             "bundle_id": "com.uniplanck.BoardMan",
-            "token_version": 1
-        ], options: [.sortedKeys])
+            "token_version": tokenVersion
+        ]
+        payloadObject["limits"] = limits
+        let payload = try JSONSerialization.data(withJSONObject: payloadObject, options: [.sortedKeys])
         let signingInput = "\(base64URL(header)).\(base64URL(payload))"
         let signature = try privateKey.signature(for: Data(signingInput.utf8))
         return "\(signingInput).\(base64URL(signature.rawRepresentation))"
@@ -599,6 +831,301 @@ final class CommercialLicenseBoundaryTests {
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+@Suite(.serialized)
+final class CommercialLicenseHardeningTests {
+
+    @Test
+    func localDeviceIdentityFailsClosedWhenPersistenceIsUnavailable() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManDeviceIdentityFailureTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let blockingParent = root.appendingPathComponent("not-a-directory")
+        try Data("blocker".utf8).write(to: blockingParent)
+        let identity = LocalDeviceIdentityService(
+            fileURL: blockingParent.appendingPathComponent("device-id")
+        )
+
+        do {
+            _ = try identity.persistentDeviceID()
+            Issue.record("Expected stable device identity persistence to fail.")
+        } catch {
+            #expect(error as? LocalDeviceIdentityError == .persistenceFailed)
+        }
+    }
+
+    @Test
+    func activationCoordinatorRequiresStableDeviceAndBuildIdentityBeforeNetwork() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManActivationPreflightTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        let blockingParent = root.appendingPathComponent("not-a-directory")
+        try Data("blocker".utf8).write(to: blockingParent)
+        let identityFailureClient = RecordingLicenseActivationClient()
+        let identityFailure = LicenseActivationCoordinator(
+            client: identityFailureClient,
+            verifier: StubSignedLicenseTokenVerifier(mode: .parseOnly),
+            tokenStore: MemoryLicenseTokenStore(),
+            entitlementService: EntitlementService(snapshot: .freeDefault),
+            deviceIdentity: LocalDeviceIdentityService(
+                fileURL: blockingParent.appendingPathComponent("device-id")
+            ),
+            bundleID: "com.uniplanck.BoardMan",
+            clientVersion: "9.9.9"
+        )
+
+        let identityResult = await identityFailure.activate(licenseKey: "LIFETIME-CODE")
+        #expect(identityResult.status == .storageFailed)
+        #expect(identityFailureClient.receivedRequest == nil)
+
+        let metadataFailureClient = RecordingLicenseActivationClient()
+        let metadataFailure = LicenseActivationCoordinator(
+            client: metadataFailureClient,
+            verifier: StubSignedLicenseTokenVerifier(mode: .parseOnly),
+            tokenStore: MemoryLicenseTokenStore(),
+            entitlementService: EntitlementService(snapshot: .freeDefault),
+            deviceIdentity: LocalDeviceIdentityService(fileURL: root.appendingPathComponent("device-id")),
+            bundleID: nil,
+            clientVersion: "9.9.9"
+        )
+
+        let metadataResult = await metadataFailure.activate(licenseKey: "LIFETIME-CODE")
+        #expect(metadataResult.status == .notConfigured)
+        #expect(metadataFailureClient.receivedRequest == nil)
+    }
+
+    @Test
+    func bootstrapFallsBackToFreeWhenStableDeviceIdentityIsUnavailable() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManBootstrapIdentityFailureTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let blockingParent = root.appendingPathComponent("not-a-directory")
+        try Data("blocker".utf8).write(to: blockingParent)
+        let suiteName = "BoardManBootstrapIdentityFailureTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let entitlementService = EntitlementService(snapshot: .proActive())
+        let bootstrap = LicenseBootstrapService(
+            tokenStore: MemoryLicenseTokenStore(loadedToken: "header.payload.signature"),
+            verifier: StubSignedLicenseTokenVerifier(mode: .parseOnly),
+            entitlementService: entitlementService,
+            deviceIdentity: LocalDeviceIdentityService(
+                fileURL: blockingParent.appendingPathComponent("device-id")
+            ),
+            bundleID: "com.uniplanck.BoardMan",
+            diagnosticDefaults: defaults
+        )
+
+        #expect(!bootstrap.restoreEntitlement())
+        #expect(entitlementService.currentSnapshot.plan == .free)
+        #expect(defaults.string(forKey: "BoardManDiagnosticEntitlementStatus") == "deviceIdentityUnavailable")
+    }
+
+    private final class RecordingLicenseActivationClient: LicenseActivationClient {
+        var receivedRequest: LicenseActivationRequest?
+
+        func activate(_ request: LicenseActivationRequest) async -> LicenseActivationResponse {
+            receivedRequest = request
+            return LicenseActivationResponse(status: .rejected, message: "Should not be called.")
+        }
+    }
+
+    private final class MemoryLicenseTokenStore: LicenseTokenStoring {
+        let loadedToken: String?
+
+        init(loadedToken: String? = nil) {
+            self.loadedToken = loadedToken
+        }
+
+        func loadSignedLicenseToken() -> String? {
+            return loadedToken
+        }
+
+        func storeVerifiedSignedLicenseToken(_ token: SignedLicenseToken) throws {}
+    }
+}
+
+@Suite(.serialized)
+final class BoardManLicenseActivationClientTests {
+
+    @Test
+    func activationRequestEncodesOnlyPrivacySafeContractFields() throws {
+        let request = LicenseActivationRequest(
+            licenseKey: "  LIFETIME-CODE  ",
+            localDeviceID: "device-id",
+            bundleID: "com.uniplanck.BoardMan",
+            clientVersion: "9.9.9"
+        )
+
+        let data = try JSONEncoder().encode(request)
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(Set(object.keys) == Set(["license_key", "device_id", "bundle_id", "client_version"]))
+        #expect(object["license_key"] as? String == "LIFETIME-CODE")
+        #expect(object["device_id"] as? String == "device-id")
+        #expect(object["bundle_id"] as? String == "com.uniplanck.BoardMan")
+        #expect(object["client_version"] as? String == "9.9.9")
+    }
+
+    @Test
+    func urlSessionActivationClientPostsContractAndParsesResponse() async throws {
+        LicenseActivationURLProtocolStub.reset()
+        defer { LicenseActivationURLProtocolStub.reset() }
+        LicenseActivationURLProtocolStub.configure(
+            statusCode: 200,
+            json: [
+                "status": "activated",
+                "message": "Lifetime license activated.",
+                "signed_token": "header.payload.signature"
+            ]
+        )
+
+        let session = makeSession()
+        defer { session.invalidateAndCancel() }
+        let client = URLSessionLicenseActivationClient(
+            configuration: BoardManCommercialServiceConfiguration(
+                baseURL: URL(string: "https://licenses.example.test/base")
+            ),
+            session: session
+        )
+
+        let result = await client.activate(
+            LicenseActivationRequest(
+                licenseKey: "LIFETIME-CODE",
+                localDeviceID: "device-id",
+                bundleID: "com.uniplanck.BoardMan",
+                clientVersion: "9.9.9"
+            )
+        )
+
+        #expect(result.status == .activated)
+        #expect(result.signedToken == "header.payload.signature")
+        let captured = try #require(LicenseActivationURLProtocolStub.capturedRequest())
+        #expect(captured.httpMethod == "POST")
+        #expect(captured.url?.absoluteString == "https://licenses.example.test/base/v1/licenses/activate")
+        #expect(captured.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    }
+
+    @Test
+    func urlSessionActivationClientPreservesSafeRejectionMessage() async {
+        LicenseActivationURLProtocolStub.reset()
+        defer { LicenseActivationURLProtocolStub.reset() }
+        LicenseActivationURLProtocolStub.configure(
+            statusCode: 409,
+            json: [
+                "status": "rejected",
+                "message": "Deactivate the current device in MyPage first."
+            ]
+        )
+
+        let session = makeSession()
+        defer { session.invalidateAndCancel() }
+        let client = URLSessionLicenseActivationClient(
+            configuration: BoardManCommercialServiceConfiguration(
+                baseURL: URL(string: "https://licenses.example.test")
+            ),
+            session: session
+        )
+
+        let result = await client.activate(
+            LicenseActivationRequest(
+                licenseKey: "LIFETIME-CODE",
+                localDeviceID: "device-id",
+                bundleID: "com.uniplanck.BoardMan",
+                clientVersion: "9.9.9"
+            )
+        )
+
+        #expect(result.status == .rejected)
+        #expect(result.message == "Deactivate the current device in MyPage first.")
+        #expect(result.signedToken == nil)
+    }
+
+    @Test
+    func urlSessionActivationClientRejectsIncompleteIdentityWithoutNetwork() async {
+        LicenseActivationURLProtocolStub.reset()
+        defer { LicenseActivationURLProtocolStub.reset() }
+        let session = makeSession()
+        defer { session.invalidateAndCancel() }
+        let client = URLSessionLicenseActivationClient(
+            configuration: BoardManCommercialServiceConfiguration(
+                baseURL: URL(string: "https://licenses.example.test")
+            ),
+            session: session
+        )
+
+        let result = await client.activate(
+            LicenseActivationRequest(
+                licenseKey: "LIFETIME-CODE",
+                localDeviceID: "device-id",
+                bundleID: nil,
+                clientVersion: "9.9.9"
+            )
+        )
+
+        #expect(result.status == .invalidInput)
+        #expect(LicenseActivationURLProtocolStub.capturedRequest() == nil)
+    }
+
+    private func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [LicenseActivationURLProtocolStub.self]
+        return URLSession(configuration: configuration)
+    }
+
+    private class LicenseActivationURLProtocolStub: URLProtocol {
+        nonisolated(unsafe) private static var statusCode = 200
+        nonisolated(unsafe) private static var responseData = Data()
+        nonisolated(unsafe) private static var lastRequest: URLRequest?
+
+        static func configure(statusCode: Int, json: [String: Any]) {
+            self.statusCode = statusCode
+            responseData = (try? JSONSerialization.data(withJSONObject: json)) ?? Data()
+            lastRequest = nil
+        }
+
+        static func capturedRequest() -> URLRequest? {
+            return lastRequest
+        }
+
+        static func reset() {
+            statusCode = 200
+            responseData = Data()
+            lastRequest = nil
+        }
+
+        override class func canInit(with request: URLRequest) -> Bool {
+            return true
+        }
+
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+            return request
+        }
+
+        override func startLoading() {
+            Self.lastRequest = request
+            guard let url = request.url,
+                  let response = HTTPURLResponse(
+                    url: url,
+                    statusCode: Self.statusCode,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                  ) else {
+                client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+                return
+            }
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Self.responseData)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        override func stopLoading() {}
     }
 }
 

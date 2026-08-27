@@ -58,22 +58,7 @@ final class P256SignedLicenseTokenVerifier: SignedLicenseTokenVerifying {
     private let publicKey: P256.Signing.PublicKey?
 
     private static func hasValidCommercialClaims(_ payload: SignedLicenseToken.Payload) -> Bool {
-        guard payload.tokenVersion == 1 else { return false }
-
-        switch payload.licenseKind {
-        case .ownerLifetime:
-            return payload.plan == .ownerLifetime
-                && payload.state == .ownerLifetime
-                && payload.isLifetime
-                && payload.expiresAt == nil
-        case .pro:
-            return payload.plan == .pro
-                && (payload.state == .proActive || payload.state == .trial)
-                && !payload.isLifetime
-                && payload.expiresAt != nil
-        case .free:
-            return false
-        }
+        return payload.isLifetimeCommercialEntitlement || payload.isLegacyProEntitlement
     }
 
     init(publicKeyBase64: String = BoardManLicenseVerificationConfiguration.ownerPublicKeyBase64) {
@@ -125,47 +110,79 @@ final class LicenseBootstrapService {
 
     private let tokenStore: LicenseTokenStoring
     private let verifier: SignedLicenseTokenVerifying
+    private let entitlementService: EntitlementService
+    private let deviceIdentity: LocalDeviceIdentityService
+    private let bundleID: String?
+    private let now: () -> Date
+    private let diagnosticDefaults: UserDefaults
 
     init(tokenStore: LicenseTokenStoring = SignedLicenseTokenFileStore(),
-         verifier: SignedLicenseTokenVerifying = P256SignedLicenseTokenVerifier()) {
+         verifier: SignedLicenseTokenVerifying = P256SignedLicenseTokenVerifier(),
+         entitlementService: EntitlementService = .shared,
+         deviceIdentity: LocalDeviceIdentityService = .shared,
+         bundleID: String? = Bundle.main.bundleIdentifier,
+         now: @escaping () -> Date = Date.init,
+         diagnosticDefaults: UserDefaults = AppEnvironment.current.defaults) {
         self.tokenStore = tokenStore
         self.verifier = verifier
+        self.entitlementService = entitlementService
+        self.deviceIdentity = deviceIdentity
+        self.bundleID = bundleID
+        self.now = now
+        self.diagnosticDefaults = diagnosticDefaults
     }
 
     @discardableResult
     func restoreEntitlement() -> Bool {
         guard let token = tokenStore.loadSignedLicenseToken() else {
-            EntitlementService.shared.replaceSnapshot(.freeDefault)
+            entitlementService.replaceSnapshot(.freeDefault)
             publishDiagnostic(status: "missingToken", plan: .free)
             return false
         }
 
+        guard let configuredBundleID = bundleID?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !configuredBundleID.isEmpty else {
+            entitlementService.replaceSnapshot(.freeDefault)
+            publishDiagnostic(status: "bundleUnavailable", plan: .free)
+            return false
+        }
+
+        let deviceID: String
+        do {
+            deviceID = try deviceIdentity.persistentDeviceID()
+        } catch {
+            entitlementService.replaceSnapshot(.freeDefault)
+            publishDiagnostic(status: "deviceIdentityUnavailable", plan: .free)
+            return false
+        }
+
+        let verificationDate = now()
         let context = SignedLicenseTokenVerificationContext(
-            deviceID: LocalDeviceIdentityService.shared.deviceID(),
-            bundleID: Bundle.main.bundleIdentifier,
-            verificationDate: Date()
+            deviceID: deviceID,
+            bundleID: configuredBundleID,
+            verificationDate: verificationDate
         )
         switch verifier.verify(token, context: context) {
         case .verified(let payload):
-            let snapshot = payload.entitlementSnapshot(lastVerifiedAt: context.verificationDate)
+            let snapshot = payload.entitlementSnapshot(lastVerifiedAt: verificationDate)
             guard snapshot.isProEntitled else {
-                EntitlementService.shared.replaceSnapshot(.freeDefault)
+                entitlementService.replaceSnapshot(.freeDefault)
                 publishDiagnostic(status: "inactive", plan: .free)
                 return false
             }
-            EntitlementService.shared.replaceSnapshot(snapshot)
+            entitlementService.replaceSnapshot(snapshot)
             publishDiagnostic(status: "verified", plan: snapshot.plan)
             return true
         case .invalid:
-            EntitlementService.shared.replaceSnapshot(.freeDefault)
+            entitlementService.replaceSnapshot(.freeDefault)
             publishDiagnostic(status: "invalid", plan: .free)
             return false
         case .unsupported:
-            EntitlementService.shared.replaceSnapshot(.freeDefault)
+            entitlementService.replaceSnapshot(.freeDefault)
             publishDiagnostic(status: "unsupported", plan: .free)
             return false
         case .notConfigured:
-            EntitlementService.shared.replaceSnapshot(.freeDefault)
+            entitlementService.replaceSnapshot(.freeDefault)
             publishDiagnostic(status: "notConfigured", plan: .free)
             return false
         }
@@ -173,10 +190,9 @@ final class LicenseBootstrapService {
 
     private func publishDiagnostic(status: String, plan: EntitlementPlan) {
         // Diagnostic only. Entitlement decisions never read these defaults.
-        let defaults = AppEnvironment.current.defaults
-        defaults.set(status, forKey: "BoardManDiagnosticEntitlementStatus")
-        defaults.set(plan.rawValue, forKey: "BoardManDiagnosticEntitlementPlan")
-        defaults.set(Date(), forKey: "BoardManDiagnosticEntitlementCheckedAt")
+        diagnosticDefaults.set(status, forKey: "BoardManDiagnosticEntitlementStatus")
+        diagnosticDefaults.set(plan.rawValue, forKey: "BoardManDiagnosticEntitlementPlan")
+        diagnosticDefaults.set(now(), forKey: "BoardManDiagnosticEntitlementCheckedAt")
     }
 }
 

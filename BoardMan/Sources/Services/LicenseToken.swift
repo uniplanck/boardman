@@ -35,10 +35,32 @@ struct SignedLicenseToken: Equatable {
         let bundleID: String?
         let tokenVersion: Int?
 
+        var isLifetimeCommercialEntitlement: Bool {
+            return tokenVersion == 1
+                && licenseKind == .ownerLifetime
+                && plan == .ownerLifetime
+                && state == .ownerLifetime
+                && isLifetime
+                && expiresAt == nil
+        }
+
+        var isLegacyProEntitlement: Bool {
+            return tokenVersion == 1
+                && licenseKind == .pro
+                && plan == .pro
+                && (state == .proActive || state == .trial)
+                && !isLifetime
+                && expiresAt != nil
+        }
+
         func entitlementSnapshot(lastVerifiedAt: Date,
                                  offlineGraceExpiresAt: Date? = nil) -> EntitlementSnapshot {
+            let resolvedFeatures = isLifetimeCommercialEntitlement
+                ? features.union(EntitlementFeature.lifetimeLocalFeatures)
+                : features
+            let resolvedLimits = isLifetimeCommercialEntitlement ? .lifetimeDefault : limits
             let metadata = LicenseMetadata(
-                licenseKeyMasked: licenseID,
+                licenseKeyMasked: Self.masked(licenseID),
                 deviceIdMasked: deviceID.map(Self.masked),
                 activatedAt: issuedAt,
                 lastVerifiedAt: lastVerifiedAt,
@@ -49,8 +71,8 @@ struct SignedLicenseToken: Equatable {
             return EntitlementSnapshot(
                 plan: plan,
                 licenseState: state,
-                features: features,
-                limits: limits,
+                features: resolvedFeatures,
+                limits: resolvedLimits,
                 licenseMetadata: metadata,
                 expiresAt: expiresAt,
                 offlineGraceExpiresAt: offlineGraceExpiresAt
@@ -248,11 +270,13 @@ enum BoardManLocalStatePaths {
 
     static func writePrivateData(_ data: Data, to fileURL: URL) throws {
         let fileManager = FileManager.default
+        let directoryURL = fileURL.deletingLastPathComponent()
         try fileManager.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
+            at: directoryURL,
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
+        try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directoryURL.path)
         try data.write(to: fileURL, options: .atomic)
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
     }

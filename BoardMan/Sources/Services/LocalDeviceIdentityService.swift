@@ -5,6 +5,10 @@
 
 import Foundation
 
+enum LocalDeviceIdentityError: Error, Equatable {
+    case persistenceFailed
+}
+
 final class LocalDeviceIdentityService {
 
     static let shared = LocalDeviceIdentityService()
@@ -17,7 +21,7 @@ final class LocalDeviceIdentityService {
         self.fileURL = fileURL
     }
 
-    func deviceID() -> String {
+    func persistentDeviceID() throws -> String {
         lock.lock(); defer { lock.unlock() }
 
         if let cachedDeviceID {
@@ -30,13 +34,16 @@ final class LocalDeviceIdentityService {
         }
 
         let newDeviceID = UUID().uuidString
-        if storeDeviceID(newDeviceID) {
-            cachedDeviceID = newDeviceID
-            return newDeviceID
+        guard storeDeviceID(newDeviceID) else {
+            throw LocalDeviceIdentityError.persistenceFailed
         }
 
         cachedDeviceID = newDeviceID
         return newDeviceID
+    }
+
+    func deviceID() -> String {
+        return (try? persistentDeviceID()) ?? UUID().uuidString
     }
 
     private func readDeviceID() -> String? {

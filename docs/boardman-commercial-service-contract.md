@@ -66,6 +66,8 @@ The base URL is supplied by build/runtime configuration:
 - environment variable: `BOARD_MAN_COMMERCIAL_SERVICE_BASE_URL`
 - Info.plist key: `BoardManCommercialServiceBaseURL`
 
+Production and remote activation URLs must use HTTPS. Plain HTTP is accepted only for loopback development hosts (`localhost`, `127.0.0.1`, or `::1`). Invalid or insecure remote base URLs are treated as unconfigured and no license request is sent.
+
 The public client must not contain a private service secret.
 
 ### Request

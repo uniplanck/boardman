@@ -6,15 +6,37 @@
 // swiftlint:disable identifier_name function_parameter_count line_length
 import Cocoa
 
+@MainActor
 final class BoardManServicesPreferenceViewController: NSViewController {
+    private let activationCoordinator: LicenseActivationCoordinator
     private let licenseField = NSSecureTextField(string: "")
-    private let validationLabel = BoardManPreferenceUI.label("Not connected yet", size: 12, color: BoardManPreferenceUI.secondaryText)
+    private let activateButton = BoardManPreferenceUI.primaryButton("Activate License")
+    private let pasteButton = BoardManPreferenceUI.secondaryButton("Paste from Clipboard")
+    private let validationLabel = BoardManPreferenceUI.label("Ready for Lifetime activation", size: 12, color: BoardManPreferenceUI.secondaryText)
+    private let activationSummary = BoardManPreferenceUI.label("No Lifetime license is active on this Mac.", size: 13, color: BoardManPreferenceUI.secondaryText)
     private let planLabel = BoardManPreferenceUI.label("Free Plan", size: 28, weight: .bold)
     private let statusPill = BoardManPreferenceUI.label("Free", size: 12, weight: .semibold)
     private let currentPlanValue = BoardManPreferenceUI.label("Free Plan", size: 12, weight: .semibold)
     private let statusValue = BoardManPreferenceUI.label("Free", size: 12, weight: .semibold)
     private let lastVerifiedValue = BoardManPreferenceUI.label("Not verified / Offline", size: 12, weight: .semibold, color: BoardManPreferenceUI.red)
     private let deviceStatus = BoardManPreferenceUI.label("Not activated", size: 12, color: BoardManPreferenceUI.secondaryText)
+    private let maskedDeviceIDValue = BoardManPreferenceUI.label("Not activated", size: 13, weight: .semibold)
+    private let activatedAtValue = BoardManPreferenceUI.label("—", size: 13, weight: .semibold)
+
+    override init(nibName nibNameOrNil: NSNib.Name?, bundle nibBundleOrNil: Bundle?) {
+        activationCoordinator = LicenseActivationCoordinator()
+        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
+    }
+
+    init(activationCoordinator: LicenseActivationCoordinator) {
+        self.activationCoordinator = activationCoordinator
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) {
+        activationCoordinator = LicenseActivationCoordinator()
+        super.init(coder: coder)
+    }
 
     override func loadView() {
         view = NSView(frame: NSRect(x: 0, y: 0, width: 1180, height: 620))
@@ -45,44 +67,39 @@ final class BoardManServicesPreferenceViewController: NSViewController {
         view.addSubview(currentPlan)
 
         let activation = card(x: 395, y: 320, w: 405, h: 250, title: "2. License Key Activation", icon: "key")
-        licenseField.placeholderString = "License activation is not connected yet"
+        licenseField.placeholderString = "Enter your Board-Man Lifetime license code"
         licenseField.font = NSFont.systemFont(ofSize: 14)
         licenseField.textColor = BoardManPreferenceUI.primaryText
         licenseField.backgroundColor = BoardManPreferenceUI.field
-        licenseField.isEnabled = false
-        licenseField.toolTip = "License activation is a disabled preview in this build."
+        licenseField.toolTip = "The code is sent only when you explicitly activate it."
         licenseField.frame = NSRect(x: 20, y: 165, width: 365, height: 38)
         activation.addSubview(licenseField)
-        let activate = BoardManPreferenceUI.primaryButton("Activate License")
-        activate.target = self
-        activate.action = #selector(activateLicense)
-        activate.isEnabled = false
-        activate.toolTip = "Activation is not connected yet."
-        activate.frame = NSRect(x: 20, y: 115, width: 165, height: 38)
-        activation.addSubview(activate)
-        let paste = BoardManPreferenceUI.secondaryButton("Paste from Clipboard")
-        paste.target = self
-        paste.action = #selector(pasteLicense)
-        paste.isEnabled = false
-        paste.toolTip = "License input is disabled until activation is implemented."
-        paste.frame = NSRect(x: 195, y: 115, width: 190, height: 38)
-        activation.addSubview(paste)
+        activateButton.target = self
+        activateButton.action = #selector(activateLicense)
+        activateButton.toolTip = "Verify and bind this Lifetime license to this Mac."
+        activateButton.frame = NSRect(x: 20, y: 115, width: 165, height: 38)
+        activation.addSubview(activateButton)
+        pasteButton.target = self
+        pasteButton.action = #selector(pasteLicense)
+        pasteButton.toolTip = "Paste a license code locally without activating it yet."
+        pasteButton.frame = NSRect(x: 195, y: 115, width: 190, height: 38)
+        activation.addSubview(pasteButton)
         activation.addSubview(BoardManPreferenceUI.label("Validation status:", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 20, y: 78, w: 130, h: 20))
         validationLabel.frame = NSRect(x: 150, y: 78, width: 220, height: 20)
         activation.addSubview(validationLabel)
-        let empty = BoardManPreferenceUI.label("No license has been activated. Activation is not connected in this build.", size: 13, color: BoardManPreferenceUI.secondaryText)
-        empty.alignment = .center
-        empty.frame = NSRect(x: 20, y: 18, width: 365, height: 44)
-        BoardManPreferenceUI.prepare(empty, color: BoardManPreferenceUI.field, radius: BoardManPreferenceUI.Radius.control, border: BoardManPreferenceUI.borderSubtle)
-        activation.addSubview(empty)
+        activationSummary.alignment = .center
+        activationSummary.frame = NSRect(x: 20, y: 18, width: 365, height: 44)
+        BoardManPreferenceUI.prepare(activationSummary, color: BoardManPreferenceUI.field, radius: BoardManPreferenceUI.Radius.control, border: BoardManPreferenceUI.borderSubtle)
+        activation.addSubview(activationSummary)
         view.addSubview(activation)
 
         let device = card(x: 820, y: 320, w: 330, h: 250, title: "3. Device Binding", icon: "laptopcomputer")
         device.addSubview(row("Device name:", Host.current().localizedName ?? "This Mac", y: 165))
-        device.addSubview(row("Masked Device ID:", "Not activated", y: 132))
-        device.addSubview(row("Activated at:", "—", y: 99))
-        device.addSubview(BoardManPreferenceUI.label("1 license = 1 PC. Device binding is not connected in this build.", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 20, y: 58, w: 285, h: 38))
-        let deactivate = BoardManPreferenceUI.secondaryButton("Deactivate this device")
+        device.addSubview(row("Masked Device ID:", value: maskedDeviceIDValue, y: 132))
+        device.addSubview(row("Activated at:", value: activatedAtValue, y: 99))
+        device.addSubview(BoardManPreferenceUI.label("1 license = 1 active device. Deactivate it from MyPage before moving to another Mac.", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 20, y: 58, w: 285, h: 38))
+        let deactivate = BoardManPreferenceUI.secondaryButton("Deactivate in MyPage")
+        deactivate.toolTip = "Device deactivation will be enabled when MyPage license management is connected."
         deactivate.isEnabled = false
         deactivate.frame = NSRect(x: 20, y: 20, width: 290, height: 30)
         device.addSubview(deactivate)
@@ -117,6 +134,7 @@ final class BoardManServicesPreferenceViewController: NSViewController {
 
     private func refreshPlanState() {
         let snapshot = EntitlementGate.currentSnapshot()
+        let metadata = snapshot.licenseMetadata
         let active = snapshot.isProEntitled
         let isOwnerLifetime = snapshot.licenseState == .ownerLifetime && snapshot.plan == .ownerLifetime
         let planName = isOwnerLifetime ? "Board-Man Lifetime" : (active ? "Legacy Entitlement" : "Free Plan")
@@ -126,12 +144,22 @@ final class BoardManServicesPreferenceViewController: NSViewController {
         statusPill.layer?.backgroundColor = (active ? BoardManPreferenceUI.redSoft : BoardManPreferenceUI.card).cgColor
         currentPlanValue.stringValue = planName
         statusValue.stringValue = statusName
-        lastVerifiedValue.stringValue = active ? "Verified" : "Not verified / Offline"
+        lastVerifiedValue.stringValue = metadata?.lastVerifiedAt.map(Self.formattedTimestamp)
+            ?? (active ? "Verified" : "Not verified / Offline")
         lastVerifiedValue.textColor = active ? .systemGreen : BoardManPreferenceUI.red
         deviceStatus.stringValue = active ? "Activated" : "Not activated"
         deviceStatus.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
-        validationLabel.stringValue = isOwnerLifetime ? "Lifetime license verified" : (active ? "Legacy entitlement verified" : "Not connected yet")
+        validationLabel.stringValue = isOwnerLifetime ? "Lifetime license verified" : (active ? "Legacy entitlement verified" : "Ready for Lifetime activation")
         validationLabel.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
+
+        maskedDeviceIDValue.stringValue = metadata?.deviceIdMasked ?? "Not activated"
+        activatedAtValue.stringValue = metadata?.activatedAt.map(Self.formattedTimestamp) ?? "—"
+        activationSummary.stringValue = isOwnerLifetime
+            ? "Lifetime is active. This Mac will continue to verify the signed license offline."
+            : "No Lifetime license is active on this Mac."
+        licenseField.isEnabled = !isOwnerLifetime
+        activateButton.isEnabled = !isOwnerLifetime
+        pasteButton.isEnabled = !isOwnerLifetime
     }
 
     private func card(x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, title: String, icon: String) -> NSView {
@@ -145,9 +173,14 @@ final class BoardManServicesPreferenceViewController: NSViewController {
     }
 
     private func row(_ left: String, _ right: String, y: CGFloat) -> NSView {
+        return row(left, value: BoardManPreferenceUI.label(right, size: 13, weight: .semibold), y: y)
+    }
+
+    private func row(_ left: String, value: NSTextField, y: CGFloat) -> NSView {
         let row = NSView(frame: NSRect(x: 20, y: y, width: 290, height: 20))
         row.addSubview(BoardManPreferenceUI.label(left, size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 0, y: 0, w: 145, h: 20))
-        row.addSubview(BoardManPreferenceUI.label(right, size: 13, weight: .semibold).positioned(x: 150, y: 0, w: 140, h: 20))
+        value.frame = NSRect(x: 150, y: 0, width: 140, height: 20)
+        row.addSubview(value)
         return row
     }
 
@@ -176,13 +209,65 @@ final class BoardManServicesPreferenceViewController: NSViewController {
     }
 
     @objc private func pasteLicense() {
-        validationLabel.stringValue = "Activation is not connected yet."
-        validationLabel.textColor = BoardManPreferenceUI.secondaryText
+        guard let value = NSPasteboard.general.string(forType: .string)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            setValidation(message: "The clipboard does not contain a license code.", color: .systemRed)
+            return
+        }
+
+        licenseField.stringValue = value
+        setValidation(message: "License code pasted locally. Review it, then activate.", color: BoardManPreferenceUI.secondaryText)
     }
 
     @objc private func activateLicense() {
-        validationLabel.stringValue = "Activation is not connected yet."
-        validationLabel.textColor = BoardManPreferenceUI.secondaryText
+        let licenseKey = licenseField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !licenseKey.isEmpty else {
+            setValidation(message: "Enter a Lifetime license code.", color: .systemRed)
+            return
+        }
+
+        setActivationInProgress(true)
+        Task { [weak self] in
+            guard let self else { return }
+            let response = await activationCoordinator.activate(licenseKey: licenseKey)
+            applyActivationResponse(response)
+        }
+    }
+
+    private func applyActivationResponse(_ response: LicenseActivationResponse) {
+        setActivationInProgress(false)
+
+        switch response.status {
+        case .activated:
+            licenseField.stringValue = ""
+            refreshPlanState()
+            setValidation(message: response.message.isEmpty ? "Lifetime license activated." : response.message, color: .systemGreen)
+        case .networkUnavailable, .notConfigured:
+            setValidation(message: response.message, color: .systemOrange)
+        case .invalidInput, .rejected, .serverError, .verificationFailed, .storageFailed:
+            setValidation(message: response.message, color: .systemRed)
+        }
+    }
+
+    private func setActivationInProgress(_ inProgress: Bool) {
+        let isLifetimeActive = EntitlementGate.currentSnapshot().licenseState == .ownerLifetime
+        licenseField.isEnabled = !inProgress && !isLifetimeActive
+        activateButton.isEnabled = !inProgress && !isLifetimeActive
+        pasteButton.isEnabled = !inProgress && !isLifetimeActive
+        activateButton.title = inProgress ? "Activating…" : "Activate License"
+        if inProgress {
+            setValidation(message: "Verifying the Lifetime license…", color: BoardManPreferenceUI.secondaryText)
+        }
+    }
+
+    private func setValidation(message: String, color: NSColor) {
+        validationLabel.stringValue = message
+        validationLabel.textColor = color
+    }
+
+    private static func formattedTimestamp(_ date: Date) -> String {
+        return DateFormatter.localizedString(from: date, dateStyle: .medium, timeStyle: .short)
     }
 
     @objc private func openBuyPro() {

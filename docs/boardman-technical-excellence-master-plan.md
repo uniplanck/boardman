@@ -639,6 +639,137 @@ Board-Man-owned outbound request construction was audited on 2026-08-27. The onl
 
 Clipboard-sensitive diagnostics remain local. Home paths are redacted, line breaks are flattened, messages are capped at 1,024 characters, paste-count identity/key values are redacted, and local diagnostic files are bounded. The redaction contract is covered by the Phase 5 reliability suite and the current `183/183` full regression. Any future cloud or AI content processing remains subject to explicit opt-in and a new privacy acceptance gate.
 
+# Commercial Program — Free / Lifetime Distribution
+
+**Program status: ACTIVE. Phase C1 and C2 are PASS / CLOSED. C3/C4 implementation is GREEN on the isolated uniplanck.com feature branch; production configuration, deployment, payment/email/live-device acceptance remain HOLD.**
+
+This program replaces the earlier subscription-oriented commercial assumptions with a deliberately simple two-tier product contract:
+
+```text
+Board-Man Free
+Board-Man Lifetime
+```
+
+There is no subscription product. Legacy subscription/trial token shapes may remain parseable only inside an isolated compatibility boundary until their safe removal; they are not a supported sales plan, upgrade path, or user-facing product state.
+
+## Approved commercial contract
+
+### Purchase and ownership
+
+- purchase occurs on the Board-Man product LP at `uniplanck.com`,
+- one purchase issues one reusable lifetime license code,
+- the code is delivered by email and is also visible in the purchaser's MyPage,
+- one license permits one simultaneously activated device,
+- the purchaser may deactivate the current device from MyPage and activate another device with the same code,
+- a lifetime license has no expiry date,
+- the same lifetime license remains valid across future Board-Man app versions,
+- a device change does not require issuing a replacement license code.
+
+### Free limits
+
+| Capability | Free | Lifetime |
+|---|---:|---:|
+| Stored history | 100 | Unlimited |
+| PIN items | 3 | Unlimited |
+| Templates | 5 | Unlimited |
+| Template folders | 1 | Unlimited |
+| Basic paste, search, privacy and recovery | Available | Available |
+| Export / import | Available | Available |
+| Advanced search | Locked | Available |
+| Workflow actions | Locked | Available |
+| Template variables | Locked | Available |
+| Workspace / session features | Locked | Available |
+| Advanced timed PIN behavior | Locked | Available |
+| Advanced appearance | Locked | Available |
+| Detailed local analytics | Locked | Available |
+
+Free limits block creation of new items after the boundary is reached. They must not silently delete, corrupt, hide, or make existing user data inaccessible. Reliability, privacy, recovery, security updates, basic export/import, and ordinary paste behavior are never withheld as a failure tax.
+
+### Service-backed features
+
+Cloud storage, paid AI usage, team infrastructure, API hosting, or other services with ongoing provider cost are outside the lifetime-local contract unless a later explicit product decision includes them. A Lifetime license unlocks the approved local paid feature set; it does not silently promise unlimited third-party service expenditure forever, because that would be a rather creative way to turn every sale into a future liability.
+
+## Commercial phases
+
+### C1 — Product contract and client entitlement foundation [PASS / CLOSED]
+
+Required outcomes:
+
+- central Free/Lifetime policy is the single source of truth,
+- Free limits are `100 / 3 / 5 / 1`,
+- Lifetime local limits are unlimited,
+- Lifetime-only local feature gates are explicit,
+- service-backed features remain a separate entitlement category,
+- subscription is marked unsupported by the current product contract,
+- future app versions remain accepted by lifetime entitlement verification,
+- existing over-limit data is preserved,
+- focused entitlement/license tests PASS,
+- affected Debug build PASS,
+- exact feature-branch commit.
+
+### C2 — Board-Man activation client [PASS / CLOSED]
+
+Implemented outcomes:
+
+- secure license-code entry, paste, activation progress and result feedback are wired into Settings,
+- the client calls the versioned `/v1/licenses/activate` endpoint using the four-field privacy-safe request contract,
+- remote activation requires HTTPS; plain HTTP is accepted only for loopback development hosts,
+- activation fails closed unless a stable locally persisted device identity, bundle identifier and client version are available,
+- signed Lifetime tokens are verified for ES256/P-256 signature, bundle, token version and device binding before entitlement replacement,
+- only the verified signed token is persisted; state directory/file permissions are normalized to `0700 / 0600`,
+- license and device diagnostics are masked, and a signed token is not returned from the coordinator into the UI layer,
+- verified Lifetime tokens normalize to the approved unlimited local limits and current Lifetime-local feature set,
+- launch-time offline restore is wired before runtime services and safely falls back to Free when verification identity is unavailable,
+- invalid input, unconfigured build, network unavailability, service rejection, malformed response, verification failure and storage failure remain distinct client states,
+- service failure does not block launch, ordinary paste, basic search or other Free/local behavior.
+
+Closure evidence:
+
+- focused C2 gate: `18/18 PASS` across four suites,
+- SwiftLint: `0 serious`,
+- affected Debug build: `PASS`,
+- fresh full regression: `196/196 PASS`, failed `0`, skipped `0`,
+- `git diff --check`: `PASS`.
+
+C2 closes the native client boundary. Live production activation is intentionally a separate C3/C4 acceptance gate. The private service and MyPage implementation now exist on the isolated `uniplanck.com` feature branch, but no production secret, payment, customer-data mutation, email delivery, deploy, or live activation is claimed here.
+
+### C3 — uniplanck purchase, issuance and email delivery [IMPLEMENTATION GREEN / LIVE HOLD]
+
+- create one license per completed Board-Man purchase,
+- retain only hashed or otherwise safely managed license credentials server-side,
+- send the license code by transactional email,
+- associate purchase, user, product and license without exposing signing secrets,
+- make issuance idempotent so duplicate payment/webhook delivery cannot mint accidental duplicate licenses.
+
+### C4 — MyPage license and device management [IMPLEMENTATION GREEN / LIVE HOLD]
+
+- show the purchaser's license code safely,
+- show current activation and masked device details,
+- permit explicit device deactivation,
+- make deactivation idempotent and auditable,
+- allow the same license code to activate a replacement device after release,
+- enforce one simultaneous active device.
+
+### C5 — App-wide Free/Lifetime UX
+
+- connect every approved quantity and feature gate to the central entitlement policy,
+- show the exact limit and upgrade path at the point of refusal,
+- never destroy existing data when a gate becomes restrictive,
+- replace obsolete Pro/subscription wording with Lifetime wording,
+- preserve keyboard-first operation and offline startup/paste behavior.
+
+### C6 — Purchase-to-device E2E and release acceptance
+
+- LP purchase to license issuance,
+- email and MyPage visibility,
+- first-device activation,
+- offline relaunch with the verified signed token,
+- MyPage deactivation,
+- second-device activation using the same code,
+- one-device concurrency rejection,
+- invalid/tampered/device-mismatched token rejection,
+- signed/notarized release and previous-version update acceptance.
+
 # Phase 6 — Product capability superiority
 
 **Goal: add capability only after the foundation is fast and clean.**
@@ -813,10 +944,14 @@ Every phase closes only with evidence for:
 
 # 10. Immediate next action
 
-**Phase 5 is PASS / CLOSED. Commercial Free/Lifetime Phase 1 is PASS / CLOSED; proceed with Phase 2 Lifetime activation wiring without reopening accepted Phase 5 work.**
+**Current authoritative action: C1/C2 are PASS / CLOSED. C3/C4 implementation is committed on the isolated `uniplanck.com` feature branch; next is preview/local integration, secret/config provisioning under explicit production authority, and purchase→email/MyPage→device-transfer live acceptance. Phase 5 remains PASS / CLOSED.**
 
 `docs/boardman-paste-reliability-matrix.md` remains optional QA evidence. Unexercised rows remain factually `pending`, but the product owner explicitly waived them as a Phase 5 closure gate on 2026-08-27.
 
 Do not reopen P5.1, P5.2, or P5.3 unless fresh code, test, or runtime evidence identifies a concrete regression. Phase 1 measurement remains useful as non-blocking calibration evidence for later product and release work.
 
 This document remains the default technical roadmap unless a newer explicitly approved roadmap supersedes it.
+
+<!-- BOARDMAN_C3_CONTRACT_LINK -->
+
+Commercial C3 service authority: [`docs/boardman-commercial-c3-service-contract.md`](boardman-commercial-c3-service-contract.md). The artifact freezes the activation API, signed-token claims, purchase/idempotency rules, MyPage release boundary, private data model, security gates, and the production-operation HOLD list.

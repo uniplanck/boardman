@@ -70,7 +70,7 @@ struct BoardManCommercialServiceConfiguration: Equatable {
     let baseURL: URL?
 
     init(baseURL: URL?) {
-        self.baseURL = baseURL
+        self.baseURL = Self.validatedBaseURL(baseURL)
     }
 
     static func current(environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -83,6 +83,20 @@ struct BoardManCommercialServiceConfiguration: Equatable {
 
     var activationURL: URL? {
         baseURL?.appendingPathComponent("v1/licenses/activate", isDirectory: false)
+    }
+
+    private static func validatedBaseURL(_ url: URL?) -> URL? {
+        guard let url,
+              let scheme = url.scheme?.lowercased(),
+              let host = url.host?.lowercased(),
+              !host.isEmpty else {
+            return nil
+        }
+        if scheme == "https" {
+            return url
+        }
+        let loopbackHosts = Set(["localhost", "127.0.0.1", "::1"])
+        return scheme == "http" && loopbackHosts.contains(host) ? url : nil
     }
 }
 
@@ -101,6 +115,17 @@ final class URLSessionLicenseActivationClient: LicenseActivationClient {
             return LicenseActivationResponse(
                 status: .invalidInput,
                 message: "Enter a license key."
+            )
+        }
+        guard let deviceID = request.localDeviceID?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !deviceID.isEmpty,
+              let bundleID = request.bundleID?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !bundleID.isEmpty,
+              let clientVersion = request.clientVersion?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !clientVersion.isEmpty else {
+            return LicenseActivationResponse(
+                status: .invalidInput,
+                message: "The activation request is missing required device or build identity."
             )
         }
         guard let activationURL = configuration.activationURL else {
@@ -164,41 +189,78 @@ final class LicenseActivationCoordinator {
     private let tokenStore: LicenseTokenStoring
     private let entitlementService: EntitlementService
     private let deviceIdentity: LocalDeviceIdentityService
+    private let bundleID: String?
+    private let clientVersion: String?
+    private let now: () -> Date
 
     init(client: LicenseActivationClient = URLSessionLicenseActivationClient(),
          verifier: SignedLicenseTokenVerifying = P256SignedLicenseTokenVerifier(),
          tokenStore: LicenseTokenStoring = SignedLicenseTokenFileStore(),
          entitlementService: EntitlementService = .shared,
-         deviceIdentity: LocalDeviceIdentityService = .shared) {
+         deviceIdentity: LocalDeviceIdentityService = .shared,
+         bundleID: String? = Bundle.main.bundleIdentifier,
+         clientVersion: String? = Bundle.main.appVersion,
+         now: @escaping () -> Date = Date.init) {
         self.client = client
         self.verifier = verifier
         self.tokenStore = tokenStore
         self.entitlementService = entitlementService
         self.deviceIdentity = deviceIdentity
+        self.bundleID = bundleID
+        self.clientVersion = clientVersion
+        self.now = now
     }
 
     func activate(licenseKey: String) async -> LicenseActivationResponse {
-        let deviceID = deviceIdentity.deviceID()
-        let request = LicenseActivationRequest(
-            licenseKey: licenseKey,
-            localDeviceID: deviceID
-        )
-        let response = await client.activate(request)
-        guard response.status == .activated,
-              let rawToken = response.signedToken else {
-            return response
+        let deviceID: String
+        do {
+            deviceID = try deviceIdentity.persistentDeviceID()
+        } catch {
+            return LicenseActivationResponse(
+                status: .storageFailed,
+                message: "A stable local device identity could not be stored."
+            )
         }
 
+        guard let configuredBundleID = bundleID?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !configuredBundleID.isEmpty,
+              let configuredClientVersion = clientVersion?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !configuredClientVersion.isEmpty else {
+            return LicenseActivationResponse(
+                status: .notConfigured,
+                message: "This build is missing required licensing identity metadata."
+            )
+        }
+
+        let request = LicenseActivationRequest(
+            licenseKey: licenseKey,
+            localDeviceID: deviceID,
+            bundleID: configuredBundleID,
+            clientVersion: configuredClientVersion
+        )
+        let response = await client.activate(request)
+        guard response.status == .activated else {
+            return response
+        }
+        guard let rawToken = response.signedToken else {
+            return LicenseActivationResponse(
+                status: .verificationFailed,
+                message: "The activation service did not return a signed Lifetime token."
+            )
+        }
+
+        let verificationDate = now()
         let context = SignedLicenseTokenVerificationContext(
             deviceID: deviceID,
-            bundleID: request.bundleID,
-            verificationDate: Date()
+            bundleID: configuredBundleID,
+            verificationDate: verificationDate
         )
         guard case .verified(let payload) = verifier.verify(rawToken, context: context),
+              payload.isLifetimeCommercialEntitlement,
               let parsedToken = try? SignedLicenseToken(rawValue: rawToken) else {
             return LicenseActivationResponse(
                 status: .verificationFailed,
-                message: "The activation service returned a token that Board-Man could not verify."
+                message: "Board-Man accepts only a valid device-bound Lifetime token for new activation."
             )
         }
 
@@ -212,9 +274,12 @@ final class LicenseActivationCoordinator {
         }
 
         entitlementService.replaceSnapshot(
-            payload.entitlementSnapshot(lastVerifiedAt: Date())
+            payload.entitlementSnapshot(lastVerifiedAt: verificationDate)
         )
-        return response
+        return LicenseActivationResponse(
+            status: .activated,
+            message: response.message
+        )
     }
 }
 
