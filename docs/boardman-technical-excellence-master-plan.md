@@ -1,9 +1,9 @@
 # Board-Man Technical Excellence Master Plan
 
-Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 PASS / CLOSED, Phase 4 PASS / CLOSED, Phase 5 ACTIVE (P5.2/P5.3 PASS / CLOSED; P5.1 manual acceptance OPEN)
+Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 PASS / CLOSED, Phase 4 PASS / CLOSED, Phase 5 PASS / CLOSED (P5.1 manual matrix explicitly waived by product owner on 2026-08-27)
 Created: 2026-08-21
 Baseline refreshed: 2026-08-27
-Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 search and information retrieval (P3.1-P3.3) is PASS / CLOSED. Phase 4 structural decomposition, dependency reduction, and concurrency hardening is PASS / CLOSED. Phase 5 remains ACTIVE: P5.2 data integrity/recovery and P5.3 privacy are PASS / CLOSED; P5.1 automated coverage is PASS and real-application manual acceptance remains OPEN.**
+Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 search and information retrieval (P3.1-P3.3) is PASS / CLOSED. Phase 4 structural decomposition, dependency reduction, and concurrency hardening is PASS / CLOSED. Phase 5 reliability/recovery/privacy is PASS / CLOSED. P5.1 automated coverage is PASS; the remaining real-application manual matrix was explicitly waived by the product owner on 2026-08-27 and is no longer a closure gate.**
 
 ## 1. Purpose
 
@@ -578,7 +578,7 @@ Implementation status: **PASS / CLOSED (2026-08-26)**.
 
 **Goal: clipboard software must be boringly trustworthy because it handles sensitive data.**
 
-**Phase 5 status: ACTIVE. P5.2 and P5.3 are PASS / CLOSED. P5.1 automated coverage is PASS, while real-application manual acceptance remains OPEN.**
+**Phase 5 status: PASS / CLOSED. P5.2 and P5.3 are PASS / CLOSED. P5.1 automated coverage is PASS; the remaining real-application manual acceptance matrix was explicitly waived by the product owner on 2026-08-27.**
 
 ## P5.1 Paste reliability matrix
 
@@ -603,11 +603,11 @@ Test:
 - accessibility permission loss/regrant,
 - rapid repeated invocation.
 
-**P5.1 status: AUTOMATED PASS / MANUAL OPEN.**
+**P5.1 status: PASS / CLOSED BY EXPLICIT SCOPE DECISION.**
 
 Automated evidence includes deterministic target-family profiles for Safari, Chromium, Firefox, Electron, terminal, and native/unknown targets; bounded activation retry/settle policy; paste-target change confirmation; clipboard text reconciliation; shortcut sequencing; paste-count deduplication; and payload/image identity coverage. The authoritative acceptance rows are maintained in `docs/boardman-paste-reliability-matrix.md`.
 
-The current source/test checkpoint passed the Phase 5 focused suite at `40/40` and the full regression at `183/183`, with `0` failed and `0` skipped tests. These automated results do not promote any real-application row from `pending`. Phase 5 cannot close until the manual matrix is completed or explicitly re-scoped.
+The current source/test checkpoint passed the Phase 5 focused suite at `40/40` and the full regression at `183/183`, with `0` failed and `0` skipped tests. These automated results do not promote any unexercised real-application row from `pending`; instead, the product owner explicitly removed the remaining manual matrix from the Phase 5 closure gate on 2026-08-27. The matrix remains useful as optional future QA evidence, but it is not an open Phase 5 requirement.
 
 ## P5.2 Data integrity and recovery
 
@@ -813,10 +813,10 @@ Every phase closes only with evidence for:
 
 # 10. Immediate next action
 
-**Complete P5.1 real-application paste acceptance. P5.2 and P5.3 are PASS / CLOSED; Phase 5 remains ACTIVE.**
+**Phase 5 is PASS / CLOSED. Begin the separately governed Board-Man commercial Free/Lifetime program without reopening accepted Phase 5 work.**
 
-Use `docs/boardman-paste-reliability-matrix.md` as the acceptance record. Exercise the next authorized acceptance build across the listed target families and interaction cases, classify failures before changing timing policy, and leave every unexercised row as `pending`. Automated coverage alone must not close Phase 5.
+`docs/boardman-paste-reliability-matrix.md` remains optional QA evidence. Unexercised rows remain factually `pending`, but the product owner explicitly waived them as a Phase 5 closure gate on 2026-08-27.
 
-Do not reopen P5.2 or P5.3 unless fresh code, test, or runtime evidence identifies a concrete regression. Phase 1 measurement remains useful as non-blocking calibration evidence and continues to inform the remaining paste matrix and later release gates.
+Do not reopen P5.1, P5.2, or P5.3 unless fresh code, test, or runtime evidence identifies a concrete regression. Phase 1 measurement remains useful as non-blocking calibration evidence for later product and release work.
 
 This document remains the default technical roadmap unless a newer explicitly approved roadmap supersedes it.
