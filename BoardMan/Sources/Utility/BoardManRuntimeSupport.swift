@@ -200,8 +200,32 @@ final class BoardManRuntimeSupport {
         }
     }
 
+    @discardableResult
+    static func archiveRootObjectAtomically(_ object: Any, to path: String) -> Bool {
+        do {
+            let archive = try NSKeyedArchiver.archivedData(withRootObject: object, requiringSecureCoding: false)
+            try archive.write(to: URL(fileURLWithPath: path), options: .atomic)
+            return true
+        } catch {
+            sendDiagnosticLog("Payload archive write failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    static func redactedDiagnosticMessage(
+        _ message: String,
+        fileManager: FileManager = .default
+    ) -> String {
+        let homePath = fileManager.homeDirectoryForCurrentUser.path
+        var redacted = message.replacingOccurrences(of: homePath, with: "~")
+        redacted = redacted
+            .replacingOccurrences(of: "\r", with: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+        return String(redacted.prefix(1_024))
+    }
+
     static func sendDiagnosticLog(_ name: String) {
         guard AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.collectCrashReport) else { return }
-        NSLog("Board-Man: %@", name)
+        NSLog("Board-Man: %@", redactedDiagnosticMessage(name))
     }
 }

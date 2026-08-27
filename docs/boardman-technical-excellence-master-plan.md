@@ -1,9 +1,9 @@
 # Board-Man Technical Excellence Master Plan
 
-Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 PASS / CLOSED, Phase 4 ACTIVE
+Status: authoritative roadmap; Phase 2 PASS / CLOSED, Phase 3 PASS / CLOSED, Phase 4 PASS / CLOSED, Phase 5 ACTIVE (P5.2/P5.3 PASS / CLOSED; P5.1 manual acceptance OPEN)
 Created: 2026-08-21
-Baseline refreshed: 2026-08-25
-Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 search and information retrieval (P3.1-P3.3) is PASS / CLOSED. Phase 4 structural decomposition and dependency reduction is ACTIVE.**
+Baseline refreshed: 2026-08-27
+Execution rule: **Phase 0 is PASS / CLOSED. Phase 1 measurement remains active as non-blocking calibration work. Phase 2 persistence modernization is PASS / CLOSED. Phase 3 search and information retrieval (P3.1-P3.3) is PASS / CLOSED. Phase 4 structural decomposition, dependency reduction, and concurrency hardening is PASS / CLOSED. Phase 5 remains ACTIVE: P5.2 data integrity/recovery and P5.3 privacy are PASS / CLOSED; P5.1 automated coverage is PASS and real-application manual acceptance remains OPEN.**
 
 ## 1. Purpose
 
@@ -578,6 +578,8 @@ Implementation status: **PASS / CLOSED (2026-08-26)**.
 
 **Goal: clipboard software must be boringly trustworthy because it handles sensitive data.**
 
+**Phase 5 status: ACTIVE. P5.2 and P5.3 are PASS / CLOSED. P5.1 automated coverage is PASS, while real-application manual acceptance remains OPEN.**
+
 ## P5.1 Paste reliability matrix
 
 Maintain automated/manual acceptance across:
@@ -601,6 +603,12 @@ Test:
 - accessibility permission loss/regrant,
 - rapid repeated invocation.
 
+**P5.1 status: AUTOMATED PASS / MANUAL OPEN.**
+
+Automated evidence includes deterministic target-family profiles for Safari, Chromium, Firefox, Electron, terminal, and native/unknown targets; bounded activation retry/settle policy; paste-target change confirmation; clipboard text reconciliation; shortcut sequencing; paste-count deduplication; and payload/image identity coverage. The authoritative acceptance rows are maintained in `docs/boardman-paste-reliability-matrix.md`.
+
+The current source/test checkpoint passed the Phase 5 focused suite at `40/40` and the full regression at `183/183`, with `0` failed and `0` skipped tests. These automated results do not promote any real-application row from `pending`. Phase 5 cannot close until the manual matrix is completed or explicitly re-scoped.
+
 ## P5.2 Data integrity and recovery
 
 - DB integrity checks on suspicious failure paths,
@@ -611,6 +619,12 @@ Test:
 - thumbnail/payload rebuild when metadata permits,
 - crash-safe write patterns.
 
+**P5.2 status: PASS / CLOSED.**
+
+Closure evidence includes SQLite `PRAGMA quick_check` and foreign-key validation; fail-closed backup and restore; a schema-versioned local Recovery Archive; payload byte-count and SHA-256 verification; duplicate-manifest, path-traversal, and destination-root rejection; restoration of history, Templates, folders, and their relationships; bounded text-payload reconstruction from recoverable metadata; thumbnail rebuild from archived image payload; exact-directory orphan `.data` collection; and atomic payload archive writes.
+
+Verification is the current Phase 5 focused suite (`40/40` PASS) plus the current full regression (`183/183` PASS, `0` failed, `0` skipped). No release, installed-app, or manual paste claim is implied by this subphase closure.
+
 ## P5.3 Privacy
 
 - no clipboard content sent to commercial services by default,
@@ -618,6 +632,12 @@ Test:
 - local masking/exclusion rules applied before persistence where appropriate,
 - sensitive diagnostics avoid raw clipboard contents,
 - commercial-service telemetry separated from local clipboard data.
+
+**P5.3 status: PASS / CLOSED.**
+
+Board-Man-owned outbound request construction was audited on 2026-08-27. The only `URLSession` request surfaces are an update-feed `HEAD` check and license activation. The activation JSON contract contains only `license_key`, `device_id`, `bundle_id`, and `client_version`; no clipboard body, history title, Template content, payload bytes, or local payload path enters that request. Sparkle update checks use update-feed metadata rather than clipboard data, and no separate clipboard telemetry path exists.
+
+Clipboard-sensitive diagnostics remain local. Home paths are redacted, line breaks are flattened, messages are capped at 1,024 characters, paste-count identity/key values are redacted, and local diagnostic files are bounded. The redaction contract is covered by the Phase 5 reliability suite and the current `183/183` full regression. Any future cloud or AI content processing remains subject to explicit opt-in and a new privacy acceptance gate.
 
 # Phase 6 — Product capability superiority
 
@@ -793,10 +813,10 @@ Every phase closes only with evidence for:
 
 # 10. Immediate next action
 
-**Continue Phase 4 structural decomposition. Phase 2 and Phase 3 are already PASS / CLOSED.**
+**Complete P5.1 real-application paste acceptance. P5.2 and P5.3 are PASS / CLOSED; Phase 5 remains ACTIVE.**
 
-P4.1 should continue by extracting coherent panel/history/template presentation responsibilities from `MenuManager.swift`, prioritizing pure layout/presentation policies and testable service boundaries over mechanical line-count reduction. Search, navigation, paste orchestration, screenshot/demo fixtures, and timestamp presentation/interaction already have focused owners. Once the remaining high-coupling presentation ownership is sufficiently separated, proceed directly to P4.2 dependency audit and then P4.3 concurrency/main-thread discipline.
+Use `docs/boardman-paste-reliability-matrix.md` as the acceptance record. Exercise the next authorized acceptance build across the listed target families and interaction cases, classify failures before changing timing policy, and leave every unexercised row as `pending`. Automated coverage alone must not close Phase 5.
 
-Phase 1 measurement remains useful as non-blocking calibration evidence, but it no longer blocks the accepted SQLiteData migration, FTS/search work, or Phase 4 decomposition.
+Do not reopen P5.2 or P5.3 unless fresh code, test, or runtime evidence identifies a concrete regression. Phase 1 measurement remains useful as non-blocking calibration evidence and continues to inform the remaining paste matrix and later release gates.
 
 This document remains the default technical roadmap unless a newer explicitly approved roadmap supersedes it.

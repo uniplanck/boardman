@@ -279,7 +279,9 @@ extension MenuManager {
                                        previewTitle: title,
                                        dataHash: clip.dataHash,
                                        imageDataPath: clip.dataPath,
-                                       inlineThumbnail: isImageClip ? PINCache.shared.object(forKey: clip.thumbnailPath) as? NSImage : nil,
+                                       inlineThumbnail: isImageClip
+                                           ? BoardManThumbnailRecoveryService.cachedImage(for: BoardManClipSnapshot(clip))
+                                           : nil,
                                        pasteCount: pasteCount,
                                        isPinned: isPinned,
                                        isMasked: isMasked,
@@ -650,18 +652,11 @@ private extension MenuManager {
             applyPasteCountStyle(to: menuItem, clip: clip)
         }
 
-        if !clip.thumbnailPath.isEmpty && !clip.isColorCode && isShowImage {
-            PINCache.shared.object(forKeyAsync: clip.thumbnailPath) { [weak menuItem] _, _, object in
-                DispatchQueue.main.async {
-                    menuItem?.image = object as? NSImage
-                }
-            }
-        }
-        if !clip.thumbnailPath.isEmpty && clip.isColorCode && isShowColorCode {
-            PINCache.shared.object(forKeyAsync: clip.thumbnailPath) { [weak menuItem] _, _, object in
-                DispatchQueue.main.async {
-                    menuItem?.image = object as? NSImage
-                }
+        let shouldShowThumbnail = (!clip.isColorCode && isShowImage) || (clip.isColorCode && isShowColorCode)
+        if !clip.thumbnailPath.isEmpty && shouldShowThumbnail {
+            let snapshot = BoardManClipSnapshot(clip)
+            menuItem.image = BoardManThumbnailRecoveryService.cachedImage(for: snapshot) { [weak menuItem] image in
+                menuItem?.image = image
             }
         }
 

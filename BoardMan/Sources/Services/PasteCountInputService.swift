@@ -630,7 +630,7 @@ final class PasteCountInputService {
                 PasteCountStore.shared.increment(forKey: key)
                 self?.lastCountedIdentity = identity
                 self?.lastCountedAt = now
-                self?.log("count increment success source=\(source) key=\(key)")
+                self?.log("count increment success source=\(source) key=redacted")
             }
         }
     }

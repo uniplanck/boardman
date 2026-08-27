@@ -7,6 +7,65 @@
 
 import Cocoa
 
+enum BoardManPasteTargetFamily: String, Sendable, Equatable {
+    case chromium
+    case electron
+    case firefox
+    case safari
+    case terminal
+    case nativeOrUnknown
+}
+
+struct BoardManPasteReliabilityProfile: Sendable, Equatable {
+    let family: BoardManPasteTargetFamily
+    let settleDelay: TimeInterval
+    let activationRetryDelay: TimeInterval
+    let maximumActivationAttempts: Int
+}
+
+enum BoardManPasteReliabilityPolicy {
+    static func profile(bundleIdentifier: String?) -> BoardManPasteReliabilityProfile {
+        let identifier = bundleIdentifier?.lowercased() ?? ""
+        let chromiumPrefixes = [
+            "com.google.chrome", "com.brave.browser", "com.microsoft.edgemac",
+            "com.operasoftware.opera", "com.vivaldi.vivaldi", "org.chromium.chromium",
+            "company.thebrowser.browser"
+        ]
+        let electronPrefixes = [
+            "com.tinyspeck.slackmacgap", "com.hnc.discord", "com.microsoft.vscode",
+            "md.obsidian", "notion.id", "com.postmanlabs.mac"
+        ]
+        let family: BoardManPasteTargetFamily
+        let settleDelay: TimeInterval
+        if chromiumPrefixes.contains(where: identifier.hasPrefix) {
+            family = .chromium
+            settleDelay = 0.24
+        } else if electronPrefixes.contains(where: identifier.hasPrefix) {
+            family = .electron
+            settleDelay = 0.24
+        } else if identifier.hasPrefix("org.mozilla.firefox") {
+            family = .firefox
+            settleDelay = 0.12
+        } else if identifier.hasPrefix("com.apple.safari") {
+            family = .safari
+            settleDelay = 0.08
+        } else if ["com.apple.terminal", "com.googlecode.iterm2", "dev.warp.warp-stable", "com.mitchellh.ghostty"]
+            .contains(where: identifier.hasPrefix) {
+            family = .terminal
+            settleDelay = 0.08
+        } else {
+            family = .nativeOrUnknown
+            settleDelay = 0.08
+        }
+        return BoardManPasteReliabilityProfile(
+            family: family,
+            settleDelay: settleDelay,
+            activationRetryDelay: 0.03,
+            maximumActivationAttempts: 12
+        )
+    }
+}
+
 final class BoardManPanelPasteCoordinator {
     private let store: BoardManStore
     private var previousFrontmostApplication: NSRunningApplication?
@@ -18,17 +77,7 @@ final class BoardManPanelPasteCoordinator {
     }
 
     static func pasteTargetSettleDelay(bundleIdentifier: String?) -> TimeInterval {
-        let normalizedIdentifier = bundleIdentifier?.lowercased() ?? ""
-        let chromiumBundlePrefixes = [
-            "com.google.chrome",
-            "com.brave.browser",
-            "com.microsoft.edgemac",
-            "com.operasoftware.opera",
-            "com.vivaldi.vivaldi",
-            "org.chromium.chromium",
-            "company.thebrowser.browser"
-        ]
-        return chromiumBundlePrefixes.contains(where: normalizedIdentifier.hasPrefix) ? 0.24 : 0.08
+        BoardManPasteReliabilityPolicy.profile(bundleIdentifier: bundleIdentifier).settleDelay
     }
 
     static func clampedTimestampShortcutDelay(_ value: TimeInterval) -> TimeInterval {
@@ -107,7 +156,8 @@ final class BoardManPanelPasteCoordinator {
         }
 
         application.activate(options: [.activateIgnoringOtherApps])
-        let settleDelay = Self.pasteTargetSettleDelay(bundleIdentifier: application.bundleIdentifier)
+        let reliabilityProfile = BoardManPasteReliabilityPolicy.profile(bundleIdentifier: application.bundleIdentifier)
+        let settleDelay = reliabilityProfile.settleDelay
         let isTargetFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier
             == application.processIdentifier
         if isTargetFrontmost {
@@ -119,7 +169,7 @@ final class BoardManPanelPasteCoordinator {
             return
         }
 
-        guard attempt < 12 else {
+        guard attempt < reliabilityProfile.maximumActivationAttempts else {
             if let focusTarget = previousPasteFocusTarget {
                 _ = PasteTargetVerifier.restoreFocus(to: focusTarget)
             }
@@ -127,7 +177,7 @@ final class BoardManPanelPasteCoordinator {
             return
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + reliabilityProfile.activationRetryDelay) { [weak self] in
             self?.restoreTarget(attempt: attempt + 1, completion: completion)
         }
     }

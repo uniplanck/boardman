@@ -10,7 +10,7 @@ import GRDB
 import SQLiteData
 
 final class SQLiteBoardManStore: BoardManStore {
-    private let database: any DatabaseWriter
+    let database: any DatabaseWriter
 
     init(database: any DatabaseWriter) throws {
         self.database = database
@@ -26,42 +26,6 @@ final class SQLiteBoardManStore: BoardManStore {
 
     static func inMemoryForTesting() throws -> SQLiteBoardManStore {
         try SQLiteBoardManStore(database: DatabaseQueue())
-    }
-
-    func createBackup(at fileURL: URL, fileManager: FileManager = .default) throws {
-        guard !fileManager.fileExists(atPath: fileURL.path) else {
-            throw CocoaError(.fileWriteFileExists)
-        }
-        try fileManager.createDirectory(
-            at: fileURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
-        )
-        let backupDatabase = try DatabaseQueue(path: fileURL.path)
-        try database.backup(to: backupDatabase)
-        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
-    }
-
-    static func restoreBackup(
-        from backupURL: URL,
-        to destinationURL: URL,
-        fileManager: FileManager = .default
-    ) throws -> SQLiteBoardManStore {
-        guard fileManager.fileExists(atPath: backupURL.path) else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        try fileManager.createDirectory(
-            at: destinationURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
-        )
-        var sourceConfiguration = Configuration()
-        sourceConfiguration.readonly = true
-        let sourceDatabase = try DatabaseQueue(path: backupURL.path, configuration: sourceConfiguration)
-        let destinationDatabase = try DatabaseQueue(path: destinationURL.path)
-        try sourceDatabase.backup(to: destinationDatabase)
-        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: destinationURL.path)
-        return try SQLiteBoardManStore(fileURL: destinationURL)
     }
 
     private func postHistoryDidChange() {

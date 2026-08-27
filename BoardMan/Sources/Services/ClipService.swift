@@ -282,7 +282,7 @@ extension ClipService {
                 }
                 guard BoardManRuntimeSupport.prepareDirectory(
                     at: BoardManRuntimeSupport.applicationSupportFolder()
-                ), NSKeyedArchiver.archiveRootObject(data, toFile: savedPath) else {
+                ), BoardManRuntimeSupport.archiveRootObjectAtomically(data, to: savedPath) else {
                     return
                 }
 

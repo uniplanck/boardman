@@ -167,6 +167,51 @@ extension BoardManClip {
     }
 }
 
+enum BoardManPayloadGarbageCollector {
+    static func orphanPayloadURLs(
+        in directoryURL: URL,
+        liveDataPaths: [String],
+        fileManager: FileManager = .default
+    ) -> [URL] {
+        let livePaths = Set(liveDataPaths
+            .filter { !$0.isEmpty }
+            .map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+        return entries.filter { url in
+            guard url.pathExtension == "data",
+                  url.standardizedFileURL.deletingLastPathComponent() == directoryURL.standardizedFileURL else {
+                return false
+            }
+            let isRegularFile = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            return isRegularFile && !livePaths.contains(url.standardizedFileURL.path)
+        }
+    }
+
+    @discardableResult
+    static func collect(
+        in directoryURL: URL,
+        liveDataPaths: [String],
+        fileManager: FileManager = .default
+    ) -> Int {
+        let orphans = orphanPayloadURLs(
+            in: directoryURL,
+            liveDataPaths: liveDataPaths,
+            fileManager: fileManager
+        )
+        var removedCount = 0
+        for url in orphans where (try? fileManager.removeItem(at: url)) != nil {
+            removedCount += 1
+        }
+        return removedCount
+    }
+}
+
 final class DataCleanService {
 
     // MARK: - Properties
@@ -229,19 +274,19 @@ final class DataCleanService {
     }
 
     private func cleanFiles(with clips: [BoardManClip]) {
-        let liveClipFileNames = Set(clips
-            .compactMap { URL(fileURLWithPath: $0.dataPath).lastPathComponent })
-        let applicationSupportFolder = BoardManRuntimeSupport.applicationSupportFolder()
+        let liveDataPaths = clips.map(\.dataPath)
+        let applicationSupportURL = URL(
+            fileURLWithPath: BoardManRuntimeSupport.applicationSupportFolder(),
+            isDirectory: true
+        )
 
-        // File-system cleanup has no reason to block AppKit. Only Board-Man's archived
-        // *.data payloads are eligible; unrelated support files are never touched.
+        // File-system cleanup has no reason to block AppKit. Only unreferenced Board-Man
+        // *.data payloads in the exact support directory are eligible; DBs and nested files stay untouched.
         fileCleanupQueue.async {
-            let fileManager = FileManager.default
-            guard let paths = try? fileManager.contentsOfDirectory(atPath: applicationSupportFolder) else { return }
-            paths
-                .filter { $0.hasSuffix(".data") && !liveClipFileNames.contains($0) }
-                .map { (applicationSupportFolder as NSString).appendingPathComponent($0) }
-                .forEach { BoardManRuntimeSupport.deleteData(at: $0) }
+            _ = BoardManPayloadGarbageCollector.collect(
+                in: applicationSupportURL,
+                liveDataPaths: liveDataPaths
+            )
         }
     }
 }
