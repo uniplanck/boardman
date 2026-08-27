@@ -24,18 +24,36 @@ enum Plan: String, Equatable {
 
 typealias EntitlementPlan = Plan
 
+enum BoardManCommercialPolicy {
+    static let freeHistoryItems = 100
+    static let freePinnedItems = 3
+    static let freeSnippetItems = 5
+    static let freeSnippetFolders = 1
+    static let lifetimeDeviceLimit = 1
+    static let supportsSubscription = false
+    static let lifetimeIncludesFutureAppVersions = true
+}
+
 enum EntitlementFeature: String, CaseIterable, Hashable {
-    // Legacy local capabilities. These remain parseable for existing signed
-    // tokens, but the MIT client no longer requires a commercial entitlement
-    // to use them.
+    // Free local capability.
+    case exportImport
+
+    // Lifetime local capabilities. The Lifetime license is a one-time purchase
+    // and remains valid across future Board-Man app versions.
     case unlimitedHistory
     case unlimitedSnippets
     case advancedAppearance
-    case exportImport
     case pasteAnalytics
+    case advancedSearch
+    case workflowActions
+    case templateVariables
+    case workspaceSessions
+    case advancedTimedPins
 
-    // Commercial-service capabilities. These depend on infrastructure that
-    // lives outside the MIT client and therefore still require entitlement.
+    // Legacy/future service-backed capabilities. New subscriptions are not part
+    // of the approved product model. These remain parseable for compatibility
+    // and future explicit service design, but Lifetime does not imply perpetual
+    // third-party/server operating-cost coverage.
     case futureSync
     case cloudBackup
     case aiAssist
@@ -45,17 +63,28 @@ enum EntitlementFeature: String, CaseIterable, Hashable {
     case commercialSupport
 }
 
+enum EntitlementFeatureAccessModel {
+    case freeLocal
+    case lifetimeLocal
+    case serviceBacked
+}
+
 extension EntitlementFeature {
     static let appearanceAdvanced: EntitlementFeature = .advancedAppearance
 
-    var requiresCommercialService: Bool {
+    var accessModel: EntitlementFeatureAccessModel {
         switch self {
-        case .unlimitedHistory, .unlimitedSnippets, .advancedAppearance, .exportImport, .pasteAnalytics:
-            return false
+        case .exportImport:
+            return .freeLocal
+        case .unlimitedHistory, .unlimitedSnippets, .advancedAppearance, .pasteAnalytics,
+             .advancedSearch, .workflowActions, .templateVariables, .workspaceSessions, .advancedTimedPins:
+            return .lifetimeLocal
         case .futureSync, .cloudBackup, .aiAssist, .teamSharing, .accountServices, .apiAccess, .commercialSupport:
-            return true
+            return .serviceBacked
         }
     }
+
+    static let lifetimeLocalFeatures = Set(allCases.filter { $0.accessModel == .lifetimeLocal })
 }
 
 typealias Feature = EntitlementFeature
@@ -80,18 +109,21 @@ struct PlanLimits: Equatable {
     }
 
     static let freeDefault = PlanLimits(
+        maxHistoryItems: BoardManCommercialPolicy.freeHistoryItems,
+        maxPinnedItems: BoardManCommercialPolicy.freePinnedItems,
+        maxSnippetItems: BoardManCommercialPolicy.freeSnippetItems,
+        maxSnippetFolders: BoardManCommercialPolicy.freeSnippetFolders
+    )
+
+    static let lifetimeDefault = PlanLimits(
         maxHistoryItems: unlimited,
         maxPinnedItems: unlimited,
         maxSnippetItems: unlimited,
         maxSnippetFolders: unlimited
     )
 
-    static let proDefault = PlanLimits(
-        maxHistoryItems: unlimited,
-        maxPinnedItems: unlimited,
-        maxSnippetItems: unlimited,
-        maxSnippetFolders: unlimited
-    )
+    // Legacy compatibility name for existing subscription/trial token parsing.
+    static let proDefault = lifetimeDefault
 }
 
 typealias EntitlementLimits = PlanLimits
@@ -191,21 +223,36 @@ struct Entitlement: Equatable {
     }
 
     var isProEntitled: Bool {
+        return isLifetimeEntitled || isLegacyServiceEntitled
+    }
+
+    var isLifetimeEntitled: Bool {
+        return licenseState == .ownerLifetime && plan == .ownerLifetime
+    }
+
+    private var isLegacyServiceEntitled: Bool {
         switch licenseState {
         case .trial, .proActive:
             return plan == .pro
-        case .ownerLifetime:
-            return plan == .ownerLifetime
-        case .free, .proExpired, .invalid, .offlineGrace, .locked:
+        case .free, .ownerLifetime, .proExpired, .invalid, .offlineGrace, .locked:
             return false
         }
     }
 
     func canUse(_ feature: EntitlementFeature) -> Bool {
-        if !feature.requiresCommercialService {
+        switch feature.accessModel {
+        case .freeLocal:
             return true
+        case .lifetimeLocal:
+            // Lifetime covers future local paid features even when an older
+            // signed token predates the feature claim.
+            if isLifetimeEntitled { return true }
+            return isLegacyServiceEntitled && features.contains(feature)
+        case .serviceBacked:
+            // Server-backed capabilities are never implied by Lifetime, but an
+            // explicit signed feature claim remains valid for compatibility.
+            return isProEntitled && features.contains(feature)
         }
-        return isProEntitled && features.contains(feature)
     }
 
     static let freeDefault = Entitlement(
@@ -242,8 +289,8 @@ struct Entitlement: Equatable {
         return Entitlement(
             plan: .ownerLifetime,
             licenseState: .ownerLifetime,
-            features: Set(EntitlementFeature.allCases),
-            limits: .proDefault,
+            features: EntitlementFeature.lifetimeLocalFeatures,
+            limits: .lifetimeDefault,
             licenseMetadata: metadata
         )
     }
@@ -292,9 +339,7 @@ enum EntitlementGate {
 
     static func limit(for limit: EntitlementLimit,
                       service: EntitlementService = .shared) -> Int? {
-        // History, pins, snippets, and snippet groups are local client capabilities.
-        // Commercial tokens may describe historical limits, but they must never gate local use.
-        return nil
+        return limitValue(for: limit, in: service.currentSnapshot)
     }
 
     static func canAddHistoryItem(currentCount: Int,

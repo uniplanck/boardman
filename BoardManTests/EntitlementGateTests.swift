@@ -18,12 +18,21 @@ final class EntitlementGateTests {
         #expect(entitlement.plan == .free)
         #expect(entitlement.licenseState == .free)
         #expect(entitlement.features.isEmpty)
-        #expect(entitlement.limits.maxHistoryItems == PlanLimits.unlimited)
-        #expect(entitlement.limits.maxPinnedItems == PlanLimits.unlimited)
-        #expect(entitlement.limits.maxSnippetItems == PlanLimits.unlimited)
-        #expect(entitlement.limits.maxSnippetFolders == PlanLimits.unlimited)
-        #expect(EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
-        #expect(EntitlementGate.canUse(feature: .advancedAppearance, service: service))
+        #expect(BoardManCommercialPolicy.freeHistoryItems == 100)
+        #expect(BoardManCommercialPolicy.freePinnedItems == 3)
+        #expect(BoardManCommercialPolicy.freeSnippetItems == 5)
+        #expect(BoardManCommercialPolicy.freeSnippetFolders == 1)
+        #expect(BoardManCommercialPolicy.lifetimeDeviceLimit == 1)
+        #expect(!BoardManCommercialPolicy.supportsSubscription)
+        #expect(BoardManCommercialPolicy.lifetimeIncludesFutureAppVersions)
+        #expect(entitlement.limits.maxHistoryItems == 100)
+        #expect(entitlement.limits.maxPinnedItems == 3)
+        #expect(entitlement.limits.maxSnippetItems == 5)
+        #expect(entitlement.limits.maxSnippetFolders == 1)
+        #expect(!EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
+        #expect(!EntitlementGate.canUse(feature: .advancedAppearance, service: service))
+        #expect(!EntitlementGate.canUse(feature: .advancedSearch, service: service))
+        #expect(!EntitlementGate.canUse(feature: .workflowActions, service: service))
         #expect(EntitlementGate.canUse(feature: .exportImport, service: service))
         #expect(!EntitlementGate.canUse(feature: .futureSync, service: service))
         #expect(!EntitlementGate.canUse(feature: .aiAssist, service: service))
@@ -62,10 +71,15 @@ final class EntitlementGateTests {
         #expect(entitlement.plan == .ownerLifetime)
         #expect(entitlement.licenseState == .ownerLifetime)
         #expect(entitlement.isProEntitled)
+        #expect(entitlement.isLifetimeEntitled)
+        #expect(EntitlementGate.canUse(feature: .exportImport, service: service))
 
-        for feature in EntitlementFeature.allCases {
+        for feature in EntitlementFeature.lifetimeLocalFeatures {
             #expect(EntitlementGate.canUse(feature: feature, service: service))
         }
+        #expect(!EntitlementGate.canUse(feature: .futureSync, service: service))
+        #expect(!EntitlementGate.canUse(feature: .cloudBackup, service: service))
+        #expect(!EntitlementGate.canUse(feature: .aiAssist, service: service))
 
         #expect(EntitlementGate.limit(for: .historyItems, service: service) == nil)
         #expect(EntitlementGate.limit(for: .pinnedItems, service: service) == nil)
@@ -74,16 +88,47 @@ final class EntitlementGateTests {
     }
 
     @Test
-    func mitClientDoesNotImposeHistoryEntitlementLimit() {
-        let service = EntitlementService(snapshot: .freeDefault)
+    func lifetimeUnlocksFutureLocalFeaturesWithoutReissuingOldTokenClaims() {
+        let entitlement = EntitlementSnapshot(
+            plan: .ownerLifetime,
+            licenseState: .ownerLifetime,
+            features: [],
+            limits: .lifetimeDefault
+        )
+        let service = EntitlementService(snapshot: entitlement)
 
-        #expect(EntitlementGate.canAddHistoryItem(currentCount: 99, service: service))
-        #expect(EntitlementGate.canAddHistoryItem(currentCount: 100_000, service: service))
-        #expect(EntitlementGate.historyRetentionLimit(service: service) == nil)
+        #expect(EntitlementGate.canUse(feature: .advancedSearch, service: service))
+        #expect(EntitlementGate.canUse(feature: .workflowActions, service: service))
+        #expect(EntitlementGate.canUse(feature: .workspaceSessions, service: service))
+        #expect(!EntitlementGate.canUse(feature: .futureSync, service: service))
     }
 
     @Test
-    func mitClientLeavesHistoryRetentionToUserConfiguration() {
+    func lifetimeServiceFeatureRequiresExplicitSignedClaim() {
+        let entitlement = EntitlementSnapshot(
+            plan: .ownerLifetime,
+            licenseState: .ownerLifetime,
+            features: [.futureSync],
+            limits: .lifetimeDefault
+        )
+        let service = EntitlementService(snapshot: entitlement)
+
+        #expect(EntitlementGate.canUse(feature: .futureSync, service: service))
+        #expect(!EntitlementGate.canUse(feature: .cloudBackup, service: service))
+    }
+
+    @Test
+    func freePlanEnforcesHistoryLimit() {
+        let service = EntitlementService(snapshot: .freeDefault)
+
+        #expect(EntitlementGate.canAddHistoryItem(currentCount: 99, service: service))
+        #expect(!EntitlementGate.canAddHistoryItem(currentCount: 100, service: service))
+        #expect(!EntitlementGate.canAddHistoryItem(currentCount: 100_000, service: service))
+        #expect(EntitlementGate.historyRetentionLimit(service: service) == 100)
+    }
+
+    @Test
+    func freeHistoryRetentionCapsUserConfigurationAtCommercialLimit() {
         let service = EntitlementService(snapshot: .freeDefault)
         var storedHistoryCount = 100
 
@@ -93,15 +138,16 @@ final class EntitlementGateTests {
             storedHistoryCount = limit
         }
 
-        #expect(storedHistoryCount == 101)
+        #expect(storedHistoryCount == 100)
     }
 
     @Test
-    func mitClientDoesNotImposePinnedItemEntitlementLimit() {
+    func freePlanEnforcesPinnedItemLimit() {
         let service = EntitlementService(snapshot: .freeDefault)
 
         #expect(EntitlementGate.canPinItem(currentPinnedCount: 2, service: service))
-        #expect(EntitlementGate.canPinItem(currentPinnedCount: 10_000, service: service))
+        #expect(!EntitlementGate.canPinItem(currentPinnedCount: 3, service: service))
+        #expect(!EntitlementGate.canPinItem(currentPinnedCount: 10_000, service: service))
     }
 
     @Test
@@ -210,29 +256,31 @@ final class EntitlementGateTests {
     }
 
     @Test
-    func mitClientDoesNotImposeSnippetEntitlementLimit() {
+    func freePlanEnforcesSnippetLimit() {
         let service = EntitlementService(snapshot: .freeDefault)
 
         #expect(EntitlementGate.canCreateSnippet(currentSnippetCount: 4, service: service))
-        #expect(EntitlementGate.canCreateSnippet(currentSnippetCount: 10_000, service: service))
+        #expect(!EntitlementGate.canCreateSnippet(currentSnippetCount: 5, service: service))
+        #expect(!EntitlementGate.canCreateSnippet(currentSnippetCount: 10_000, service: service))
     }
 
     @Test
-    func mitClientDoesNotImposeSnippetFolderEntitlementLimit() {
+    func freePlanEnforcesSnippetFolderLimit() {
         let service = EntitlementService(snapshot: .freeDefault)
 
         #expect(EntitlementGate.canCreateSnippetFolder(currentFolderCount: 0, service: service))
-        #expect(EntitlementGate.canCreateSnippetFolder(currentFolderCount: 10_000, service: service))
+        #expect(!EntitlementGate.canCreateSnippetFolder(currentFolderCount: 1, service: service))
+        #expect(!EntitlementGate.canCreateSnippetFolder(currentFolderCount: 10_000, service: service))
     }
 
     @Test
-    func localCapabilityGateDoesNotRejectExistingCounts() {
+    func freeLimitChecksDoNotMutateExistingCounts() {
         let service = EntitlementService(snapshot: .freeDefault)
         let existingPinnedCount = 10
         let existingSnippetCount = 12
 
-        #expect(EntitlementGate.canPinItem(currentPinnedCount: existingPinnedCount, service: service))
-        #expect(EntitlementGate.canCreateSnippet(currentSnippetCount: existingSnippetCount, service: service))
+        #expect(!EntitlementGate.canPinItem(currentPinnedCount: existingPinnedCount, service: service))
+        #expect(!EntitlementGate.canCreateSnippet(currentSnippetCount: existingSnippetCount, service: service))
         #expect(existingPinnedCount == 10)
         #expect(existingSnippetCount == 12)
     }
@@ -335,7 +383,7 @@ final class EntitlementGateTests {
             let service = EntitlementService(snapshot: entitlement)
 
             #expect(!entitlement.isProEntitled)
-            #expect(EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
+            #expect(!EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
             #expect(!EntitlementGate.canUse(feature: .futureSync, service: service))
         }
     }
@@ -352,7 +400,7 @@ final class EntitlementGateTests {
         let service = EntitlementService(snapshot: entitlement)
 
         #expect(!entitlement.isProEntitled)
-        #expect(EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
+        #expect(!EntitlementGate.canUse(feature: .unlimitedHistory, service: service))
         #expect(!EntitlementGate.canUse(feature: .futureSync, service: service))
     }
 

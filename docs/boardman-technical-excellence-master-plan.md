@@ -16,7 +16,7 @@ Board-Man should not merely be a feature-rich clipboard manager. The target is a
 - safe to migrate and recover,
 - independent from the historical Clipy implementation,
 - local-first by default,
-- open-source for the local client while commercial value stays behind explicit service boundaries,
+- local-first with explicit Free/Lifetime product boundaries and isolated private service responsibilities,
 - easy to test, benchmark, release, update, and diagnose.
 
 The roadmap optimizes for **measured user-visible quality**, not modernization for its own sake. Rewriting code, adding frameworks, adopting SwiftUI, or replacing storage is not success unless the resulting product is measurably smaller, faster, safer, clearer, or more capable.
@@ -26,7 +26,7 @@ The roadmap optimizes for **measured user-visible quality**, not modernization f
 1. **Finish current work before starting this roadmap.** Phase 0 is the only executable phase until its acceptance gate passes.
 2. **No data-loss migrations.** Every persistence migration must be backed up, verified, recoverable, and tested with realistic legacy fixtures.
 3. **No framework worship.** Replace a dependency only when the replacement lowers complexity, runtime cost, maintenance risk, or improves a required capability.
-4. **Local features remain usable without a commercial license.** Paid value should primarily depend on private services such as sync, backup, AI, team, account, or API services.
+4. **Core safety remains Free.** Paste, basic search, privacy, recovery, export/import, and security updates remain available without purchase; approved limits and advanced local features may require the one-time Lifetime license.
 5. **Performance claims require repeatable measurements.** Targets below are SLO candidates until Phase 1 records a baseline on fixed hardware and fixtures.
 6. **One architectural owner per responsibility.** Clipboard capture, persistence, search, paste, hotkeys, templates, pins, licensing, and UI presentation must not be hidden inside a single coordinator.
 7. **Compatibility code is temporary and isolated.** Legacy identifiers may exist only inside a clearly named migration/compatibility boundary and must not leak into normal product code.
@@ -46,8 +46,8 @@ Fresh Phase 1 entry snapshot captured on 2026-08-24. Detailed evidence lives in 
 - screenshot observation moved to Board-Man implementation,
 - `BoardManApplicationInfo`, `BoardManDragPayload`, and `BoardManRuntimeSupport` introduced,
 - MIT-client / commercial-service entitlement boundary introduced,
-- local feature limits removed from the commercial entitlement model,
-- signed entitlement verification supports subscription/trial/owner-lifetime forms,
+- the historical Phase 0 client removed local limits; that policy is superseded by the approved Free/Lifetime commercial roadmap dated 2026-08-27,
+- signed entitlement verification retains subscription/trial parsing only as bounded legacy compatibility while new sales use Lifetime only,
 - Phase 0 full tests, Debug/Release build, codesign, installed-app smoke, compatibility and attribution gates passed,
 - post-Phase-0 horizontal keyboard navigation now covers History → Templates All → persisted template groups.
 
@@ -161,7 +161,7 @@ Phase 0 cannot close until all are true:
 
 Before later feature work:
 
-- keep all local product features available independently of subscription,
+- do not implement a recurring subscription; preserve the approved Free core and one-time Lifetime local feature boundary,
 - keep private signing keys, customer DB, payment systems, and anti-abuse logic outside this repo,
 - version the public activation/entitlement contract,
 - reject invalid/expired/device-mismatched/bundle-mismatched tokens,
@@ -813,7 +813,7 @@ Every phase closes only with evidence for:
 
 # 10. Immediate next action
 
-**Phase 5 is PASS / CLOSED. Begin the separately governed Board-Man commercial Free/Lifetime program without reopening accepted Phase 5 work.**
+**Phase 5 is PASS / CLOSED. Commercial Free/Lifetime Phase 1 is PASS / CLOSED; proceed with Phase 2 Lifetime activation wiring without reopening accepted Phase 5 work.**
 
 `docs/boardman-paste-reliability-matrix.md` remains optional QA evidence. Unexercised rows remain factually `pending`, but the product owner explicitly waived them as a Phase 5 closure gate on 2026-08-27.
 

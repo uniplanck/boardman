@@ -36,7 +36,7 @@ final class BoardManServicesPreferenceViewController: NSViewController {
         currentPlan.addSubview(statusRow("checkmark.seal", "Status:", statusValue, y: 66))
         currentPlan.addSubview(statusRow("clock", "Last verified:", lastVerifiedValue, y: 40))
         currentPlan.addSubview(statusRow("laptopcomputer", "Device activated:", deviceStatus, y: 14))
-        let upgrade = BoardManPreferenceUI.secondaryButton("Upgrade to Pro  ›")
+        let upgrade = BoardManPreferenceUI.secondaryButton("Unlock Lifetime  ›")
         upgrade.target = self
         upgrade.action = #selector(openBuyPro)
         upgrade.frame = NSRect(x: 200, y: 150, width: 130, height: 38)
@@ -101,8 +101,8 @@ final class BoardManServicesPreferenceViewController: NSViewController {
         cta.layer?.borderColor = BoardManPreferenceUI.red.withAlphaComponent(0.9).cgColor
         cta.addSubview(BoardManPreferenceUI.icon("diamond.fill", size: 34).positioned(x: 143, y: 190, w: 44, h: 36))
         cta.addSubview(BoardManPreferenceUI.label("Unlock the full power of Board-Man", size: 17, weight: .bold).positioned(x: 45, y: 150, w: 250, h: 26))
-        cta.addSubview(BoardManPreferenceUI.label("Local features stay available offline.\nPro adds optional connected services.", size: 14, color: BoardManPreferenceUI.primaryText).positioned(x: 50, y: 95, w: 240, h: 46))
-        let buy = BoardManPreferenceUI.primaryButton("Buy Board-Man Pro  ›")
+        cta.addSubview(BoardManPreferenceUI.label("One purchase unlocks all local Lifetime features.\nNo subscription.", size: 14, color: BoardManPreferenceUI.primaryText).positioned(x: 50, y: 95, w: 240, h: 46))
+        let buy = BoardManPreferenceUI.primaryButton("Buy Lifetime License  ›")
         buy.target = self
         buy.action = #selector(openBuyPro)
         buy.frame = NSRect(x: 25, y: 64, width: 280, height: 36)
@@ -119,7 +119,7 @@ final class BoardManServicesPreferenceViewController: NSViewController {
         let snapshot = EntitlementGate.currentSnapshot()
         let active = snapshot.isProEntitled
         let isOwnerLifetime = snapshot.licenseState == .ownerLifetime && snapshot.plan == .ownerLifetime
-        let planName = isOwnerLifetime ? "Owner Lifetime" : (active ? "Board-Man Pro" : "Free Plan")
+        let planName = isOwnerLifetime ? "Board-Man Lifetime" : (active ? "Legacy Entitlement" : "Free Plan")
         let statusName = isOwnerLifetime ? "Lifetime" : (active ? "Active" : "Free")
         planLabel.stringValue = planName
         statusPill.stringValue = statusName
@@ -130,7 +130,7 @@ final class BoardManServicesPreferenceViewController: NSViewController {
         lastVerifiedValue.textColor = active ? .systemGreen : BoardManPreferenceUI.red
         deviceStatus.stringValue = active ? "Activated" : "Not activated"
         deviceStatus.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
-        validationLabel.stringValue = isOwnerLifetime ? "Signed owner token required" : (active ? "Activated" : "Not connected yet")
+        validationLabel.stringValue = isOwnerLifetime ? "Lifetime license verified" : (active ? "Legacy entitlement verified" : "Not connected yet")
         validationLabel.textColor = active ? .systemGreen : BoardManPreferenceUI.secondaryText
     }
 
@@ -172,7 +172,7 @@ final class BoardManServicesPreferenceViewController: NSViewController {
 
     private func addHeaderTabsHint() {
         view.addSubview(BoardManPreferenceUI.label("License", size: 22, weight: .bold).positioned(x: 30, y: 585, w: 160, h: 26))
-        view.addSubview(BoardManPreferenceUI.label("All ordinary local features remain available. Pro adds optional service-backed capabilities.", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 30, y: 562, w: 680, h: 18))
+        view.addSubview(BoardManPreferenceUI.label("Free includes the core clipboard experience. Lifetime removes limits and unlocks advanced local features.", size: 13, color: BoardManPreferenceUI.secondaryText).positioned(x: 30, y: 562, w: 760, h: 18))
     }
 
     @objc private func pasteLicense() {
