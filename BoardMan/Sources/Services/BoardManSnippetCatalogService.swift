@@ -17,6 +17,22 @@ enum BoardManSnippetCatalogService {
     }
 
     @discardableResult
+    static func createFolderIfAllowed(
+        title: String,
+        store: BoardManStore,
+        entitlementService: EntitlementService = .shared
+    ) -> BoardManFolder? {
+        let currentCount = store.foldersSortedByIndex().count
+        guard EntitlementGate.canCreateSnippetFolder(
+            currentFolderCount: currentCount,
+            service: entitlementService
+        ) else {
+            return nil
+        }
+        return createFolder(title: title, store: store)
+    }
+
+    @discardableResult
     static func createFolder(title: String, store: BoardManStore) -> BoardManFolder {
         let folder = BoardManFolder()
         folder.title = title
@@ -51,6 +67,28 @@ enum BoardManSnippetCatalogService {
         }
         store.deleteFolder(identifier: savedFolder.identifier)
         return fallbackFolder
+    }
+
+    static func createSnippetIfAllowed(
+        preferredFolderIdentifier: String,
+        allCategoriesIdentifier: String,
+        uncategorizedIdentifier: String,
+        store: BoardManStore,
+        entitlementService: EntitlementService = .shared
+    ) -> BoardManSnippetCreationResult? {
+        let currentCount = store.snippetsSortedByIndex().count
+        guard EntitlementGate.canCreateSnippet(
+            currentSnippetCount: currentCount,
+            service: entitlementService
+        ) else {
+            return nil
+        }
+        return createSnippet(
+            preferredFolderIdentifier: preferredFolderIdentifier,
+            allCategoriesIdentifier: allCategoriesIdentifier,
+            uncategorizedIdentifier: uncategorizedIdentifier,
+            store: store
+        )
     }
 
     static func createSnippet(

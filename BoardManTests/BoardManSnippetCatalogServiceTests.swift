@@ -30,6 +30,56 @@ final class BoardManSnippetCatalogServiceTests {
     }
 
     @Test
+    func commercialAdmissionGatesFolderAndSnippetCreationWithoutDeletingExistingData() throws {
+        let store = try SQLiteBoardManStore.inMemoryForTesting()
+        let freeService = EntitlementService(snapshot: .freeDefault)
+
+        let firstFolder = try #require(BoardManSnippetCatalogService.createFolderIfAllowed(
+            title: "Free Folder",
+            store: store,
+            entitlementService: freeService
+        ))
+        #expect(BoardManSnippetCatalogService.createFolderIfAllowed(
+            title: "Blocked Folder",
+            store: store,
+            entitlementService: freeService
+        ) == nil)
+        #expect(store.foldersSortedByIndex().map(\.identifier).contains(firstFolder.identifier))
+
+        for _ in 0..<5 {
+            #expect(BoardManSnippetCatalogService.createSnippetIfAllowed(
+                preferredFolderIdentifier: firstFolder.identifier,
+                allCategoriesIdentifier: "__all__",
+                uncategorizedIdentifier: "__uncategorized__",
+                store: store,
+                entitlementService: freeService
+            ) != nil)
+        }
+        #expect(BoardManSnippetCatalogService.createSnippetIfAllowed(
+            preferredFolderIdentifier: firstFolder.identifier,
+            allCategoriesIdentifier: "__all__",
+            uncategorizedIdentifier: "__uncategorized__",
+            store: store,
+            entitlementService: freeService
+        ) == nil)
+        #expect(store.snippetsSortedByIndex().count == 5)
+
+        let legacyUnlimited = EntitlementService(snapshot: .proActive())
+        #expect(BoardManSnippetCatalogService.createFolderIfAllowed(
+            title: "Lifetime-compatible Folder",
+            store: store,
+            entitlementService: legacyUnlimited
+        ) != nil)
+        #expect(BoardManSnippetCatalogService.createSnippetIfAllowed(
+            preferredFolderIdentifier: firstFolder.identifier,
+            allCategoriesIdentifier: "__all__",
+            uncategorizedIdentifier: "__uncategorized__",
+            store: store,
+            entitlementService: legacyUnlimited
+        ) != nil)
+    }
+
+    @Test
     func snippetCrudSelectsDeterministicTargetsAndCompactsAfterDelete() throws {
         let store = try SQLiteBoardManStore.inMemoryForTesting()
         let disabled = BoardManSnippetCatalogService.createFolder(title: "Disabled", store: store)

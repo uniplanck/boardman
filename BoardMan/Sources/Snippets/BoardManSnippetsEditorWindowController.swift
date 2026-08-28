@@ -87,6 +87,11 @@ extension BoardManSnippetsEditorWindowController {
             NSSound.beep()
             return
         }
+        let snippetCount = BoardManStores.authoritative.snippetsSortedByIndex().count
+        guard EntitlementGate.canCreateSnippet(currentSnippetCount: snippetCount) else {
+            presentCommercialLimit(.snippetItems)
+            return
+        }
         let snippet = folder.createSnippet()
         folder.snippets.append(snippet)
         folder.mergeSnippet(snippet)
@@ -97,6 +102,11 @@ extension BoardManSnippetsEditorWindowController {
     }
 
     @IBAction private func addFolderButtonTapped(_ sender: AnyObject) {
+        let folderCount = BoardManStores.authoritative.foldersSortedByIndex().count
+        guard EntitlementGate.canCreateSnippetFolder(currentFolderCount: folderCount) else {
+            presentCommercialLimit(.snippetFolders)
+            return
+        }
         let folder = BoardManFolder.create()
         folders.append(folder)
         folder.merge()
@@ -166,6 +176,17 @@ extension BoardManSnippetsEditorWindowController {
             let lastFolder = store.foldersSortedByIndex().last
             var folderIndex = (lastFolder?.index ?? -1) + 1
             let importedFolders = try BoardManSnippetXMLCodec.decode(data)
+            let importedSnippetCount = importedFolders.reduce(0) { $0 + $1.snippets.count }
+            let projectedFolderCount = store.foldersSortedByIndex().count + importedFolders.count
+            let projectedSnippetCount = store.snippetsSortedByIndex().count + importedSnippetCount
+            if let folderLimit = EntitlementGate.limit(for: .snippetFolders), projectedFolderCount > folderLimit {
+                presentCommercialLimit(.snippetFolders)
+                return
+            }
+            if let snippetLimit = EntitlementGate.limit(for: .snippetItems), projectedSnippetCount > snippetLimit {
+                presentCommercialLimit(.snippetItems)
+                return
+            }
 
             importedFolders.forEach { importedFolder in
                 let folder = BoardManFolder()
@@ -508,9 +529,15 @@ private extension BoardManSnippetsEditorWindowController {
 
         if PinnedSnippetStore.shared.isPinned(snippet.identifier) {
             PinnedSnippetStore.shared.remove(snippet.identifier)
-        } else {
-            _ = PinnedSnippetStore.shared.add(snippet.identifier)
+        } else if !PinnedSnippetStore.shared.add(snippet.identifier) {
+            presentCommercialLimit(.pinnedItems)
+            return
         }
         outlineView.reloadData()
+    }
+
+    func presentCommercialLimit(_ limit: EntitlementLimit) {
+        guard let value = EntitlementGate.limit(for: limit) else { return }
+        BoardManUpgradeRoute.presentLimitReached(limit, limitValue: value)
     }
 }

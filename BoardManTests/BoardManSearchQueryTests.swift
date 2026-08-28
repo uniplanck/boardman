@@ -30,8 +30,12 @@ final class BoardManSearchQueryTests: XCTestCase {
         XCTAssertFalse(parsed.pinnedOnly)
     }
 
-    func testExplicitScopeSwitchesPanelIntoMatchingActionContext() {
-        let panel = BoardManPanel()
+    @MainActor
+    func testExplicitScopeSwitchesPanelIntoMatchingActionContext() throws {
+        let panel = BoardManPanel(
+            store: try SQLiteBoardManStore.inMemoryForTesting(),
+            entitlementService: EntitlementService(snapshot: .proActive())
+        )
         panel.setBenchmarkIsolationForTesting(true)
         panel.loadItemsForTesting([])
         panel.selectHistoryTab()

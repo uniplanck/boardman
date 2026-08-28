@@ -21,12 +21,12 @@ struct ArchivedTextHistoryEntry: Codable, Equatable {
 
 enum BoardManHistoryRetentionPolicy {
     static func effectiveLimit(
-        defaults: UserDefaults = AppEnvironment.current.defaults,
-        entitlementLimit: Int? = nil
+        defaults: UserDefaults = AppEnvironment.current.defaults
     ) -> Int? {
-        let configuredLimit = max(1, defaults.integer(forKey: Constants.UserDefaults.maxHistorySize))
-        guard let entitlementLimit, entitlementLimit > 0 else { return configuredLimit }
-        return min(configuredLimit, entitlementLimit)
+        // Retention cleanup is a user preference, not a commercial quota. Free/Lifetime
+        // admission is enforced before creating a new history record so a downgrade can
+        // never trim grandfathered data merely because the account is over a Free limit.
+        return max(1, defaults.integer(forKey: Constants.UserDefaults.maxHistorySize))
     }
 }
 

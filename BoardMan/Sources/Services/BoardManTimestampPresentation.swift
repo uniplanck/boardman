@@ -108,7 +108,18 @@ struct BoardManRelativeTimestampStyle: Equatable {
     let suffix: BoardManRelativeSuffixStyle
     let now: BoardManRelativeNowStyle
 
-    static func current(defaults: UserDefaults = AppEnvironment.current.defaults) -> BoardManRelativeTimestampStyle {
+    static func current(
+        defaults: UserDefaults = AppEnvironment.current.defaults,
+        entitlementService: EntitlementService = .shared
+    ) -> BoardManRelativeTimestampStyle {
+        guard EntitlementGate.canUse(.advancedAppearance, service: entitlementService) else {
+            return BoardManRelativeTimestampStyle(
+                number: .single,
+                unit: .symbol,
+                suffix: .none,
+                now: .localized
+            )
+        }
         return BoardManRelativeTimestampStyle(
             number: .allowed(defaults.string(forKey: Constants.UserDefaults.boardManRelativeNumberStyle)),
             unit: .allowed(defaults.string(forKey: Constants.UserDefaults.boardManRelativeUnitStyle)),

@@ -641,7 +641,7 @@ Clipboard-sensitive diagnostics remain local. Home paths are redacted, line brea
 
 # Commercial Program — Free / Lifetime Distribution
 
-**Program status: ACTIVE. Phase C1 and C2 are PASS / CLOSED. C3/C4 implementation is GREEN on the isolated uniplanck.com feature branch; production configuration, deployment, payment/email/live-device acceptance remain HOLD.**
+**Program status: ACTIVE. Phase C1 and C2 are PASS / CLOSED. C3/C4/C5 implementation is GREEN; production configuration, deployment, payment/email/live-device and purchase-to-device acceptance remain HOLD.**
 
 This program replaces the earlier subscription-oriented commercial assumptions with a deliberately simple two-tier product contract:
 
@@ -750,13 +750,33 @@ C2 closes the native client boundary. Live production activation is intentionall
 - allow the same license code to activate a replacement device after release,
 - enforce one simultaneous active device.
 
-### C5 — App-wide Free/Lifetime UX
+### C5 — App-wide Free/Lifetime UX [IMPLEMENTATION GREEN / LIVE HOLD]
 
-- connect every approved quantity and feature gate to the central entitlement policy,
-- show the exact limit and upgrade path at the point of refusal,
-- never destroy existing data when a gate becomes restrictive,
-- replace obsolete Pro/subscription wording with Lifetime wording,
-- preserve keyboard-first operation and offline startup/paste behavior.
+Implemented outcomes:
+
+- every approved quantity gate is connected to the central entitlement policy at the mutation boundary: history `100`, PIN `3`, Templates `5`, Template folders `1`,
+- Free quota enforcement is admission-only: restrictive entitlement changes do not trim grandfathered history, PINs, Templates, folders or paid appearance preferences,
+- Lifetime removes local quantity limits and unlocks the approved local paid feature set,
+- advanced search, advanced timed PIN, advanced appearance, relative-time detail, item highlighting and detailed local analytics are gated at their actual mutation/use boundaries,
+- basic paste, text search, privacy, recovery and export remain available without a purchase,
+- Template import remains available but preflights projected counts so import cannot bypass Free limits,
+- new-product purchase/upgrade UI uses Lifetime wording; legacy Pro/trial state names remain isolated compatibility labels rather than a current sales product,
+- the formerly inert inline License activation path now uses the real `LicenseActivationCoordinator`,
+- service-backed capabilities remain separate and are not silently included with Lifetime,
+- Free effective appearance ignores stored paid preferences without deleting them; restoring Lifetime restores the saved advanced relative-time configuration.
+
+Closure evidence for the non-production C5 implementation:
+
+- C5 focused admission gate: **28/28 PASS**, failed `0`, skipped `0`,
+- relative-time Free/Lifetime preservation gate: **4/4 PASS**, failed `0`, skipped `0`,
+- SwiftLint: **0 serious** in the focused C5 build,
+- `uniplanck.com` C3/C4 service + wiring: **14/14 PASS**,
+- preview readiness validator: **3/3 PASS**,
+- `uniplanck.com` full regression: **313/313 PASS**, failed `0`, cancelled `0`, skipped `0`,
+- preview readiness tooling commit: `46184e9cdf3e93b4b6221fd39f2cbbf19f3ea9b2`,
+- detailed acceptance and remaining HOLD contract: [`docs/boardman-commercial-preview-c5-acceptance.md`](boardman-commercial-preview-c5-acceptance.md).
+
+C5 code and non-production validation are GREEN. Production secrets, exact Stripe Product/Price configuration, deploy, real payment/email/customer-data mutation and live device transfer remain C6/live-acceptance work and are not claimed by this gate.
 
 ### C6 — Purchase-to-device E2E and release acceptance
 
@@ -944,7 +964,7 @@ Every phase closes only with evidence for:
 
 # 10. Immediate next action
 
-**Current authoritative action: C1/C2 are PASS / CLOSED. C3/C4 implementation is committed on the isolated `uniplanck.com` feature branch; next is preview/local integration, secret/config provisioning under explicit production authority, and purchase→email/MyPage→device-transfer live acceptance. Phase 5 remains PASS / CLOSED.**
+**Current authoritative action: C1/C2 are PASS / CLOSED and C3/C4/C5 implementation is GREEN. The remaining commercial work is C6/live acceptance: provision authorized preview/production signing and exact Stripe Product/Price configuration, then verify purchase→issuance/email/MyPage→first-device activation→offline relaunch→device release/transfer under explicit production authority. Phase 5 remains PASS / CLOSED.**
 
 `docs/boardman-paste-reliability-matrix.md` remains optional QA evidence. Unexercised rows remain factually `pending`, but the product owner explicitly waived them as a Phase 5 closure gate on 2026-08-27.
 

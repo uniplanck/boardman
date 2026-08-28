@@ -128,17 +128,13 @@ final class EntitlementGateTests {
     }
 
     @Test
-    func freeHistoryRetentionCapsUserConfigurationAtCommercialLimit() {
+    func freeHistoryLimitBlocksGrowthWithoutTrimmingGrandfatheredData() {
         let service = EntitlementService(snapshot: .freeDefault)
-        var storedHistoryCount = 100
+        let existingHistoryCount = 101
 
-        storedHistoryCount += 1
-        if let limit = EntitlementGate.historyRetentionLimit(service: service),
-           storedHistoryCount > limit {
-            storedHistoryCount = limit
-        }
-
-        #expect(storedHistoryCount == 100)
+        #expect(!EntitlementGate.canAddHistoryItem(currentCount: existingHistoryCount, service: service))
+        #expect(EntitlementGate.historyRetentionLimit(service: service) == 100)
+        #expect(existingHistoryCount == 101)
     }
 
     @Test
@@ -191,17 +187,17 @@ final class EntitlementGateTests {
     }
 
     @Test
-    func configuredHistoryLimitIsCappedByEntitlement() throws {
+    func configuredHistoryRetentionIsIndependentFromCommercialAdmissionLimit() throws {
         let suiteName = "HistoryRetentionPolicyTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         defaults.set(40, forKey: Constants.UserDefaults.maxHistorySize)
-        #expect(BoardManHistoryRetentionPolicy.effectiveLimit(defaults: defaults, entitlementLimit: 100) == 40)
-        #expect(BoardManHistoryRetentionPolicy.effectiveLimit(defaults: defaults, entitlementLimit: nil) == 40)
+        #expect(BoardManHistoryRetentionPolicy.effectiveLimit(defaults: defaults) == 40)
 
         defaults.set(500, forKey: Constants.UserDefaults.maxHistorySize)
-        #expect(BoardManHistoryRetentionPolicy.effectiveLimit(defaults: defaults, entitlementLimit: 100) == 100)
+        #expect(BoardManHistoryRetentionPolicy.effectiveLimit(defaults: defaults) == 500)
+        #expect(EntitlementGate.historyRetentionLimit(service: EntitlementService(snapshot: .freeDefault)) == 100)
     }
 
     @Test
@@ -296,12 +292,26 @@ final class EntitlementGateTests {
     }
 
     @Test
-    func timedPinStoreEnforcesFreeLimitAndExpires() {
+    func timedPinStoreRequiresLifetimeAndStillExpiresBoundedRecords() {
         let suiteName = "BoardManTimedPinStoreTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var currentDate = Date(timeIntervalSince1970: 1_700_000_000)
-        let store = BoardManTimedPinStore(defaults: defaults, now: { currentDate })
+        let metadata = LicenseMetadata(
+            licenseKeyMasked: "••••-TEST",
+            deviceIdMasked: "••••-DEVICE",
+            activatedAt: currentDate,
+            lastVerifiedAt: currentDate,
+            status: LicenseState.ownerLifetime.rawValue,
+            licenseKind: .ownerLifetime,
+            issuedTo: "test-owner"
+        )
+        let lifetimeService = EntitlementService(snapshot: .ownerLifetime(metadata: metadata))
+        let store = BoardManTimedPinStore(
+            defaults: defaults,
+            entitlementService: lifetimeService,
+            now: { currentDate }
+        )
 
         #expect(store.setPin("first", durationValue: 1, unit: .hours, maximumActiveCount: 3))
         #expect(store.setPin("second", durationValue: 1, unit: .hours, maximumActiveCount: 3))
@@ -404,6 +414,77 @@ final class EntitlementGateTests {
         #expect(!EntitlementGate.canUse(feature: .futureSync, service: service))
     }
 
+}
+
+@Suite(.serialized)
+final class CommercialC5AdmissionTests {
+
+    @Test
+    func pinnedStoreEnforcesFreeAdmissionWithoutRemovingGrandfatheredPins() throws {
+        let suiteName = "PinnedSnippetCommercialGateTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let freeService = EntitlementService(snapshot: .freeDefault)
+        let store = PinnedSnippetStore(
+            defaults: defaults,
+            entitlementService: freeService,
+            timedPinIdentifiers: { [] }
+        )
+
+        #expect(store.add("pin-1"))
+        #expect(store.add("pin-2"))
+        #expect(store.add("pin-3"))
+        #expect(!store.add("pin-4"))
+        #expect(store.identifiers == ["pin-1", "pin-2", "pin-3"])
+
+        defaults.set(
+            ["pin-1", "pin-2", "pin-3", "grandfathered"],
+            forKey: "com.uniplanck.BoardMan.pinnedSnippetIdentifiers"
+        )
+        let reloaded = PinnedSnippetStore(
+            defaults: defaults,
+            entitlementService: freeService,
+            timedPinIdentifiers: { [] }
+        )
+        #expect(reloaded.isPinned("grandfathered"))
+        #expect(!reloaded.add("pin-5"))
+        reloaded.remove("grandfathered")
+        #expect(!reloaded.isPinned("grandfathered"))
+    }
+
+    @Test
+    func freeTimedPinAdmissionFailsWithoutMutatingExistingRecords() {
+        let suiteName = "BoardManTimedPinFreeGateTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let currentDate = Date(timeIntervalSince1970: 1_700_000_000)
+        let lifetimeMetadata = LicenseMetadata(
+            licenseKeyMasked: "••••-TEST",
+            deviceIdMasked: "••••-DEVICE",
+            activatedAt: currentDate,
+            lastVerifiedAt: currentDate,
+            status: LicenseState.ownerLifetime.rawValue,
+            licenseKind: .ownerLifetime,
+            issuedTo: "test-owner"
+        )
+        let lifetimeStore = BoardManTimedPinStore(
+            defaults: defaults,
+            entitlementService: EntitlementService(snapshot: .ownerLifetime(metadata: lifetimeMetadata)),
+            now: { currentDate }
+        )
+        #expect(lifetimeStore.setPin("grandfathered", durationValue: 1, unit: .days, maximumActiveCount: nil))
+
+        let freeStore = BoardManTimedPinStore(
+            defaults: defaults,
+            entitlementService: EntitlementService(snapshot: .freeDefault),
+            now: { currentDate }
+        )
+        #expect(!freeStore.setPin("new", durationValue: 1, unit: .days, maximumActiveCount: nil))
+        #expect(freeStore.isPinned("grandfathered"))
+        #expect(!freeStore.isPinned("new"))
+        freeStore.remove("grandfathered")
+        #expect(!freeStore.isPinned("grandfathered"))
+    }
 }
 
 @Suite(.serialized)
@@ -2146,10 +2227,8 @@ final class BoardManUIRegressionTests {
 
     @Test
     func majorTabsAndSettingsCategoriesStayInsidePanel() async throws {
-        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
-        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
-
+        let testStore = try SQLiteBoardManStore.inMemoryForTesting()
+        let entitlementService = makeLifetimeTestEntitlementService()
         let defaults = AppEnvironment.current.defaults
         let originalTimestampFormat = defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat)
         let originalTimestampPosition = defaults.string(forKey: Constants.UserDefaults.boardManTimestampPosition)
@@ -2180,7 +2259,7 @@ final class BoardManUIRegressionTests {
             }
         }
 
-        let panel = BoardManPanel()
+        let panel = BoardManPanel(store: testStore, entitlementService: entitlementService)
         panel.setFrame(NSRect(x: 0, y: 0, width: 680, height: 760), display: false)
         await settlePanelLayout(panel)
         #expect(panel.presentationItemScope == .historyOnly)
@@ -2422,11 +2501,11 @@ extension BoardManUIRegressionTests {
 
     @Test
     func searchEditingHoverAndFilterPresentationStayStable() async throws {
-        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
-        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
-
-        let panel = BoardManPanel()
+        let testStore = try SQLiteBoardManStore.inMemoryForTesting()
+        let panel = BoardManPanel(
+            store: testStore,
+            entitlementService: makeLifetimeTestEntitlementService()
+        )
         panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
         defer { panel.orderOut(nil) }
         await presentPanelForTesting(panel)
@@ -2493,11 +2572,7 @@ extension BoardManUIRegressionTests {
 
     @Test
     func snippetEditModeWaitsForClickAndUsesReadableTextSurface() async throws {
-        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
-        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
-
-        let realm = try Realm()
+        let testStore = try SQLiteBoardManStore.inMemoryForTesting()
         let folder = BoardManFolder()
         folder.title = "Test group"
         folder.enable = true
@@ -2505,12 +2580,13 @@ extension BoardManUIRegressionTests {
         snippet.title = "Deploy command"
         snippet.content = "git status && git push"
         snippet.enable = true
-        folder.snippets.append(snippet)
-        try realm.write {
-            realm.add(folder)
-        }
+        testStore.upsertFolder(folder)
+        testStore.upsertSnippet(snippet, folderIdentifier: folder.identifier)
 
-        let panel = BoardManPanel()
+        let panel = BoardManPanel(
+            store: testStore,
+            entitlementService: makeLifetimeTestEntitlementService()
+        )
         panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
         panel.makeKeyAndOrderFront(nil)
         defer { panel.orderOut(nil) }
@@ -2580,11 +2656,10 @@ extension BoardManUIRegressionTests {
 
     @Test
     func settingsUpdateTextUsesDynamicReadableColors() async throws {
-        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
-        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
-
-        let panel = BoardManPanel()
+        let panel = BoardManPanel(
+            store: try SQLiteBoardManStore.inMemoryForTesting(),
+            entitlementService: makeLifetimeTestEntitlementService()
+        )
         panel.appearance = NSAppearance(named: .darkAqua)
         panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
         panel.selectSettingsTab()
@@ -2611,6 +2686,19 @@ extension BoardManUIRegressionTests {
             #expect(luminance >= 0.35,
                     "Settings contains low-contrast dark text: \(field.stringValue), luminance=\(luminance)")
         }
+    }
+
+    private func makeLifetimeTestEntitlementService() -> EntitlementService {
+        let metadata = LicenseMetadata(
+            licenseKeyMasked: "••••-TEST",
+            deviceIdMasked: "••••-DEVICE",
+            activatedAt: nil,
+            lastVerifiedAt: nil,
+            status: LicenseState.ownerLifetime.rawValue,
+            licenseKind: .ownerLifetime,
+            issuedTo: "ui-regression"
+        )
+        return EntitlementService(snapshot: .ownerLifetime(metadata: metadata))
     }
 
     private func settlePanelLayout(_ panel: BoardManPanel) async {
@@ -2654,20 +2742,15 @@ extension BoardManUIRegressionTests {
 
     @Test
     func multipleSnippetGroupsFilterTogetherAndDeletedGroupsAreDiscarded() throws {
-        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
-        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
-
-        let realm = try Realm()
+        let testStore = try SQLiteBoardManStore.inMemoryForTesting()
         let firstFolder = BoardManFolder()
         firstFolder.title = "First"
         firstFolder.enable = true
         let secondFolder = BoardManFolder()
         secondFolder.title = "Second"
         secondFolder.enable = true
-        try realm.write {
-            realm.add([firstFolder, secondFolder])
-        }
+        testStore.upsertFolder(firstFolder)
+        testStore.upsertFolder(secondFolder)
         let firstIdentifier = firstFolder.identifier
         let secondIdentifier = secondFolder.identifier
 
@@ -2693,7 +2776,10 @@ extension BoardManUIRegressionTests {
             )
         }
 
-        let panel = BoardManPanel()
+        let panel = BoardManPanel(
+            store: testStore,
+            entitlementService: makeLifetimeTestEntitlementService()
+        )
         panel.openSnippetsManagerMode()
         panel.loadItemsForTesting([
             snippetItem(hash: "first", folder: firstFolder),
@@ -2711,9 +2797,7 @@ extension BoardManUIRegressionTests {
         #expect(popup.itemArray.first { ($0.representedObject as? String) == firstIdentifier }?.state == .on)
         #expect(popup.itemArray.first { ($0.representedObject as? String) == secondIdentifier }?.state == .on)
 
-        try realm.write {
-            realm.delete(secondFolder)
-        }
+        testStore.deleteFolder(identifier: secondIdentifier)
         panel.reloadSnippetGroupsForTesting()
         #expect(panel.activeSnippetGroupIdentifiersForTesting == Set([firstIdentifier]))
         #expect(panel.visibleItemHashesForTesting == ["first"])
@@ -2764,24 +2848,22 @@ extension BoardManUIRegressionTests {
 
     @Test
     func horizontalArrowNavigationMovesThroughHistoryAllAndSnippetGroups() throws {
-        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
-        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
-
-        let realm = try Realm()
+        let testStore = try SQLiteBoardManStore.inMemoryForTesting()
         let firstFolder = BoardManFolder()
         firstFolder.title = "First"
         firstFolder.index = 0
         let secondFolder = BoardManFolder()
         secondFolder.title = "Second"
         secondFolder.index = 1
-        try realm.write {
-            realm.add([firstFolder, secondFolder])
-        }
+        testStore.upsertFolder(firstFolder)
+        testStore.upsertFolder(secondFolder)
 
         let firstIdentifier = firstFolder.identifier
         let secondIdentifier = secondFolder.identifier
-        let panel = BoardManPanel()
+        let panel = BoardManPanel(
+            store: testStore,
+            entitlementService: makeLifetimeTestEntitlementService()
+        )
         panel.selectHistoryTab()
 
         #expect(panel.activePanelTabForTesting == "history")
@@ -2821,10 +2903,6 @@ extension BoardManUIRegressionTests {
 
     @Test
     func responsiveTemplateTabLabelsStayReadableAcrossLanguages() async throws {
-        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
-        Realm.Configuration.defaultConfiguration = Realm.Configuration(inMemoryIdentifier: UUID().uuidString)
-        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
-
         let defaults = AppEnvironment.current.defaults
         let originalLanguage = defaults.string(forKey: Constants.UserDefaults.boardManLanguage)
         defer { defaults.set(originalLanguage, forKey: Constants.UserDefaults.boardManLanguage) }
@@ -2838,7 +2916,10 @@ extension BoardManUIRegressionTests {
 
         for (language, regularTitle, compactTitle) in expectations {
             defaults.set(language.rawValue, forKey: Constants.UserDefaults.boardManLanguage)
-            let panel = BoardManPanel()
+            let panel = BoardManPanel(
+                store: try SQLiteBoardManStore.inMemoryForTesting(),
+                entitlementService: makeLifetimeTestEntitlementService()
+            )
             panel.setFrame(NSRect(x: 0, y: 0, width: 800, height: 760), display: false)
             await settlePanelLayout(panel)
             let root = try #require(panel.contentView)
@@ -2857,8 +2938,12 @@ extension BoardManUIRegressionTests {
     }
 
     @Test
-    func panelHidesWhenApplicationDeactivates() async {
-        let panel = BoardManPanel()
+    func panelHidesWhenApplicationDeactivates() async throws {
+        let panel = BoardManPanel(
+            store: try SQLiteBoardManStore.inMemoryForTesting(),
+            entitlementService: makeLifetimeTestEntitlementService()
+        )
+        defer { panel.orderOut(nil) }
         #expect(panel.hidesOnDeactivate)
 
         await presentPanelForTesting(panel)
@@ -2874,8 +2959,11 @@ extension BoardManUIRegressionTests {
     }
 
     @Test
-    func quickModeHidesFullHeaderAndUsesThreeItemLimit() async {
-        let panel = BoardManPanel()
+    func quickModeHidesFullHeaderAndUsesThreeItemLimit() async throws {
+        let panel = BoardManPanel(
+            store: try SQLiteBoardManStore.inMemoryForTesting(),
+            entitlementService: makeLifetimeTestEntitlementService()
+        )
         panel.setQuickMode(true)
         let size = BoardManPanel.quickPanelSize()
         panel.setFrame(NSRect(origin: .zero, size: size), display: false)

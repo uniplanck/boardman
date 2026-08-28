@@ -1,6 +1,5 @@
 import AppKit
 import Foundation
-import RealmSwift
 import Testing
 @testable import Board_Man
 
@@ -31,18 +30,20 @@ final class BoardManPerformanceBaselineTests {
 
     @Test
     func phase1DeterministicPanelBaseline() throws {
-        let originalRealmConfiguration = Realm.Configuration.defaultConfiguration
-        Realm.Configuration.defaultConfiguration = Realm.Configuration(
-            inMemoryIdentifier: "BoardManPhase1Benchmark-\(UUID().uuidString)"
-        )
-        defer { Realm.Configuration.defaultConfiguration = originalRealmConfiguration }
-
-        let realm = try Realm()
+        let testStore = try SQLiteBoardManStore.inMemoryForTesting()
+        let entitlementService = makeLifetimeTestEntitlementService()
         let folders = makeBenchmarkFolders(count: 10)
-        try realm.write { realm.add(folders) }
+        folders.forEach(testStore.upsertFolder)
 
-        var metrics = benchmarkHistoryMetrics()
-        metrics.append(contentsOf: benchmarkTemplateMetrics(folders: folders))
+        var metrics = benchmarkHistoryMetrics(
+            store: testStore,
+            entitlementService: entitlementService
+        )
+        metrics.append(contentsOf: benchmarkTemplateMetrics(
+            folders: folders,
+            store: testStore,
+            entitlementService: entitlementService
+        ))
 
         #expect(metrics.allSatisfy { metric in
             metric.iterations > 0
@@ -78,6 +79,19 @@ final class BoardManPerformanceBaselineTests {
         print("BOARDMAN_PHASE1_BENCHMARK_OUTPUT=\(outputPath)")
     }
 
+    private func makeLifetimeTestEntitlementService() -> EntitlementService {
+        let metadata = LicenseMetadata(
+            licenseKeyMasked: "••••-BENCH",
+            deviceIdMasked: "••••-DEVICE",
+            activatedAt: nil,
+            lastVerifiedAt: nil,
+            status: LicenseState.ownerLifetime.rawValue,
+            licenseKind: .ownerLifetime,
+            issuedTo: "performance-baseline"
+        )
+        return EntitlementService(snapshot: .ownerLifetime(metadata: metadata))
+    }
+
     private func makeBenchmarkFolders(count: Int) -> [BoardManFolder] {
         return (0..<count).map { index in
             let folder = BoardManFolder()
@@ -89,7 +103,10 @@ final class BoardManPerformanceBaselineTests {
         }
     }
 
-    private func benchmarkHistoryMetrics() -> [Metric] {
+    private func benchmarkHistoryMetrics(
+        store: BoardManStore,
+        entitlementService: EntitlementService
+    ) -> [Metric] {
         let history100 = makeHistoryItems(count: 100)
         let history1k = makeHistoryItems(count: 1_000)
         let history10k = makeHistoryItems(count: 10_000)
@@ -104,13 +121,13 @@ final class BoardManPerformanceBaselineTests {
             ("10000", history10k, 4)
         ] {
             metrics.append(measure(name: "history_load", fixture: fixture, iterations: iterations) {
-                let panel = BoardManPanel()
+                let panel = BoardManPanel(store: store, entitlementService: entitlementService)
                 panel.setBenchmarkIsolationForTesting(true)
                 panel.loadItemsForTesting(items)
             })
         }
 
-        let searchPanel = BoardManPanel()
+        let searchPanel = BoardManPanel(store: store, entitlementService: entitlementService)
         searchPanel.setBenchmarkIsolationForTesting(true)
         searchPanel.loadItemsForTesting(history10k)
         metrics.append(measure(name: "search_full_result", fixture: "history-10000-single-hit", iterations: 12) {
@@ -130,14 +147,14 @@ final class BoardManPerformanceBaselineTests {
         })
         #expect(searchPanel.selectedIndexForTesting == 40)
 
-        let pinnedPanel = BoardManPanel()
+        let pinnedPanel = BoardManPanel(store: store, entitlementService: entitlementService)
         pinnedPanel.setBenchmarkIsolationForTesting(true)
         metrics.append(measure(name: "history_load", fixture: "1000-half-pinned", iterations: 6) {
             pinnedPanel.loadItemsForTesting(pinned1k)
         })
         #expect(pinnedPanel.visibleItemCountForTesting == pinned1k.count)
 
-        let longTextPanel = BoardManPanel()
+        let longTextPanel = BoardManPanel(store: store, entitlementService: entitlementService)
         longTextPanel.setBenchmarkIsolationForTesting(true)
         longTextPanel.loadItemsForTesting(longText100)
         metrics.append(measure(name: "search_full_result", fixture: "100-long-text", iterations: 8) {
@@ -147,19 +164,23 @@ final class BoardManPerformanceBaselineTests {
         return metrics
     }
 
-    private func benchmarkTemplateMetrics(folders: [BoardManFolder]) -> [Metric] {
+    private func benchmarkTemplateMetrics(
+        folders: [BoardManFolder],
+        store: BoardManStore,
+        entitlementService: EntitlementService
+    ) -> [Metric] {
         let templates100 = makeTemplateItems(count: 100, groupCount: folders.count)
         let templates1k = makeTemplateItems(count: 1_000, groupCount: folders.count)
         var metrics = [Metric]()
 
-        let templates100Panel = BoardManPanel()
+        let templates100Panel = BoardManPanel(store: store, entitlementService: entitlementService)
         templates100Panel.setBenchmarkIsolationForTesting(true)
         templates100Panel.openSnippetsManagerMode()
         metrics.append(measure(name: "template_load", fixture: "100", iterations: 8) {
             templates100Panel.loadItemsForTesting(templates100)
         })
 
-        let templates1kPanel = BoardManPanel()
+        let templates1kPanel = BoardManPanel(store: store, entitlementService: entitlementService)
         templates1kPanel.setBenchmarkIsolationForTesting(true)
         templates1kPanel.openSnippetsManagerMode()
         metrics.append(measure(name: "template_load", fixture: "1000", iterations: 6) {
@@ -177,7 +198,7 @@ final class BoardManPerformanceBaselineTests {
         })
         #expect(templates1kPanel.visibleItemCountForTesting == 100)
 
-        let horizontalPanel = BoardManPanel()
+        let horizontalPanel = BoardManPanel(store: store, entitlementService: entitlementService)
         horizontalPanel.setBenchmarkIsolationForTesting(true)
         horizontalPanel.loadItemsForTesting(templates1k)
         metrics.append(measure(name: "horizontal_group_traversal", fixture: "10-groups", iterations: 5) {

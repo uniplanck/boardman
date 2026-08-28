@@ -230,7 +230,8 @@ extension MenuManager {
         let showRowNumbers = defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true
         let timestampFormat = BoardManPanel.allowedTimestampFormat(defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat))
         let relativeTimestampStyle = BoardManRelativeTimestampStyle.current(defaults: defaults)
-        let showUsageCount = defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true
+        let showUsageCount = EntitlementGate.canUse(.pasteAnalytics)
+            && (defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true)
         let timestampReferenceDate = Date()
 
         let pinStore = PinnedSnippetStore.shared
@@ -829,14 +830,17 @@ final class PinnedSnippetStore {
     static let shared = PinnedSnippetStore()
 
     private let defaults: UserDefaults
+    private let entitlementService: EntitlementService
     private let timedPinIdentifiers: () -> [String]
     private let key = "com.uniplanck.BoardMan.pinnedSnippetIdentifiers"
 
     init(
         defaults: UserDefaults = AppEnvironment.current.defaults,
+        entitlementService: EntitlementService = .shared,
         timedPinIdentifiers: @escaping () -> [String] = { BoardManTimedPinStore.shared.identifiers }
     ) {
         self.defaults = defaults
+        self.entitlementService = entitlementService
         self.timedPinIdentifiers = timedPinIdentifiers
     }
 
@@ -859,6 +863,12 @@ final class PinnedSnippetStore {
     func add(_ identifier: String) -> Bool {
         var values = identifiers.filter { !$0.isEmpty }
         guard !values.contains(identifier) else { return true }
+        guard EntitlementGate.canPinItem(
+            currentPinnedCount: values.count,
+            service: entitlementService
+        ) else {
+            return false
+        }
         BoardManTimedPinStore.shared.remove(identifier)
         values.append(identifier)
         save(values)
@@ -1058,11 +1068,14 @@ final class BoardManTimedPinStore {
     static let shared = BoardManTimedPinStore()
 
     private let defaults: UserDefaults
+    private let entitlementService: EntitlementService
     private let now: () -> Date
 
     init(defaults: UserDefaults = AppEnvironment.current.defaults,
+         entitlementService: EntitlementService = .shared,
          now: @escaping () -> Date = Date.init) {
         self.defaults = defaults
+        self.entitlementService = entitlementService
         self.now = now
     }
 
@@ -1084,7 +1097,10 @@ final class BoardManTimedPinStore {
                 durationValue: Int,
                 unit: BoardManTimedPinUnit,
                 maximumActiveCount: Int?) -> Bool {
-        guard !identifier.isEmpty else { return false }
+        guard !identifier.isEmpty,
+              EntitlementGate.canUse(.advancedTimedPins, service: entitlementService) else {
+            return false
+        }
         var records = activeRecords()
         if records[identifier] == nil,
            let maximumActiveCount,
@@ -1465,7 +1481,7 @@ func boardManText(_ english: String) -> String {
         "Jump directly to clipboard history": "クリップボード履歴を直接開きます",
         "Jump directly to snippets": "スニペットを直接開きます",
         "Clear history after confirmation": "確認後に履歴を消去します",
-        "Add": "追加", "Edit": "編集", "Delete": "削除", "Clear": "消去", "Save": "保存", "Upgrade": "アップグレード", "OK": "OK",
+        "Add": "追加", "Edit": "編集", "Delete": "削除", "Clear": "消去", "Save": "保存", "Upgrade": "アップグレード", "Learn More": "詳しく見る", "Buy Lifetime": "Lifetimeを購入", "OK": "OK",
         "Category": "グループ", "Add Group": "グループ追加", "Rename Group": "グループ名変更", "Delete Group": "グループ削除",
         "Title": "タイトル", "Content": "内容", "Group Enabled": "グループを有効化", "Snippet Enabled": "定型文を有効化",
         "Saved Filters": "保存フィルタ", "Save Current Filter…": "現在の条件を保存…",
@@ -1533,6 +1549,16 @@ func boardManText(_ english: String) -> String {
         "Hover to open group list": "カーソルを合わせるとグループ一覧を開きます",
         "Clear all clipboard history?": "クリップボード履歴をすべて消去しますか？",
         "Activation is not connected yet. Free remains the default runtime entitlement.": "オンライン認証はまだ接続されていません。現在は無料プランとして動作します。",
+        "Enter a Lifetime license code to activate this Mac.": "Lifetimeライセンスコードを入力して、このMacを認証します。",
+        "Enter a Lifetime license code.": "Lifetimeライセンスコードを入力してください。",
+        "Verifying the Lifetime license…": "Lifetimeライセンスを確認しています…",
+        "Connected services are separate from Lifetime and require an explicit service entitlement when available.": "接続サービスはLifetimeとは別枠で、提供時には専用のサービス利用権が必要です。",
+        "Free includes 1 Template folder. Lifetime unlocks unlimited folders.": "無料版では定型文フォルダを1件利用できます。Lifetimeでは無制限です。",
+        "Lifetime unlocks custom colors, highlighting, and preview scale. Free uses standard appearance.": "Lifetimeではカスタム色・色付け・プレビュー倍率を利用できます。無料版は標準表示を使用します。",
+        "Board-Man Lifetime unlocks advanced appearance controls.": "Board-Man Lifetimeで高度な外観設定を利用できます。",
+        "Board-Man Lifetime unlocks detailed local analytics.": "Board-Man Lifetimeで詳細なローカル利用分析を利用できます。",
+        "Board-Man Lifetime unlocks advanced search conditions.": "Board-Man Lifetimeで高度な検索条件を利用できます。",
+        "Board-Man Lifetime unlocks saved advanced filters.": "Board-Man Lifetimeで高度な保存フィルタを利用できます。",
         "Filter %@ history": "%@履歴の絞り込み",
         "Only matching items remain visible. Empty fields are ignored; clearing every field removes this condition.": "条件に一致する項目だけを表示します。空欄は無視され、すべて空にすると条件を削除します。",
         "Applies only to the %@ tab": "%@タブだけに適用",
@@ -2015,7 +2041,7 @@ fileprivate final class BoardManProLockedControlView: NSView {
 
     private let feature: EntitlementFeature
     private let titleLabel = NSTextField(labelWithString: "")
-    private let badgeLabel = NSTextField(labelWithString: "PRO")
+    private let badgeLabel = NSTextField(labelWithString: "SERVICE")
     private let explanationLabel = NSTextField(labelWithString: "")
     private let upgradeButton: NSButton
     private let lockedControl: NSView
@@ -2029,7 +2055,7 @@ fileprivate final class BoardManProLockedControlView: NSView {
          upgradeAction: Selector?) {
         self.feature = feature
         self.lockedControl = control
-        self.upgradeButton = NSButton(title: boardManText("Upgrade"), target: upgradeTarget, action: upgradeAction)
+        self.upgradeButton = NSButton(title: boardManText("Learn More"), target: upgradeTarget, action: upgradeAction)
         super.init(frame: .zero)
 
         wantsLayer = true
@@ -2074,7 +2100,7 @@ fileprivate final class BoardManProLockedControlView: NSView {
 
         upgradeButton.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         upgradeButton.bezelStyle = .rounded
-        upgradeButton.toolTip = "Upgrade to unlock this Pro control."
+        upgradeButton.toolTip = "Connected services require a separate service entitlement when available."
         addSubview(upgradeButton)
 
         addSubview(lockedControl)
@@ -2089,7 +2115,7 @@ fileprivate final class BoardManProLockedControlView: NSView {
         super.layout()
         let inset: CGFloat = 10
         let lockSize: CGFloat = 14
-        let badgeWidth: CGFloat = 34
+        let badgeWidth: CGFloat = 54
         let buttonWidth: CGFloat = 78
         let controlGap: CGFloat = 10
         let controlWidth = max(96, bounds.width - (inset * 2) - buttonWidth - controlGap)
@@ -2117,7 +2143,7 @@ fileprivate final class BoardManProLockedControlView: NSView {
         badgeLabel.isHidden = canUse
         explanationLabel.textColor = canUse ? .secondaryLabelColor : .tertiaryLabelColor
         upgradeButton.isHidden = canUse
-        toolTip = canUse ? "Available in your current plan." : "Pro feature. Upgrade to unlock this control."
+        toolTip = canUse ? "Available with the current service entitlement." : "Separate connected-service entitlement required. Lifetime local features remain independent."
     }
 
     private func setEnabled(_ enabled: Bool, in view: NSView) {
@@ -3134,7 +3160,8 @@ final class BoardManHistoryCellView: NSTableCellView {
 // MARK: - BoardManPanel MVP Shell (embedded in MenuManager.swift per constraints)
 class BoardManPanel: NSPanel {
 
-    private let store: BoardManStore = BoardManStores.authoritative
+    private var store: BoardManStore = BoardManStores.authoritative
+    private var entitlementService: EntitlementService = .shared
     private lazy var searchCoordinator = BoardManSearchCoordinator(store: store)
 
     private typealias LayoutMetrics = BoardManPanelLayoutMetrics
@@ -3263,6 +3290,7 @@ class BoardManPanel: NSPanel {
     private var licenseLimitsLabel: NSTextField?
     private var licenseKeyField: NSTextField?
     private var licenseActivateButton: NSButton?
+    private let licenseActivationCoordinator = LicenseActivationCoordinator()
     private var licenseActivationStatusLabel: NSTextField?
     private var licenseUpgradeButton: NSButton?
     private var licenseProLockedControlView: BoardManProLockedControlView?
@@ -3475,6 +3503,9 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate var themeAccentColor: NSColor {
+        guard EntitlementGate.canUse(.advancedAppearance, service: entitlementService) else {
+            return themePreset.accentColor
+        }
         let base = BoardManPanel.customColor(
             forKey: Constants.UserDefaults.boardManCustomAccentColor,
             fallback: themePreset.accentColor
@@ -3484,6 +3515,9 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate var customPanelTintColor: NSColor {
+        guard EntitlementGate.canUse(.advancedAppearance, service: entitlementService) else {
+            return themePreset.accentColor.withAlphaComponent(0.16)
+        }
         let base = BoardManPanel.customColor(
             forKey: Constants.UserDefaults.boardManCustomPanelColor,
             fallback: themePreset.accentColor
@@ -3493,6 +3527,10 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate var customUsedTintColor: NSColor {
+        guard EntitlementGate.canUse(.pasteAnalytics, service: entitlementService),
+              EntitlementGate.canUse(.advancedAppearance, service: entitlementService) else {
+            return NSColor.systemGray.withAlphaComponent(0.18)
+        }
         let base = BoardManPanel.customColor(
             forKey: Constants.UserDefaults.boardManCustomUsedColor,
             fallback: .systemGray
@@ -3502,11 +3540,13 @@ class BoardManPanel: NSPanel {
     }
 
     private var effectiveTextPreviewScale: CGFloat {
+        guard EntitlementGate.canUse(.advancedAppearance, service: entitlementService) else { return 1 }
         let stored = AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManTextPreviewScale)
         return CGFloat(Self.clampedPreviewScale(stored)) / 100
     }
 
     private var effectiveImagePreviewScale: CGFloat {
+        guard EntitlementGate.canUse(.advancedAppearance, service: entitlementService) else { return 1 }
         let stored = AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManImagePreviewScale)
         return CGFloat(Self.clampedPreviewScale(stored)) / 100
     }
@@ -3894,12 +3934,17 @@ class BoardManPanel: NSPanel {
         }
     }
 
-    convenience init() {
+    convenience init(
+        store: BoardManStore = BoardManStores.authoritative,
+        entitlementService: EntitlementService = .shared
+    ) {
         let contentRect = NSRect(x: 0, y: 0, width: BoardManPanel.preferredPanelWidth(), height: BoardManPanel.preferredPanelHeight())
         self.init(contentRect: contentRect,
                   styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
                   backing: .buffered,
                   defer: false)
+        self.store = store
+        self.entitlementService = entitlementService
         self.minSize = NSSize(width: LayoutMetrics.minimumWidth, height: 600)
         self.title = "Board-Man"
         self.titleVisibility = .hidden
@@ -4294,7 +4339,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(snippetFolders)
         snippetFoldersLabel = snippetFolders
 
-        let groupProNote = NSTextField(labelWithString: boardManText("Pro only: group creation, ordering, and folder shortcuts."))
+        let groupProNote = NSTextField(labelWithString: boardManText("Free includes 1 Template folder. Lifetime unlocks unlimited folders."))
         groupProNote.font = NSFont.systemFont(ofSize: 10.5, weight: .medium)
         groupProNote.textColor = .tertiaryLabelColor
         groupProNote.lineBreakMode = .byWordWrapping
@@ -5023,7 +5068,7 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(imagePreviewValue)
         imagePreviewScaleValueLabel = imagePreviewValue
 
-        let previewScaleNote = NSTextField(labelWithString: boardManText("Pro only: custom colors and preview scale. Free preview stays at 100%."))
+        let previewScaleNote = NSTextField(labelWithString: boardManText("Lifetime unlocks custom colors, highlighting, and preview scale. Free uses standard appearance."))
         previewScaleNote.font = NSFont.systemFont(ofSize: 10.5, weight: .medium)
         previewScaleNote.textColor = .tertiaryLabelColor
         previewScaleNote.lineBreakMode = .byWordWrapping
@@ -5370,40 +5415,40 @@ class BoardManPanel: NSPanel {
         licenseKey.cell = BoardManCenteredTextFieldCell(textCell: "")
         licenseKey.placeholderString = boardManText("Secure local license")
         licenseKey.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        licenseKey.isEnabled = false
-        licenseKey.toolTip = "Verified licenses are stored securely in Keychain."
+        licenseKey.isEnabled = true
+        licenseKey.toolTip = "Enter the Lifetime license code delivered after purchase. The code is sent only to the configured activation service."
         contentView.addSubview(licenseKey)
         licenseKeyField = licenseKey
 
         let activate = NSButton(title: boardManText("Activate"), target: self, action: #selector(activateLicenseRequested(_:)))
         activate.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         activate.bezelStyle = .rounded
-        activate.isEnabled = false
-        activate.toolTip = "Activation is not connected yet."
+        activate.isEnabled = true
+        activate.toolTip = "Verify this Lifetime code and bind the signed entitlement to this Mac."
         contentView.addSubview(activate)
         licenseActivateButton = activate
 
-        let activationStatus = NSTextField(labelWithString: boardManText("Online activation is not connected yet."))
+        let activationStatus = NSTextField(labelWithString: boardManText("Enter a Lifetime license code to activate this Mac."))
         activationStatus.font = NSFont.systemFont(ofSize: 11)
         activationStatus.textColor = .secondaryLabelColor
         activationStatus.lineBreakMode = .byWordWrapping
         contentView.addSubview(activationStatus)
         licenseActivationStatusLabel = activationStatus
 
-        let upgrade = NSButton(title: boardManText("Upgrade to Pro"), target: self, action: #selector(openLicensePurchasePage(_:)))
+        let upgrade = NSButton(title: boardManText("Buy Lifetime"), target: self, action: #selector(openLicensePurchasePage(_:)))
         upgrade.font = NSFont.systemFont(ofSize: 11, weight: .medium)
         upgrade.bezelStyle = .rounded
-        upgrade.toolTip = "Opens uniplanck.com for the future purchase flow."
+        upgrade.toolTip = "Open the Board-Man Lifetime purchase page on uniplanck.com."
         contentView.addSubview(upgrade)
         licenseUpgradeButton = upgrade
 
         let proControl = NSPopUpButton(frame: .zero, pullsDown: false)
         proControl.addItems(withTitles: ["Encrypted Sync", "Encrypted Backup"])
         proControl.font = NSFont.systemFont(ofSize: 11)
-        proControl.toolTip = "Optional connected services require a Pro entitlement."
+        proControl.toolTip = "Connected services are separate from the local Lifetime license and are not enabled in this build."
         let lockedProControl = BoardManProLockedControlView(
             title: boardManText("Connected services"),
-            explanation: boardManText("Pro adds optional encrypted sync and backup services."),
+            explanation: boardManText("Connected services are separate from Lifetime and require an explicit service entitlement when available."),
             feature: .futureSync,
             control: proControl,
             upgradeTarget: self,
@@ -5412,14 +5457,14 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(lockedProControl)
         licenseProLockedControlView = lockedProControl
 
-        let licenseNote = NSTextField(labelWithString: boardManText("Verified licenses are stored in Keychain and bound to this Mac. Online purchase activation remains unavailable."))
+        let licenseNote = NSTextField(labelWithString: boardManText("Verified signed Lifetime tokens are stored in Board-Man's private local state and bound to this Mac."))
         licenseNote.font = NSFont.systemFont(ofSize: 11)
         licenseNote.textColor = .secondaryLabelColor
         licenseNote.lineBreakMode = .byWordWrapping
         contentView.addSubview(licenseNote)
         licenseMockNoteLabel = licenseNote
 
-        let examples = NSTextField(labelWithString: boardManText("UI states: Free / Trial / Pro Active / Expired / Invalid / Offline Grace / Locked"))
+        let examples = NSTextField(labelWithString: boardManText("Current product states: Free / Lifetime. Legacy signed states remain compatibility-only."))
         examples.font = NSFont.systemFont(ofSize: 10)
         examples.textColor = .tertiaryLabelColor
         examples.lineBreakMode = .byTruncatingTail
@@ -5891,13 +5936,15 @@ class BoardManPanel: NSPanel {
         guard let preview = appearancePreviewView else { return }
         let defaults = AppEnvironment.current.defaults
         let showRows = defaults.object(forKey: Constants.UserDefaults.boardManShowRowNumbers) as? Bool ?? true
-        let showCount = defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true
+        let showCount = EntitlementGate.canUse(.pasteAnalytics, service: entitlementService)
+            && (defaults.object(forKey: Constants.UserDefaults.boardManShowUsageCount) as? Bool ?? true)
         let format = BoardManPanel.allowedTimestampFormat(defaults.string(forKey: Constants.UserDefaults.boardManTimestampFormat))
         let timestamp = BoardManPanel.timestampText(
             for: Int(Date().addingTimeInterval(-4_200).timeIntervalSince1970),
             format: format == "none" ? "relative" : format
         )
-        let hasCustomPanelColor = defaults.string(forKey: Constants.UserDefaults.boardManCustomPanelColor) != nil
+        let hasCustomPanelColor = EntitlementGate.canUse(.advancedAppearance, service: entitlementService)
+            && defaults.string(forKey: Constants.UserDefaults.boardManCustomPanelColor) != nil
         let panelColor: NSColor
         if uiStyle == .simple {
             panelColor = NSColor.controlBackgroundColor
@@ -5909,7 +5956,9 @@ class BoardManPanel: NSPanel {
                 lighten: isThemeLightenEnabled
             )
         }
-        let hasCustomUsedColor = defaults.string(forKey: Constants.UserDefaults.boardManCustomUsedColor) != nil
+        let hasCustomUsedColor = EntitlementGate.canUse(.advancedAppearance, service: entitlementService)
+            && EntitlementGate.canUse(.pasteAnalytics, service: entitlementService)
+            && defaults.string(forKey: Constants.UserDefaults.boardManCustomUsedColor) != nil
         let usedColor = hasCustomUsedColor ? customUsedTintColor : NSColor.systemGray
         let countStyle = BoardManPanel.allowedUsageCountStyle(
             defaults.string(forKey: Constants.UserDefaults.boardManUsageCountStyle)
@@ -6025,8 +6074,8 @@ class BoardManPanel: NSPanel {
         resetCustomColorsButton?.title = boardManText("Reset colors")
         textPreviewScaleLabel?.stringValue = boardManText("Text preview")
         imagePreviewScaleLabel?.stringValue = boardManText("Image preview")
-        previewScaleProNoteLabel?.stringValue = boardManText("Custom colors and preview scale are available locally.")
-        snippetGroupProNoteLabel?.stringValue = boardManText("Group creation, ordering, and folder shortcuts are available locally.")
+        previewScaleProNoteLabel?.stringValue = boardManText("Lifetime unlocks custom colors, highlighting, and preview scale. Free uses standard appearance.")
+        snippetGroupProNoteLabel?.stringValue = boardManText("Free includes 1 Template folder. Lifetime unlocks unlimited folders.")
         manageSnippetsButton?.title = boardManText("Manage Snippets")
         snippetAddButton?.title = boardManText("Add")
         snippetEditButton?.title = boardManText("Edit")
@@ -6062,11 +6111,11 @@ class BoardManPanel: NSPanel {
         addHideRuleButton?.title = boardManText("Add Rule")
         removeLastHideRuleButton?.title = boardManText("Remove Last")
         clearHideRulesButton?.title = boardManText("Clear")
-        licenseUpgradeButton?.title = boardManText("Upgrade to Pro")
+        licenseUpgradeButton?.title = boardManText("Buy Lifetime")
         licenseProLockedControlView?.updateLocalizedText(
             title: boardManText("Connected services"),
-            explanation: boardManText("Pro adds optional encrypted sync and backup services."),
-            upgradeTitle: boardManText("Upgrade")
+            explanation: boardManText("Connected services are separate from Lifetime and require an explicit service entitlement when available."),
+            upgradeTitle: boardManText("Learn More")
         )
         globalShortcutRows.forEach { row in
             row.titleLabel.stringValue = row.kind.title
@@ -7239,9 +7288,14 @@ class BoardManPanel: NSPanel {
     }
 
     private var configuredLongPressAction: BoardManLongPressAction {
-        return BoardManLongPressAction.allowed(
+        let action = BoardManLongPressAction.allowed(
             AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManLongPressAction)
         )
+        if action == .timedPin,
+           !EntitlementGate.canUse(.advancedTimedPins, service: entitlementService) {
+            return .togglePin
+        }
+        return action
     }
 
     private var configuredTimedPinDurationValue: Int {
@@ -7265,7 +7319,8 @@ class BoardManPanel: NSPanel {
         }) {
             timedPinPresetPopup?.select(item)
         }
-        timedPinPresetRemoveButton?.isEnabled = presets.count > 1
+        let canUseTimedPins = EntitlementGate.canUse(.advancedTimedPins, service: entitlementService)
+        timedPinPresetRemoveButton?.isEnabled = canUseTimedPins && presets.count > 1
         timedPinDurationStepper?.integerValue = selected.value
         timedPinDurationValueLabel?.stringValue = "\(selected.value)"
         if let item = timedPinDurationUnitPopup?.itemArray.first(where: {
@@ -7273,13 +7328,15 @@ class BoardManPanel: NSPanel {
         }) {
             timedPinDurationUnitPopup?.select(item)
         }
-        timedPinDurationLabel?.textColor = .labelColor
-        timedPinPresetPopup?.isEnabled = true
-        timedPinPresetAddButton?.isEnabled = true
-        timedPinDurationStepper?.isEnabled = true
-        timedPinDurationUnitPopup?.isEnabled = true
-        timedPinDurationValueLabel?.isEnabled = true
-        timedPinDurationValueLabel?.textColor = .labelColor
+        timedPinDurationLabel?.textColor = canUseTimedPins ? .labelColor : .tertiaryLabelColor
+        timedPinPresetPopup?.isEnabled = canUseTimedPins
+        timedPinPresetAddButton?.isEnabled = canUseTimedPins
+        timedPinDurationStepper?.isEnabled = canUseTimedPins
+        timedPinDurationUnitPopup?.isEnabled = canUseTimedPins
+        timedPinDurationValueLabel?.isEnabled = canUseTimedPins
+        timedPinDurationValueLabel?.textColor = canUseTimedPins ? .labelColor : .tertiaryLabelColor
+        timedPinDurationDecreaseButton?.isEnabled = canUseTimedPins
+        timedPinDurationIncreaseButton?.isEnabled = canUseTimedPins
     }
 
     private func refreshTimestampShortcutControls() {
@@ -7309,25 +7366,36 @@ class BoardManPanel: NSPanel {
     @objc private func longPressActionChanged(_ sender: NSPopUpButton) {
         let rawValue = sender.selectedItem?.representedObject as? String
         let action = BoardManLongPressAction.allowed(rawValue)
+        if action == .timedPin, !requireLifetimeFeature(.advancedTimedPins) {
+            if let item = sender.itemArray.first(where: {
+                ($0.representedObject as? String) == configuredLongPressAction.rawValue
+            }) {
+                sender.select(item)
+            }
+            return
+        }
         AppEnvironment.current.defaults.set(action.rawValue, forKey: Constants.UserDefaults.boardManLongPressAction)
         refreshTimedPinSettingsControls()
         updateSnippetModeUI()
     }
 
     @objc private func timedPinPresetChanged(_ sender: NSPopUpButton) {
-        guard let id = sender.selectedItem?.representedObject as? String else { return }
+        guard requireLifetimeFeature(.advancedTimedPins),
+              let id = sender.selectedItem?.representedObject as? String else { return }
         BoardManTimedPinPresetStore.select(id)
         refreshTimedPinSettingsControls()
         updateSnippetModeUI()
     }
 
     @objc private func addTimedPinPreset(_ sender: Any?) {
+        guard requireLifetimeFeature(.advancedTimedPins) else { return }
         _ = BoardManTimedPinPresetStore.add()
         refreshTimedPinSettingsControls()
         layoutPanelSubviews()
     }
 
     @objc private func removeTimedPinPreset(_ sender: Any?) {
+        guard requireLifetimeFeature(.advancedTimedPins) else { return }
         guard BoardManTimedPinPresetStore.removeSelected() else {
             NSSound.beep()
             return
@@ -7337,6 +7405,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func timedPinDurationChanged(_ sender: NSStepper) {
+        guard requireLifetimeFeature(.advancedTimedPins) else { return }
         let selected = BoardManTimedPinPresetStore.updateSelected(value: sender.integerValue)
         sender.integerValue = selected.value
         refreshTimedPinSettingsControls()
@@ -7344,6 +7413,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func timedPinDurationFieldChanged(_ sender: NSTextField) {
+        guard requireLifetimeFeature(.advancedTimedPins) else { return }
         let selected = BoardManTimedPinPresetStore.updateSelected(value: sender.integerValue)
         sender.integerValue = selected.value
         refreshTimedPinSettingsControls()
@@ -7351,6 +7421,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func adjustTimedPinDuration(_ sender: NSButton) {
+        guard requireLifetimeFeature(.advancedTimedPins) else { return }
         let current = timedPinDurationValueLabel?.integerValue ?? configuredTimedPinDurationValue
         _ = BoardManTimedPinPresetStore.updateSelected(value: current + sender.tag)
         refreshTimedPinSettingsControls()
@@ -7358,6 +7429,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func timedPinDurationUnitChanged(_ sender: NSPopUpButton) {
+        guard requireLifetimeFeature(.advancedTimedPins) else { return }
         let rawValue = sender.selectedItem?.representedObject as? String
         _ = BoardManTimedPinPresetStore.updateSelected(unit: BoardManTimedPinUnit.allowed(rawValue))
         refreshTimedPinSettingsControls()
@@ -7418,6 +7490,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func previewScaleChanged(_ sender: NSSlider) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         let value = Self.clampedPreviewScale(sender.integerValue)
         sender.integerValue = value
         let key = sender.tag == 1
@@ -7448,6 +7521,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func relativeNumberStyleChanged(_ sender: NSPopUpButton) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         let style = BoardManRelativeNumberStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeNumberStyle)
         onRefreshRequested?()
@@ -7455,6 +7529,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func relativeUnitStyleChanged(_ sender: NSPopUpButton) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         let style = BoardManRelativeUnitStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeUnitStyle)
         onRefreshRequested?()
@@ -7462,6 +7537,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func relativeSuffixStyleChanged(_ sender: NSPopUpButton) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         let style = BoardManRelativeSuffixStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeSuffixStyle)
         onRefreshRequested?()
@@ -7469,6 +7545,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func relativeNowStyleChanged(_ sender: NSPopUpButton) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         let style = BoardManRelativeNowStyle.allowed(sender.selectedItem?.representedObject as? String)
         AppEnvironment.current.defaults.set(style.rawValue, forKey: Constants.UserDefaults.boardManRelativeNowStyle)
         onRefreshRequested?()
@@ -7530,12 +7607,17 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func usageCountChanged(_ sender: NSButton) {
+        guard requireLifetimeFeature(.pasteAnalytics) else {
+            sender.state = .off
+            return
+        }
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.boardManShowUsageCount)
         onRefreshRequested?()
         refreshAppearancePreview()
     }
 
     @objc private func usageStyleChanged(_ sender: NSPopUpButton) {
+        guard requireLifetimeFeature(.pasteAnalytics) else { return }
         let selectedRaw = sender.selectedItem?.representedObject as? String ?? sender.titleOfSelectedItem
         AppEnvironment.current.defaults.set(BoardManPanel.allowedUsageCountStyle(selectedRaw),
                                             forKey: Constants.UserDefaults.boardManUsageCountStyle)
@@ -7544,6 +7626,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func usedItemStyleChanged(_ sender: NSPopUpButton) {
+        guard requireLifetimeFeature(.pasteAnalytics) else { return }
         let selectedRaw = sender.selectedItem?.representedObject as? String ?? sender.titleOfSelectedItem
         AppEnvironment.current.defaults.set(BoardManPanel.allowedUsedItemStyle(selectedRaw),
                                             forKey: Constants.UserDefaults.boardManUsedItemStyle)
@@ -7655,6 +7738,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func customColorChanged(_ sender: NSColorWell) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         let key: String
         switch sender.tag {
         case 1: key = Constants.UserDefaults.boardManCustomPanelColor
@@ -7668,6 +7752,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func customOpacityChanged(_ sender: NSSlider) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         let key: String
         switch sender.tag {
         case 1: key = Constants.UserDefaults.boardManCustomPanelOpacity
@@ -7681,6 +7766,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func resetCustomColors(_ sender: Any?) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         let defaults = AppEnvironment.current.defaults
         [
             Constants.UserDefaults.boardManCustomAccentColor,
@@ -7715,16 +7801,19 @@ class BoardManPanel: NSPanel {
     }
 
     private func refreshProFeatureAvailability() {
-        // All controls in these sections are local Board-Man capabilities and stay available
-        // regardless of account or service entitlement. Only connected services are commercial.
+        let canUseAdvancedAppearance = EntitlementGate.canUse(.advancedAppearance, service: entitlementService)
         [
+            relativeNumberLabel, relativeNumberPopup, relativeUnitLabel, relativeUnitPopup,
+            relativeSuffixLabel, relativeSuffixPopup, relativeNowLabel, relativeNowPopup,
             customAccentLabel, customAccentColorWell, customAccentOpacitySlider,
             customPanelLabel, customPanelColorWell, customPanelOpacitySlider,
             customUsedColorLabel, customUsedColorWell, customUsedOpacitySlider,
             resetCustomColorsButton,
             textPreviewScaleLabel, textPreviewScaleSlider, textPreviewScaleValueLabel,
             imagePreviewScaleLabel, imagePreviewScaleSlider, imagePreviewScaleValueLabel
-        ].forEach { setControlTree($0, enabled: true, alpha: 1) }
+        ].forEach {
+            setControlTree($0, enabled: canUseAdvancedAppearance, alpha: canUseAdvancedAppearance ? 1 : 0.52)
+        }
 
         let storedTextScale = Self.clampedPreviewScale(
             AppEnvironment.current.defaults.integer(forKey: Constants.UserDefaults.boardManTextPreviewScale)
@@ -7736,13 +7825,49 @@ class BoardManPanel: NSPanel {
         imagePreviewScaleSlider?.integerValue = storedImageScale
         textPreviewScaleValueLabel?.stringValue = "\(storedTextScale)%"
         imagePreviewScaleValueLabel?.stringValue = "\(storedImageScale)%"
-        previewScaleProNoteLabel?.isHidden = true
+        previewScaleProNoteLabel?.stringValue = canUseAdvancedAppearance
+            ? ""
+            : boardManText("Board-Man Lifetime unlocks advanced appearance controls.")
+        previewScaleProNoteLabel?.isHidden = canUseAdvancedAppearance
+
+        let canUseAnalytics = EntitlementGate.canUse(.pasteAnalytics, service: entitlementService)
+        [usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup].forEach {
+            setControlTree($0, enabled: canUseAnalytics, alpha: canUseAnalytics ? 1 : 0.52)
+        }
+        if !canUseAnalytics {
+            usageCountButton?.state = .off
+            historyUsageFilterControl?.selectedSegment = BoardManHistoryUsageFilter.allCases.firstIndex(of: .all) ?? 0
+        }
+        historyUsageFilterControl?.toolTip = canUseAnalytics
+            ? boardManText("Filter history by usage")
+            : boardManText("Board-Man Lifetime unlocks detailed local analytics.")
+
+        let canUseAdvancedSearch = EntitlementGate.canUse(.advancedSearch, service: entitlementService)
+        historyConditionButton?.alphaValue = canUseAdvancedSearch ? 1 : 0.68
+        historySavedFilterPopup?.alphaValue = canUseAdvancedSearch ? 1 : 0.68
+        historyConditionButton?.toolTip = canUseAdvancedSearch
+            ? boardManText("Edit history condition")
+            : boardManText("Board-Man Lifetime unlocks advanced search conditions.")
+        historySavedFilterPopup?.toolTip = canUseAdvancedSearch
+            ? boardManText("Saved Filters")
+            : boardManText("Board-Man Lifetime unlocks saved advanced filters.")
+
+        refreshTimedPinSettingsControls()
 
         [snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton].forEach {
             setControlTree($0, enabled: true, alpha: 1)
         }
         snippetShortcutRows.flatMap { $0.views }.forEach { setControlTree($0, enabled: true, alpha: 1) }
-        snippetGroupProNoteLabel?.isHidden = true
+        snippetGroupProNoteLabel?.stringValue = EntitlementGate.limit(
+            for: .snippetFolders,
+            service: entitlementService
+        ) == nil
+            ? ""
+            : boardManText("Free includes 1 Template folder. Lifetime unlocks unlimited folders.")
+        snippetGroupProNoteLabel?.isHidden = EntitlementGate.limit(
+            for: .snippetFolders,
+            service: entitlementService
+        ) == nil
 
         [snippetCategoryAddButton, snippetCategoryRenameButton, snippetCategoryDeleteButton, snippetReorderModeButton].forEach {
             setControlTree($0, enabled: true, alpha: 1)
@@ -8003,7 +8128,10 @@ class BoardManPanel: NSPanel {
             title: boardManText("Add Group"),
             initialTitle: ""
         ) else { return }
-        let folder = BoardManSnippetCatalogService.createFolder(title: title, store: store)
+        guard let folder = BoardManSnippetCatalogService.createFolderIfAllowed(title: title, store: store) else {
+            presentCommercialLimit(.snippetFolders)
+            return
+        }
         setActiveSnippetGroupIdentifiers([folder.identifier])
         onRefreshRequested?()
     }
@@ -8036,12 +8164,15 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func addSnippetFromPanel(_ sender: Any?) {
-        let creation = BoardManSnippetCatalogService.createSnippet(
+        guard let creation = BoardManSnippetCatalogService.createSnippetIfAllowed(
             preferredFolderIdentifier: activeSnippetCategoryIdentifier,
             allCategoriesIdentifier: BoardManPanel.allCategoriesIdentifier,
             uncategorizedIdentifier: BoardManPanel.uncategorizedCategoryIdentifier,
             store: store
-        )
+        ) else {
+            presentCommercialLimit(.snippetItems)
+            return
+        }
         setActiveSnippetGroupIdentifiers([creation.folder.identifier])
         onRefreshRequested?()
         selectSnippetInCurrentList(identifier: creation.snippet.identifier)
@@ -8051,13 +8182,18 @@ class BoardManPanel: NSPanel {
         snippetEditorTitleField?.selectText(nil)
     }
 
-    private func showProLockedAlert(message: String) {
-        NSSound.beep()
-        let alert = NSAlert()
-        alert.messageText = boardManText("Pro limit reached")
-        alert.informativeText = message
-        alert.addButton(withTitle: boardManText("OK"))
-        alert.runModal()
+    private func presentCommercialLimit(_ limit: EntitlementLimit) {
+        guard let limitValue = EntitlementGate.limit(for: limit, service: entitlementService) else { return }
+        BoardManUpgradeRoute.presentLimitReached(limit, limitValue: limitValue)
+    }
+
+    @discardableResult
+    private func requireLifetimeFeature(_ feature: EntitlementFeature) -> Bool {
+        guard EntitlementGate.canUse(feature, service: entitlementService) else {
+            BoardManUpgradeRoute.presentFeatureLocked(feature)
+            return false
+        }
+        return true
     }
 
     @objc private func editSelectedSnippetFromPanel(_ sender: Any?) {
@@ -8458,14 +8594,37 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func openLicensePurchasePage(_ sender: NSButton) {
-        guard let url = URL(string: "https://uniplanck.com") else { return }
-        NSWorkspace.shared.open(url)
+        BoardManUpgradeRoute.openLifetimePage()
     }
 
     @objc private func activateLicenseRequested(_ sender: NSButton) {
-        licenseActivationStatusLabel?.stringValue = boardManText("Activation is not connected yet. Free remains the default runtime entitlement.")
+        let licenseKey = licenseKeyField?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !licenseKey.isEmpty else {
+            licenseActivationStatusLabel?.stringValue = boardManText("Enter a Lifetime license code.")
+            licenseActivationStatusLabel?.textColor = .systemRed
+            return
+        }
+
+        licenseKeyField?.isEnabled = false
+        licenseActivateButton?.isEnabled = false
+        licenseActivationStatusLabel?.stringValue = boardManText("Verifying the Lifetime license…")
         licenseActivationStatusLabel?.textColor = .secondaryLabelColor
-        refreshLicenseSummary()
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let response = await self.licenseActivationCoordinator.activate(licenseKey: licenseKey)
+            switch response.status {
+            case .activated:
+                self.licenseKeyField?.stringValue = ""
+                self.licenseActivationStatusLabel?.textColor = .systemGreen
+            case .networkUnavailable, .notConfigured:
+                self.licenseActivationStatusLabel?.textColor = .systemOrange
+            case .invalidInput, .rejected, .serverError, .verificationFailed, .storageFailed:
+                self.licenseActivationStatusLabel?.textColor = .systemRed
+            }
+            self.licenseActivationStatusLabel?.stringValue = response.message
+            self.refreshLicenseSummary(preserveActivationMessage: true)
+        }
     }
 
     @objc private func clearSnippetFolderShortcut(_ sender: NSButton) {
@@ -8539,7 +8698,7 @@ class BoardManPanel: NSPanel {
         clearHideRulesButton?.isEnabled = true
     }
 
-    private func refreshLicenseSummary() {
+    private func refreshLicenseSummary(preserveActivationMessage: Bool = false) {
         let snapshot = EntitlementService.shared.currentSnapshot
         let isActive = snapshot.isProEntitled
         let isJapanese = BoardManLanguage.allowed(
@@ -8553,14 +8712,18 @@ class BoardManPanel: NSPanel {
             ? "履歴 \(limitText(snapshot.limits.maxHistoryItems))  •  Pin \(limitText(snapshot.limits.maxPinnedItems))  •  スニペット \(limitText(snapshot.limits.maxSnippets))"
             : "History \(limitText(snapshot.limits.maxHistoryItems))  •  Pins \(limitText(snapshot.limits.maxPinnedItems))  •  Snippets \(limitText(snapshot.limits.maxSnippets))"
         licenseKeyField?.placeholderString = isJapanese
-            ? (isActive ? "キーチェーンで確認済み" : "安全なローカルライセンス")
-            : (isActive ? "Verified in Keychain" : "Secure local license")
+            ? (isActive ? "このMacで認証済み" : "Lifetimeライセンスコード")
+            : (isActive ? "Activated on this Mac" : "Lifetime license code")
+        licenseKeyField?.isEnabled = !isActive
         licenseActivateButton?.isHidden = isActive
+        licenseActivateButton?.isEnabled = !isActive
         licenseUpgradeButton?.isHidden = isActive
-        licenseActivationStatusLabel?.stringValue = isJapanese
-            ? (isActive ? "ローカルで確認済みです。このMacに紐づき、起動時に自動復元されます。" : "オンライン認証はまだ接続されていません。")
-            : (isActive ? "Verified locally. This entitlement is bound to this Mac and restored automatically at launch." : "Online activation is not connected yet.")
-        licenseActivationStatusLabel?.textColor = isActive ? .systemGreen : .secondaryLabelColor
+        if !preserveActivationMessage {
+            licenseActivationStatusLabel?.stringValue = isJapanese
+                ? (isActive ? "署名済みLifetimeライセンスを確認済みです。このMacに紐づき、起動時に自動復元されます。" : "Lifetimeライセンスコードを入力して、このMacを認証できます。")
+                : (isActive ? "Verified signed Lifetime entitlement. It is bound to this Mac and restored automatically at launch." : "Enter a Lifetime license code to activate this Mac.")
+            licenseActivationStatusLabel?.textColor = isActive ? .systemGreen : .secondaryLabelColor
+        }
         licenseMockNoteLabel?.stringValue = isJapanese
             ? (isActive ? "署名済みライセンストークンはこのMacのBoard-Man用ローカル領域に保存されます。署名用秘密鍵はBoard-Manに含まれません。" : "確認済みライセンスはこのMacのBoard-Man用ローカル領域へ保存されます。商用サービス未設定のビルドではローカル機能をそのまま利用できます。")
             : (isActive ? "The signed license token is stored in Board-Man's private local application state. The signing private key is not embedded in Board-Man." : "Verified licenses are stored in Board-Man's private local application state. Local features remain available when commercial services are not configured.")
@@ -8571,7 +8734,7 @@ class BoardManPanel: NSPanel {
     private func licensePlanTitle(_ plan: EntitlementPlan) -> String {
         switch plan {
         case .free: return boardManText("Free")
-        case .pro: return "Pro"
+        case .pro: return "Legacy Pro"
         case .ownerLifetime: return boardManText("Owner Lifetime")
         }
     }
@@ -8579,8 +8742,8 @@ class BoardManPanel: NSPanel {
     private func licenseStateTitle(_ state: LicenseState) -> String {
         switch state {
         case .free: return boardManText("Free")
-        case .trial: return boardManText("Trial")
-        case .proActive: return boardManText("Pro Active")
+        case .trial: return boardManText("Legacy Trial")
+        case .proActive: return boardManText("Legacy Pro Active")
         case .ownerLifetime: return boardManText("Owner Lifetime")
         case .proExpired: return boardManText("Expired")
         case .invalid: return boardManText("Invalid")
@@ -8609,12 +8772,12 @@ class BoardManPanel: NSPanel {
         if isJapanese {
             switch snapshot.state {
             case .free: return "主要な履歴・スニペット機能をローカルで利用できます。"
-            case .trial: return "一時的なProアクセスが有効です。"
-            case .proActive: return "Proライセンスを確認済みです。"
+            case .trial: return "旧Trialトークンの互換アクセスが有効です。"
+            case .proActive: return "旧Proトークンを互換モードで確認済みです。"
             case .ownerLifetime: return "オーナー永久ライセンスを確認済みです。"
-            case .proExpired: return "Proライセンスは現在無効です。"
+            case .proExpired: return "旧Pro互換トークンは現在無効です。"
             case .invalid: return "ライセンス状態を確認できません。"
-            case .offlineGrace: return "オフライン猶予期間としてProを利用できます。"
+            case .offlineGrace: return "旧Pro互換トークンをオフライン猶予として利用しています。"
             case .locked: return "現在のライセンスでは機能がロックされています。"
             }
         }
@@ -8622,17 +8785,17 @@ class BoardManPanel: NSPanel {
         case .free:
             return "Core clipboard history and snippets are available locally."
         case .trial:
-            return "Temporary Pro access\(dateSuffix(snapshot.expiresAt, prefix: " until "))."
+            return "Legacy Trial compatibility access\(dateSuffix(snapshot.expiresAt, prefix: " until "))."
         case .proActive:
-            return "Verified Pro entitlement\(dateSuffix(snapshot.lastVerifiedAt, prefix: ", checked "))."
+            return "Verified legacy Pro compatibility entitlement\(dateSuffix(snapshot.lastVerifiedAt, prefix: ", checked "))."
         case .ownerLifetime:
             return "Verified owner lifetime entitlement\(dateSuffix(snapshot.lastVerifiedAt, prefix: ", checked "))."
         case .proExpired:
-            return "Pro entitlement is no longer active."
+            return "Legacy Pro compatibility entitlement is no longer active."
         case .invalid:
             return "License status cannot be trusted."
         case .offlineGrace:
-            return "Pro is temporarily trusted offline\(dateSuffix(snapshot.offlineGraceExpiresAt, prefix: " until "))."
+            return "Legacy Pro compatibility is temporarily trusted offline\(dateSuffix(snapshot.offlineGraceExpiresAt, prefix: " until "))."
         case .locked:
             return "Feature access is locked by the current entitlement."
         }
@@ -8686,6 +8849,7 @@ class BoardManPanel: NSPanel {
     }
 
     private var currentHistoryUsageFilter: BoardManHistoryUsageFilter {
+        guard EntitlementGate.canUse(.pasteAnalytics, service: entitlementService) else { return .all }
         return BoardManHistoryUsageFilter.allowed(
             AppEnvironment.current.defaults.string(forKey: Constants.UserDefaults.boardManHistoryUsageFilter)
         )
@@ -8776,7 +8940,8 @@ class BoardManPanel: NSPanel {
     }
 
     private func applySavedFilterPreset(_ preset: BoardManSavedFilterPreset) {
-        let usageFilter = preset.usageFilter
+        guard requireLifetimeFeature(.advancedSearch) else { return }
+        let usageFilter = EntitlementGate.canUse(.pasteAnalytics, service: entitlementService) ? preset.usageFilter : .all
         AppEnvironment.current.defaults.set(
             usageFilter.rawValue,
             forKey: Constants.UserDefaults.boardManHistoryUsageFilter
@@ -8802,6 +8967,10 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func savedFilterPopupChanged(_ sender: NSPopUpButton) {
+        guard requireLifetimeFeature(.advancedSearch) else {
+            reloadSavedFilterPopup()
+            return
+        }
         guard let value = sender.selectedItem?.representedObject as? String else {
             reloadSavedFilterPopup()
             return
@@ -8845,6 +9014,10 @@ class BoardManPanel: NSPanel {
 
     @objc private func historyUsageFilterChanged(_ sender: NSSegmentedControl) {
         guard let filter = BoardManHistoryUsageFilter.allCases[safe: sender.selectedSegment] else { return }
+        if filter != .all, !requireLifetimeFeature(.pasteAnalytics) {
+            sender.selectedSegment = BoardManHistoryUsageFilter.allCases.firstIndex(of: .all) ?? 0
+            return
+        }
         AppEnvironment.current.defaults.set(filter.rawValue, forKey: Constants.UserDefaults.boardManHistoryUsageFilter)
         selectedIndex = -1
         hoveredRow = -1
@@ -8854,10 +9027,12 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func historyConditionButtonPressed(_ sender: NSButton) {
+        guard requireLifetimeFeature(.advancedSearch) else { return }
         editCurrentHistoryCondition(sender)
     }
 
     @objc private func editCurrentHistoryCondition(_ sender: Any?) {
+        guard requireLifetimeFeature(.advancedSearch) else { return }
         let filter = currentHistoryUsageFilter
         let storedCondition = BoardManHistoryConditionStore.shared.condition(for: filter)
         let existing = storedCondition ?? .empty
@@ -8967,6 +9142,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func toggleCurrentHistoryCondition(_ sender: Any?) {
+        guard requireLifetimeFeature(.advancedSearch) else { return }
         let filter = currentHistoryUsageFilter
         guard let condition = BoardManHistoryConditionStore.shared.condition(for: filter) else { return }
         BoardManHistoryConditionStore.shared.setEnabled(!condition.isEnabled, for: filter)
@@ -8975,6 +9151,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func deleteCurrentHistoryCondition(_ sender: Any?) {
+        guard requireLifetimeFeature(.advancedSearch) else { return }
         BoardManHistoryConditionStore.shared.delete(for: currentHistoryUsageFilter)
         updateHistoryConditionButton()
         applyCurrentFilter()
@@ -9513,6 +9690,7 @@ class BoardManPanel: NSPanel {
     }
 
     @objc private func setItemHighlightFromMenu(_ sender: NSMenuItem) {
+        guard requireLifetimeFeature(.advancedAppearance) else { return }
         guard let context = sender.representedObject as? [String: String],
               let identifier = context["identifier"],
               let rawValue = context["highlight"],
@@ -10087,8 +10265,9 @@ class BoardManPanel: NSPanel {
         let store = PinnedSnippetStore.shared
         if store.isPinned(identifier) {
             store.remove(identifier)
-        } else {
-            _ = store.add(identifier)
+        } else if !store.add(identifier) {
+            presentCommercialLimit(.pinnedItems)
+            return false
         }
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         onRefreshRequested?()
@@ -10102,8 +10281,7 @@ class BoardManPanel: NSPanel {
         if store.isPinned(identifier) {
             store.remove(identifier)
         } else {
-            let permanentStore = PinnedSnippetStore.shared
-            permanentStore.remove(identifier)
+            guard requireLifetimeFeature(.advancedTimedPins) else { return false }
             let selectedPreset = preset ?? BoardManTimedPinPresetStore.selectedPreset()
             guard store.setPin(
                 identifier,
@@ -10111,6 +10289,7 @@ class BoardManPanel: NSPanel {
                 unit: selectedPreset.unit,
                 maximumActiveCount: nil
             ) else { return false }
+            PinnedSnippetStore.shared.remove(identifier)
         }
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
         onRefreshRequested?()
@@ -10249,7 +10428,8 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate func itemHighlightAppearance(for row: Int) -> (background: NSColor, border: NSColor, borderWidth: CGFloat)? {
-        guard row >= 0,
+        guard EntitlementGate.canUse(.advancedAppearance, service: entitlementService),
+              row >= 0,
               let item = historyItems[safe: row],
               let highlight = BoardManItemHighlightStore.shared.highlight(for: item.dataHash) else { return nil }
         let base = highlight.color
@@ -10263,7 +10443,8 @@ class BoardManPanel: NSPanel {
     }
 
     fileprivate func usedItemAppearance(for row: Int) -> (background: NSColor, border: NSColor, borderWidth: CGFloat)? {
-        guard row >= 0,
+        guard EntitlementGate.canUse(.pasteAnalytics, service: entitlementService),
+              row >= 0,
               let item = historyItems[safe: row],
               item.pasteCount >= 1,
               !item.isPinned else { return nil }

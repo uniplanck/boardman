@@ -583,7 +583,7 @@ private extension BoardManPreferencesWindowController {
         BoardManPreferenceUI.prepare(pill, color: BoardManPreferenceUI.field, radius: BoardManPreferenceUI.Radius.control, border: BoardManPreferenceUI.borderSubtle)
         view.addSubview(pill.bmPositioned(originX: originX + 244, originY: originY + 1, width: 44, height: 24))
         if locked {
-            view.addSubview(BoardManPreferenceUI.proBadge().bmPositioned(originX: originX + 206, originY: originY + 3, width: 30, height: 18))
+            view.addSubview(BoardManPreferenceUI.lifetimeBadge().bmPositioned(originX: originX + 182, originY: originY + 3, width: 54, height: 18))
         }
     }
 
@@ -615,7 +615,7 @@ private extension BoardManPreferencesWindowController {
         if active {
             tile.addSubview(BoardManPreferenceUI.icon("checkmark.circle.fill", size: 15).bmPositioned(originX: 64, originY: 22, width: 18, height: 18))
         } else if locked {
-            tile.addSubview(BoardManPreferenceUI.proBadge().bmPositioned(originX: 51, originY: 52, width: 30, height: 18))
+            tile.addSubview(BoardManPreferenceUI.lifetimeBadge().bmPositioned(originX: 27, originY: 52, width: 54, height: 18))
         }
         return tile
     }
@@ -723,8 +723,8 @@ enum BoardManPreferenceUI {
         return button
     }
 
-    static func proBadge() -> NSTextField {
-        let badge = label("PRO", size: 10, weight: .bold, color: .white)
+    static func lifetimeBadge() -> NSTextField {
+        let badge = label("LIFETIME", size: 8, weight: .bold, color: .white)
         badge.alignment = .center
         badge.wantsLayer = true
         badge.layer?.backgroundColor = Self.red.withAlphaComponent(0.88).cgColor

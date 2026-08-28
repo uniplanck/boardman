@@ -269,6 +269,17 @@ extension ClipService {
             autoreleasepool {
                 assert(!Thread.isMainThread, "Clipboard persistence must never run on the main thread")
 
+                // Commercial limits are admission gates, never retention/deletion gates. A
+                // downgrade therefore leaves grandfathered history untouched and only refuses
+                // a record that would grow the collection past the current plan limit.
+                let replacesExistingRecord = self.store.clip(identifier: clip.dataHash) != nil
+                if !replacesExistingRecord {
+                    let currentCount = self.store.clipsSortedByUpdateTimeDescending().count
+                    guard EntitlementGate.canAddHistoryItem(currentCount: currentCount) else {
+                        return
+                    }
+                }
+
                 // Thumbnail generation, archive encoding, and database writes are deliberately
                 // serialized away from AppKit presentation work.
                 if let thumbnailImage = data.thumbnailImage {
