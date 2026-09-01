@@ -3947,6 +3947,13 @@ class BoardManPanel: NSPanel {
         }
     }
 
+    convenience init() {
+        self.init(
+            store: BoardManStores.authoritative,
+            entitlementService: .shared
+        )
+    }
+
     convenience init(
         store: BoardManStore = BoardManStores.authoritative,
         entitlementService: EntitlementService = .shared

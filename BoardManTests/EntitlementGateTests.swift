@@ -2257,6 +2257,17 @@ final class BoardManFilterSettingsTests {
 final class BoardManUIRegressionTests {
 
     @Test
+    func defaultInitializerBuildsProductionPanelShell() {
+        let panel = BoardManPanel()
+        defer { panel.close() }
+
+        #expect(panel.isFloatingPanel)
+        #expect(panel.level == .popUpMenu)
+        #expect((panel.contentView?.subviews.count ?? 0) > 0,
+                "Production BoardManPanel() must build the full panel UI instead of inheriting an empty NSPanel initializer.")
+    }
+
+    @Test
     func majorTabsAndSettingsCategoriesStayInsidePanel() async throws {
         let testStore = try SQLiteBoardManStore.inMemoryForTesting()
         let entitlementService = makeLifetimeTestEntitlementService()
