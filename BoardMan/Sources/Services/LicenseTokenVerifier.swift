@@ -52,6 +52,22 @@ protocol SignedLicenseTokenVerifying {
 
 private enum BoardManLicenseVerificationConfiguration {
     static let ownerPublicKeyBase64 = "BGGgQPFnOgKAk821OQGix9fQLDPrqJSCEP98KvCBXqs4YZ6Vfw6QmscEpbZROEjiAavFvNNc1V/fCw1cYa62Cuc="
+#if DEBUG
+    static let previewPublicKeyEnvironmentKey = "BOARDMAN_LICENSE_VERIFICATION_PUBLIC_KEY_BASE64"
+#endif
+
+    static func resolvedPublicKeyBase64(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String {
+#if DEBUG
+        if let previewKey = environment[previewPublicKeyEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !previewKey.isEmpty {
+            return previewKey
+        }
+#endif
+        return ownerPublicKeyBase64
+    }
 }
 
 final class P256SignedLicenseTokenVerifier: SignedLicenseTokenVerifying {
@@ -61,7 +77,21 @@ final class P256SignedLicenseTokenVerifier: SignedLicenseTokenVerifying {
         return payload.isLifetimeCommercialEntitlement || payload.isLegacyProEntitlement
     }
 
-    init(publicKeyBase64: String = BoardManLicenseVerificationConfiguration.ownerPublicKeyBase64) {
+    convenience init() {
+        self.init(publicKeyBase64: BoardManLicenseVerificationConfiguration.resolvedPublicKeyBase64())
+    }
+
+#if DEBUG
+    convenience init(environment: [String: String]) {
+        self.init(
+            publicKeyBase64: BoardManLicenseVerificationConfiguration.resolvedPublicKeyBase64(
+                environment: environment
+            )
+        )
+    }
+#endif
+
+    init(publicKeyBase64: String) {
         guard let data = Data(base64Encoded: publicKeyBase64) else {
             publicKey = nil
             return

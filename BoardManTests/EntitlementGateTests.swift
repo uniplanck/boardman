@@ -915,6 +915,37 @@ final class CommercialLicenseBoundaryTests {
     }
 }
 
+extension CommercialLicenseBoundaryTests {
+    @Test
+    func debugPreviewVerificationKeyOverrideSupportsServiceInterop() throws {
+#if DEBUG
+        let privateKey = P256.Signing.PrivateKey()
+        let deviceID = UUID().uuidString
+        let bundleID = "com.uniplanck.BoardMan"
+        let token = try makeOwnerToken(privateKey: privateKey, deviceID: deviceID)
+        let previewPublicKey = privateKey.publicKey.x963Representation.base64EncodedString()
+        let previewVerifier = P256SignedLicenseTokenVerifier(environment: [
+            "BOARDMAN_LICENSE_VERIFICATION_PUBLIC_KEY_BASE64": previewPublicKey
+        ])
+        let context = SignedLicenseTokenVerificationContext(
+            deviceID: deviceID,
+            bundleID: bundleID,
+            verificationDate: Date()
+        )
+        if case .verified(let payload) = previewVerifier.verify(token, context: context) {
+            #expect(payload.isLifetimeCommercialEntitlement)
+        } else {
+            Issue.record("Expected the Debug preview verification-key override to accept its matching token.")
+        }
+
+        let blankOverrideVerifier = P256SignedLicenseTokenVerifier(environment: [
+            "BOARDMAN_LICENSE_VERIFICATION_PUBLIC_KEY_BASE64": "   "
+        ])
+        #expect(blankOverrideVerifier.verify(token, context: context) == .invalid(.signatureInvalid))
+#endif
+    }
+}
+
 @Suite(.serialized)
 final class CommercialLicenseHardeningTests {
 
