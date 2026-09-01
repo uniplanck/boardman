@@ -45,6 +45,12 @@ class AppDelegate: NSObject, NSMenuItemValidation {
         )
     }
 
+    private static func wasLaunchedAsLoginItem() -> Bool {
+        guard let event = NSAppleEventManager.shared().currentAppleEvent else { return false }
+        return event.eventID == kAEOpenApplication
+            && event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+    }
+
     // MARK: - Init
     override func awakeFromNib() {
         super.awakeFromNib()
@@ -256,6 +262,12 @@ class AppDelegate: NSObject, NSMenuItemValidation {
 // MARK: - NSApplication Delegate
 extension AppDelegate: NSApplicationDelegate {
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard Self.shouldStartRuntimeServices() else { return false }
+        AppEnvironment.current.menuManager.popUpMenu(.main)
+        return true
+    }
+
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         NSApplication.shared.applicationIconImage = NSImage(named: "AppIcon") ?? NSApplication.shared.applicationIconImage
 
@@ -305,6 +317,14 @@ extension AppDelegate: NSApplicationDelegate {
 
         // Managers
         AppEnvironment.current.menuManager.setup()
+
+        // A direct Finder/LaunchServices launch should visibly open Board-Man. Login-item launches
+        // stay background-only so signing in never steals focus or opens the panel unexpectedly.
+        if !Self.wasLaunchedAsLoginItem() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+                AppEnvironment.current.menuManager.popUpMainPanelForApplicationLaunch()
+            }
+        }
 
         // Build the hidden panel during idle launch time so the first global shortcut does not
         // pay the full AppKit construction + initial history load cost.

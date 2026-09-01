@@ -90,9 +90,18 @@ extension MenuManager {
         showBoardManSnippetsPanel(folderIdentifier: folder.identifier)
     }
 
-    fileprivate func showBoardManPanel(anchorPoint: NSPoint? = nil, quickMode: Bool = false) {
+    func popUpMainPanelForApplicationLaunch() {
+        showBoardManPanel(keepVisibleUntilApplicationActivates: true)
+    }
+
+    fileprivate func showBoardManPanel(
+        anchorPoint: NSPoint? = nil,
+        quickMode: Bool = false,
+        keepVisibleUntilApplicationActivates: Bool = false
+    ) {
         let startedAt = CFAbsoluteTimeGetCurrent()
         if let visiblePanel = boardManPanel, visiblePanel.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
             visiblePanel.orderFrontRegardless()
             visiblePanel.makeKeyAndOrderFront(nil)
             visiblePanel.focusTableForKeyboard()
@@ -106,6 +115,9 @@ extension MenuManager {
 
         panelPasteCoordinator.captureTarget(frontmostApplication: NSWorkspace.shared.frontmostApplication)
         let panel = prepareBoardManPanelIfNeeded()
+        if keepVisibleUntilApplicationActivates {
+            panel.keepVisibleUntilApplicationActivates()
+        }
         panel.setQuickMode(quickMode)
         let panelSize = quickMode
             ? BoardManPanel.quickPanelSize()
@@ -3376,6 +3388,7 @@ class BoardManPanel: NSPanel {
     private var keyboardPreviewLockUntil: CFAbsoluteTime = 0
     private var localKeyMonitor: Any?
     private var previewLifecycleObservers: [NSObjectProtocol] = []
+    private var restoreHidesOnDeactivateObserver: NSObjectProtocol?
     private var isPanelLayoutScheduled = false
     private var suppressSingleClickUntil: CFAbsoluteTime = 0
     private var pendingSnippetSingleClickWorkItem: DispatchWorkItem?
@@ -3973,6 +3986,9 @@ class BoardManPanel: NSPanel {
         hidePreviewBubble()
         removeLocalKeyMonitor()
         previewLifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        if let observer = restoreHidesOnDeactivateObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     private func setupPanelContainer() {
@@ -9881,6 +9897,32 @@ class BoardManPanel: NSPanel {
         }
         setSelectedIndex(row)
         deleteSelectedSnippetFromPanel(sender)
+    }
+
+    func keepVisibleUntilApplicationActivates() {
+        if let observer = restoreHidesOnDeactivateObserver {
+            NotificationCenter.default.removeObserver(observer)
+            restoreHidesOnDeactivateObserver = nil
+        }
+
+        hidesOnDeactivate = false
+        guard !NSApp.isActive else {
+            hidesOnDeactivate = true
+            return
+        }
+
+        restoreHidesOnDeactivateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: NSApp,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.hidesOnDeactivate = true
+            if let observer = self.restoreHidesOnDeactivateObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self.restoreHidesOnDeactivateObserver = nil
+            }
+        }
     }
 
     override func cancelOperation(_ sender: Any?) {
