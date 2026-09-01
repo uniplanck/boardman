@@ -116,6 +116,7 @@ struct Constants {
         static let boardManMaskedItemIdentifiers = "BoardManMaskedItemIdentifiers"
         static let boardManHidePreviewForMaskedItems = "BoardManHidePreviewForMaskedItems"
         static let boardManHideTitleForMaskedItems = "BoardManHideTitleForMaskedItems"
+        static let boardManSelectionMemoryEnabled = "BoardManSelectionMemoryEnabled"
         static let boardManCustomAccentColor = "BoardManCustomAccentColor"
         static let boardManCustomAccentOpacity = "BoardManCustomAccentOpacity"
         static let boardManCustomPanelColor = "BoardManCustomPanelColor"
@@ -167,6 +168,7 @@ struct Constants {
         static let folderKeyCombos = "kCPYFolderKeyCombos"
         static let clearHistoryKeyCombo = "kCPYClearHistoryKeyCombo"
         static let quickModeKeyCombo = "kCPYQuickModeKeyCombo"
+        static let selectionPasteKeyCombo = "BoardManSelectionPasteKeyCombo"
     }
 
 }

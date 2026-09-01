@@ -156,6 +156,8 @@ final class BoardManRuntimeSupport {
         defaults[Constants.UserDefaults.boardManMaskedItemIdentifiers] = [String]()
         defaults[Constants.UserDefaults.boardManHidePreviewForMaskedItems] = false
         defaults[Constants.UserDefaults.boardManHideTitleForMaskedItems] = false
+        // Selection Clipboard is privacy-sensitive and opt-in by default.
+        defaults[Constants.UserDefaults.boardManSelectionMemoryEnabled] = false
         defaults[Constants.UserDefaults.boardManCustomAccentOpacity] = 1.0
         defaults[Constants.UserDefaults.boardManCustomPanelOpacity] = 0.16
         defaults[Constants.UserDefaults.boardManCustomUsedOpacity] = 0.18

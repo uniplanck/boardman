@@ -7,7 +7,7 @@ import AppKit
 import Testing
 @testable import Board_Man
 
-@Suite(.serialized)
+@MainActor @Suite(.serialized)
 struct BoardManSelectionMemoryPhase0Tests {
     @Test
     func capturePolicyFailsClosedForExcludedAndSecureFields() {
@@ -95,6 +95,93 @@ struct BoardManSelectionMemoryPhase0Tests {
         #expect(pasteboard.pasteboardItems?.isEmpty ?? true)
     }
 
+    @Test
+    func productionStorePersistsLatestSelectionAndDeduplicatesBySource() throws {
+        let fileURL = makeTemporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+
+        let store = BoardManSelectionMemoryStore(fileURL: fileURL)
+        let first = candidate("first selection")
+        let second = candidate("second selection")
+        #expect(store.append(first, capturedAt: Date(timeIntervalSince1970: 1)) != nil)
+        #expect(store.append(second, capturedAt: Date(timeIntervalSince1970: 2)) != nil)
+        #expect(store.append(first, capturedAt: Date(timeIntervalSince1970: 3)) != nil)
+        #expect(store.count == 2)
+        #expect(store.latest?.text == "first selection")
+
+        let reloaded = BoardManSelectionMemoryStore(fileURL: fileURL)
+        #expect(reloaded.count == 2)
+        #expect(reloaded.latest?.text == "first selection")
+        #expect(reloaded.entries.map(\.text) == ["first selection", "second selection"])
+    }
+
+    @Test
+    func productionServiceIsOptInAndFailsClosedWithoutLifetime() throws {
+        let suite = "BoardManSelectionMemoryPhase0Tests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let storeURL = makeTemporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+        let store = BoardManSelectionMemoryStore(fileURL: storeURL)
+        let service = BoardManSelectionMemoryService(
+            defaults: defaults,
+            store: store,
+            pasteboard: makePasteboard(),
+            readSelection: { nil },
+            canUseFeature: { false },
+            sendPaste: { false },
+            markPasteboardHandled: {}
+        )
+
+        #expect(!service.isEnabled)
+        #expect(!service.setEnabled(true))
+        #expect(!defaults.bool(forKey: Constants.UserDefaults.boardManSelectionMemoryEnabled))
+    }
+
+    @Test
+    func productionServiceCapturesPrivatelyAndRestoresNormalClipboardAfterDedicatedPaste() async throws {
+        let suite = "BoardManSelectionMemoryPhase0Tests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: Constants.UserDefaults.boardManSelectionMemoryEnabled)
+
+        let storeURL = makeTemporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+        let store = BoardManSelectionMemoryStore(fileURL: storeURL)
+        let pasteboard = makePasteboard()
+        defer { pasteboard.clearContents() }
+        pasteboard.clearContents()
+        pasteboard.setString("ordinary clipboard sentinel", forType: .string)
+
+        var pasteObservedText: String?
+        var handledChangeCount = 0
+        let service = BoardManSelectionMemoryService(
+            defaults: defaults,
+            store: store,
+            pasteboard: pasteboard,
+            readSelection: { nil },
+            canUseFeature: { true },
+            sendPaste: {
+                pasteObservedText = pasteboard.string(forType: .string)
+                return true
+            },
+            markPasteboardHandled: {
+                handledChangeCount += 1
+            }
+        )
+        service.ingestForTesting(candidate("privately captured selection"), at: 10)
+
+        #expect(service.itemCount == 1)
+        #expect(service.latestEntry?.text == "privately captured selection")
+        #expect(pasteboard.string(forType: .string) == "ordinary clipboard sentinel")
+        #expect(service.pasteLatest())
+        #expect(pasteObservedText == "privately captured selection")
+
+        try await Task.sleep(nanoseconds: 450_000_000)
+        #expect(pasteboard.string(forType: .string) == "ordinary clipboard sentinel")
+        #expect(handledChangeCount == 2)
+    }
+
     private func candidate(_ text: String) -> BoardManSelectionCaptureCandidate {
         BoardManSelectionCaptureCandidate(
             text: text,
@@ -105,5 +192,11 @@ struct BoardManSelectionMemoryPhase0Tests {
 
     private func makePasteboard() -> NSPasteboard {
         NSPasteboard(name: NSPasteboard.Name("com.uniplanck.BoardMan.SelectionMemoryPhase0.\(UUID().uuidString)"))
+    }
+
+    private func makeTemporaryStoreURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("BoardManSelectionMemoryTests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("history.json", isDirectory: false)
     }
 }

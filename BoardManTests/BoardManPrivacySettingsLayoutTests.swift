@@ -41,7 +41,7 @@ final class BoardManPrivacySettingsLayoutTests {
     }
 
     @Test
-    func privacySectionsPreserveHistoricalVerticalOffsets() {
+    func privacySectionsReserveSpaceForSelectionClipboardControls() {
         let layout = BoardManPrivacySettingsLayoutPolicy.layout(
             BoardManPrivacySettingsLayoutInput(
                 originX: 30,
@@ -52,8 +52,11 @@ final class BoardManPrivacySettingsLayoutTests {
         )
 
         #expect(layout.privacyHeaderFrame.minY == 700)
-        #expect(layout.storedTypesHeaderFrame.minY == 510)
-        #expect(layout.filterHeaderFrame.minY == 336)
+        #expect(layout.selectionMemoryFrame.minY < layout.privacyHeaderFrame.minY)
+        #expect(layout.selectionMemoryClearFrame.maxX <= 530)
+        #expect(layout.hideMaskedPreviewFrame.minY < layout.selectionMemoryStatusFrame.minY)
+        #expect(layout.storedTypesHeaderFrame.minY == 450)
+        #expect(layout.filterHeaderFrame.minY == 276)
         #expect(layout.excludedAppsButtonFrame.width <= 178)
         #expect(layout.storedTypeFrames.isEmpty)
     }

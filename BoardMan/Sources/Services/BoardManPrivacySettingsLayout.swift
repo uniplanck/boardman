@@ -27,6 +27,9 @@ struct BoardManPrivacySettingsLayoutInput: Equatable {
 
 struct BoardManPrivacySettingsLayout: Equatable {
     let privacyHeaderFrame: NSRect
+    let selectionMemoryFrame: NSRect
+    let selectionMemoryStatusFrame: NSRect
+    let selectionMemoryClearFrame: NSRect
     let hideMaskedPreviewFrame: NSRect
     let hideMaskedTitleFrame: NSRect
     let excludedAppsSummaryFrame: NSRect
@@ -59,8 +62,8 @@ enum BoardManPrivacySettingsLayoutPolicy {
     }
 
     static func layout(_ input: BoardManPrivacySettingsLayoutInput) -> BoardManPrivacySettingsLayout {
-        let storedOriginY = input.originY - 190
-        let filterOriginY = input.originY - 364
+        let storedOriginY = input.originY - 250
+        let filterOriginY = input.originY - 424
         let storedTypeFrames = storedTypes(
             originX: input.originX,
             originY: storedOriginY,
@@ -78,12 +81,15 @@ enum BoardManPrivacySettingsLayoutPolicy {
 
         return BoardManPrivacySettingsLayout(
             privacyHeaderFrame: NSRect(x: input.originX, y: input.originY, width: input.width, height: 18),
-            hideMaskedPreviewFrame: NSRect(x: input.originX, y: input.originY - 38, width: input.width, height: 20),
-            hideMaskedTitleFrame: NSRect(x: input.originX, y: input.originY - 68, width: input.width, height: 20),
-            excludedAppsSummaryFrame: NSRect(x: input.originX, y: input.originY - 104, width: input.width, height: 18),
+            selectionMemoryFrame: NSRect(x: input.originX, y: input.originY - 38, width: max(120, input.width - 96), height: 20),
+            selectionMemoryStatusFrame: NSRect(x: input.originX, y: input.originY - 64, width: max(120, input.width - 96), height: 18),
+            selectionMemoryClearFrame: NSRect(x: input.originX + max(0, input.width - 86), y: input.originY - 68, width: 86, height: input.controlHeight),
+            hideMaskedPreviewFrame: NSRect(x: input.originX, y: input.originY - 100, width: input.width, height: 20),
+            hideMaskedTitleFrame: NSRect(x: input.originX, y: input.originY - 130, width: input.width, height: 20),
+            excludedAppsSummaryFrame: NSRect(x: input.originX, y: input.originY - 164, width: input.width, height: 18),
             excludedAppsButtonFrame: NSRect(
                 x: input.originX,
-                y: input.originY - 144,
+                y: input.originY - 204,
                 width: min(178, input.width),
                 height: input.controlHeight
             ),

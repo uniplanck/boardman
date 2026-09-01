@@ -67,6 +67,7 @@ final class HotKeyService: NSObject {
     fileprivate(set) var snippetKeyCombo: KeyCombo?
     fileprivate(set) var clearHistoryKeyCombo: KeyCombo?
     fileprivate(set) var quickModeKeyCombo: KeyCombo?
+    fileprivate(set) var selectionPasteKeyCombo: KeyCombo?
     private let defaults: UserDefaults
     private var globalMainHotKeyEventTap: CFMachPort?
     private var globalMainHotKeyRunLoopSource: CFRunLoopSource?
@@ -149,6 +150,10 @@ extension HotKeyService {
     @objc func popupQuickMode() {
         AppEnvironment.current.menuManager.showBoardManQuickPanel()
     }
+
+    @MainActor @objc func pasteLatestSelectionMemory() {
+        _ = BoardManSelectionMemoryService.shared.pasteLatest()
+    }
 }
 
 // MARK: - Setup
@@ -178,6 +183,9 @@ extension HotKeyService {
         changeClearHistoryKeyCombo(savedKeyCombo(forKey: Constants.HotKey.clearHistoryKeyCombo))
         // Quick Mode
         changeQuickModeKeyCombo(savedKeyCombo(forKey: Constants.HotKey.quickModeKeyCombo))
+        // Selection Clipboard is Lifetime-only. Preserve a saved shortcut while Free, but do not
+        // register it until the entitlement is available.
+        refreshSelectionPasteHotKey()
     }
 
     func change(with type: MenuType, keyCombo: KeyCombo?) {
@@ -231,6 +239,33 @@ extension HotKeyService {
         hotkey.register()
     }
 
+    func refreshSelectionPasteHotKey() {
+        selectionPasteKeyCombo = savedKeyCombo(forKey: Constants.HotKey.selectionPasteKeyCombo)
+        guard EntitlementGate.canUse(.selectionMemory) else {
+            if Self.shouldRegisterSystemHotKeys() {
+                HotKeyCenter.shared.unregisterHotKey(with: "SelectionPaste")
+            }
+            return
+        }
+        changeSelectionPasteKeyCombo(selectionPasteKeyCombo ?? restoreDefaultSelectionPasteKeyCombo())
+    }
+
+    func changeSelectionPasteKeyCombo(_ keyCombo: KeyCombo?) {
+        selectionPasteKeyCombo = keyCombo
+        defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.selectionPasteKeyCombo)
+        defaults.synchronize()
+        guard Self.shouldRegisterSystemHotKeys() else { return }
+        HotKeyCenter.shared.unregisterHotKey(with: "SelectionPaste")
+        guard let keyCombo, EntitlementGate.canUse(.selectionMemory) else { return }
+        let hotkey = HotKey(
+            identifier: "SelectionPaste",
+            keyCombo: keyCombo,
+            target: self,
+            action: #selector(HotKeyService.pasteLatestSelectionMemory)
+        )
+        hotkey.register()
+    }
+
     private func savedKeyCombo(forKey key: String) -> KeyCombo? {
         guard let data = defaults.object(forKey: key) as? Data else { return nil }
         guard let keyCombo = NSKeyedUnarchiver.unarchiveObject(with: data) as? KeyCombo else { return nil }
@@ -247,6 +282,18 @@ extension HotKeyService {
         defaults.set(keyCombo.archive(), forKey: Constants.HotKey.mainKeyCombo)
         defaults.synchronize()
         NSLog("Board-Man main hotkey archive missing or invalid; restored default Command-Option-V")
+        return keyCombo
+    }
+
+    private func restoreDefaultSelectionPasteKeyCombo() -> KeyCombo? {
+        guard let keyCombo = KeyCombo(
+            QWERTYKeyCode: 9,
+            carbonModifiers: Int(controlKey) | Int(optionKey)
+        ) else {
+            return nil
+        }
+        defaults.set(keyCombo.archive(), forKey: Constants.HotKey.selectionPasteKeyCombo)
+        defaults.synchronize()
         return keyCombo
     }
 }

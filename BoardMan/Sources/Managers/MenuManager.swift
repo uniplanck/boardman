@@ -1532,6 +1532,12 @@ func boardManText(_ english: String) -> String {
         "Subtle Red": "薄い赤", "Amber": "アンバー", "Teal": "ティール", "Indigo": "インディゴ",
         "Graphite": "グラファイト", "Ocean": "オーシャン", "Rose": "ローズ", "Scarlet": "スカーレット", "Emerald": "エメラルド", "Violet": "バイオレット",
         "Stored Types": "保存対象", "Manage Excluded Apps": "除外アプリを管理", "Hide Rules": "非表示ルール",
+        "Selection Clipboard": "選択クリップボード", "Paste Selection Clipboard": "選択クリップボードをペースト",
+        "Automatically remember selected text without replacing the normal clipboard": "通常のクリップボードを置き換えず、選択したテキストを自動保存します",
+        "Clear Selection Clipboard history": "選択クリップボード履歴を消去します",
+        "Board-Man Lifetime unlocks Selection Clipboard.": "Board-Man Lifetimeで選択クリップボードを利用できます。",
+        "Local only · normal Command+V stays unchanged · ": "ローカルのみ · 通常の⌘Vには影響しません · ",
+        "saved": "件保存",
         "Free": "無料", "Owner Lifetime": "オーナー永久版", "Trial": "試用版", "Pro Active": "Pro有効", "Expired": "期限切れ", "Invalid": "無効", "Offline Grace": "オフライン猶予", "Locked": "ロック中",
         "Untitled folder": "名称未設定のグループ", "Untitled snippet": "名称未設定のスニペット",
         "Enabled": "有効", "Disabled": "無効", "snippets": "スニペット",
@@ -1679,7 +1685,7 @@ enum BoardManInlineSettingsCategory: Int, CaseIterable {
 }
 
 private enum BoardManGlobalShortcutKind: Int, CaseIterable {
-    case openBoardMan, quickMode, history, snippets, clearHistory
+    case openBoardMan, quickMode, history, snippets, selectionPaste, clearHistory
 
     var title: String {
         switch self {
@@ -1687,6 +1693,7 @@ private enum BoardManGlobalShortcutKind: Int, CaseIterable {
         case .quickMode: return boardManText("Quick Mode")
         case .history: return boardManText("Open History")
         case .snippets: return boardManText("Open Snippets")
+        case .selectionPaste: return boardManText("Paste Selection Clipboard")
         case .clearHistory: return boardManText("Clear History")
         }
     }
@@ -1697,6 +1704,7 @@ private enum BoardManGlobalShortcutKind: Int, CaseIterable {
         case .quickMode: return boardManText("Show the top 3 items from the selected History filter")
         case .history: return boardManText("Jump directly to clipboard history")
         case .snippets: return boardManText("Jump directly to snippets")
+        case .selectionPaste: return boardManText("Paste the latest automatically captured text selection")
         case .clearHistory: return boardManText("Clear history after confirmation")
         }
     }
@@ -3343,6 +3351,9 @@ class BoardManPanel: NSPanel {
     private var snippetGroupProNoteLabel: NSTextField?
     private var exportHistoryCSVButton: NSButton?
     private var privacySectionLabel: NSTextField?
+    private var selectionMemoryEnabledButton: NSButton?
+    private var selectionMemoryStatusLabel: NSTextField?
+    private var selectionMemoryClearButton: NSButton?
     private var hideMaskedPreviewButton: NSButton?
     private var hideMaskedTitleButton: NSButton?
     private var labsSectionLabel: NSTextField?
@@ -3747,6 +3758,7 @@ class BoardManPanel: NSPanel {
         case .quickMode: return AppEnvironment.current.hotKeyService.quickModeKeyCombo
         case .history: return AppEnvironment.current.hotKeyService.historyKeyCombo
         case .snippets: return AppEnvironment.current.hotKeyService.snippetKeyCombo
+        case .selectionPaste: return AppEnvironment.current.hotKeyService.selectionPasteKeyCombo
         case .clearHistory: return AppEnvironment.current.hotKeyService.clearHistoryKeyCombo
         }
     }
@@ -5285,6 +5297,38 @@ class BoardManPanel: NSPanel {
         contentView.addSubview(privacyTitle)
         privacySectionLabel = privacyTitle
 
+        let selectionMemory = NSButton(
+            checkboxWithTitle: boardManText("Selection Clipboard"),
+            target: self,
+            action: #selector(selectionMemoryEnabledChanged(_:))
+        )
+        selectionMemory.state = AppEnvironment.current.defaults.bool(
+            forKey: Constants.UserDefaults.boardManSelectionMemoryEnabled
+        ) ? .on : .off
+        selectionMemory.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        selectionMemory.toolTip = boardManText("Automatically remember selected text without replacing the normal clipboard")
+        contentView.addSubview(selectionMemory)
+        selectionMemoryEnabledButton = selectionMemory
+
+        let selectionStatus = NSTextField(labelWithString: "")
+        selectionStatus.font = NSFont.systemFont(ofSize: 10.5)
+        selectionStatus.textColor = .secondaryLabelColor
+        selectionStatus.lineBreakMode = .byTruncatingTail
+        contentView.addSubview(selectionStatus)
+        selectionMemoryStatusLabel = selectionStatus
+
+        let selectionClear = NSButton(
+            title: boardManText("Clear"),
+            target: self,
+            action: #selector(clearSelectionMemoryRequested(_:))
+        )
+        selectionClear.font = NSFont.systemFont(ofSize: 10)
+        selectionClear.bezelStyle = .rounded
+        selectionClear.toolTip = boardManText("Clear Selection Clipboard history")
+        contentView.addSubview(selectionClear)
+        selectionMemoryClearButton = selectionClear
+        refreshSelectionMemoryStatus()
+
         let hideMaskedPreview = NSButton(
             checkboxWithTitle: boardManText("Hide preview when content is hidden"),
             target: self,
@@ -6757,7 +6801,8 @@ class BoardManPanel: NSPanel {
             timedPinDurationStepper, timedPinDurationValueLabel,
             timedPinDurationDecreaseButton, timedPinDurationIncreaseButton,
             timedPinDurationUnitPopup, exportHistoryCSVButton,
-            privacySectionLabel, hideMaskedPreviewButton, hideMaskedTitleButton,
+            privacySectionLabel, selectionMemoryEnabledButton, selectionMemoryStatusLabel, selectionMemoryClearButton,
+            hideMaskedPreviewButton, hideMaskedTitleButton,
             excludedAppsButton, excludedAppsSummaryLabel, storedTypesSectionLabel,
             filterSectionLabel, hideRuleTextField, hideRuleModePopup, addHideRuleButton,
             removeLastHideRuleButton, clearHideRulesButton, hideRulesSummaryLabel,
@@ -6830,7 +6875,8 @@ class BoardManPanel: NSPanel {
         ]
         let snippetControls: [NSView?] = [snippetSettingsSectionLabel, snippetSummaryLabel, snippetFoldersLabel, snippetGroupProNoteLabel, snippetGroupOrderPopup, snippetGroupMoveUpButton, snippetGroupMoveDownButton, snippetShortcutsLabel, snippetShortcutScrollView, manageSnippetsButton]
         let privacyControls: [NSView?] = [
-            privacySectionLabel, hideMaskedPreviewButton, hideMaskedTitleButton,
+            privacySectionLabel, selectionMemoryEnabledButton, selectionMemoryStatusLabel, selectionMemoryClearButton,
+            hideMaskedPreviewButton, hideMaskedTitleButton,
             excludedAppsButton, excludedAppsSummaryLabel,
             storedTypesSectionLabel, filterSectionLabel, hideRuleTextField,
             hideRuleModePopup, addHideRuleButton, removeLastHideRuleButton,
@@ -7091,6 +7137,9 @@ class BoardManPanel: NSPanel {
                 )
             )
             privacySectionLabel?.frame = layout.privacyHeaderFrame
+            selectionMemoryEnabledButton?.frame = layout.selectionMemoryFrame
+            selectionMemoryStatusLabel?.frame = layout.selectionMemoryStatusFrame
+            selectionMemoryClearButton?.frame = layout.selectionMemoryClearFrame
             hideMaskedPreviewButton?.frame = layout.hideMaskedPreviewFrame
             hideMaskedTitleButton?.frame = layout.hideMaskedTitleFrame
             excludedAppsSummaryLabel?.frame = layout.excludedAppsSummaryFrame
@@ -7853,6 +7902,21 @@ class BoardManPanel: NSPanel {
             : boardManText("Board-Man Lifetime unlocks advanced appearance controls.")
         previewScaleProNoteLabel?.isHidden = canUseAdvancedAppearance
 
+        let canUseSelectionMemory = EntitlementGate.canUse(.selectionMemory, service: entitlementService)
+        AppEnvironment.current.hotKeyService.refreshSelectionPasteHotKey()
+        BoardManSelectionMemoryService.shared.refreshMonitoringState()
+        if !canUseSelectionMemory {
+            selectionMemoryEnabledButton?.state = .off
+        }
+        selectionMemoryEnabledButton?.isEnabled = canUseSelectionMemory
+        selectionMemoryEnabledButton?.alphaValue = canUseSelectionMemory ? 1 : 0.52
+        if let selectionShortcutRow = globalShortcutRows.first(where: { $0.kind == .selectionPaste }) {
+            selectionShortcutRow.views.forEach {
+                setControlTree($0, enabled: canUseSelectionMemory, alpha: canUseSelectionMemory ? 1 : 0.52)
+            }
+        }
+        refreshSelectionMemoryStatus()
+
         let canUseAnalytics = EntitlementGate.canUse(.pasteAnalytics, service: entitlementService)
         [usageCountButton, usageStyleLabel, usageStylePopup, usedItemStyleLabel, usedItemStylePopup].forEach {
             setControlTree($0, enabled: canUseAnalytics, alpha: canUseAnalytics ? 1 : 0.52)
@@ -8532,6 +8596,8 @@ class BoardManPanel: NSPanel {
             AppEnvironment.current.hotKeyService.change(with: .history, keyCombo: keyCombo)
         case .snippets:
             AppEnvironment.current.hotKeyService.change(with: .snippet, keyCombo: keyCombo)
+        case .selectionPaste:
+            AppEnvironment.current.hotKeyService.changeSelectionPasteKeyCombo(keyCombo)
         case .clearHistory:
             AppEnvironment.current.hotKeyService.changeClearHistoryKeyCombo(keyCombo)
         }
@@ -8544,6 +8610,34 @@ class BoardManPanel: NSPanel {
 
     @objc private func inputPasteCommandChanged(_ sender: NSButton) {
         AppEnvironment.current.defaults.set(sender.state == .on, forKey: Constants.UserDefaults.inputPasteCommand)
+    }
+
+    @objc private func selectionMemoryEnabledChanged(_ sender: NSButton) {
+        let wantsEnabled = sender.state == .on
+        guard BoardManSelectionMemoryService.shared.setEnabled(wantsEnabled) else {
+            sender.state = .off
+            BoardManUpgradeRoute.presentFeatureLocked(.selectionMemory)
+            refreshSelectionMemoryStatus()
+            return
+        }
+        refreshSelectionMemoryStatus()
+    }
+
+    @objc private func clearSelectionMemoryRequested(_ sender: NSButton) {
+        BoardManSelectionMemoryService.shared.clearHistory()
+        refreshSelectionMemoryStatus()
+    }
+
+    private func refreshSelectionMemoryStatus() {
+        let service = BoardManSelectionMemoryService.shared
+        let available = EntitlementGate.canUse(.selectionMemory, service: entitlementService)
+        selectionMemoryEnabledButton?.isEnabled = available
+        selectionMemoryEnabledButton?.alphaValue = available ? 1 : 0.52
+        selectionMemoryEnabledButton?.state = service.isEnabled && available ? .on : .off
+        selectionMemoryStatusLabel?.stringValue = available
+            ? boardManText("Local only · normal Command+V stays unchanged · ") + "\(service.itemCount) " + boardManText("saved")
+            : boardManText("Board-Man Lifetime unlocks Selection Clipboard.")
+        selectionMemoryClearButton?.isEnabled = service.itemCount > 0
     }
 
     private func applyMaxHistorySize(_ rawValue: Int) {

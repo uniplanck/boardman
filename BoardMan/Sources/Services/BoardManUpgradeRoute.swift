@@ -47,6 +47,7 @@ enum BoardManUpgradeRoute {
         case .templateVariables: title = "Template variables"
         case .workspaceSessions: title = "Workspace and session features"
         case .advancedTimedPins: title = "Advanced timed PIN"
+        case .selectionMemory: title = "Selection Clipboard"
         case .unlimitedHistory: title = "Unlimited history"
         case .unlimitedSnippets: title = "Unlimited Templates"
         case .exportImport: title = "Export and import"

@@ -49,6 +49,7 @@ enum EntitlementFeature: String, CaseIterable, Hashable {
     case templateVariables
     case workspaceSessions
     case advancedTimedPins
+    case selectionMemory
 
     // Legacy/future service-backed capabilities. New subscriptions are not part
     // of the approved product model. These remain parseable for compatibility
@@ -77,7 +78,8 @@ extension EntitlementFeature {
         case .exportImport:
             return .freeLocal
         case .unlimitedHistory, .unlimitedSnippets, .advancedAppearance, .pasteAnalytics,
-             .advancedSearch, .workflowActions, .templateVariables, .workspaceSessions, .advancedTimedPins:
+             .advancedSearch, .workflowActions, .templateVariables, .workspaceSessions, .advancedTimedPins,
+             .selectionMemory:
             return .lifetimeLocal
         case .futureSync, .cloudBackup, .aiAssist, .teamSharing, .accountServices, .apiAccess, .commercialSupport:
             return .serviceBacked
