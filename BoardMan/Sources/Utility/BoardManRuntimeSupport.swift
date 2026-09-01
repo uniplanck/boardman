@@ -100,6 +100,8 @@ final class BoardManRuntimeSupport {
         defaults[Constants.UserDefaults.inputPasteCommand] = true
         defaults[Constants.UserDefaults.reorderClipsAfterPasting] = true
         defaults[Constants.UserDefaults.collectCrashReport] = true
+        defaults[Constants.UserDefaults.boardManSelectionMemoryEnabled] = false
+        defaults[Constants.UserDefaults.boardManSelectionHarvestModeEnabled] = false
         defaults[Constants.UserDefaults.menuIconSize] = 16
         defaults[Constants.UserDefaults.maxMenuItemTitleLength] = 20
         defaults[Constants.UserDefaults.numberOfItemsPlaceInline] = 0

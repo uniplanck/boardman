@@ -268,23 +268,30 @@ final class BoardManSelectionMemoryStore {
     static let shared = BoardManSelectionMemoryStore()
     static let maximumItems = 100
     static let maximumTotalCharacters = 250_000
+    static let maximumStackItems = 50
 
     private let fileURL: URL
+    private let stackFileURL: URL
     private let fileManager: FileManager
     private(set) var entries: [BoardManSelectionMemoryEntry]
+    private(set) var stackEntries: [BoardManSelectionMemoryEntry]
 
     init(
         fileURL: URL = BoardManSelectionMemoryStore.defaultFileURL(),
         fileManager: FileManager = .default
     ) {
         self.fileURL = fileURL
+        self.stackFileURL = fileURL.deletingLastPathComponent().appendingPathComponent("stack.json", isDirectory: false)
         self.fileManager = fileManager
-        self.entries = Self.load(from: fileURL)
+        self.entries = Self.load(from: fileURL, newestFirst: true)
+        self.stackEntries = Self.load(from: stackFileURL, newestFirst: false)
         trimToBounds()
+        trimStackToBounds()
     }
 
     var latest: BoardManSelectionMemoryEntry? { entries.first }
     var count: Int { entries.count }
+    var stackCount: Int { stackEntries.count }
 
     @discardableResult
     func append(
@@ -294,58 +301,103 @@ final class BoardManSelectionMemoryStore {
         let text = candidate.text
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
 
-        // Re-selecting the exact same source/text moves it to the front instead of filling history
-        // with identical rows.
         entries.removeAll {
             $0.text == text && $0.sourceBundleIdentifier == candidate.sourceBundleIdentifier
         }
         let entry = BoardManSelectionMemoryEntry(candidate: candidate, capturedAt: capturedAt)
         entries.insert(entry, at: 0)
         trimToBounds()
-        persist()
+        persistHistory()
+        return entry
+    }
+
+    @discardableResult
+    func appendToStack(
+        _ candidate: BoardManSelectionCaptureCandidate,
+        capturedAt: Date = Date()
+    ) -> BoardManSelectionMemoryEntry? {
+        guard !candidate.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let entry = BoardManSelectionMemoryEntry(candidate: candidate, capturedAt: capturedAt)
+        stackEntries.append(entry)
+        trimStackToBounds()
+        persistStack()
         return entry
     }
 
     func clear() {
         entries.removeAll(keepingCapacity: false)
-        do {
-            if fileManager.fileExists(atPath: fileURL.path) {
-                try fileManager.removeItem(at: fileURL)
-            }
-        } catch {
-            NSLog("Board-Man Selection Clipboard clear failed: %@", error.localizedDescription)
-        }
+        removeFileIfPresent(fileURL, label: "history")
+    }
+
+    func clearStack() {
+        stackEntries.removeAll(keepingCapacity: false)
+        removeFileIfPresent(stackFileURL, label: "stack")
     }
 
     private func trimToBounds() {
         if entries.count > Self.maximumItems {
             entries.removeLast(entries.count - Self.maximumItems)
         }
-        var totalCharacters = entries.reduce(0) { $0 + $1.text.count }
-        while entries.count > 1, totalCharacters > Self.maximumTotalCharacters {
-            totalCharacters -= entries.removeLast().text.count
+        trimCharacterBudget(&entries, removeFromFront: false)
+    }
+
+    private func trimStackToBounds() {
+        if stackEntries.count > Self.maximumStackItems {
+            stackEntries.removeFirst(stackEntries.count - Self.maximumStackItems)
+        }
+        trimCharacterBudget(&stackEntries, removeFromFront: true)
+    }
+
+    private func trimCharacterBudget(
+        _ values: inout [BoardManSelectionMemoryEntry],
+        removeFromFront: Bool
+    ) {
+        var totalCharacters = values.reduce(0) { $0 + $1.text.count }
+        while values.count > 1, totalCharacters > Self.maximumTotalCharacters {
+            let removed = removeFromFront ? values.removeFirst() : values.removeLast()
+            totalCharacters -= removed.text.count
         }
     }
 
-    private func persist() {
+    private func persistHistory() {
+        persist(entries, to: fileURL, label: "history")
+    }
+
+    private func persistStack() {
+        persist(stackEntries, to: stackFileURL, label: "stack")
+    }
+
+    private func persist(_ values: [BoardManSelectionMemoryEntry], to url: URL, label: String) {
         do {
             try fileManager.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
+                at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
-            let data = try JSONEncoder().encode(entries)
-            try data.write(to: fileURL, options: .atomic)
+            let data = try JSONEncoder().encode(values)
+            try data.write(to: url, options: .atomic)
         } catch {
-            NSLog("Board-Man Selection Clipboard persist failed: %@", error.localizedDescription)
+            NSLog("Board-Man Selection Clipboard %@ persist failed: %@", label, error.localizedDescription)
         }
     }
 
-    private static func load(from fileURL: URL) -> [BoardManSelectionMemoryEntry] {
+    private func removeFileIfPresent(_ url: URL, label: String) {
+        do {
+            if fileManager.fileExists(atPath: url.path) {
+                try fileManager.removeItem(at: url)
+            }
+        } catch {
+            NSLog("Board-Man Selection Clipboard %@ clear failed: %@", label, error.localizedDescription)
+        }
+    }
+
+    private static func load(from fileURL: URL, newestFirst: Bool) -> [BoardManSelectionMemoryEntry] {
         guard let data = try? Data(contentsOf: fileURL),
               let decoded = try? JSONDecoder().decode([BoardManSelectionMemoryEntry].self, from: data) else {
             return []
         }
-        return decoded.sorted { $0.capturedAt > $1.capturedAt }
+        return decoded.sorted {
+            newestFirst ? $0.capturedAt > $1.capturedAt : $0.capturedAt < $1.capturedAt
+        }
     }
 
     nonisolated private static func defaultFileURL() -> URL {
@@ -418,15 +470,32 @@ final class BoardManSelectionMemoryService {
         defaults.bool(forKey: Constants.UserDefaults.boardManSelectionMemoryEnabled)
     }
 
+    var isHarvestEnabled: Bool {
+        defaults.bool(forKey: Constants.UserDefaults.boardManSelectionHarvestModeEnabled)
+    }
+
     var isAvailable: Bool { canUseFeature() }
     var itemCount: Int { store.count }
+    var stackCount: Int { store.stackCount }
     var latestEntry: BoardManSelectionMemoryEntry? { store.latest }
+    var historyEntries: [BoardManSelectionMemoryEntry] { store.entries }
+    var stackEntries: [BoardManSelectionMemoryEntry] { store.stackEntries }
 
     func setEnabled(_ enabled: Bool) -> Bool {
         guard !enabled || canUseFeature() else { return false }
         defaults.set(enabled, forKey: Constants.UserDefaults.boardManSelectionMemoryEnabled)
+        if !enabled {
+            defaults.set(false, forKey: Constants.UserDefaults.boardManSelectionHarvestModeEnabled)
+        }
         defaults.synchronize()
         refreshMonitoringState()
+        return true
+    }
+
+    func setHarvestEnabled(_ enabled: Bool) -> Bool {
+        guard !enabled || (isEnabled && canUseFeature()) else { return false }
+        defaults.set(enabled, forKey: Constants.UserDefaults.boardManSelectionHarvestModeEnabled)
+        defaults.synchronize()
         return true
     }
 
@@ -470,19 +539,67 @@ final class BoardManSelectionMemoryService {
         store.clear()
     }
 
+    func clearStack() {
+        store.clearStack()
+    }
+
+    func showPicker() {
+        guard canUseFeature(), isEnabled else {
+            NSSound.beep()
+            return
+        }
+        BoardManSelectionMemoryPickerController.shared.show(service: self)
+    }
+
     @discardableResult
     func pasteLatest() -> Bool {
+        guard let latest = store.latest else {
+            NSSound.beep()
+            return false
+        }
+        return paste(entry: latest)
+    }
+
+    @discardableResult
+    func paste(entry: BoardManSelectionMemoryEntry) -> Bool {
+        paste(text: entry.text)
+    }
+
+    @discardableResult
+    func pasteStack(separator: String = "\n") -> Bool {
+        let text = store.stackEntries.map(\.text).joined(separator: separator)
+        guard !text.isEmpty else {
+            NSSound.beep()
+            return false
+        }
+        return paste(text: text)
+    }
+
+    func ingestForTesting(_ candidate: BoardManSelectionCaptureCandidate, at timestamp: TimeInterval) {
+        coalescer.observe(candidate, at: timestamp)
+        if let stable = coalescer.flush(at: timestamp + coalescer.stabilityInterval) {
+            record(stable)
+        }
+    }
+
+    static func shouldCaptureKeyboardSelection(_ event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.shift) { return true }
+        return event.keyCode == 0 && event.modifierFlags.contains(.command)
+    }
+
+    @discardableResult
+    private func paste(text: String) -> Bool {
         guard canUseFeature() else {
             BoardManUpgradeRoute.presentFeatureLocked(.selectionMemory)
             return false
         }
-        guard isEnabled, let latest = store.latest, activePasteTransaction == nil else {
+        guard isEnabled, activePasteTransaction == nil else {
             NSSound.beep()
             return false
         }
 
         let transaction = BoardManTransientPasteboardTransaction(pasteboard: pasteboard)
-        guard transaction.stage(text: latest.text) else { return false }
+        guard transaction.stage(text: text) else { return false }
         markPasteboardHandled()
         activePasteTransaction = transaction
 
@@ -507,17 +624,17 @@ final class BoardManSelectionMemoryService {
         return true
     }
 
-    func ingestForTesting(_ candidate: BoardManSelectionCaptureCandidate, at timestamp: TimeInterval) {
-        coalescer.observe(candidate, at: timestamp)
-        if let stable = coalescer.flush(at: timestamp + coalescer.stabilityInterval) {
-            _ = store.append(stable)
+    private func record(_ candidate: BoardManSelectionCaptureCandidate) {
+        guard store.append(candidate) != nil else { return }
+        if isHarvestEnabled {
+            _ = store.appendToStack(candidate)
         }
-    }
-
-    static func shouldCaptureKeyboardSelection(_ event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.shift) { return true }
-        // QWERTY key code 0 is A. Capture Command-A because it creates a selection without a mouse-up.
-        return event.keyCode == 0 && event.modifierFlags.contains(.command)
+        NSLog(
+            "Board-Man Selection Clipboard captured source=%@ count=%d stack=%d",
+            candidate.sourceBundleIdentifier,
+            store.count,
+            store.stackCount
+        )
     }
 
     private func scheduleCapture() {
@@ -534,13 +651,7 @@ final class BoardManSelectionMemoryService {
             let flush = DispatchWorkItem { [weak self] in
                 guard let self,
                       let stable = self.coalescer.flush(at: ProcessInfo.processInfo.systemUptime) else { return }
-                if self.store.append(stable) != nil {
-                    NSLog(
-                        "Board-Man Selection Clipboard captured source=%@ count=%d",
-                        stable.sourceBundleIdentifier,
-                        self.store.count
-                    )
-                }
+                self.record(stable)
             }
             self.flushWorkItem = flush
             DispatchQueue.main.asyncAfter(
@@ -550,5 +661,276 @@ final class BoardManSelectionMemoryService {
         }
         captureWorkItem = capture
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: capture)
+    }
+}
+
+@MainActor
+private final class BoardManSelectionMemoryPickerTableView: NSTableView {
+    var onConfirm: (() -> Void)?
+    var onEscape: (() -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        switch event.keyCode {
+        case 36, 76:
+            onConfirm?()
+        case 53:
+            onEscape?()
+        default:
+            super.keyDown(with: event)
+        }
+    }
+}
+
+@MainActor
+final class BoardManSelectionMemoryPickerController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+    static let shared = BoardManSelectionMemoryPickerController()
+
+    private weak var service: BoardManSelectionMemoryService?
+    private var targetApplication: NSRunningApplication?
+    private var targetFocus: PasteFocusTarget?
+    private var panel: NSPanel?
+    private let modeControl = NSSegmentedControl(labels: ["History", "Stack"], trackingMode: .selectOne, target: nil, action: nil)
+    private let harvestButton = NSButton(checkboxWithTitle: "Harvest Mode", target: nil, action: nil)
+    private let statusLabel = NSTextField(labelWithString: "")
+    private let tableView = BoardManSelectionMemoryPickerTableView(frame: .zero)
+    private let scrollView = NSScrollView(frame: .zero)
+    private let pasteButton = NSButton(title: "Paste", target: nil, action: nil)
+    private let pasteStackButton = NSButton(title: "Paste Stack", target: nil, action: nil)
+    private let clearStackButton = NSButton(title: "Clear Stack", target: nil, action: nil)
+
+    private override init() {
+        super.init()
+        configureControls()
+    }
+
+    func show(service: BoardManSelectionMemoryService) {
+        self.service = service
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        if frontmost?.bundleIdentifier != Bundle.main.bundleIdentifier {
+            targetApplication = frontmost
+            targetFocus = PasteTargetVerifier.focusTarget(for: frontmost)
+        } else {
+            targetApplication = nil
+            targetFocus = nil
+        }
+        let panel = ensurePanel()
+        reload()
+        position(panel)
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        if tableView.numberOfRows > 0 {
+            tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        }
+        panel.makeFirstResponder(tableView)
+    }
+
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        displayedEntries.count
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard displayedEntries.indices.contains(row) else { return nil }
+        let entry = displayedEntries[row]
+        let cell = NSTableCellView(frame: NSRect(x: 0, y: 0, width: tableView.bounds.width, height: 52))
+
+        let text = NSTextField(wrappingLabelWithString: entry.text)
+        text.font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        text.lineBreakMode = .byTruncatingTail
+        text.maximumNumberOfLines = 2
+        text.frame = NSRect(x: 10, y: 21, width: max(120, tableView.bounds.width - 20), height: 28)
+        cell.addSubview(text)
+
+        let sourceName = entry.sourceApplicationName.isEmpty ? boardManText("Unknown App") : entry.sourceApplicationName
+        let source = NSTextField(labelWithString: sourceName)
+        source.font = NSFont.systemFont(ofSize: 10)
+        source.textColor = .secondaryLabelColor
+        source.lineBreakMode = .byTruncatingTail
+        source.frame = NSRect(x: 10, y: 4, width: max(120, tableView.bounds.width - 20), height: 15)
+        cell.addSubview(source)
+        return cell
+    }
+
+    private var displayedEntries: [BoardManSelectionMemoryEntry] {
+        guard let service else { return [] }
+        if modeControl.selectedSegment == 1 {
+            return Array(service.stackEntries.reversed())
+        }
+        return service.historyEntries
+    }
+
+    private func configureControls() {
+        modeControl.selectedSegment = 0
+        modeControl.target = self
+        modeControl.action = #selector(modeChanged(_:))
+
+        harvestButton.target = self
+        harvestButton.action = #selector(harvestChanged(_:))
+        harvestButton.font = NSFont.systemFont(ofSize: 11)
+
+        statusLabel.font = NSFont.systemFont(ofSize: 10.5)
+        statusLabel.textColor = .secondaryLabelColor
+        statusLabel.lineBreakMode = .byTruncatingTail
+
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("SelectionMemory"))
+        column.title = ""
+        tableView.addTableColumn(column)
+        tableView.headerView = nil
+        tableView.rowHeight = 54
+        tableView.intercellSpacing = NSSize(width: 0, height: 1)
+        tableView.delegate = self
+        tableView.dataSource = self
+        tableView.target = self
+        tableView.doubleAction = #selector(pasteSelected(_:))
+        tableView.onConfirm = { [weak self] in self?.pasteSelected(nil) }
+        tableView.onEscape = { [weak self] in self?.panel?.orderOut(nil) }
+
+        scrollView.documentView = tableView
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .bezelBorder
+
+        pasteButton.target = self
+        pasteButton.action = #selector(pasteSelected(_:))
+        pasteStackButton.target = self
+        pasteStackButton.action = #selector(pasteStack(_:))
+        clearStackButton.target = self
+        clearStackButton.action = #selector(clearStack(_:))
+        [pasteButton, pasteStackButton, clearStackButton].forEach {
+            $0.bezelStyle = .rounded
+            $0.font = NSFont.systemFont(ofSize: 11)
+        }
+    }
+
+    private func ensurePanel() -> NSPanel {
+        if let panel { return panel }
+        let frame = NSRect(x: 0, y: 0, width: 580, height: 440)
+        let panel = NSPanel(
+            contentRect: frame,
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = boardManText("Selection Clipboard")
+        panel.level = .floating
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        panel.minSize = NSSize(width: 440, height: 320)
+        panel.isReleasedWhenClosed = false
+
+        let content = NSView(frame: frame)
+        panel.contentView = content
+
+        modeControl.frame = NSRect(x: 16, y: frame.height - 46, width: 188, height: 28)
+        modeControl.autoresizingMask = [.minYMargin]
+        content.addSubview(modeControl)
+
+        harvestButton.frame = NSRect(x: 222, y: frame.height - 44, width: 150, height: 22)
+        harvestButton.autoresizingMask = [.minYMargin]
+        content.addSubview(harvestButton)
+
+        statusLabel.frame = NSRect(x: 380, y: frame.height - 43, width: 184, height: 18)
+        statusLabel.alignment = .right
+        statusLabel.autoresizingMask = [.minXMargin, .minYMargin]
+        content.addSubview(statusLabel)
+
+        scrollView.frame = NSRect(x: 16, y: 56, width: frame.width - 32, height: frame.height - 112)
+        scrollView.autoresizingMask = [.width, .height]
+        content.addSubview(scrollView)
+
+        pasteButton.frame = NSRect(x: 16, y: 16, width: 92, height: 28)
+        pasteButton.autoresizingMask = [.maxXMargin, .maxYMargin]
+        content.addSubview(pasteButton)
+
+        pasteStackButton.frame = NSRect(x: 116, y: 16, width: 108, height: 28)
+        pasteStackButton.autoresizingMask = [.maxXMargin, .maxYMargin]
+        content.addSubview(pasteStackButton)
+
+        clearStackButton.frame = NSRect(x: 232, y: 16, width: 100, height: 28)
+        clearStackButton.autoresizingMask = [.maxXMargin, .maxYMargin]
+        content.addSubview(clearStackButton)
+
+        self.panel = panel
+        return panel
+    }
+
+    private func reload() {
+        guard let service else { return }
+        harvestButton.state = service.isHarvestEnabled ? .on : .off
+        let modeName = modeControl.selectedSegment == 1 ? boardManText("Stack") : boardManText("History")
+        statusLabel.stringValue = "\(modeName) · \(displayedEntries.count)"
+        pasteStackButton.isEnabled = service.stackCount > 0
+        clearStackButton.isEnabled = service.stackCount > 0
+        tableView.reloadData()
+    }
+
+    private func position(_ panel: NSPanel) {
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main
+        guard let visibleFrame = screen?.visibleFrame else {
+            panel.center()
+            return
+        }
+        let origin = NSPoint(
+            x: visibleFrame.midX - panel.frame.width / 2,
+            y: visibleFrame.midY - panel.frame.height / 2
+        )
+        panel.setFrameOrigin(origin)
+    }
+
+    @objc private func modeChanged(_ sender: NSSegmentedControl) {
+        reload()
+        if tableView.numberOfRows > 0 {
+            tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        }
+    }
+
+    @objc private func harvestChanged(_ sender: NSButton) {
+        guard let service else { return }
+        if !service.setHarvestEnabled(sender.state == .on) {
+            sender.state = .off
+            NSSound.beep()
+        }
+        reload()
+    }
+
+    @objc private func pasteSelected(_ sender: Any?) {
+        guard let service else { return }
+        let row = tableView.selectedRow
+        guard displayedEntries.indices.contains(row) else {
+            NSSound.beep()
+            return
+        }
+        let entry = displayedEntries[row]
+        pasteIntoCapturedTarget { service.paste(entry: entry) }
+    }
+
+    @objc private func pasteStack(_ sender: Any?) {
+        guard let service else { return }
+        pasteIntoCapturedTarget { service.pasteStack() }
+    }
+
+    private func pasteIntoCapturedTarget(_ paste: @escaping () -> Bool) {
+        guard let targetApplication, !targetApplication.isTerminated else {
+            NSSound.beep()
+            return
+        }
+        panel?.orderOut(nil)
+        targetApplication.activate(options: [.activateIgnoringOtherApps])
+        if let targetFocus {
+            _ = PasteTargetVerifier.restoreFocus(to: targetFocus)
+        }
+        let delay = BoardManPanelPasteCoordinator.pasteTargetSettleDelay(
+            bundleIdentifier: targetApplication.bundleIdentifier
+        )
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            if !paste() {
+                NSSound.beep()
+            }
+        }
+    }
+
+    @objc private func clearStack(_ sender: Any?) {
+        service?.clearStack()
+        reload()
     }
 }

@@ -53,11 +53,51 @@ final class BoardManPrivacySettingsLayoutTests {
 
         #expect(layout.privacyHeaderFrame.minY == 700)
         #expect(layout.selectionMemoryFrame.minY < layout.privacyHeaderFrame.minY)
+        #expect(layout.selectionHarvestFrame.minY < layout.selectionMemoryFrame.minY)
+        #expect(layout.selectionMemoryOpenFrame.maxX < layout.selectionMemoryClearFrame.minX)
         #expect(layout.selectionMemoryClearFrame.maxX <= 530)
         #expect(layout.hideMaskedPreviewFrame.minY < layout.selectionMemoryStatusFrame.minY)
-        #expect(layout.storedTypesHeaderFrame.minY == 450)
-        #expect(layout.filterHeaderFrame.minY == 276)
+        #expect(layout.storedTypesHeaderFrame.minY == 414)
+        #expect(layout.filterHeaderFrame.minY == 372)
         #expect(layout.excludedAppsButtonFrame.width <= 178)
         #expect(layout.storedTypeFrames.isEmpty)
+    }
+
+    @Test
+    func privacyLayoutKeepsAllControlsAboveBottomSafeArea() {
+        let layout = BoardManPrivacySettingsLayoutPolicy.layout(
+            BoardManPrivacySettingsLayoutInput(
+                originX: 24,
+                originY: 700,
+                width: 520,
+                storedTypeCount: 6
+            )
+        )
+        let frames = [
+            layout.selectionMemoryFrame,
+            layout.selectionHarvestFrame,
+            layout.selectionMemoryStatusFrame,
+            layout.selectionMemoryOpenFrame,
+            layout.selectionMemoryClearFrame,
+            layout.hideMaskedPreviewFrame,
+            layout.hideMaskedTitleFrame,
+            layout.excludedAppsSummaryFrame,
+            layout.excludedAppsButtonFrame,
+            layout.storedTypesHeaderFrame,
+            layout.filterHeaderFrame,
+            layout.hideRuleModeFrame,
+            layout.hideRuleTextFrame,
+            layout.addHideRuleFrame,
+            layout.removeLastHideRuleFrame,
+            layout.clearHideRulesFrame,
+            layout.hideRulesSummaryFrame,
+            layout.hideRulesExamplesFrame,
+            layout.hideRulesNoteFrame
+        ] + layout.storedTypeFrames
+
+        #expect(frames.allSatisfy { $0.minY >= 80 })
+        #expect(layout.selectionMemoryStatusFrame.maxX < layout.selectionMemoryOpenFrame.minX)
+        let storedBottom = layout.storedTypeFrames.map(\.minY).min() ?? .greatestFiniteMagnitude
+        #expect(layout.filterHeaderFrame.maxY < storedBottom)
     }
 }

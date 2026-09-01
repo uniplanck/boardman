@@ -286,7 +286,7 @@ enum BoardManPanelLayoutPolicy {
         case .snippets:
             requiredHeight = 640
         case .privacy:
-            requiredHeight = 750
+            requiredHeight = 840
         case .updates:
             requiredHeight = 390
         case .license:

@@ -68,6 +68,7 @@ final class HotKeyService: NSObject {
     fileprivate(set) var clearHistoryKeyCombo: KeyCombo?
     fileprivate(set) var quickModeKeyCombo: KeyCombo?
     fileprivate(set) var selectionPasteKeyCombo: KeyCombo?
+    fileprivate(set) var selectionPickerKeyCombo: KeyCombo?
     private let defaults: UserDefaults
     private var globalMainHotKeyEventTap: CFMachPort?
     private var globalMainHotKeyRunLoopSource: CFRunLoopSource?
@@ -154,6 +155,10 @@ extension HotKeyService {
     @MainActor @objc func pasteLatestSelectionMemory() {
         _ = BoardManSelectionMemoryService.shared.pasteLatest()
     }
+
+    @MainActor @objc func showSelectionMemoryPicker() {
+        BoardManSelectionMemoryService.shared.showPicker()
+    }
 }
 
 // MARK: - Setup
@@ -183,9 +188,9 @@ extension HotKeyService {
         changeClearHistoryKeyCombo(savedKeyCombo(forKey: Constants.HotKey.clearHistoryKeyCombo))
         // Quick Mode
         changeQuickModeKeyCombo(savedKeyCombo(forKey: Constants.HotKey.quickModeKeyCombo))
-        // Selection Clipboard is Lifetime-only. Preserve a saved shortcut while Free, but do not
-        // register it until the entitlement is available.
-        refreshSelectionPasteHotKey()
+        // Selection Clipboard is Lifetime-only. Preserve saved shortcuts while Free, but do not
+        // register them until the entitlement is available.
+        refreshSelectionMemoryHotKeys()
     }
 
     func change(with type: MenuType, keyCombo: KeyCombo?) {
@@ -239,15 +244,22 @@ extension HotKeyService {
         hotkey.register()
     }
 
-    func refreshSelectionPasteHotKey() {
+    func refreshSelectionMemoryHotKeys() {
         selectionPasteKeyCombo = savedKeyCombo(forKey: Constants.HotKey.selectionPasteKeyCombo)
+        selectionPickerKeyCombo = savedKeyCombo(forKey: Constants.HotKey.selectionPickerKeyCombo)
         guard EntitlementGate.canUse(.selectionMemory) else {
             if Self.shouldRegisterSystemHotKeys() {
                 HotKeyCenter.shared.unregisterHotKey(with: "SelectionPaste")
+                HotKeyCenter.shared.unregisterHotKey(with: "SelectionPicker")
             }
             return
         }
         changeSelectionPasteKeyCombo(selectionPasteKeyCombo ?? restoreDefaultSelectionPasteKeyCombo())
+        changeSelectionPickerKeyCombo(selectionPickerKeyCombo ?? restoreDefaultSelectionPickerKeyCombo())
+    }
+
+    func refreshSelectionPasteHotKey() {
+        refreshSelectionMemoryHotKeys()
     }
 
     func changeSelectionPasteKeyCombo(_ keyCombo: KeyCombo?) {
@@ -262,6 +274,22 @@ extension HotKeyService {
             keyCombo: keyCombo,
             target: self,
             action: #selector(HotKeyService.pasteLatestSelectionMemory)
+        )
+        hotkey.register()
+    }
+
+    func changeSelectionPickerKeyCombo(_ keyCombo: KeyCombo?) {
+        selectionPickerKeyCombo = keyCombo
+        defaults.set(keyCombo?.archive(), forKey: Constants.HotKey.selectionPickerKeyCombo)
+        defaults.synchronize()
+        guard Self.shouldRegisterSystemHotKeys() else { return }
+        HotKeyCenter.shared.unregisterHotKey(with: "SelectionPicker")
+        guard let keyCombo, EntitlementGate.canUse(.selectionMemory) else { return }
+        let hotkey = HotKey(
+            identifier: "SelectionPicker",
+            keyCombo: keyCombo,
+            target: self,
+            action: #selector(HotKeyService.showSelectionMemoryPicker)
         )
         hotkey.register()
     }
@@ -293,6 +321,18 @@ extension HotKeyService {
             return nil
         }
         defaults.set(keyCombo.archive(), forKey: Constants.HotKey.selectionPasteKeyCombo)
+        defaults.synchronize()
+        return keyCombo
+    }
+
+    private func restoreDefaultSelectionPickerKeyCombo() -> KeyCombo? {
+        guard let keyCombo = KeyCombo(
+            QWERTYKeyCode: 9,
+            carbonModifiers: Int(controlKey) | Int(optionKey) | Int(shiftKey)
+        ) else {
+            return nil
+        }
+        defaults.set(keyCombo.archive(), forKey: Constants.HotKey.selectionPickerKeyCombo)
         defaults.synchronize()
         return keyCombo
     }

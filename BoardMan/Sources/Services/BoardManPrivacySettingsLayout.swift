@@ -28,7 +28,9 @@ struct BoardManPrivacySettingsLayoutInput: Equatable {
 struct BoardManPrivacySettingsLayout: Equatable {
     let privacyHeaderFrame: NSRect
     let selectionMemoryFrame: NSRect
+    let selectionHarvestFrame: NSRect
     let selectionMemoryStatusFrame: NSRect
+    let selectionMemoryOpenFrame: NSRect
     let selectionMemoryClearFrame: NSRect
     let hideMaskedPreviewFrame: NSRect
     let hideMaskedTitleFrame: NSRect
@@ -62,8 +64,7 @@ enum BoardManPrivacySettingsLayoutPolicy {
     }
 
     static func layout(_ input: BoardManPrivacySettingsLayoutInput) -> BoardManPrivacySettingsLayout {
-        let storedOriginY = input.originY - 250
-        let filterOriginY = input.originY - 424
+        let storedOriginY = input.originY - 286
         let storedTypeFrames = storedTypes(
             originX: input.originX,
             originY: storedOriginY,
@@ -71,6 +72,8 @@ enum BoardManPrivacySettingsLayoutPolicy {
             count: input.storedTypeCount,
             rowGap: input.rowGap
         )
+        let storedBottomY = storedTypeFrames.map(\.minY).min() ?? storedOriginY
+        let filterOriginY = storedBottomY - 42
         let filter = filterFrames(
             originX: input.originX,
             originY: filterOriginY,
@@ -78,18 +81,35 @@ enum BoardManPrivacySettingsLayoutPolicy {
             controlHeight: input.controlHeight,
             rowGap: input.rowGap
         )
+        let clearWidth: CGFloat = 72
+        let openWidth: CGFloat = 104
+        let actionGap: CGFloat = 8
+        let actionsWidth = clearWidth + openWidth + actionGap
+        let statusWidth = max(120, input.width - actionsWidth - 10)
 
         return BoardManPrivacySettingsLayout(
             privacyHeaderFrame: NSRect(x: input.originX, y: input.originY, width: input.width, height: 18),
-            selectionMemoryFrame: NSRect(x: input.originX, y: input.originY - 38, width: max(120, input.width - 96), height: 20),
-            selectionMemoryStatusFrame: NSRect(x: input.originX, y: input.originY - 64, width: max(120, input.width - 96), height: 18),
-            selectionMemoryClearFrame: NSRect(x: input.originX + max(0, input.width - 86), y: input.originY - 68, width: 86, height: input.controlHeight),
-            hideMaskedPreviewFrame: NSRect(x: input.originX, y: input.originY - 100, width: input.width, height: 20),
-            hideMaskedTitleFrame: NSRect(x: input.originX, y: input.originY - 130, width: input.width, height: 20),
-            excludedAppsSummaryFrame: NSRect(x: input.originX, y: input.originY - 164, width: input.width, height: 18),
+            selectionMemoryFrame: NSRect(x: input.originX, y: input.originY - 38, width: input.width, height: 20),
+            selectionHarvestFrame: NSRect(x: input.originX + 18, y: input.originY - 70, width: input.width - 18, height: 20),
+            selectionMemoryStatusFrame: NSRect(x: input.originX, y: input.originY - 105, width: statusWidth, height: 18),
+            selectionMemoryOpenFrame: NSRect(
+                x: input.originX + max(0, input.width - actionsWidth),
+                y: input.originY - 111,
+                width: openWidth,
+                height: input.controlHeight
+            ),
+            selectionMemoryClearFrame: NSRect(
+                x: input.originX + max(0, input.width - clearWidth),
+                y: input.originY - 111,
+                width: clearWidth,
+                height: input.controlHeight
+            ),
+            hideMaskedPreviewFrame: NSRect(x: input.originX, y: input.originY - 148, width: input.width, height: 20),
+            hideMaskedTitleFrame: NSRect(x: input.originX, y: input.originY - 178, width: input.width, height: 20),
+            excludedAppsSummaryFrame: NSRect(x: input.originX, y: input.originY - 212, width: input.width, height: 18),
             excludedAppsButtonFrame: NSRect(
                 x: input.originX,
-                y: input.originY - 204,
+                y: input.originY - 250,
                 width: min(178, input.width),
                 height: input.controlHeight
             ),

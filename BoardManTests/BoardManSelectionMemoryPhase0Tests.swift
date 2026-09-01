@@ -182,6 +182,65 @@ struct BoardManSelectionMemoryPhase0Tests {
         #expect(handledChangeCount == 2)
     }
 
+    @Test
+    func productionStorePersistsHarvestStackInCaptureOrder() throws {
+        let fileURL = makeTemporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+        let store = BoardManSelectionMemoryStore(fileURL: fileURL)
+
+        #expect(store.appendToStack(candidate("first"), capturedAt: Date(timeIntervalSince1970: 1)) != nil)
+        #expect(store.appendToStack(candidate("second"), capturedAt: Date(timeIntervalSince1970: 2)) != nil)
+        #expect(store.stackEntries.map(\.text) == ["first", "second"])
+
+        let reloaded = BoardManSelectionMemoryStore(fileURL: fileURL)
+        #expect(reloaded.stackEntries.map(\.text) == ["first", "second"])
+        reloaded.clearStack()
+        #expect(reloaded.stackCount == 0)
+    }
+
+    @Test
+    func harvestModeCollectsOrderedSelectionsAndPastesStackWithoutChangingNormalClipboard() async throws {
+        let suite = "BoardManSelectionMemoryPhase0Tests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: Constants.UserDefaults.boardManSelectionMemoryEnabled)
+
+        let storeURL = makeTemporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+        let store = BoardManSelectionMemoryStore(fileURL: storeURL)
+        let pasteboard = makePasteboard()
+        defer { pasteboard.clearContents() }
+        pasteboard.clearContents()
+        pasteboard.setString("normal clipboard", forType: .string)
+
+        var pastedText: String?
+        let service = BoardManSelectionMemoryService(
+            defaults: defaults,
+            store: store,
+            pasteboard: pasteboard,
+            readSelection: { nil },
+            canUseFeature: { true },
+            sendPaste: {
+                pastedText = pasteboard.string(forType: .string)
+                return true
+            },
+            markPasteboardHandled: {}
+        )
+
+        #expect(service.setHarvestEnabled(true))
+        service.ingestForTesting(candidate("alpha"), at: 10)
+        service.ingestForTesting(candidate("beta"), at: 12)
+        #expect(service.stackCount == 2)
+        #expect(service.stackEntries.map(\.text) == ["alpha", "beta"])
+        #expect(service.pasteStack())
+        #expect(pastedText == "alpha\nbeta")
+
+        try await Task.sleep(nanoseconds: 450_000_000)
+        #expect(pasteboard.string(forType: .string) == "normal clipboard")
+        #expect(service.setEnabled(false))
+        #expect(!service.isHarvestEnabled)
+    }
+
     private func candidate(_ text: String) -> BoardManSelectionCaptureCandidate {
         BoardManSelectionCaptureCandidate(
             text: text,
