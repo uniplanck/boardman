@@ -1379,7 +1379,7 @@
 			repositoryURL = "https://github.com/realm/realm-swift";
 			requirement = {
 				kind = exactVersion;
-				version = 10.7.2;
+				version = 20.0.5;
 			};
 		};
 		C5D76DA62FBA9C140083839F /* XCRemoteSwiftPackageReference "pincache" */ = {
