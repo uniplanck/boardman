@@ -4,7 +4,7 @@
 
 Board-Man is a local-first macOS clipboard workspace for fast recall, repeated text, pins, search, images, usage signals, and keyboard-driven pasting.
 
-> The current formal product line is **v0.2.1**. It follows the intentional version reset from the older experimental line. Historical v0.1.x and v1.2.x tags are preserved rather than reused; `main` can still contain changes that have not yet shipped in a tagged archive.
+> The current published release is **v0.2.1**. The development line on `main` is prepared as **v0.2.2 (build 4)** and includes clipboard newline reconciliation that has not yet been published as a tagged archive. Historical v0.1.x and v1.2.x tags are preserved rather than reused.
 
 ![Board-Man History with safe demo content](docs/assets/screenshots/board-man-history-en.png)
 
@@ -168,13 +168,14 @@ See [`docs/readme-screenshots.md`](docs/readme-screenshots.md) for the full work
 
 ## Development status
 
-v0.2.1 is the current patch release on the formal product line introduced by v0.2.0. It keeps the rebuilt History / Templates / Settings workflow intact while shipping post-v0.2.0 fixes for large-text descenders, timestamp paste-then-shortcut actions, global shortcut recovery, Japanese Template empty-state copy, and safe repository/build cleanup.
+v0.2.1 remains the current published patch release. The development build is now v0.2.2 (build 4), carrying the post-v0.2.1 clipboard newline reconciliation fixes while preserving intentional blank lines. A GitHub `v0.2.2` tag and downloadable archive do not exist until the release is explicitly published.
 
 For the authoritative development summary, see [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Documentation
 
 - [Changelog](CHANGELOG.md)
+- [v0.2.2 candidate release notes](docs/boardman-v0.2.2-release-notes.md)
 - [v0.2.1 release notes](docs/boardman-v0.2.1-release-notes.md)
 - [v0.2.0 release notes](docs/boardman-v0.2.0-release-notes.md)
 - [Development install guide](docs/boardman-dev-install.md)

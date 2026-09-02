@@ -1,5 +1,7 @@
 # Board-Man Freemium License Design
 
+> **SUPERSEDED:** This document preserves the earlier Free/Pro/trial design history. The approved product contract is now `docs/boardman-commercial-lifetime-roadmap.md`: Free + one-time Lifetime, one active device, reusable after MyPage deactivation, no subscription, and Lifetime validity across future app versions.
+
 ## Product Definition
 
 Board-Man is a local-first macOS clipboard productivity app derived from Clipy. It focuses on fast clipboard history, snippets, paste visibility, hotkeys, and dense customization for people who repeatedly move text, URLs, commands, and images across apps.

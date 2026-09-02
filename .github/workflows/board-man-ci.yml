@@ -27,7 +27,7 @@ jobs:
         run: |
           test -d Board-Man.xcodeproj
           test -f Board-Man.xcodeproj/xcshareddata/xcschemes/Board-Man.xcscheme
-          test -d Clipy/Sources
+          test -d BoardMan/Sources
           test -d scripts/boardman
           test -f scripts/boardman/capture-readme-screenshots.sh
           test -f docs/readme-screenshots.md
@@ -83,7 +83,7 @@ jobs:
 
       - name: Select Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
           xcodebuild -version
           swift --version
 

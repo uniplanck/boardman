@@ -1,5 +1,7 @@
 # Board-Man LP Free Vs Pro Design Spec
 
+> **SUPERSEDED:** Do not implement the old Pro/subscription wording from this document. The current LP contract is Free vs Lifetime and is governed by `docs/boardman-commercial-lifetime-roadmap.md`. This file remains only as a visual-layout reference until a replacement LP spec is written in the uniplanck.com repository.
+
 ## Purpose
 
 This document is the implementation handoff for a future Board-Man landing page on uniplanck.com. It is docs-only for this PR because this repository does not contain the production uniplanck.com landing page implementation target.

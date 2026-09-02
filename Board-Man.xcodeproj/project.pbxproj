@@ -10,17 +10,37 @@
 		C576AD7C2FBD345000B71213 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = C576AD7B2FBD345000B71213 /* Localizable.xcstrings */; };
 		C5A6BA742FBC5A6E00C8B9EB /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = C5A6BA732FBC5A6E00C8B9EB /* Sparkle */; };
 		C5D220A82FBD2655005CD45E /* RealmSwift in Frameworks */ = {isa = PBXBuildFile; productRef = C5D220A72FBD2655005CD45E /* RealmSwift */; };
-		C5D3A75C2FB869EA00C9DCB6 /* Sauce in Frameworks */ = {isa = PBXBuildFile; productRef = C5D3A75B2FB869EA00C9DCB6 /* Sauce */; };
-		C5D3A75F2FB86A0200C9DCB6 /* Magnet in Frameworks */ = {isa = PBXBuildFile; productRef = C5D3A75E2FB86A0200C9DCB6 /* Magnet */; };
-		C5D3A7622FB86A1C00C9DCB6 /* KeyHolder in Frameworks */ = {isa = PBXBuildFile; productRef = C5D3A7612FB86A1C00C9DCB6 /* KeyHolder */; };
-		C5D3A7652FB86A2C00C9DCB6 /* LoginServiceKit in Frameworks */ = {isa = PBXBuildFile; productRef = C5D3A7642FB86A2C00C9DCB6 /* LoginServiceKit */; };
-		C5D76D9E2FBA939E0083839F /* RxCocoa in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76D9D2FBA939E0083839F /* RxCocoa */; };
-		C5D76DA02FBA939E0083839F /* RxSwift in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76D9F2FBA939E0083839F /* RxSwift */; };
-		C5D76DA52FBA98A90083839F /* AEXML in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76DA42FBA98A90083839F /* AEXML */; };
+		C6B1A10F2FCE000100B0A001 /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = C6B1A10E2FCE000100B0A001 /* SQLiteData */; };
 		C5D76DA82FBA9C150083839F /* PINCache in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76DA72FBA9C150083839F /* PINCache */; };
-		C5D76DAB2FBA9D2E0083839F /* SwiftHEXColors in Frameworks */ = {isa = PBXBuildFile; productRef = C5D76DAA2FBA9D2E0083839F /* SwiftHEXColors */; };
-		C5E3D0512FB43570005D632A /* Screeen in Frameworks */ = {isa = PBXBuildFile; productRef = C5E3D0502FB43570005D632A /* Screeen */; };
 		C5F1B7331FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5F1B7321FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift */; };
+		C6B1A1002FCE000100B0A001 /* BoardManScreenshotObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1012FCE000100B0A001 /* BoardManScreenshotObserver.swift */; };
+		C6B1A1022FCE000100B0A001 /* BoardManKeyCombo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1032FCE000100B0A001 /* BoardManKeyCombo.swift */; };
+		C6B1A1042FCE000100B0A001 /* BoardManHotKeyRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */; };
+		C6B1A1062FCE000100B0A001 /* BoardManShortcutRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1072FCE000100B0A001 /* BoardManShortcutRecordView.swift */; };
+		C6B1A10A2FCE000100B0A001 /* BoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1092FCE000100B0A001 /* BoardManStore.swift */; };
+		C6B1A1192FCE000100B0A001 /* BoardManSearchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */; };
+		C6B1A11D2FCE000100B0A001 /* BoardManPanelNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A11C2FCE000100B0A001 /* BoardManPanelNavigation.swift */; };
+		C6B1A11F2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A11E2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift */; };
+		C6B1A1212FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1202FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift */; };
+		C6B1A1252FCE000100B0A001 /* BoardManTimestampPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1242FCE000100B0A001 /* BoardManTimestampPresentation.swift */; };
+		C6B1A1272FCE000100B0A001 /* BoardManTimestampInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1262FCE000100B0A001 /* BoardManTimestampInteraction.swift */; };
+		C6B1A12B2FCE000100B0A001 /* BoardManPanelAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */; };
+		C6B1A12F2FCE000100B0A001 /* BoardManHistoryPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */; };
+		C6B1A1332FCE000100B0A001 /* BoardManPanelHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */; };
+		C6B1A1352FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1342FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift */; };
+		C6B1A1382FCE000100B0A001 /* BoardManSnippetPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1392FCE000100B0A001 /* BoardManSnippetPresentation.swift */; };
+		C6B1A13C2FCE000100B0A001 /* BoardManSnippetCatalogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A13D2FCE000100B0A001 /* BoardManSnippetCatalogService.swift */; };
+		C6B1A13E2FCE000100B0A001 /* BoardManSnippetDialogCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A13F2FCE000100B0A001 /* BoardManSnippetDialogCoordinator.swift */; };
+		C6B1A1422FCE000100B0A001 /* BoardManPanelLayoutPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1432FCE000100B0A001 /* BoardManPanelLayoutPolicy.swift */; };
+		C6B1A1462FCE000100B0A001 /* BoardManGeneralSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1472FCE000100B0A001 /* BoardManGeneralSettingsLayout.swift */; };
+		C6B1A14A2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A14B2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift */; };
+		C6B1A14E2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A14F2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift */; };
+		C6B1A1522FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1532FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift */; };
+		C6B1A1562FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1572FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift */; };
+		C6B1A15A2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A15B2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift */; };
+		C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */; };
+		C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */; };
+		C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */; };
 		FA08EDF81D1FED7D000D1D13 /* HotKeyServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */; };
 		FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CE71DDCC61600AC9052 /* ClipService.swift */; };
 		FA0D5CFA1DDCC61600AC9052 /* BoardManUpgradeRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */; };
@@ -41,41 +61,42 @@
 		FA1DB4B31DDCB452007F95C8 /* Array+Remove.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4A81DDCB452007F95C8 /* Array+Remove.swift */; };
 		FA1DB4B41DDCB452007F95C8 /* NSBundle+Version.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4A91DDCB452007F95C8 /* NSBundle+Version.swift */; };
 		FA1DB4B71DDCB452007F95C8 /* NSImage+Resize.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4AC1DDCB452007F95C8 /* NSImage+Resize.swift */; };
-		FA1DB4B81DDCB452007F95C8 /* NSLock+Clipy.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4AD1DDCB452007F95C8 /* NSLock+Clipy.swift */; };
+		FA1DB4B81DDCB452007F95C8 /* NSLock+BoardMan.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4AD1DDCB452007F95C8 /* NSLock+BoardMan.swift */; };
 		FA1DB4B91DDCB452007F95C8 /* NSMenuItem+Initialize.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4AE1DDCB452007F95C8 /* NSMenuItem+Initialize.swift */; };
 		FA1DB4BA1DDCB452007F95C8 /* NSUserDefaults+ArchiveData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4AF1DDCB452007F95C8 /* NSUserDefaults+ArchiveData.swift */; };
 		FA1DB4BB1DDCB452007F95C8 /* Realm+Migration.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4B01DDCB452007F95C8 /* Realm+Migration.swift */; };
 		FA1DB4BC1DDCB452007F95C8 /* Realm+NoCatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4B11DDCB452007F95C8 /* Realm+NoCatch.swift */; };
 		FA1DB4BD1DDCB452007F95C8 /* String+Substring.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4B21DDCB452007F95C8 /* String+Substring.swift */; };
 		FA1DB4C91DDCB460007F95C8 /* MenuManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4C31DDCB460007F95C8 /* MenuManager.swift */; };
-		FA1DB4D21DDCB479007F95C8 /* CPYAppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4CC1DDCB479007F95C8 /* CPYAppInfo.swift */; };
-		FA1DB4D31DDCB479007F95C8 /* CPYClip.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4CD1DDCB479007F95C8 /* CPYClip.swift */; };
-		FA1DB4D41DDCB479007F95C8 /* CPYClipData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4CE1DDCB479007F95C8 /* CPYClipData.swift */; };
-		FA1DB4D51DDCB479007F95C8 /* CPYDraggedData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4CF1DDCB479007F95C8 /* CPYDraggedData.swift */; };
-		FA1DB4D61DDCB479007F95C8 /* CPYFolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4D01DDCB479007F95C8 /* CPYFolder.swift */; };
-		FA1DB4D71DDCB479007F95C8 /* CPYSnippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4D11DDCB479007F95C8 /* CPYSnippet.swift */; };
-		FA1DB4E51DDCB49C007F95C8 /* CPYUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4D91DDCB49C007F95C8 /* CPYUtilities.swift */; };
-		FA1DB4E71DDCB49C007F95C8 /* CPYDesignableButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4DD1DDCB49C007F95C8 /* CPYDesignableButton.swift */; };
-		FA1DB4E81DDCB49C007F95C8 /* CPYDesignableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4DE1DDCB49C007F95C8 /* CPYDesignableView.swift */; };
-		FA1DB4E91DDCB49C007F95C8 /* CPYSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4E01DDCB49C007F95C8 /* CPYSplitView.swift */; };
-		FA1DB4EA1DDCB49C007F95C8 /* CPYSnippetsEditorCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4E21DDCB49C007F95C8 /* CPYSnippetsEditorCell.swift */; };
-		FA1DB4EB1DDCB49C007F95C8 /* CPYPlaceHolderTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4E41DDCB49C007F95C8 /* CPYPlaceHolderTextView.swift */; };
-		FA1DB5121DDCB4C0007F95C8 /* CPYPreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4ED1DDCB4C0007F95C8 /* CPYPreferencesWindowController.swift */; };
-		FA1DB5131DDCB4C0007F95C8 /* CPYPreferencesWindowController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4EE1DDCB4C0007F95C8 /* CPYPreferencesWindowController.xib */; };
-		FA1DB5141DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F21DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.swift */; };
-		FA1DB5151DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F31DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.swift */; };
-		FA1DB5161DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F41DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.swift */; };
-		FA1DB5171DDCB4C0007F95C8 /* CPYTypePreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F51DDCB4C0007F95C8 /* CPYTypePreferenceViewController.swift */; };
-		FA1DB5181DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F61DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.swift */; };
-		FA1DB5191DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4F71DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.xib */; };
-		FA1DB51A1DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4F91DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.xib */; };
-		FA1DB51B1DDCB4C0007F95C8 /* CPYGeneralPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4FB1DDCB4C0007F95C8 /* CPYGeneralPreferenceViewController.xib */; };
-		FA1DB51C1DDCB4C0007F95C8 /* CPYMenuPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4FD1DDCB4C0007F95C8 /* CPYMenuPreferenceViewController.xib */; };
-		FA1DB51D1DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4FF1DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.xib */; };
-		FA1DB51E1DDCB4C0007F95C8 /* CPYTypePreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB5011DDCB4C0007F95C8 /* CPYTypePreferenceViewController.xib */; };
-		FA1DB51F1DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB5031DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.xib */; };
-		FA1DB5201DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB50D1DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.swift */; };
-		FA1DB5221DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB50F1DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.xib */; };
+		FA1DB4D21DDCB479007F95C8 /* BoardManApplicationInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4CC1DDCB479007F95C8 /* BoardManApplicationInfo.swift */; };
+		FA1DB4D31DDCB479007F95C8 /* BoardManClip.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4CD1DDCB479007F95C8 /* BoardManClip.swift */; };
+		FA1DB4D41DDCB479007F95C8 /* BoardManClipData.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4CE1DDCB479007F95C8 /* BoardManClipData.swift */; };
+		C6B1A11B2FCE000100B0A001 /* BoardManPanelItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A11A2FCE000100B0A001 /* BoardManPanelItem.swift */; };
+		FA1DB4D51DDCB479007F95C8 /* BoardManDragPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4CF1DDCB479007F95C8 /* BoardManDragPayload.swift */; };
+		FA1DB4D61DDCB479007F95C8 /* BoardManFolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4D01DDCB479007F95C8 /* BoardManFolder.swift */; };
+		FA1DB4D71DDCB479007F95C8 /* BoardManSnippet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4D11DDCB479007F95C8 /* BoardManSnippet.swift */; };
+		FA1DB4E51DDCB49C007F95C8 /* BoardManRuntimeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4D91DDCB49C007F95C8 /* BoardManRuntimeSupport.swift */; };
+		FA1DB4E71DDCB49C007F95C8 /* BoardManDesignableButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4DD1DDCB49C007F95C8 /* BoardManDesignableButton.swift */; };
+		FA1DB4E81DDCB49C007F95C8 /* BoardManDesignableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4DE1DDCB49C007F95C8 /* BoardManDesignableView.swift */; };
+		FA1DB4E91DDCB49C007F95C8 /* BoardManSplitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4E01DDCB49C007F95C8 /* BoardManSplitView.swift */; };
+		FA1DB4EA1DDCB49C007F95C8 /* BoardManTemplatesEditorCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4E21DDCB49C007F95C8 /* BoardManTemplatesEditorCell.swift */; };
+		FA1DB4EB1DDCB49C007F95C8 /* BoardManPlaceholderTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4E41DDCB49C007F95C8 /* BoardManPlaceholderTextView.swift */; };
+		FA1DB5121DDCB4C0007F95C8 /* BoardManPreferencesWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4ED1DDCB4C0007F95C8 /* BoardManPreferencesWindowController.swift */; };
+		FA1DB5131DDCB4C0007F95C8 /* BoardManPreferencesWindowController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4EE1DDCB4C0007F95C8 /* BoardManPreferencesWindowController.xib */; };
+		FA1DB5141DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F21DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.swift */; };
+		FA1DB5151DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F31DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.swift */; };
+		FA1DB5161DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F41DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.swift */; };
+		FA1DB5171DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F51DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.swift */; };
+		FA1DB5181DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB4F61DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.swift */; };
+		FA1DB5191DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4F71DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.xib */; };
+		FA1DB51A1DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4F91DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.xib */; };
+		FA1DB51B1DDCB4C0007F95C8 /* BoardManGeneralPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4FB1DDCB4C0007F95C8 /* BoardManGeneralPreferenceViewController.xib */; };
+		FA1DB51C1DDCB4C0007F95C8 /* BoardManHistoryPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4FD1DDCB4C0007F95C8 /* BoardManHistoryPreferenceViewController.xib */; };
+		FA1DB51D1DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB4FF1DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.xib */; };
+		FA1DB51E1DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB5011DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.xib */; };
+		FA1DB51F1DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB5031DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.xib */; };
+		FA1DB5201DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA1DB50D1DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.swift */; };
+		FA1DB5221DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.xib in Resources */ = {isa = PBXBuildFile; fileRef = FA1DB50F1DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.xib */; };
 		FA3778931F3B691A003B5BAB /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA3778921F3B691A003B5BAB /* AppEnvironment.swift */; };
 		FA3778951F3B6920003B5BAB /* Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA3778941F3B6920003B5BAB /* Environment.swift */; };
 		FA431F021E6718CE00ACFF56 /* Collection+Safe.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA431F011E6718CE00ACFF56 /* Collection+Safe.swift */; };
@@ -83,6 +104,33 @@
 		FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */; };
 		FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA6167951D3ACDD80049FA14 /* SnippetTests.swift */; };
 		FA0D5CF81DDCC61600AC9052 /* EntitlementGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */; };
+		B0A1B00226A8240000000001 /* BoardManPerformanceBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */; };
+		B0A1B00426A8240000000001 /* BoardManRuntimeEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */; };
+		C6B1A10C2FCE000100B0A001 /* BoardManStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */; };
+		C6B1A1172FCE000100B0A001 /* BoardManSearchQueryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1162FCE000100B0A001 /* BoardManSearchQueryTests.swift */; };
+		C6B1A1232FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1222FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift */; };
+		C6B1A1292FCE000100B0A001 /* BoardManTimestampPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1282FCE000100B0A001 /* BoardManTimestampPresentationTests.swift */; };
+		C6B1A12D2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A12C2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift */; };
+		C6B1A1312FCE000100B0A001 /* BoardManHistoryPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1302FCE000100B0A001 /* BoardManHistoryPresentationTests.swift */; };
+		C6B1A1372FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1362FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift */; };
+		C6B1A13A2FCE000100B0A001 /* BoardManSnippetPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A13B2FCE000100B0A001 /* BoardManSnippetPresentationTests.swift */; };
+		C6B1A1402FCE000100B0A001 /* BoardManSnippetCatalogServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1412FCE000100B0A001 /* BoardManSnippetCatalogServiceTests.swift */; };
+		C6B1A1442FCE000100B0A001 /* BoardManPanelLayoutPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1452FCE000100B0A001 /* BoardManPanelLayoutPolicyTests.swift */; };
+		C6B1A1482FCE000100B0A001 /* BoardManGeneralSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1492FCE000100B0A001 /* BoardManGeneralSettingsLayoutTests.swift */; };
+		C6B1A14C2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A14D2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift */; };
+		C6B1A1502FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1512FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift */; };
+		C6B1A1542FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */; };
+		C6B1A1582FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */; };
+		C6B1A15C2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */; };
+		C6B1A1602FCE000100B0A001 /* BoardManClipDataColorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1612FCE000100B0A001 /* BoardManClipDataColorTests.swift */; };
+		C6B1A1622FCE000100B0A001 /* BoardManSnippetXMLCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1632FCE000100B0A001 /* BoardManSnippetXMLCodec.swift */; };
+		C6B1A1642FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1652FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift */; };
+		C6B1A1662FCE000100B0A001 /* BoardManSQLiteMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1672FCE000100B0A001 /* BoardManSQLiteMaintenance.swift */; };
+		C6B1A1682FCE000100B0A001 /* BoardManReliabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1692FCE000100B0A001 /* BoardManReliabilityTests.swift */; };
+		C6B1A16A2FCE000100B0A001 /* BoardManRecoveryArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A16B2FCE000100B0A001 /* BoardManRecoveryArchive.swift */; };
+		C6B1A16C2FCE000100B0A001 /* BoardManPayloadRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A16D2FCE000100B0A001 /* BoardManPayloadRecovery.swift */; };
+		C6B1A16E2FCE000100B0A001 /* BoardManSelectionMemoryPhase0.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A16F2FCE000100B0A001 /* BoardManSelectionMemoryPhase0.swift */; };
+		C6B1A1702FCE000100B0A001 /* BoardManSelectionMemoryPhase0Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6B1A1712FCE000100B0A001 /* BoardManSelectionMemoryPhase0Tests.swift */; };
 		FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */; };
 		FAC0DCE91DE15FD900309C49 /* DataCleanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCE81DE15FD900309C49 /* DataCleanService.swift */; };
 		FAC0DCEF1DE3255E00309C49 /* NSImage+NSColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAC0DCEE1DE3255E00309C49 /* NSImage+NSColor.swift */; };
@@ -101,7 +149,7 @@
 			containerPortal = FAC43DBE1B35D8B100C06102 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = FAC43DC51B35D8B100C06102;
-			remoteInfo = Clipy;
+			remoteInfo = "Board-Man";
 		};
 /* End PBXContainerItemProxy section */
 
@@ -119,39 +167,64 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		314B299D1EC49AD5004DD070 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYSnippetsEditorWindowController.xib; sourceTree = "<group>"; };
-		314B299E1EC49AEF004DD070 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYSnippetsEditorWindowController.strings; sourceTree = "<group>"; };
-		314B299F1EC49BAF004DD070 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYPreferencesWindowController.xib; sourceTree = "<group>"; };
-		314B29A11EC49D31004DD070 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYPreferencesWindowController.strings; sourceTree = "<group>"; };
-		31ACA9F01EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYPreferencesWindowController.strings; sourceTree = "<group>"; };
-		31ACA9F11EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYBetaPreferenceViewController.strings; sourceTree = "<group>"; };
-		31ACA9F21EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYExcludeAppPreferenceViewController.strings; sourceTree = "<group>"; };
-		31ACA9F31EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYGeneralPreferenceViewController.strings; sourceTree = "<group>"; };
-		31ACA9F41EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYMenuPreferenceViewController.strings; sourceTree = "<group>"; };
-		31ACA9F51EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYShortcutsPreferenceViewController.strings; sourceTree = "<group>"; };
-		31ACA9F61EC5B85C00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYTypePreferenceViewController.strings; sourceTree = "<group>"; };
-		31ACA9F71EC5B85C00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYUpdatesPreferenceViewController.strings; sourceTree = "<group>"; };
-		31ACA9F81EC5B85C00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/CPYSnippetsEditorWindowController.strings; sourceTree = "<group>"; };
-		54ADE0FA2008F63F00239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYPreferencesWindowController.strings"; sourceTree = "<group>"; };
-		54ADE0FB2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYBetaPreferenceViewController.strings"; sourceTree = "<group>"; };
-		54ADE0FC2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYExcludeAppPreferenceViewController.strings"; sourceTree = "<group>"; };
-		54ADE0FD2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYGeneralPreferenceViewController.strings"; sourceTree = "<group>"; };
-		54ADE0FE2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYMenuPreferenceViewController.strings"; sourceTree = "<group>"; };
-		54ADE0FF2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYShortcutsPreferenceViewController.strings"; sourceTree = "<group>"; };
-		54ADE1002008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYTypePreferenceViewController.strings"; sourceTree = "<group>"; };
-		54ADE1012008F64100239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYUpdatesPreferenceViewController.strings"; sourceTree = "<group>"; };
-		54ADE1022008F64100239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/CPYSnippetsEditorWindowController.strings"; sourceTree = "<group>"; };
-		846004961FD5511800BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYPreferencesWindowController.strings; sourceTree = "<group>"; };
-		846004971FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYBetaPreferenceViewController.strings; sourceTree = "<group>"; };
-		846004981FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYExcludeAppPreferenceViewController.strings; sourceTree = "<group>"; };
-		846004991FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYGeneralPreferenceViewController.strings; sourceTree = "<group>"; };
-		8460049A1FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYMenuPreferenceViewController.strings; sourceTree = "<group>"; };
-		8460049B1FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYShortcutsPreferenceViewController.strings; sourceTree = "<group>"; };
-		8460049C1FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYTypePreferenceViewController.strings; sourceTree = "<group>"; };
-		8460049D1FD5511A00BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYUpdatesPreferenceViewController.strings; sourceTree = "<group>"; };
-		8460049E1FD5511A00BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/CPYSnippetsEditorWindowController.strings; sourceTree = "<group>"; };
+		314B299D1EC49AD5004DD070 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManSnippetsEditorWindowController.xib; sourceTree = "<group>"; };
+		314B299E1EC49AEF004DD070 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManSnippetsEditorWindowController.strings; sourceTree = "<group>"; };
+		314B299F1EC49BAF004DD070 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManPreferencesWindowController.xib; sourceTree = "<group>"; };
+		314B29A11EC49D31004DD070 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManPreferencesWindowController.strings; sourceTree = "<group>"; };
+		31ACA9F01EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManPreferencesWindowController.strings; sourceTree = "<group>"; };
+		31ACA9F11EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManServicesPreferenceViewController.strings; sourceTree = "<group>"; };
+		31ACA9F21EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManExcludedAppsPreferenceViewController.strings; sourceTree = "<group>"; };
+		31ACA9F31EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManGeneralPreferenceViewController.strings; sourceTree = "<group>"; };
+		31ACA9F41EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManHistoryPreferenceViewController.strings; sourceTree = "<group>"; };
+		31ACA9F51EC5B85B00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManShortcutsPreferenceViewController.strings; sourceTree = "<group>"; };
+		31ACA9F61EC5B85C00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManClipboardTypesPreferenceViewController.strings; sourceTree = "<group>"; };
+		31ACA9F71EC5B85C00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManUpdatesPreferenceViewController.strings; sourceTree = "<group>"; };
+		31ACA9F81EC5B85C00BD34C0 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/BoardManSnippetsEditorWindowController.strings; sourceTree = "<group>"; };
+		54ADE0FA2008F63F00239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManPreferencesWindowController.strings"; sourceTree = "<group>"; };
+		54ADE0FB2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManServicesPreferenceViewController.strings"; sourceTree = "<group>"; };
+		54ADE0FC2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManExcludedAppsPreferenceViewController.strings"; sourceTree = "<group>"; };
+		54ADE0FD2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManGeneralPreferenceViewController.strings"; sourceTree = "<group>"; };
+		54ADE0FE2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManHistoryPreferenceViewController.strings"; sourceTree = "<group>"; };
+		54ADE0FF2008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManShortcutsPreferenceViewController.strings"; sourceTree = "<group>"; };
+		54ADE1002008F64000239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManClipboardTypesPreferenceViewController.strings"; sourceTree = "<group>"; };
+		54ADE1012008F64100239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManUpdatesPreferenceViewController.strings"; sourceTree = "<group>"; };
+		54ADE1022008F64100239852 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/BoardManSnippetsEditorWindowController.strings"; sourceTree = "<group>"; };
+		846004961FD5511800BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManPreferencesWindowController.strings; sourceTree = "<group>"; };
+		846004971FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManServicesPreferenceViewController.strings; sourceTree = "<group>"; };
+		846004981FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManExcludedAppsPreferenceViewController.strings; sourceTree = "<group>"; };
+		846004991FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManGeneralPreferenceViewController.strings; sourceTree = "<group>"; };
+		8460049A1FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManHistoryPreferenceViewController.strings; sourceTree = "<group>"; };
+		8460049B1FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManShortcutsPreferenceViewController.strings; sourceTree = "<group>"; };
+		8460049C1FD5511900BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManClipboardTypesPreferenceViewController.strings; sourceTree = "<group>"; };
+		8460049D1FD5511A00BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManUpdatesPreferenceViewController.strings; sourceTree = "<group>"; };
+		8460049E1FD5511A00BA733E /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/BoardManSnippetsEditorWindowController.strings; sourceTree = "<group>"; };
 		C576AD7B2FBD345000B71213 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		C5F1B7321FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSPasteboard+Deprecated.swift"; sourceTree = "<group>"; };
+		C6B1A1012FCE000100B0A001 /* BoardManScreenshotObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManScreenshotObserver.swift; sourceTree = "<group>"; };
+		C6B1A1032FCE000100B0A001 /* BoardManKeyCombo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManKeyCombo.swift; sourceTree = "<group>"; };
+		C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManHotKeyRegistry.swift; sourceTree = "<group>"; };
+		C6B1A1072FCE000100B0A001 /* BoardManShortcutRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManShortcutRecordView.swift; sourceTree = "<group>"; };
+		C6B1A1092FCE000100B0A001 /* BoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManStore.swift; sourceTree = "<group>"; };
+		C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSearchCoordinator.swift; sourceTree = "<group>"; };
+		C6B1A11C2FCE000100B0A001 /* BoardManPanelNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelNavigation.swift; sourceTree = "<group>"; };
+		C6B1A11E2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelPasteCoordinator.swift; sourceTree = "<group>"; };
+		C6B1A1202FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManReadmeScreenshotCoordinator.swift; sourceTree = "<group>"; };
+		C6B1A1242FCE000100B0A001 /* BoardManTimestampPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManTimestampPresentation.swift; sourceTree = "<group>"; };
+		C6B1A1262FCE000100B0A001 /* BoardManTimestampInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManTimestampInteraction.swift; sourceTree = "<group>"; };
+		C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelAppearance.swift; sourceTree = "<group>"; };
+		C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManHistoryPresentation.swift; sourceTree = "<group>"; };
+		C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelHeader.swift; sourceTree = "<group>"; };
+		C6B1A1342FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetEditingPolicy.swift; sourceTree = "<group>"; };
+		C6B1A1392FCE000100B0A001 /* BoardManSnippetPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetPresentation.swift; sourceTree = "<group>"; };
+		C6B1A13D2FCE000100B0A001 /* BoardManSnippetCatalogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetCatalogService.swift; sourceTree = "<group>"; };
+		C6B1A13F2FCE000100B0A001 /* BoardManSnippetDialogCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetDialogCoordinator.swift; sourceTree = "<group>"; };
+		C6B1A1432FCE000100B0A001 /* BoardManPanelLayoutPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPanelLayoutPolicy.swift; sourceTree = "<group>"; };
+		C6B1A1472FCE000100B0A001 /* BoardManGeneralSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManGeneralSettingsLayout.swift; sourceTree = "<group>"; };
+		C6B1A14B2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetSettingsLayout.swift; sourceTree = "<group>"; };
+		C6B1A14F2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManHistorySettingsLayout.swift; sourceTree = "<group>"; };
+		C6B1A1532FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPrivacySettingsLayout.swift; sourceTree = "<group>"; };
+		C6B1A1572FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManLicenseSettingsLayout.swift; sourceTree = "<group>"; };
+		C6B1A15B2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManAppearanceSettingsLayout.swift; sourceTree = "<group>"; };
 		FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HotKeyServiceTests.swift; sourceTree = "<group>"; };
 		FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpgradeRoute.swift; sourceTree = "<group>"; };
 		FA0D5CE71DDCC61600AC9052 /* ClipService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ClipService.swift; sourceTree = "<group>"; };
@@ -173,32 +246,33 @@
 		FA1DB4A81DDCB452007F95C8 /* Array+Remove.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Array+Remove.swift"; sourceTree = "<group>"; };
 		FA1DB4A91DDCB452007F95C8 /* NSBundle+Version.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSBundle+Version.swift"; sourceTree = "<group>"; };
 		FA1DB4AC1DDCB452007F95C8 /* NSImage+Resize.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSImage+Resize.swift"; sourceTree = "<group>"; };
-		FA1DB4AD1DDCB452007F95C8 /* NSLock+Clipy.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSLock+Clipy.swift"; sourceTree = "<group>"; };
+		FA1DB4AD1DDCB452007F95C8 /* NSLock+BoardMan.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSLock+BoardMan.swift"; sourceTree = "<group>"; };
 		FA1DB4AE1DDCB452007F95C8 /* NSMenuItem+Initialize.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSMenuItem+Initialize.swift"; sourceTree = "<group>"; };
 		FA1DB4AF1DDCB452007F95C8 /* NSUserDefaults+ArchiveData.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSUserDefaults+ArchiveData.swift"; sourceTree = "<group>"; };
 		FA1DB4B01DDCB452007F95C8 /* Realm+Migration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Realm+Migration.swift"; sourceTree = "<group>"; };
 		FA1DB4B11DDCB452007F95C8 /* Realm+NoCatch.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Realm+NoCatch.swift"; sourceTree = "<group>"; };
 		FA1DB4B21DDCB452007F95C8 /* String+Substring.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "String+Substring.swift"; sourceTree = "<group>"; };
 		FA1DB4C31DDCB460007F95C8 /* MenuManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MenuManager.swift; sourceTree = "<group>"; };
-		FA1DB4CC1DDCB479007F95C8 /* CPYAppInfo.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYAppInfo.swift; sourceTree = "<group>"; };
-		FA1DB4CD1DDCB479007F95C8 /* CPYClip.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYClip.swift; sourceTree = "<group>"; };
-		FA1DB4CE1DDCB479007F95C8 /* CPYClipData.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYClipData.swift; sourceTree = "<group>"; };
-		FA1DB4CF1DDCB479007F95C8 /* CPYDraggedData.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYDraggedData.swift; sourceTree = "<group>"; };
-		FA1DB4D01DDCB479007F95C8 /* CPYFolder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYFolder.swift; sourceTree = "<group>"; };
-		FA1DB4D11DDCB479007F95C8 /* CPYSnippet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYSnippet.swift; sourceTree = "<group>"; };
-		FA1DB4D91DDCB49C007F95C8 /* CPYUtilities.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYUtilities.swift; sourceTree = "<group>"; };
-		FA1DB4DD1DDCB49C007F95C8 /* CPYDesignableButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYDesignableButton.swift; sourceTree = "<group>"; };
-		FA1DB4DE1DDCB49C007F95C8 /* CPYDesignableView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYDesignableView.swift; sourceTree = "<group>"; };
-		FA1DB4E01DDCB49C007F95C8 /* CPYSplitView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYSplitView.swift; sourceTree = "<group>"; };
-		FA1DB4E21DDCB49C007F95C8 /* CPYSnippetsEditorCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYSnippetsEditorCell.swift; sourceTree = "<group>"; };
-		FA1DB4E41DDCB49C007F95C8 /* CPYPlaceHolderTextView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYPlaceHolderTextView.swift; sourceTree = "<group>"; };
-		FA1DB4ED1DDCB4C0007F95C8 /* CPYPreferencesWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYPreferencesWindowController.swift; sourceTree = "<group>"; };
-		FA1DB4F21DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYBetaPreferenceViewController.swift; sourceTree = "<group>"; };
-		FA1DB4F31DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYExcludeAppPreferenceViewController.swift; sourceTree = "<group>"; };
-		FA1DB4F41DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYShortcutsPreferenceViewController.swift; sourceTree = "<group>"; };
-		FA1DB4F51DDCB4C0007F95C8 /* CPYTypePreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYTypePreferenceViewController.swift; sourceTree = "<group>"; };
-		FA1DB4F61DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYUpdatesPreferenceViewController.swift; sourceTree = "<group>"; };
-		FA1DB50D1DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CPYSnippetsEditorWindowController.swift; sourceTree = "<group>"; };
+		FA1DB4CC1DDCB479007F95C8 /* BoardManApplicationInfo.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManApplicationInfo.swift; sourceTree = "<group>"; };
+		FA1DB4CD1DDCB479007F95C8 /* BoardManClip.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManClip.swift; sourceTree = "<group>"; };
+		FA1DB4CE1DDCB479007F95C8 /* BoardManClipData.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManClipData.swift; sourceTree = "<group>"; };
+		C6B1A11A2FCE000100B0A001 /* BoardManPanelItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPanelItem.swift; sourceTree = "<group>"; };
+		FA1DB4CF1DDCB479007F95C8 /* BoardManDragPayload.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManDragPayload.swift; sourceTree = "<group>"; };
+		FA1DB4D01DDCB479007F95C8 /* BoardManFolder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManFolder.swift; sourceTree = "<group>"; };
+		FA1DB4D11DDCB479007F95C8 /* BoardManSnippet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippet.swift; sourceTree = "<group>"; };
+		FA1DB4D91DDCB49C007F95C8 /* BoardManRuntimeSupport.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManRuntimeSupport.swift; sourceTree = "<group>"; };
+		FA1DB4DD1DDCB49C007F95C8 /* BoardManDesignableButton.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManDesignableButton.swift; sourceTree = "<group>"; };
+		FA1DB4DE1DDCB49C007F95C8 /* BoardManDesignableView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManDesignableView.swift; sourceTree = "<group>"; };
+		FA1DB4E01DDCB49C007F95C8 /* BoardManSplitView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSplitView.swift; sourceTree = "<group>"; };
+		FA1DB4E21DDCB49C007F95C8 /* BoardManTemplatesEditorCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManTemplatesEditorCell.swift; sourceTree = "<group>"; };
+		FA1DB4E41DDCB49C007F95C8 /* BoardManPlaceholderTextView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPlaceholderTextView.swift; sourceTree = "<group>"; };
+		FA1DB4ED1DDCB4C0007F95C8 /* BoardManPreferencesWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPreferencesWindowController.swift; sourceTree = "<group>"; };
+		FA1DB4F21DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManServicesPreferenceViewController.swift; sourceTree = "<group>"; };
+		FA1DB4F31DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManExcludedAppsPreferenceViewController.swift; sourceTree = "<group>"; };
+		FA1DB4F41DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManShortcutsPreferenceViewController.swift; sourceTree = "<group>"; };
+		FA1DB4F51DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManClipboardTypesPreferenceViewController.swift; sourceTree = "<group>"; };
+		FA1DB4F61DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManUpdatesPreferenceViewController.swift; sourceTree = "<group>"; };
+		FA1DB50D1DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetsEditorWindowController.swift; sourceTree = "<group>"; };
 		FA3778921F3B691A003B5BAB /* AppEnvironment.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		FA3778941F3B6920003B5BAB /* Environment.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Environment.swift; sourceTree = "<group>"; };
 		FA431F011E6718CE00ACFF56 /* Collection+Safe.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Collection+Safe.swift"; sourceTree = "<group>"; };
@@ -206,26 +280,56 @@
 		FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DraggedDataTests.swift; sourceTree = "<group>"; };
 		FA6167951D3ACDD80049FA14 /* SnippetTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SnippetTests.swift; sourceTree = "<group>"; };
 		FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EntitlementGateTests.swift; sourceTree = "<group>"; };
+		B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPerformanceBaselineTests.swift; sourceTree = "<group>"; };
+		B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManRuntimeEnvironmentTests.swift; sourceTree = "<group>"; };
+		C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManStoreTests.swift; sourceTree = "<group>"; };
+		C6B1A1162FCE000100B0A001 /* BoardManSearchQueryTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSearchQueryTests.swift; sourceTree = "<group>"; };
+		C6B1A1222FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManReadmeScreenshotCoordinatorTests.swift; sourceTree = "<group>"; };
+		C6B1A1282FCE000100B0A001 /* BoardManTimestampPresentationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManTimestampPresentationTests.swift; sourceTree = "<group>"; };
+		C6B1A12C2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPanelAppearanceTests.swift; sourceTree = "<group>"; };
+		C6B1A1302FCE000100B0A001 /* BoardManHistoryPresentationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManHistoryPresentationTests.swift; sourceTree = "<group>"; };
+		C6B1A1362FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetEditingPolicyTests.swift; sourceTree = "<group>"; };
+		C6B1A13B2FCE000100B0A001 /* BoardManSnippetPresentationTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetPresentationTests.swift; sourceTree = "<group>"; };
+		C6B1A1412FCE000100B0A001 /* BoardManSnippetCatalogServiceTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetCatalogServiceTests.swift; sourceTree = "<group>"; };
+		C6B1A1452FCE000100B0A001 /* BoardManPanelLayoutPolicyTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPanelLayoutPolicyTests.swift; sourceTree = "<group>"; };
+		C6B1A1492FCE000100B0A001 /* BoardManGeneralSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManGeneralSettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A14D2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetSettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A1512FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManHistorySettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManPrivacySettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManLicenseSettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManAppearanceSettingsLayoutTests.swift; sourceTree = "<group>"; };
+		C6B1A1612FCE000100B0A001 /* BoardManClipDataColorTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManClipDataColorTests.swift; sourceTree = "<group>"; };
+		C6B1A1632FCE000100B0A001 /* BoardManSnippetXMLCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSnippetXMLCodec.swift; sourceTree = "<group>"; };
+		C6B1A1652FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManSnippetXMLCodecTests.swift; sourceTree = "<group>"; };
+		C6B1A1672FCE000100B0A001 /* BoardManSQLiteMaintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSQLiteMaintenance.swift; sourceTree = "<group>"; };
+		C6B1A1692FCE000100B0A001 /* BoardManReliabilityTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BoardManReliabilityTests.swift; sourceTree = "<group>"; };
+		C6B1A16B2FCE000100B0A001 /* BoardManRecoveryArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManRecoveryArchive.swift; sourceTree = "<group>"; };
+		C6B1A16D2FCE000100B0A001 /* BoardManPayloadRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManPayloadRecovery.swift; sourceTree = "<group>"; };
+		C6B1A16F2FCE000100B0A001 /* BoardManSelectionMemoryPhase0.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSelectionMemoryPhase0.swift; sourceTree = "<group>"; };
+		C6B1A1712FCE000100B0A001 /* BoardManSelectionMemoryPhase0Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSelectionMemoryPhase0Tests.swift; sourceTree = "<group>"; };
+		C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteBoardManStore.swift; sourceTree = "<group>"; };
+		C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManSQLiteShadowReplicator.swift; sourceTree = "<group>"; };
+		C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoardManLegacyHistoryImporter.swift; sourceTree = "<group>"; };
 		FAA4BCCB2163DC9100FF5D18 /* AccessibilityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityService.swift; sourceTree = "<group>"; };
-		FAAA885C1E6853B80088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYBetaPreferenceViewController.xib; sourceTree = "<group>"; };
-		FAAA88621E6858030088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYBetaPreferenceViewController.strings; sourceTree = "<group>"; };
-		FAAA886C1E685DC70088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYExcludeAppPreferenceViewController.xib; sourceTree = "<group>"; };
-		FAAA88701E685DD40088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYExcludeAppPreferenceViewController.strings; sourceTree = "<group>"; };
-		FAAA88721E685E270088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYGeneralPreferenceViewController.xib; sourceTree = "<group>"; };
-		FAAA88761E685E310088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYGeneralPreferenceViewController.strings; sourceTree = "<group>"; };
-		FAAA88781E685F360088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYMenuPreferenceViewController.xib; sourceTree = "<group>"; };
-		FAAA887C1E685F3F0088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYMenuPreferenceViewController.strings; sourceTree = "<group>"; };
-		FAAA887E1E6862370088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYShortcutsPreferenceViewController.xib; sourceTree = "<group>"; };
-		FAAA88821E6862400088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYShortcutsPreferenceViewController.strings; sourceTree = "<group>"; };
-		FAAA88841E68627D0088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYTypePreferenceViewController.xib; sourceTree = "<group>"; };
-		FAAA88881E6862850088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYTypePreferenceViewController.strings; sourceTree = "<group>"; };
-		FAAA888A1E6862D20088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/CPYUpdatesPreferenceViewController.xib; sourceTree = "<group>"; };
-		FAAA888E1E6862D90088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/CPYUpdatesPreferenceViewController.strings; sourceTree = "<group>"; };
+		FAAA885C1E6853B80088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManServicesPreferenceViewController.xib; sourceTree = "<group>"; };
+		FAAA88621E6858030088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManServicesPreferenceViewController.strings; sourceTree = "<group>"; };
+		FAAA886C1E685DC70088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManExcludedAppsPreferenceViewController.xib; sourceTree = "<group>"; };
+		FAAA88701E685DD40088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManExcludedAppsPreferenceViewController.strings; sourceTree = "<group>"; };
+		FAAA88721E685E270088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManGeneralPreferenceViewController.xib; sourceTree = "<group>"; };
+		FAAA88761E685E310088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManGeneralPreferenceViewController.strings; sourceTree = "<group>"; };
+		FAAA88781E685F360088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManHistoryPreferenceViewController.xib; sourceTree = "<group>"; };
+		FAAA887C1E685F3F0088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManHistoryPreferenceViewController.strings; sourceTree = "<group>"; };
+		FAAA887E1E6862370088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManShortcutsPreferenceViewController.xib; sourceTree = "<group>"; };
+		FAAA88821E6862400088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManShortcutsPreferenceViewController.strings; sourceTree = "<group>"; };
+		FAAA88841E68627D0088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManClipboardTypesPreferenceViewController.xib; sourceTree = "<group>"; };
+		FAAA88881E6862850088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManClipboardTypesPreferenceViewController.strings; sourceTree = "<group>"; };
+		FAAA888A1E6862D20088FB34 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/BoardManUpdatesPreferenceViewController.xib; sourceTree = "<group>"; };
+		FAAA888E1E6862D90088FB34 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/BoardManUpdatesPreferenceViewController.strings; sourceTree = "<group>"; };
 		FAC0DCE81DE15FD900309C49 /* DataCleanService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DataCleanService.swift; sourceTree = "<group>"; };
 		FAC0DCEE1DE3255E00309C49 /* NSImage+NSColor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "NSImage+NSColor.swift"; sourceTree = "<group>"; };
 		FAC0DCF01DE576F300309C49 /* PasteService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PasteService.swift; sourceTree = "<group>"; };
 		FAC43DC61B35D8B100C06102 /* Board-Man.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Board-Man.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		FAC43DD81B35D8B100C06102 /* ClipyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FAC43DD81B35D8B100C06102 /* Board-ManTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Board-ManTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAC43DDD1B35D8B100C06102 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		FAC43E221B35DFC800C06102 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		FAC43E241B35DFD000C06102 /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
@@ -240,22 +344,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C5E3D0512FB43570005D632A /* Screeen in Frameworks */,
-				C5D76DAB2FBA9D2E0083839F /* SwiftHEXColors in Frameworks */,
 				FAC43E291B35DFDA00C06102 /* Cocoa.framework in Frameworks */,
 				FAC43E271B35DFD300C06102 /* Carbon.framework in Frameworks */,
-				C5D76DA52FBA98A90083839F /* AEXML in Frameworks */,
-				C5D3A7652FB86A2C00C9DCB6 /* LoginServiceKit in Frameworks */,
 				C5D76DA82FBA9C150083839F /* PINCache in Frameworks */,
 				FAC43E251B35DFD000C06102 /* AppKit.framework in Frameworks */,
-				C5D76DA02FBA939E0083839F /* RxSwift in Frameworks */,
-				C5D76D9E2FBA939E0083839F /* RxCocoa in Frameworks */,
 				FAC43E231B35DFC800C06102 /* Foundation.framework in Frameworks */,
 				C5D220A82FBD2655005CD45E /* RealmSwift in Frameworks */,
+				C6B1A10F2FCE000100B0A001 /* SQLiteData in Frameworks */,
 				C5A6BA742FBC5A6E00C8B9EB /* Sparkle in Frameworks */,
-				C5D3A75F2FB86A0200C9DCB6 /* Magnet in Frameworks */,
-				C5D3A75C2FB869EA00C9DCB6 /* Sauce in Frameworks */,
-				C5D3A7622FB86A1C00C9DCB6 /* KeyHolder in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -293,6 +389,38 @@
 			isa = PBXGroup;
 			children = (
 				FA0D5CF91DDCC61600AC9052 /* BoardManUpgradeRoute.swift */,
+				C6B1A1012FCE000100B0A001 /* BoardManScreenshotObserver.swift */,
+				C6B1A1032FCE000100B0A001 /* BoardManKeyCombo.swift */,
+				C6B1A1052FCE000100B0A001 /* BoardManHotKeyRegistry.swift */,
+				C6B1A1092FCE000100B0A001 /* BoardManStore.swift */,
+				C6B1A1182FCE000100B0A001 /* BoardManSearchCoordinator.swift */,
+				C6B1A11C2FCE000100B0A001 /* BoardManPanelNavigation.swift */,
+				C6B1A11E2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift */,
+				C6B1A1202FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift */,
+				C6B1A1242FCE000100B0A001 /* BoardManTimestampPresentation.swift */,
+				C6B1A1262FCE000100B0A001 /* BoardManTimestampInteraction.swift */,
+				C6B1A12A2FCE000100B0A001 /* BoardManPanelAppearance.swift */,
+				C6B1A12E2FCE000100B0A001 /* BoardManHistoryPresentation.swift */,
+				C6B1A1322FCE000100B0A001 /* BoardManPanelHeader.swift */,
+				C6B1A1342FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift */,
+				C6B1A1392FCE000100B0A001 /* BoardManSnippetPresentation.swift */,
+				C6B1A13D2FCE000100B0A001 /* BoardManSnippetCatalogService.swift */,
+				C6B1A13F2FCE000100B0A001 /* BoardManSnippetDialogCoordinator.swift */,
+				C6B1A1432FCE000100B0A001 /* BoardManPanelLayoutPolicy.swift */,
+				C6B1A1472FCE000100B0A001 /* BoardManGeneralSettingsLayout.swift */,
+				C6B1A14B2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift */,
+				C6B1A14F2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift */,
+				C6B1A1532FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift */,
+				C6B1A1572FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift */,
+				C6B1A15B2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift */,
+				C6B1A1632FCE000100B0A001 /* BoardManSnippetXMLCodec.swift */,
+				C6B1A1672FCE000100B0A001 /* BoardManSQLiteMaintenance.swift */,
+				C6B1A16B2FCE000100B0A001 /* BoardManRecoveryArchive.swift */,
+				C6B1A16D2FCE000100B0A001 /* BoardManPayloadRecovery.swift */,
+				C6B1A16F2FCE000100B0A001 /* BoardManSelectionMemoryPhase0.swift */,
+				C6B1A1102FCE000100B0A001 /* SQLiteBoardManStore.swift */,
+				C6B1A1122FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift */,
+				C6B1A1142FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift */,
 				FA0D5CE71DDCC61600AC9052 /* ClipService.swift */,
 				FA0D5CED1DDCC61600AC9052 /* Entitlement.swift */,
 				FA0D5CF51DDCC61600AC9052 /* LicenseActivationClient.swift */,
@@ -362,7 +490,7 @@
 				FA1DB4A81DDCB452007F95C8 /* Array+Remove.swift */,
 				FA1DB4A91DDCB452007F95C8 /* NSBundle+Version.swift */,
 				FA1DB4AC1DDCB452007F95C8 /* NSImage+Resize.swift */,
-				FA1DB4AD1DDCB452007F95C8 /* NSLock+Clipy.swift */,
+				FA1DB4AD1DDCB452007F95C8 /* NSLock+BoardMan.swift */,
 				FA1DB4AE1DDCB452007F95C8 /* NSMenuItem+Initialize.swift */,
 				FA1DB4AF1DDCB452007F95C8 /* NSUserDefaults+ArchiveData.swift */,
 				FA1DB4B01DDCB452007F95C8 /* Realm+Migration.swift */,
@@ -385,12 +513,13 @@
 		FA1DB4CB1DDCB479007F95C8 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB4CC1DDCB479007F95C8 /* CPYAppInfo.swift */,
-				FA1DB4CD1DDCB479007F95C8 /* CPYClip.swift */,
-				FA1DB4CE1DDCB479007F95C8 /* CPYClipData.swift */,
-				FA1DB4CF1DDCB479007F95C8 /* CPYDraggedData.swift */,
-				FA1DB4D01DDCB479007F95C8 /* CPYFolder.swift */,
-				FA1DB4D11DDCB479007F95C8 /* CPYSnippet.swift */,
+				FA1DB4CC1DDCB479007F95C8 /* BoardManApplicationInfo.swift */,
+				FA1DB4CD1DDCB479007F95C8 /* BoardManClip.swift */,
+				FA1DB4CE1DDCB479007F95C8 /* BoardManClipData.swift */,
+				C6B1A11A2FCE000100B0A001 /* BoardManPanelItem.swift */,
+				FA1DB4CF1DDCB479007F95C8 /* BoardManDragPayload.swift */,
+				FA1DB4D01DDCB479007F95C8 /* BoardManFolder.swift */,
+				FA1DB4D11DDCB479007F95C8 /* BoardManSnippet.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -398,7 +527,7 @@
 		FA1DB4D81DDCB49C007F95C8 /* Utility */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB4D91DDCB49C007F95C8 /* CPYUtilities.swift */,
+				FA1DB4D91DDCB49C007F95C8 /* BoardManRuntimeSupport.swift */,
 			);
 			path = Utility;
 			sourceTree = "<group>";
@@ -410,6 +539,7 @@
 				FA1DB4DF1DDCB49C007F95C8 /* SplitViews */,
 				FA1DB4E11DDCB49C007F95C8 /* TableViewCell */,
 				FA1DB4E31DDCB49C007F95C8 /* TextViews */,
+				C6B1A1072FCE000100B0A001 /* BoardManShortcutRecordView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -417,8 +547,8 @@
 		FA1DB4DC1DDCB49C007F95C8 /* DesignableView */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB4DD1DDCB49C007F95C8 /* CPYDesignableButton.swift */,
-				FA1DB4DE1DDCB49C007F95C8 /* CPYDesignableView.swift */,
+				FA1DB4DD1DDCB49C007F95C8 /* BoardManDesignableButton.swift */,
+				FA1DB4DE1DDCB49C007F95C8 /* BoardManDesignableView.swift */,
 			);
 			path = DesignableView;
 			sourceTree = "<group>";
@@ -426,7 +556,7 @@
 		FA1DB4DF1DDCB49C007F95C8 /* SplitViews */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB4E01DDCB49C007F95C8 /* CPYSplitView.swift */,
+				FA1DB4E01DDCB49C007F95C8 /* BoardManSplitView.swift */,
 			);
 			path = SplitViews;
 			sourceTree = "<group>";
@@ -434,7 +564,7 @@
 		FA1DB4E11DDCB49C007F95C8 /* TableViewCell */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB4E21DDCB49C007F95C8 /* CPYSnippetsEditorCell.swift */,
+				FA1DB4E21DDCB49C007F95C8 /* BoardManTemplatesEditorCell.swift */,
 			);
 			path = TableViewCell;
 			sourceTree = "<group>";
@@ -442,7 +572,7 @@
 		FA1DB4E31DDCB49C007F95C8 /* TextViews */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB4E41DDCB49C007F95C8 /* CPYPlaceHolderTextView.swift */,
+				FA1DB4E41DDCB49C007F95C8 /* BoardManPlaceholderTextView.swift */,
 			);
 			path = TextViews;
 			sourceTree = "<group>";
@@ -450,8 +580,8 @@
 		FA1DB4EC1DDCB4C0007F95C8 /* Preferences */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB4ED1DDCB4C0007F95C8 /* CPYPreferencesWindowController.swift */,
-				FA1DB4EE1DDCB4C0007F95C8 /* CPYPreferencesWindowController.xib */,
+				FA1DB4ED1DDCB4C0007F95C8 /* BoardManPreferencesWindowController.swift */,
+				FA1DB4EE1DDCB4C0007F95C8 /* BoardManPreferencesWindowController.xib */,
 				FA1DB4F11DDCB4C0007F95C8 /* Panels */,
 			);
 			path = Preferences;
@@ -460,18 +590,18 @@
 		FA1DB4F11DDCB4C0007F95C8 /* Panels */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB4F21DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.swift */,
-				FA1DB4F31DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.swift */,
-				FA1DB4F41DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.swift */,
-				FA1DB4F51DDCB4C0007F95C8 /* CPYTypePreferenceViewController.swift */,
-				FA1DB4F61DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.swift */,
-				FA1DB4F71DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.xib */,
-				FA1DB4F91DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.xib */,
-				FA1DB4FB1DDCB4C0007F95C8 /* CPYGeneralPreferenceViewController.xib */,
-				FA1DB4FD1DDCB4C0007F95C8 /* CPYMenuPreferenceViewController.xib */,
-				FA1DB4FF1DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.xib */,
-				FA1DB5011DDCB4C0007F95C8 /* CPYTypePreferenceViewController.xib */,
-				FA1DB5031DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.xib */,
+				FA1DB4F21DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.swift */,
+				FA1DB4F31DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.swift */,
+				FA1DB4F41DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.swift */,
+				FA1DB4F51DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.swift */,
+				FA1DB4F61DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.swift */,
+				FA1DB4F71DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.xib */,
+				FA1DB4F91DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.xib */,
+				FA1DB4FB1DDCB4C0007F95C8 /* BoardManGeneralPreferenceViewController.xib */,
+				FA1DB4FD1DDCB4C0007F95C8 /* BoardManHistoryPreferenceViewController.xib */,
+				FA1DB4FF1DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.xib */,
+				FA1DB5011DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.xib */,
+				FA1DB5031DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.xib */,
 			);
 			path = Panels;
 			sourceTree = "<group>";
@@ -479,8 +609,8 @@
 		FA1DB50C1DDCB4C0007F95C8 /* Snippets */ = {
 			isa = PBXGroup;
 			children = (
-				FA1DB50D1DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.swift */,
-				FA1DB50F1DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.xib */,
+				FA1DB50D1DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.swift */,
+				FA1DB50F1DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.xib */,
 			);
 			path = Snippets;
 			sourceTree = "<group>";
@@ -497,8 +627,8 @@
 		FAC43DBD1B35D8B100C06102 = {
 			isa = PBXGroup;
 			children = (
-				FAC43DC81B35D8B100C06102 /* Clipy */,
-				FAC43DDB1B35D8B100C06102 /* ClipyTests */,
+				FAC43DC81B35D8B100C06102 /* BoardMan */,
+				FAC43DDB1B35D8B100C06102 /* BoardManTests */,
 				FAC43DC71B35D8B100C06102 /* Products */,
 				2CB0F71AAC48A392535FD3B0 /* Frameworks */,
 			);
@@ -508,12 +638,12 @@
 			isa = PBXGroup;
 			children = (
 				FAC43DC61B35D8B100C06102 /* Board-Man.app */,
-				FAC43DD81B35D8B100C06102 /* ClipyTests.xctest */,
+				FAC43DD81B35D8B100C06102 /* Board-ManTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		FAC43DC81B35D8B100C06102 /* Clipy */ = {
+		FAC43DC81B35D8B100C06102 /* BoardMan */ = {
 			isa = PBXGroup;
 			children = (
 				FA06D2D21DD882BD002FB7C2 /* Resources */,
@@ -521,20 +651,42 @@
 				FA1DB49C1DDCB3FB007F95C8 /* Sources */,
 				FA1DB4911DDCB205007F95C8 /* Supporting Files */,
 			);
-			path = Clipy;
+			path = BoardMan;
 			sourceTree = "<group>";
 		};
-		FAC43DDB1B35D8B100C06102 /* ClipyTests */ = {
+		FAC43DDB1B35D8B100C06102 /* BoardManTests */ = {
 			isa = PBXGroup;
 			children = (
 				FA08EDF71D1FED7D000D1D13 /* HotKeyServiceTests.swift */,
 				FA0D5CF71DDCC61600AC9052 /* EntitlementGateTests.swift */,
+				B0A1B00126A8240000000001 /* BoardManPerformanceBaselineTests.swift */,
+				B0A1B00326A8240000000001 /* BoardManRuntimeEnvironmentTests.swift */,
+				C6B1A10B2FCE000100B0A001 /* BoardManStoreTests.swift */,
+				C6B1A1162FCE000100B0A001 /* BoardManSearchQueryTests.swift */,
+				C6B1A1222FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift */,
+				C6B1A1282FCE000100B0A001 /* BoardManTimestampPresentationTests.swift */,
+				C6B1A12C2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift */,
+				C6B1A1302FCE000100B0A001 /* BoardManHistoryPresentationTests.swift */,
+				C6B1A1362FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift */,
+				C6B1A13B2FCE000100B0A001 /* BoardManSnippetPresentationTests.swift */,
+				C6B1A1412FCE000100B0A001 /* BoardManSnippetCatalogServiceTests.swift */,
+				C6B1A1452FCE000100B0A001 /* BoardManPanelLayoutPolicyTests.swift */,
+				C6B1A1492FCE000100B0A001 /* BoardManGeneralSettingsLayoutTests.swift */,
+				C6B1A14D2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift */,
+				C6B1A1512FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift */,
+				C6B1A1552FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift */,
+				C6B1A1592FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift */,
+				C6B1A15D2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift */,
+				C6B1A1612FCE000100B0A001 /* BoardManClipDataColorTests.swift */,
+				C6B1A1652FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift */,
+				C6B1A1692FCE000100B0A001 /* BoardManReliabilityTests.swift */,
+				C6B1A1712FCE000100B0A001 /* BoardManSelectionMemoryPhase0Tests.swift */,
 				FA6167931D3ACCB90049FA14 /* DraggedDataTests.swift */,
 				FA6167911D3ABEB10049FA14 /* FolderTests.swift */,
 				FA6167951D3ACDD80049FA14 /* SnippetTests.swift */,
 				FAC43DDC1B35D8B100C06102 /* Supporting Files */,
 			);
-			path = ClipyTests;
+			path = BoardManTests;
 			sourceTree = "<group>";
 		};
 		FAC43DDC1B35D8B100C06102 /* Supporting Files */ = {
@@ -548,9 +700,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		FAC43DC51B35D8B100C06102 /* Clipy */ = {
+		FAC43DC51B35D8B100C06102 /* Board-Man */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = FAC43DE21B35D8B100C06102 /* Build configuration list for PBXNativeTarget "Clipy" */;
+			buildConfigurationList = FAC43DE21B35D8B100C06102 /* Build configuration list for PBXNativeTarget "Board-Man" */;
 			buildPhases = (
 				FAC43DC21B35D8B100C06102 /* Sources */,
 				C5B0A0012FE0000000B04D1E /* SwiftLint */,
@@ -562,14 +714,14 @@
 			);
 			dependencies = (
 			);
-			name = Clipy;
-			productName = Clipy;
+			name = "Board-Man";
+			productName = "Board-Man";
 			productReference = FAC43DC61B35D8B100C06102 /* Board-Man.app */;
 			productType = "com.apple.product-type.application";
 		};
-		FAC43DD71B35D8B100C06102 /* ClipyTests */ = {
+		FAC43DD71B35D8B100C06102 /* Board-ManTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = FAC43DE51B35D8B100C06102 /* Build configuration list for PBXNativeTarget "ClipyTests" */;
+			buildConfigurationList = FAC43DE51B35D8B100C06102 /* Build configuration list for PBXNativeTarget "Board-ManTests" */;
 			buildPhases = (
 				FAC43DD41B35D8B100C06102 /* Sources */,
 				FAC43DD51B35D8B100C06102 /* Frameworks */,
@@ -580,9 +732,9 @@
 			dependencies = (
 				FAC43DDA1B35D8B100C06102 /* PBXTargetDependency */,
 			);
-			name = ClipyTests;
-			productName = ClipyTests;
-			productReference = FAC43DD81B35D8B100C06102 /* ClipyTests.xctest */;
+			name = "Board-ManTests";
+			productName = "Board-ManTests";
+			productReference = FAC43DD81B35D8B100C06102 /* Board-ManTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -591,7 +743,7 @@
 		FAC43DBE1B35D8B100C06102 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				CLASSPREFIX = CPY;
+				CLASSPREFIX = BM;
 				LastSwiftUpdateCheck = 0700;
 				LastUpgradeCheck = 0930;
 				ORGANIZATIONNAME = UniPlanck;
@@ -610,7 +762,7 @@
 					};
 				};
 			};
-			buildConfigurationList = FAC43DC11B35D8B100C06102 /* Build configuration list for PBXProject "Clipy" */;
+			buildConfigurationList = FAC43DC11B35D8B100C06102 /* Build configuration list for PBXProject "Board-Man" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -624,25 +776,18 @@
 			);
 			mainGroup = FAC43DBD1B35D8B100C06102;
 			packageReferences = (
-				C5E3D04F2FB43570005D632A /* XCRemoteSwiftPackageReference "Screeen" */,
-				C5D3A75A2FB869EA00C9DCB6 /* XCRemoteSwiftPackageReference "sauce" */,
-				C5D3A75D2FB86A0200C9DCB6 /* XCRemoteSwiftPackageReference "Magnet" */,
-				C5D3A7602FB86A1C00C9DCB6 /* XCRemoteSwiftPackageReference "KeyHolder" */,
-				C5D3A7632FB86A2C00C9DCB6 /* XCRemoteSwiftPackageReference "LoginServiceKit" */,
 				C5A4B2002FC9D76000B71510 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */,
-				C5D76D9C2FBA939E0083839F /* XCRemoteSwiftPackageReference "RxSwift" */,
-				C5D76DA32FBA98A90083839F /* XCRemoteSwiftPackageReference "AEXML" */,
 				C5D76DA62FBA9C140083839F /* XCRemoteSwiftPackageReference "pincache" */,
-				C5D76DA92FBA9D2E0083839F /* XCRemoteSwiftPackageReference "SwiftHEXColors" */,
 				C5A6BA722FBC5A6E00C8B9EB /* XCRemoteSwiftPackageReference "Sparkle" */,
 				C5D220A62FBD2655005CD45E /* XCRemoteSwiftPackageReference "realm-swift" */,
+				C6B1A10D2FCE000100B0A001 /* XCRemoteSwiftPackageReference "sqlite-data" */,
 			);
 			productRefGroup = FAC43DC71B35D8B100C06102 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				FAC43DC51B35D8B100C06102 /* Clipy */,
-				FAC43DD71B35D8B100C06102 /* ClipyTests */,
+				FAC43DC51B35D8B100C06102 /* Board-Man */,
+				FAC43DD71B35D8B100C06102 /* Board-ManTests */,
 			);
 		};
 /* End PBXProject section */
@@ -652,19 +797,19 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FA1DB5131DDCB4C0007F95C8 /* CPYPreferencesWindowController.xib in Resources */,
-				FA1DB51E1DDCB4C0007F95C8 /* CPYTypePreferenceViewController.xib in Resources */,
+				FA1DB5131DDCB4C0007F95C8 /* BoardManPreferencesWindowController.xib in Resources */,
+				FA1DB51E1DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.xib in Resources */,
 				FA1DB4901DDCA5D9007F95C8 /* Assets.xcassets in Resources */,
-				FA1DB51D1DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.xib in Resources */,
-				FA1DB51F1DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.xib in Resources */,
-				FA1DB51C1DDCB4C0007F95C8 /* CPYMenuPreferenceViewController.xib in Resources */,
-				FA1DB51B1DDCB4C0007F95C8 /* CPYGeneralPreferenceViewController.xib in Resources */,
-				FA1DB51A1DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.xib in Resources */,
-				FA1DB5191DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.xib in Resources */,
+				FA1DB51D1DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.xib in Resources */,
+				FA1DB51F1DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.xib in Resources */,
+				FA1DB51C1DDCB4C0007F95C8 /* BoardManHistoryPreferenceViewController.xib in Resources */,
+				FA1DB51B1DDCB4C0007F95C8 /* BoardManGeneralPreferenceViewController.xib in Resources */,
+				FA1DB51A1DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.xib in Resources */,
+				FA1DB5191DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.xib in Resources */,
 				C576AD7C2FBD345000B71213 /* Localizable.xcstrings in Resources */,
 				FA1DB4941DDCB22C007F95C8 /* dsa_pub.pem in Resources */,
 				FA1DB49F1DDCB417007F95C8 /* MainMenu.xib in Resources */,
-				FA1DB5221DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.xib in Resources */,
+				FA1DB5221DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -711,21 +856,50 @@
 				FA1DB4B31DDCB452007F95C8 /* Array+Remove.swift in Sources */,
 				FA3778931F3B691A003B5BAB /* AppEnvironment.swift in Sources */,
 				FAC0DCF11DE576F300309C49 /* PasteService.swift in Sources */,
-				FA1DB4E51DDCB49C007F95C8 /* CPYUtilities.swift in Sources */,
-				FA1DB4B81DDCB452007F95C8 /* NSLock+Clipy.swift in Sources */,
+				FA1DB4E51DDCB49C007F95C8 /* BoardManRuntimeSupport.swift in Sources */,
+				FA1DB4B81DDCB452007F95C8 /* NSLock+BoardMan.swift in Sources */,
 				FA1DB4BA1DDCB452007F95C8 /* NSUserDefaults+ArchiveData.swift in Sources */,
 				FAA4BCCC2163DC9100FF5D18 /* AccessibilityService.swift in Sources */,
-				FA1DB4D31DDCB479007F95C8 /* CPYClip.swift in Sources */,
+				FA1DB4D31DDCB479007F95C8 /* BoardManClip.swift in Sources */,
 				FAC0DCE91DE15FD900309C49 /* DataCleanService.swift in Sources */,
 				C5F1B7331FF74A2D00D2DA83 /* NSPasteboard+Deprecated.swift in Sources */,
 				FA1DB4A31DDCB433007F95C8 /* Constants.swift in Sources */,
-				FA1DB4D61DDCB479007F95C8 /* CPYFolder.swift in Sources */,
+				FA1DB4D61DDCB479007F95C8 /* BoardManFolder.swift in Sources */,
 				FA1DB4B41DDCB452007F95C8 /* NSBundle+Version.swift in Sources */,
-				FA1DB5171DDCB4C0007F95C8 /* CPYTypePreferenceViewController.swift in Sources */,
+				FA1DB5171DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.swift in Sources */,
 				FA1DB4A21DDCB433007F95C8 /* AppDelegate.swift in Sources */,
-				FA1DB5141DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.swift in Sources */,
+				FA1DB5141DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.swift in Sources */,
 				FA1DB4BC1DDCB452007F95C8 /* Realm+NoCatch.swift in Sources */,
 				FA1DB4B91DDCB452007F95C8 /* NSMenuItem+Initialize.swift in Sources */,
+				C6B1A10A2FCE000100B0A001 /* BoardManStore.swift in Sources */,
+				C6B1A1192FCE000100B0A001 /* BoardManSearchCoordinator.swift in Sources */,
+				C6B1A11D2FCE000100B0A001 /* BoardManPanelNavigation.swift in Sources */,
+				C6B1A11F2FCE000100B0A001 /* BoardManPanelPasteCoordinator.swift in Sources */,
+				C6B1A1212FCE000100B0A001 /* BoardManReadmeScreenshotCoordinator.swift in Sources */,
+				C6B1A1252FCE000100B0A001 /* BoardManTimestampPresentation.swift in Sources */,
+				C6B1A1272FCE000100B0A001 /* BoardManTimestampInteraction.swift in Sources */,
+				C6B1A12B2FCE000100B0A001 /* BoardManPanelAppearance.swift in Sources */,
+				C6B1A12F2FCE000100B0A001 /* BoardManHistoryPresentation.swift in Sources */,
+				C6B1A1332FCE000100B0A001 /* BoardManPanelHeader.swift in Sources */,
+				C6B1A1352FCE000100B0A001 /* BoardManSnippetEditingPolicy.swift in Sources */,
+				C6B1A1382FCE000100B0A001 /* BoardManSnippetPresentation.swift in Sources */,
+				C6B1A13C2FCE000100B0A001 /* BoardManSnippetCatalogService.swift in Sources */,
+				C6B1A13E2FCE000100B0A001 /* BoardManSnippetDialogCoordinator.swift in Sources */,
+				C6B1A1422FCE000100B0A001 /* BoardManPanelLayoutPolicy.swift in Sources */,
+				C6B1A1462FCE000100B0A001 /* BoardManGeneralSettingsLayout.swift in Sources */,
+				C6B1A14A2FCE000100B0A001 /* BoardManSnippetSettingsLayout.swift in Sources */,
+				C6B1A14E2FCE000100B0A001 /* BoardManHistorySettingsLayout.swift in Sources */,
+				C6B1A1522FCE000100B0A001 /* BoardManPrivacySettingsLayout.swift in Sources */,
+				C6B1A1562FCE000100B0A001 /* BoardManLicenseSettingsLayout.swift in Sources */,
+				C6B1A15A2FCE000100B0A001 /* BoardManAppearanceSettingsLayout.swift in Sources */,
+				C6B1A1622FCE000100B0A001 /* BoardManSnippetXMLCodec.swift in Sources */,
+				C6B1A1662FCE000100B0A001 /* BoardManSQLiteMaintenance.swift in Sources */,
+				C6B1A16A2FCE000100B0A001 /* BoardManRecoveryArchive.swift in Sources */,
+				C6B1A16C2FCE000100B0A001 /* BoardManPayloadRecovery.swift in Sources */,
+				C6B1A16E2FCE000100B0A001 /* BoardManSelectionMemoryPhase0.swift in Sources */,
+				C6B1A1112FCE000100B0A001 /* SQLiteBoardManStore.swift in Sources */,
+				C6B1A1132FCE000100B0A001 /* BoardManSQLiteShadowReplicator.swift in Sources */,
+				C6B1A1152FCE000100B0A001 /* BoardManLegacyHistoryImporter.swift in Sources */,
 				FA0D5CE81DDCC61600AC9052 /* ClipService.swift in Sources */,
 				FA0D5CEE1DDCC61600AC9052 /* Entitlement.swift in Sources */,
 				FA0D5CF61DDCC61600AC9052 /* LicenseActivationClient.swift in Sources */,
@@ -735,27 +909,32 @@
 				FA0D5CEA1DDCC61600AC9052 /* PasteCountStore.swift in Sources */,
 				FA0D5CEC1DDCC61600AC9052 /* PasteCountInputService.swift in Sources */,
 				FA0D5CFA1DDCC61600AC9052 /* BoardManUpgradeRoute.swift in Sources */,
+				C6B1A1002FCE000100B0A001 /* BoardManScreenshotObserver.swift in Sources */,
+				C6B1A1022FCE000100B0A001 /* BoardManKeyCombo.swift in Sources */,
+				C6B1A1042FCE000100B0A001 /* BoardManHotKeyRegistry.swift in Sources */,
+				C6B1A1062FCE000100B0A001 /* BoardManShortcutRecordView.swift in Sources */,
 				FA1DB4C91DDCB460007F95C8 /* MenuManager.swift in Sources */,
 				FA1DB4BD1DDCB452007F95C8 /* String+Substring.swift in Sources */,
 				FA1189331E4CD58C00244F12 /* ExcludeAppService.swift in Sources */,
-				FA1DB4E91DDCB49C007F95C8 /* CPYSplitView.swift in Sources */,
-				FA1DB4E81DDCB49C007F95C8 /* CPYDesignableView.swift in Sources */,
-				FA1DB5181DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.swift in Sources */,
-				FA1DB4D41DDCB479007F95C8 /* CPYClipData.swift in Sources */,
+				FA1DB4E91DDCB49C007F95C8 /* BoardManSplitView.swift in Sources */,
+				FA1DB4E81DDCB49C007F95C8 /* BoardManDesignableView.swift in Sources */,
+				FA1DB5181DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.swift in Sources */,
+				FA1DB4D41DDCB479007F95C8 /* BoardManClipData.swift in Sources */,
+				C6B1A11B2FCE000100B0A001 /* BoardManPanelItem.swift in Sources */,
 				FA1DB4B71DDCB452007F95C8 /* NSImage+Resize.swift in Sources */,
-				FA1DB4D51DDCB479007F95C8 /* CPYDraggedData.swift in Sources */,
-				FA1DB5151DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.swift in Sources */,
-				FA1DB4EA1DDCB49C007F95C8 /* CPYSnippetsEditorCell.swift in Sources */,
-				FA1DB5161DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.swift in Sources */,
+				FA1DB4D51DDCB479007F95C8 /* BoardManDragPayload.swift in Sources */,
+				FA1DB5151DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.swift in Sources */,
+				FA1DB4EA1DDCB49C007F95C8 /* BoardManTemplatesEditorCell.swift in Sources */,
+				FA1DB5161DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.swift in Sources */,
 				FA431F021E6718CE00ACFF56 /* Collection+Safe.swift in Sources */,
-				FA1DB4E71DDCB49C007F95C8 /* CPYDesignableButton.swift in Sources */,
-				FA1DB4D21DDCB479007F95C8 /* CPYAppInfo.swift in Sources */,
+				FA1DB4E71DDCB49C007F95C8 /* BoardManDesignableButton.swift in Sources */,
+				FA1DB4D21DDCB479007F95C8 /* BoardManApplicationInfo.swift in Sources */,
 				FAE911B91DE045E2008A4BEC /* HotKeyService.swift in Sources */,
-				FA1DB4D71DDCB479007F95C8 /* CPYSnippet.swift in Sources */,
-				FA1DB5201DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.swift in Sources */,
-				FA1DB4EB1DDCB49C007F95C8 /* CPYPlaceHolderTextView.swift in Sources */,
+				FA1DB4D71DDCB479007F95C8 /* BoardManSnippet.swift in Sources */,
+				FA1DB5201DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.swift in Sources */,
+				FA1DB4EB1DDCB49C007F95C8 /* BoardManPlaceholderTextView.swift in Sources */,
 				FA1DB4BB1DDCB452007F95C8 /* Realm+Migration.swift in Sources */,
-				FA1DB5121DDCB4C0007F95C8 /* CPYPreferencesWindowController.swift in Sources */,
+				FA1DB5121DDCB4C0007F95C8 /* BoardManPreferencesWindowController.swift in Sources */,
 				FAE911BB1DE054F1008A4BEC /* NSCoding+Archive.swift in Sources */,
 				FA3778951F3B6920003B5BAB /* Environment.swift in Sources */,
 			);
@@ -768,6 +947,28 @@
 				FA6167921D3ABEB10049FA14 /* FolderTests.swift in Sources */,
 				FA08EDF81D1FED7D000D1D13 /* HotKeyServiceTests.swift in Sources */,
 				FA0D5CF81DDCC61600AC9052 /* EntitlementGateTests.swift in Sources */,
+				B0A1B00226A8240000000001 /* BoardManPerformanceBaselineTests.swift in Sources */,
+				B0A1B00426A8240000000001 /* BoardManRuntimeEnvironmentTests.swift in Sources */,
+				C6B1A10C2FCE000100B0A001 /* BoardManStoreTests.swift in Sources */,
+				C6B1A1172FCE000100B0A001 /* BoardManSearchQueryTests.swift in Sources */,
+				C6B1A1232FCE000100B0A001 /* BoardManReadmeScreenshotCoordinatorTests.swift in Sources */,
+				C6B1A1292FCE000100B0A001 /* BoardManTimestampPresentationTests.swift in Sources */,
+				C6B1A12D2FCE000100B0A001 /* BoardManPanelAppearanceTests.swift in Sources */,
+				C6B1A1312FCE000100B0A001 /* BoardManHistoryPresentationTests.swift in Sources */,
+				C6B1A1372FCE000100B0A001 /* BoardManSnippetEditingPolicyTests.swift in Sources */,
+				C6B1A13A2FCE000100B0A001 /* BoardManSnippetPresentationTests.swift in Sources */,
+				C6B1A1402FCE000100B0A001 /* BoardManSnippetCatalogServiceTests.swift in Sources */,
+				C6B1A1442FCE000100B0A001 /* BoardManPanelLayoutPolicyTests.swift in Sources */,
+				C6B1A1482FCE000100B0A001 /* BoardManGeneralSettingsLayoutTests.swift in Sources */,
+				C6B1A14C2FCE000100B0A001 /* BoardManSnippetSettingsLayoutTests.swift in Sources */,
+				C6B1A1502FCE000100B0A001 /* BoardManHistorySettingsLayoutTests.swift in Sources */,
+				C6B1A1542FCE000100B0A001 /* BoardManPrivacySettingsLayoutTests.swift in Sources */,
+				C6B1A1582FCE000100B0A001 /* BoardManLicenseSettingsLayoutTests.swift in Sources */,
+				C6B1A15C2FCE000100B0A001 /* BoardManAppearanceSettingsLayoutTests.swift in Sources */,
+				C6B1A1602FCE000100B0A001 /* BoardManClipDataColorTests.swift in Sources */,
+				C6B1A1642FCE000100B0A001 /* BoardManSnippetXMLCodecTests.swift in Sources */,
+				C6B1A1682FCE000100B0A001 /* BoardManReliabilityTests.swift in Sources */,
+				C6B1A1702FCE000100B0A001 /* BoardManSelectionMemoryPhase0Tests.swift in Sources */,
 				FA6167961D3ACDD80049FA14 /* SnippetTests.swift in Sources */,
 				FA6167941D3ACCB90049FA14 /* DraggedDataTests.swift in Sources */,
 			);
@@ -778,13 +979,13 @@
 /* Begin PBXTargetDependency section */
 		FAC43DDA1B35D8B100C06102 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = FAC43DC51B35D8B100C06102 /* Clipy */;
+			target = FAC43DC51B35D8B100C06102 /* Board-Man */;
 			targetProxy = FAC43DD91B35D8B100C06102 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
-		FA1DB4EE1DDCB4C0007F95C8 /* CPYPreferencesWindowController.xib */ = {
+		FA1DB4EE1DDCB4C0007F95C8 /* BoardManPreferencesWindowController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				314B299F1EC49BAF004DD070 /* Base */,
@@ -793,10 +994,10 @@
 				846004961FD5511800BA733E /* de */,
 				54ADE0FA2008F63F00239852 /* zh-Hans */,
 			);
-			name = CPYPreferencesWindowController.xib;
+			name = BoardManPreferencesWindowController.xib;
 			sourceTree = "<group>";
 		};
-		FA1DB4F71DDCB4C0007F95C8 /* CPYBetaPreferenceViewController.xib */ = {
+		FA1DB4F71DDCB4C0007F95C8 /* BoardManServicesPreferenceViewController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				FAAA885C1E6853B80088FB34 /* Base */,
@@ -805,10 +1006,10 @@
 				846004971FD5511900BA733E /* de */,
 				54ADE0FB2008F64000239852 /* zh-Hans */,
 			);
-			name = CPYBetaPreferenceViewController.xib;
+			name = BoardManServicesPreferenceViewController.xib;
 			sourceTree = "<group>";
 		};
-		FA1DB4F91DDCB4C0007F95C8 /* CPYExcludeAppPreferenceViewController.xib */ = {
+		FA1DB4F91DDCB4C0007F95C8 /* BoardManExcludedAppsPreferenceViewController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				FAAA886C1E685DC70088FB34 /* Base */,
@@ -817,10 +1018,10 @@
 				846004981FD5511900BA733E /* de */,
 				54ADE0FC2008F64000239852 /* zh-Hans */,
 			);
-			name = CPYExcludeAppPreferenceViewController.xib;
+			name = BoardManExcludedAppsPreferenceViewController.xib;
 			sourceTree = "<group>";
 		};
-		FA1DB4FB1DDCB4C0007F95C8 /* CPYGeneralPreferenceViewController.xib */ = {
+		FA1DB4FB1DDCB4C0007F95C8 /* BoardManGeneralPreferenceViewController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				FAAA88721E685E270088FB34 /* Base */,
@@ -829,10 +1030,10 @@
 				846004991FD5511900BA733E /* de */,
 				54ADE0FD2008F64000239852 /* zh-Hans */,
 			);
-			name = CPYGeneralPreferenceViewController.xib;
+			name = BoardManGeneralPreferenceViewController.xib;
 			sourceTree = "<group>";
 		};
-		FA1DB4FD1DDCB4C0007F95C8 /* CPYMenuPreferenceViewController.xib */ = {
+		FA1DB4FD1DDCB4C0007F95C8 /* BoardManHistoryPreferenceViewController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				FAAA88781E685F360088FB34 /* Base */,
@@ -841,10 +1042,10 @@
 				8460049A1FD5511900BA733E /* de */,
 				54ADE0FE2008F64000239852 /* zh-Hans */,
 			);
-			name = CPYMenuPreferenceViewController.xib;
+			name = BoardManHistoryPreferenceViewController.xib;
 			sourceTree = "<group>";
 		};
-		FA1DB4FF1DDCB4C0007F95C8 /* CPYShortcutsPreferenceViewController.xib */ = {
+		FA1DB4FF1DDCB4C0007F95C8 /* BoardManShortcutsPreferenceViewController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				FAAA887E1E6862370088FB34 /* Base */,
@@ -853,10 +1054,10 @@
 				8460049B1FD5511900BA733E /* de */,
 				54ADE0FF2008F64000239852 /* zh-Hans */,
 			);
-			name = CPYShortcutsPreferenceViewController.xib;
+			name = BoardManShortcutsPreferenceViewController.xib;
 			sourceTree = "<group>";
 		};
-		FA1DB5011DDCB4C0007F95C8 /* CPYTypePreferenceViewController.xib */ = {
+		FA1DB5011DDCB4C0007F95C8 /* BoardManClipboardTypesPreferenceViewController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				FAAA88841E68627D0088FB34 /* Base */,
@@ -865,10 +1066,10 @@
 				8460049C1FD5511900BA733E /* de */,
 				54ADE1002008F64000239852 /* zh-Hans */,
 			);
-			name = CPYTypePreferenceViewController.xib;
+			name = BoardManClipboardTypesPreferenceViewController.xib;
 			sourceTree = "<group>";
 		};
-		FA1DB5031DDCB4C0007F95C8 /* CPYUpdatesPreferenceViewController.xib */ = {
+		FA1DB5031DDCB4C0007F95C8 /* BoardManUpdatesPreferenceViewController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				FAAA888A1E6862D20088FB34 /* Base */,
@@ -877,10 +1078,10 @@
 				8460049D1FD5511A00BA733E /* de */,
 				54ADE1012008F64100239852 /* zh-Hans */,
 			);
-			name = CPYUpdatesPreferenceViewController.xib;
+			name = BoardManUpdatesPreferenceViewController.xib;
 			sourceTree = "<group>";
 		};
-		FA1DB50F1DDCB4C0007F95C8 /* CPYSnippetsEditorWindowController.xib */ = {
+		FA1DB50F1DDCB4C0007F95C8 /* BoardManSnippetsEditorWindowController.xib */ = {
 			isa = PBXVariantGroup;
 			children = (
 				314B299D1EC49AD5004DD070 /* Base */,
@@ -889,7 +1090,7 @@
 				8460049E1FD5511A00BA733E /* de */,
 				54ADE1022008F64100239852 /* zh-Hans */,
 			);
-			name = CPYSnippetsEditorWindowController.xib;
+			name = BoardManSnippetsEditorWindowController.xib;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
@@ -1017,7 +1218,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)",
 				);
-				INFOPLIST_FILE = "Clipy/Supporting Files/Info.plist";
+				INFOPLIST_FILE = "BoardMan/Supporting Files/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1047,7 +1248,7 @@
 					"$(inherited)",
 					"$(PROJECT_DIR)",
 				);
-				INFOPLIST_FILE = "Clipy/Supporting Files/Info.plist";
+				INFOPLIST_FILE = "BoardMan/Supporting Files/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1076,7 +1277,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				INFOPLIST_FILE = ClipyTests/Info.plist;
+				INFOPLIST_FILE = BoardManTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1084,7 +1285,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.uniplanck.BoardManTests;
 				PRODUCT_MODULE_NAME = Board_Man_Tests;
-				PRODUCT_NAME = ClipyTests;
+				PRODUCT_NAME = "Board-ManTests";
 				SWIFT_SWIFT3_OBJC_INFERENCE = Default;
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Board-Man.app/Contents/MacOS/Board-Man";
@@ -1101,7 +1302,7 @@
 					"$(DEVELOPER_FRAMEWORKS_DIR)",
 					"$(inherited)",
 				);
-				INFOPLIST_FILE = ClipyTests/Info.plist;
+				INFOPLIST_FILE = BoardManTests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1109,7 +1310,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.uniplanck.BoardManTests;
 				PRODUCT_MODULE_NAME = Board_Man_Tests;
-				PRODUCT_NAME = ClipyTests;
+				PRODUCT_NAME = "Board-ManTests";
 				SWIFT_SWIFT3_OBJC_INFERENCE = Default;
 				SWIFT_VERSION = 5.0;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Board-Man.app/Contents/MacOS/Board-Man";
@@ -1119,7 +1320,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		FAC43DC11B35D8B100C06102 /* Build configuration list for PBXProject "Clipy" */ = {
+		FAC43DC11B35D8B100C06102 /* Build configuration list for PBXProject "Board-Man" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FAC43DE01B35D8B100C06102 /* Debug */,
@@ -1128,7 +1329,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		FAC43DE21B35D8B100C06102 /* Build configuration list for PBXNativeTarget "Clipy" */ = {
+		FAC43DE21B35D8B100C06102 /* Build configuration list for PBXNativeTarget "Board-Man" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FAC43DE31B35D8B100C06102 /* Debug */,
@@ -1137,7 +1338,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		FAC43DE51B35D8B100C06102 /* Build configuration list for PBXNativeTarget "ClipyTests" */ = {
+		FAC43DE51B35D8B100C06102 /* Build configuration list for PBXNativeTarget "Board-ManTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				FAC43DE61B35D8B100C06102 /* Debug */,
@@ -1165,6 +1366,14 @@
 				minimumVersion = 2.9.6;
 			};
 		};
+		C6B1A10D2FCE000100B0A001 /* XCRemoteSwiftPackageReference "sqlite-data" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
+			requirement = {
+				kind = exactVersion;
+				version = 1.11.0;
+			};
+		};
 		C5D220A62FBD2655005CD45E /* XCRemoteSwiftPackageReference "realm-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/realm/realm-swift";
@@ -1173,76 +1382,12 @@
 				version = 10.7.2;
 			};
 		};
-		C5D3A75A2FB869EA00C9DCB6 /* XCRemoteSwiftPackageReference "sauce" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/clipy/sauce";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 2.5.2;
-			};
-		};
-		C5D3A75D2FB86A0200C9DCB6 /* XCRemoteSwiftPackageReference "Magnet" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Clipy/Magnet";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 3.5.0;
-			};
-		};
-		C5D3A7602FB86A1C00C9DCB6 /* XCRemoteSwiftPackageReference "KeyHolder" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Clipy/KeyHolder";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 4.3.0;
-			};
-		};
-		C5D3A7632FB86A2C00C9DCB6 /* XCRemoteSwiftPackageReference "LoginServiceKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Clipy/LoginServiceKit";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 2.5.0;
-			};
-		};
-		C5D76D9C2FBA939E0083839F /* XCRemoteSwiftPackageReference "RxSwift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ReactiveX/RxSwift";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 6.10.2;
-			};
-		};
-		C5D76DA32FBA98A90083839F /* XCRemoteSwiftPackageReference "AEXML" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/tadija/AEXML";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 4.7.0;
-			};
-		};
 		C5D76DA62FBA9C140083839F /* XCRemoteSwiftPackageReference "pincache" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pinterest/pincache";
 			requirement = {
 				kind = upToNextMinorVersion;
 				minimumVersion = 3.0.4;
-			};
-		};
-		C5D76DA92FBA9D2E0083839F /* XCRemoteSwiftPackageReference "SwiftHEXColors" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/thii/SwiftHEXColors";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 1.4.1;
-			};
-		};
-		C5E3D04F2FB43570005D632A /* XCRemoteSwiftPackageReference "Screeen" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/Clipy/Screeen";
-			requirement = {
-				kind = upToNextMinorVersion;
-				minimumVersion = 2.1.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -1258,60 +1403,20 @@
 			package = C5A6BA722FBC5A6E00C8B9EB /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
 		};
+		C6B1A10E2FCE000100B0A001 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C6B1A10D2FCE000100B0A001 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
 		C5D220A72FBD2655005CD45E /* RealmSwift */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C5D220A62FBD2655005CD45E /* XCRemoteSwiftPackageReference "realm-swift" */;
 			productName = RealmSwift;
 		};
-		C5D3A75B2FB869EA00C9DCB6 /* Sauce */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D3A75A2FB869EA00C9DCB6 /* XCRemoteSwiftPackageReference "sauce" */;
-			productName = Sauce;
-		};
-		C5D3A75E2FB86A0200C9DCB6 /* Magnet */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D3A75D2FB86A0200C9DCB6 /* XCRemoteSwiftPackageReference "Magnet" */;
-			productName = Magnet;
-		};
-		C5D3A7612FB86A1C00C9DCB6 /* KeyHolder */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D3A7602FB86A1C00C9DCB6 /* XCRemoteSwiftPackageReference "KeyHolder" */;
-			productName = KeyHolder;
-		};
-		C5D3A7642FB86A2C00C9DCB6 /* LoginServiceKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D3A7632FB86A2C00C9DCB6 /* XCRemoteSwiftPackageReference "LoginServiceKit" */;
-			productName = LoginServiceKit;
-		};
-		C5D76D9D2FBA939E0083839F /* RxCocoa */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D76D9C2FBA939E0083839F /* XCRemoteSwiftPackageReference "RxSwift" */;
-			productName = RxCocoa;
-		};
-		C5D76D9F2FBA939E0083839F /* RxSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D76D9C2FBA939E0083839F /* XCRemoteSwiftPackageReference "RxSwift" */;
-			productName = RxSwift;
-		};
-		C5D76DA42FBA98A90083839F /* AEXML */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D76DA32FBA98A90083839F /* XCRemoteSwiftPackageReference "AEXML" */;
-			productName = AEXML;
-		};
 		C5D76DA72FBA9C150083839F /* PINCache */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = C5D76DA62FBA9C140083839F /* XCRemoteSwiftPackageReference "pincache" */;
 			productName = PINCache;
-		};
-		C5D76DAA2FBA9D2E0083839F /* SwiftHEXColors */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5D76DA92FBA9D2E0083839F /* XCRemoteSwiftPackageReference "SwiftHEXColors" */;
-			productName = SwiftHEXColors;
-		};
-		C5E3D0502FB43570005D632A /* Screeen */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5E3D04F2FB43570005D632A /* XCRemoteSwiftPackageReference "Screeen" */;
-			productName = Screeen;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

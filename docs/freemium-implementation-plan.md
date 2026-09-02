@@ -1,5 +1,7 @@
 # Freemium Implementation Plan
 
+> **SUPERSEDED:** This historical Free/Pro/subscription-oriented plan is no longer authoritative. New commercial work follows `docs/boardman-commercial-lifetime-roadmap.md`: Free + one-time Lifetime only, no subscription. Keep this file only as implementation-history context.
+
 ## Phase 0: Finish/Merge Manual Cmd+V Paste Count PR If Still Open
 
 - Goal: avoid mixing freemium work with paste count behavior changes.
