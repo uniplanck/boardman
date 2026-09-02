@@ -27,7 +27,7 @@ jobs:
         run: |
           test -d Board-Man.xcodeproj
           test -f Board-Man.xcodeproj/xcshareddata/xcschemes/Board-Man.xcscheme
-          test -d Clipy/Sources
+          test -d BoardMan/Sources
           test -d scripts/boardman
           test -f scripts/boardman/capture-readme-screenshots.sh
           test -f docs/readme-screenshots.md
