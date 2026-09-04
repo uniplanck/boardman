@@ -449,7 +449,9 @@ final class PasteCountInputService {
             return Unmanaged.passUnretained(event)
         }
 
-        service.handleCGEventKeyDown(event)
+        if service.handleCGEventKeyDown(event) {
+            return nil
+        }
 
         return Unmanaged.passUnretained(event)
     }
@@ -472,26 +474,44 @@ final class PasteCountInputService {
         }
     }
 
-    private func handleCGEventKeyDown(_ event: CGEvent) {
+    private func handleCGEventKeyDown(_ event: CGEvent) -> Bool {
         let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
         let flags = event.flags
 
-        guard flags.contains(.maskCommand) else { return }
-        guard !flags.contains(.maskControl), !flags.contains(.maskAlternate) else { return }
+        guard flags.contains(.maskCommand) else { return false }
+        guard !flags.contains(.maskControl), !flags.contains(.maskAlternate) else { return false }
 
         if (keyCode == UInt16(kVK_ANSI_C) || keyCode == UInt16(kVK_ANSI_X)),
            !flags.contains(.maskShift) {
             AppEnvironment.current.clipService.sanitizePasteboardSoonAfterUserCopy()
-            return
+            return false
         }
 
-        guard keyCode == UInt16(kVK_ANSI_V) else { return }
+        guard keyCode == UInt16(kVK_ANSI_V) else { return false }
+        switch BoardManSequentialPasteQueueService.shared.prepareForCommandV(
+            frontmostApplication: NSWorkspace.shared.frontmostApplication
+        ) {
+        case .prepared:
+            DispatchQueue.main.async { [weak self] in
+                self?.handleDetectedCommandV(source: "sequentialQueue")
+            }
+            return false
+        case .exhausted:
+            DispatchQueue.main.async {
+                NSSound.beep()
+            }
+            log("sequential special queue exhausted; cmd+v suppressed")
+            return true
+        case .inactive:
+            break
+        }
         if prepareSequentialUnusedPasteIfNeeded() {
-            return
+            return false
         }
         DispatchQueue.main.async { [weak self] in
             self?.handleDetectedCommandV(source: "cgEventTap")
         }
+        return false
     }
 
     private func prepareSequentialUnusedPasteIfNeeded() -> Bool {

@@ -71,9 +71,41 @@ final class BoardManPanelPasteCoordinator {
     private var previousFrontmostApplication: NSRunningApplication?
     private var previousPasteTargetSnapshot: PasteTargetSnapshot?
     private var previousPasteFocusTarget: PasteFocusTarget?
+    private var applicationActivationObserver: NSObjectProtocol?
+    private var externalMouseUpMonitor: Any?
 
     init(store: BoardManStore = BoardManStores.authoritative) {
         self.store = store
+        applicationActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  application.bundleIdentifier != Bundle.main.bundleIdentifier,
+                  application.bundleIdentifier != "com.uniplanck.BoardMan" else { return }
+            self?.captureTarget(frontmostApplication: application)
+        }
+        externalMouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseUp]) { [weak self] _ in
+            // Application activation can precede the clicked text control becoming first responder.
+            // Re-capture shortly after mouse-up so pinned Board-Man tracks field-to-field changes too.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+                guard let self,
+                      let application = NSWorkspace.shared.frontmostApplication,
+                      application.bundleIdentifier != Bundle.main.bundleIdentifier,
+                      application.bundleIdentifier != "com.uniplanck.BoardMan" else { return }
+                self.captureTarget(frontmostApplication: application)
+            }
+        }
+    }
+
+    deinit {
+        if let applicationActivationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(applicationActivationObserver)
+        }
+        if let externalMouseUpMonitor {
+            NSEvent.removeMonitor(externalMouseUpMonitor)
+        }
     }
 
     static func pasteTargetSettleDelay(bundleIdentifier: String?) -> TimeInterval {
@@ -111,6 +143,8 @@ final class BoardManPanelPasteCoordinator {
             pasteHistory(dataHash: item.dataHash, clickStartedAt: clickStartedAt, completion: completion)
         case .snippet:
             pasteSnippet(identifier: item.dataHash, clickStartedAt: clickStartedAt, completion: completion)
+        case .selection:
+            pasteSelection(identifier: item.dataHash, clickStartedAt: clickStartedAt, completion: completion)
         case .favorite:
             NSSound.beep()
             clearTarget()
@@ -138,8 +172,8 @@ final class BoardManPanelPasteCoordinator {
                 }
                 if !didSend {
                     NSSound.beep()
+                    self.clearTarget()
                 }
-                self.clearTarget()
             }
         }
 
@@ -235,10 +269,39 @@ final class BoardManPanelPasteCoordinator {
                     PasteCountStore.shared.increment(forKey: pasteCountKey)
                 }
             }
-            if let completion {
-                completion()
-            } else {
-                self.clearTarget()
+            completion?()
+        }
+    }
+
+    private func pasteSelection(
+        identifier: String,
+        clickStartedAt: CFAbsoluteTime?,
+        completion: (() -> Void)?
+    ) {
+        let restoreStartedAt = CFAbsoluteTimeGetCurrent()
+        restoreTarget { [weak self] in
+            guard let self else { return }
+            PasteCountInputService.shared.logBoardManPerformance(
+                "paste_target_restore_settle",
+                startedAt: restoreStartedAt,
+                details: "source=selection"
+            )
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let selectionMemory = BoardManSelectionMemoryService.shared
+                guard let entry = selectionMemory.entry(identifier: identifier),
+                      selectionMemory.paste(entry: entry) else {
+                    NSSound.beep()
+                    self.clearTarget()
+                    return
+                }
+                if let clickStartedAt {
+                    PasteCountInputService.shared.logBoardManPerformance(
+                        "panel_selection_paste_dispatch",
+                        startedAt: clickStartedAt
+                    )
+                }
+                completion?()
             }
         }
     }
@@ -290,11 +353,7 @@ final class BoardManPanelPasteCoordinator {
                 self.clearTarget()
                 return
             }
-            if let completion {
-                completion()
-            } else {
-                self.clearTarget()
-            }
+            completion?()
         }
     }
 }

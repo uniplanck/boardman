@@ -22,11 +22,34 @@ final class BoardManPanelLayoutPolicyTests {
         #expect(!layout.showsSnippetButtons)
         #expect(!layout.showsSnippetCategories)
         #expect(layout.tabsFrame.minX >= 0)
-        #expect(layout.settingsButtonFrame.maxX <= bounds.maxX)
-        #expect(layout.searchFrame.maxX <= layout.settingsButtonFrame.minX)
+        #expect(layout.settingsButtonFrame == .zero,
+                "Pin and Settings now belong to the native titlebar accessory, not content layout.")
+        #expect(layout.searchFrame.minX >= layout.tabsFrame.maxX)
+        #expect(layout.searchFrame.maxX <= bounds.maxX - layout.margin)
         #expect(layout.historySavedFilterFrame.maxX <= bounds.maxX)
         #expect(layout.listFrame.minY >= 0)
         #expect(layout.listFrame.maxX <= bounds.maxX)
+    }
+
+    @Test
+    func titlebarTrailingAlignmentTracksSearchMarginAcrossResize() {
+        for width in [800.0, 680.0] {
+            let bounds = NSRect(x: 0, y: 0, width: width, height: 760)
+            let layout = BoardManPanelLayoutPolicy.panelLayout(
+                bounds: bounds,
+                isQuickMode: false,
+                activeTab: .history,
+                activeSettingsCategory: .general,
+                appearanceAdvancedExpanded: false,
+                searchIntrinsicHeight: 30
+            )
+            let titlebar = BoardManPanelLayoutPolicy.titlebarControlsLayout(trailingInset: layout.margin)
+
+            #expect(layout.searchFrame.maxX == bounds.maxX - layout.margin)
+            #expect(titlebar.settingsRightInset == layout.margin)
+            #expect(titlebar.settingsFrame.maxX == titlebar.controlsFrame.width)
+            #expect(titlebar.accessoryFrame.width == titlebar.controlsFrame.width + layout.margin)
+        }
     }
 
     @Test
@@ -46,6 +69,11 @@ final class BoardManPanelLayoutPolicyTests {
         #expect(layout.showsSnippetCategories)
         #expect(layout.snippetButtonFrames.count == 3)
         #expect(layout.snippetCategoryButtonFrames.count == 3)
+        #expect(layout.snippetCategoryLabelFrame == .zero)
+        #expect(layout.snippetInteractionHintFrame == .zero)
+        #expect(layout.snippetCategoryPopupFrame.minX == layout.margin)
+        #expect(layout.snippetReorderFrame.minX > (layout.snippetCategoryButtonFrames.last?.maxX ?? 0))
+        #expect(layout.snippetReorderFrame.minY == layout.snippetCategoryPopupFrame.minY)
         #expect(layout.searchFrame.height == 32)
         #expect(layout.listFrame.maxX <= layout.snippetEditorFrame.minX)
         #expect(layout.snippetEditorFrame.width >= 300)
@@ -78,13 +106,13 @@ final class BoardManPanelLayoutPolicyTests {
             contentWidth: 560,
             category: .view,
             appearanceAdvancedExpanded: false
-        ) == 1_020)
+        ) == 2_260)
         #expect(BoardManPanelLayoutPolicy.settingsDocumentHeight(
             viewportHeight: 500,
             contentWidth: 440,
             category: .view,
             appearanceAdvancedExpanded: true
-        ) == 1_720)
+        ) == 2_260)
         #expect(BoardManPanelLayoutPolicy.settingsDocumentHeight(
             viewportHeight: 900,
             contentWidth: 560,
@@ -110,6 +138,7 @@ final class BoardManPanelLayoutPolicyTests {
         #expect(BoardManPanelLayoutPolicy.usesStackedHistorySettingsLayout(width: 519))
         #expect(!BoardManPanelLayoutPolicy.usesStackedHistorySettingsLayout(width: 520))
         #expect(BoardManPanelLayoutPolicy.usesStackedAppearanceSettingsLayout(width: 469))
-        #expect(!BoardManPanelLayoutPolicy.usesStackedAppearanceSettingsLayout(width: 470))
+        #expect(BoardManPanelLayoutPolicy.usesStackedAppearanceSettingsLayout(width: 470))
+        #expect(BoardManPanelLayoutPolicy.usesStackedAppearanceSettingsLayout(width: 900))
     }
 }

@@ -289,9 +289,21 @@ extension AppDelegate: NSApplicationDelegate {
         BoardManRuntimeSupport.initializeOptionalServices()
         // Check permissions without triggering repeated macOS prompts at launch.
         AppEnvironment.current.accessibilityService.logPermissionStatus(context: "launch")
+        let permissionCoordinator = BoardManPermissionOnboardingCoordinator.shared
+        let isExistingUser = AppEnvironment.current.defaults.bool(
+            forKey: Constants.HotKey.migrateOpenBoardManCommandOptionV
+        )
+        let permissionDisposition = permissionCoordinator.launchDisposition(isExistingUser: isExistingUser)
+        let screenshotEnvironment = ProcessInfo.processInfo.environment
+        let shouldPresentPermissionOnboarding = permissionDisposition == .onboarding
+            && !BoardManRuntimeEnvironment.isBenchmarkProfile()
+            && screenshotEnvironment["BOARDMAN_SCREENSHOT_OUTPUT"]?.isEmpty != false
 
-        // Show Login Item
-        if !AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.loginItem) && !AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.suppressAlertForLoginItem) {
+        let shouldPromptLoginItem = !AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.loginItem)
+            && !AppEnvironment.current.defaults.bool(forKey: Constants.UserDefaults.suppressAlertForLoginItem)
+        // On a true first install, Permissions must be the first visible setup surface.
+        // Existing users retain the previous Login Item behavior.
+        if !shouldPresentPermissionOnboarding, shouldPromptLoginItem {
             promptToAddLoginItems()
         }
 
@@ -322,8 +334,29 @@ extension AppDelegate: NSApplicationDelegate {
         // A direct Finder/LaunchServices launch should visibly open Board-Man. Login-item launches
         // stay background-only so signing in never steals focus or opens the panel unexpectedly.
         if !Self.wasLaunchedAsLoginItem() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
-                AppEnvironment.current.menuManager.popUpMainPanelForApplicationLaunch()
+            if shouldPresentPermissionOnboarding {
+                // First install: setup owns the visible launch surface until the required
+                // Accessibility permission is granted. Runtime services may initialize behind it,
+                // but the normal Board-Man panel never jumps in front of the wizard.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    permissionCoordinator.presentRequiredOnboarding { [weak self] in
+                        if shouldPromptLoginItem {
+                            self?.promptToAddLoginItems()
+                        }
+                        AppEnvironment.current.menuManager.popUpMainPanelForApplicationLaunch()
+                    }
+                }
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+                    AppEnvironment.current.menuManager.popUpMainPanelForApplicationLaunch()
+                    if permissionDisposition == .repair {
+                        // Revoked required permission does not block the existing user's UI.
+                        // Show a closable repair surface instead of replaying first-run onboarding.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            permissionCoordinator.presentRepair()
+                        }
+                    }
+                }
             }
         }
 
@@ -338,23 +371,12 @@ extension AppDelegate: NSApplicationDelegate {
         guard !BoardManRuntimeEnvironment.isBenchmarkProfile() else { return }
 
 #if DEBUG
-        let screenshotEnvironment = ProcessInfo.processInfo.environment
         if screenshotEnvironment["BOARDMAN_SCREENSHOT_OUTPUT"]?.isEmpty == false {
             let requestedDelay = screenshotEnvironment["BOARDMAN_SCREENSHOT_DELAY"]
                 .flatMap(Double.init) ?? 4.5
             DispatchQueue.main.asyncAfter(deadline: .now() + max(0.5, requestedDelay)) {
                 AppEnvironment.current.menuManager.popUpMenu(.main)
             }
-        } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                guard !AppEnvironment.current.accessibilityService.isAccessibilityEnabled(isPrompt: false) else { return }
-                AppEnvironment.current.accessibilityService.showAccessibilityAuthenticationAlert()
-            }
-        }
-#else
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            guard !AppEnvironment.current.accessibilityService.isAccessibilityEnabled(isPrompt: false) else { return }
-            AppEnvironment.current.accessibilityService.showAccessibilityAuthenticationAlert()
         }
 #endif
     }
