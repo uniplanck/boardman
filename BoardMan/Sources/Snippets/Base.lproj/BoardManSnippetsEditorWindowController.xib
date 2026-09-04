@@ -351,7 +351,7 @@
                                                     <size key="maxSize" width="549" height="10000000"/>
                                                     <color key="insertionPointColor" name="controlTextColor" catalog="System" colorSpace="catalog"/>
                                                     <userDefinedRuntimeAttributes>
-                                                        <userDefinedRuntimeAttribute type="string" keyPath="placeHolderText" value="スニペットの内容を記入してください"/>
+                                                        <userDefinedRuntimeAttribute type="string" keyPath="placeHolderText" value="定型文の内容を記入してください"/>
                                                         <userDefinedRuntimeAttribute type="color" keyPath="placeHolderColor">
                                                             <color key="value" red="0.26666666666666666" green="0.26666666666666666" blue="0.26666666666666666" alpha="0.59999999999999998" colorSpace="calibratedRGB"/>
                                                         </userDefinedRuntimeAttribute>

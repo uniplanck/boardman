@@ -17,6 +17,19 @@ enum BoardManPanelLayoutMetrics {
     static let compactHistoryRowHeight: CGFloat = 46
 }
 
+struct BoardManTitlebarControlsLayout: Equatable {
+    let accessoryFrame: NSRect
+    let controlsFrame: NSRect
+    let selectionFrame: NSRect
+    let sequentialFrame: NSRect
+    let pinFrame: NSRect
+    let settingsFrame: NSRect
+
+    var settingsRightInset: CGFloat {
+        accessoryFrame.width - controlsFrame.minX - settingsFrame.maxX
+    }
+}
+
 struct BoardManPanelLayout: Equatable {
     let isCompact: Bool
     let margin: CGFloat
@@ -47,6 +60,19 @@ struct BoardManPanelLayout: Equatable {
 }
 
 enum BoardManPanelLayoutPolicy {
+    static func titlebarControlsLayout(trailingInset: CGFloat) -> BoardManTitlebarControlsLayout {
+        let safeInset = max(0, trailingInset)
+        let controlsWidth: CGFloat = 180
+        return BoardManTitlebarControlsLayout(
+            accessoryFrame: NSRect(x: 0, y: 0, width: controlsWidth + safeInset, height: 38),
+            controlsFrame: NSRect(x: 0, y: 0, width: controlsWidth, height: 26),
+            selectionFrame: NSRect(x: 6, y: 2, width: 48, height: 22),
+            sequentialFrame: NSRect(x: 60, y: 2, width: 36, height: 22),
+            pinFrame: NSRect(x: 102, y: 2, width: 36, height: 22),
+            settingsFrame: NSRect(x: 144, y: 2, width: 36, height: 22)
+        )
+    }
+
     static func panelLayout(
         bounds: NSRect,
         isQuickMode: Bool,
@@ -62,16 +88,11 @@ enum BoardManPanelLayoutPolicy {
         let width = bounds.width - (margin * 2)
         let headerY = isQuickMode ? bounds.height - 42 : bounds.height - 70
         let isSettings = activeTab == .settings && !isQuickMode
-        let gearWidth: CGFloat = 36
-        let gearGap: CGFloat = isCompact ? 8 : 12
-        let tabsWidth: CGFloat = isCompact ? 190 : min(250, max(216, floor(width * 0.31)))
+        let tabsWidth: CGFloat = isCompact ? 238 : min(310, max(276, floor(width * 0.39)))
         let tabsFrame = NSIntegralRect(NSRect(x: margin, y: headerY, width: tabsWidth, height: 36))
-        let settingsButtonFrame = NSIntegralRect(NSRect(
-            x: margin + width - gearWidth,
-            y: headerY,
-            width: gearWidth,
-            height: 36
-        ))
+        // Pin and Settings live in a trailing NSTitlebarAccessoryViewController so they share
+        // the traffic-light Y-axis and do not consume search-row width.
+        let settingsButtonFrame = NSRect.zero
 
         let showsSnippetButtons = activeTab == .snippets && !isSettings && !isQuickMode
         let snippetButtonGap: CGFloat = isCompact ? 6 : 8
@@ -81,7 +102,7 @@ enum BoardManPanelLayoutPolicy {
             : 0
         let headerGap: CGFloat = isCompact ? 10 : 14
         let rightX = margin + tabsWidth + headerGap
-        let rightEdge = margin + width - gearWidth - gearGap
+        let rightEdge = margin + width
         let rightWidth = max(0, rightEdge - rightX)
         let searchWidth = max(
             78,
@@ -166,10 +187,9 @@ enum BoardManPanelLayoutPolicy {
 
         let showsSnippetCategories = activeTab == .snippets && !isSettings
         let categoryRowY = contentTop - 38
-        let snippetInteractionRowY = categoryRowY - 40
         let listTop: CGFloat
         if showsSnippetCategories {
-            listTop = snippetInteractionRowY - 12
+            listTop = categoryRowY - 16
         } else if showsHistoryToolbar {
             listTop = historyToolbarY - 16
         } else {
@@ -179,18 +199,21 @@ enum BoardManPanelLayoutPolicy {
         let listHeight = isQuickMode ? max(1, listTop - listBottom) : max(190, listTop - 28)
 
         let categoryButtonGap: CGFloat = isCompact ? 6 : 8
-        let categoryButtonWidths: [CGFloat] = isCompact ? [82, 88, 82] : [94, 108, 98]
-        let actionWidth = categoryButtonWidths.reduce(0, +) + (categoryButtonGap * 2)
-        let popupWidth = max(120, width - 64 - 12 - actionWidth - 12)
-        let snippetCategoryLabelFrame = NSRect(x: margin, y: categoryRowY + 6, width: 64, height: 17)
+        let categoryButtonWidths: [CGFloat] = isCompact ? [74, 80, 74] : [88, 98, 90]
+        let reorderWidth: CGFloat = isCompact ? 82 : 96
+        let actionWidth = categoryButtonWidths.reduce(0, +)
+            + reorderWidth
+            + (categoryButtonGap * 3)
+        let popupWidth = max(120, width - actionWidth - 12)
+        let snippetCategoryLabelFrame = NSRect.zero
         let snippetCategoryPopupFrame = NSRect(
-            x: margin + 76,
+            x: margin,
             y: categoryRowY,
             width: popupWidth,
             height: BoardManPanelLayoutMetrics.controlHeight
         )
         var categoryButtonFrames: [NSRect] = []
-        var categoryButtonX = margin + 76 + popupWidth + 12
+        var categoryButtonX = margin + popupWidth + 12
         for buttonWidth in categoryButtonWidths {
             categoryButtonFrames.append(NSRect(
                 x: categoryButtonX,
@@ -200,16 +223,10 @@ enum BoardManPanelLayoutPolicy {
             ))
             categoryButtonX += buttonWidth + categoryButtonGap
         }
-        let reorderWidth: CGFloat = 118
-        let snippetInteractionHintFrame = NSRect(
-            x: margin,
-            y: snippetInteractionRowY + 6,
-            width: max(120, width - reorderWidth - 14),
-            height: 17
-        )
+        let snippetInteractionHintFrame = NSRect.zero
         let snippetReorderFrame = NSRect(
-            x: margin + width - reorderWidth,
-            y: snippetInteractionRowY,
+            x: categoryButtonX,
+            y: categoryRowY,
             width: reorderWidth,
             height: BoardManPanelLayoutMetrics.controlHeight
         )
@@ -266,27 +283,21 @@ enum BoardManPanelLayoutPolicy {
         category: BoardManInlineSettingsCategory,
         appearanceAdvancedExpanded: Bool
     ) -> CGFloat {
-        let appearanceContentWidth = max(
-            240,
-            contentWidth - (BoardManPanelLayoutMetrics.settingsInset * 2)
-        )
-        let stacksAppearanceCards = usesStackedAppearanceSettingsLayout(width: appearanceContentWidth)
+        _ = contentWidth
+        _ = appearanceAdvancedExpanded
         let requiredHeight: CGFloat
         switch category {
         case .general:
             requiredHeight = 790
         case .view:
-            if stacksAppearanceCards {
-                requiredHeight = appearanceAdvancedExpanded ? 1_720 : 1_360
-            } else {
-                requiredHeight = appearanceAdvancedExpanded ? 1_280 : 1_020
-            }
+            // Appearance is a single-column, always-expanded settings page.
+            requiredHeight = 2_260
         case .history:
             requiredHeight = 730
         case .snippets:
             requiredHeight = 640
         case .privacy:
-            requiredHeight = 840
+            requiredHeight = 1_190
         case .updates:
             requiredHeight = 390
         case .license:
@@ -335,6 +346,7 @@ enum BoardManPanelLayoutPolicy {
     }
 
     static func usesStackedAppearanceSettingsLayout(width: CGFloat) -> Bool {
-        width < 470
+        _ = width
+        return true
     }
 }

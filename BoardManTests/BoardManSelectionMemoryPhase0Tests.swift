@@ -10,6 +10,19 @@ import Testing
 @MainActor @Suite(.serialized)
 struct BoardManSelectionMemoryPhase0Tests {
     @Test
+    func capturePreviewOffersCenterFourCornersThreeDesignsAndTwoSecondDuration() {
+        #expect(BoardManSelectionCapturePreviewPosition.allCases.map(\.rawValue) == [
+            "center", "topLeft", "topRight", "bottomLeft", "bottomRight"
+        ])
+        #expect(BoardManSelectionCapturePreviewStyle.allCases.map(\.rawValue) == [
+            "glass", "pill", "card"
+        ])
+        #expect(BoardManSelectionCapturePreviewPosition.allowed("invalid") == .center)
+        #expect(BoardManSelectionCapturePreviewStyle.allowed("invalid") == .glass)
+        #expect(BoardManSelectionCapturePreviewController.displayDuration == 2.0)
+    }
+
+    @Test
     func capturePolicyFailsClosedForExcludedAndSecureFields() {
         #expect(!BoardManSelectionCapturePolicy.canCapture(
             isExcludedApplication: true,
@@ -113,6 +126,97 @@ struct BoardManSelectionMemoryPhase0Tests {
         #expect(reloaded.count == 2)
         #expect(reloaded.latest?.text == "first selection")
         #expect(reloaded.entries.map(\.text) == ["first selection", "second selection"])
+    }
+
+    @Test
+    func selectionMetadataPositionDefaultsRightAndAllowsBottom() {
+        #expect(BoardManSelectionMetadataPosition.allowed(nil) == .right)
+        #expect(BoardManSelectionMetadataPosition.allowed("Right") == .right)
+        #expect(BoardManSelectionMetadataPosition.allowed("Below") == .below)
+        #expect(BoardManSelectionMetadataPosition.allowed("invalid") == .right)
+        #expect(BoardManSelectionMetadataPosition.right.timestampPosition == .right)
+        #expect(BoardManSelectionMetadataPosition.below.timestampPosition == .below)
+    }
+
+    @Test
+    func productionStoreLoadsLegacyEntriesWithoutPasteCount() throws {
+        let fileURL = makeTemporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: fileURL.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let identifier = UUID()
+        let legacyJSON = """
+        [{"id":"\(identifier.uuidString)","text":"legacy selection","sourceApplicationName":"Test App","sourceBundleIdentifier":"com.uniplanck.test","capturedAt":0}]
+        """
+        try Data(legacyJSON.utf8).write(to: fileURL)
+
+        let store = BoardManSelectionMemoryStore(fileURL: fileURL)
+        #expect(store.latest?.id == identifier)
+        #expect(store.latest?.pasteCount == 0)
+    }
+
+    @Test
+    func productionServiceMarksUsedOrDeletesExactSelectionAfterSuccessfulPaste() async throws {
+        let suite = "BoardManSelectionMemoryPhase0Tests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: Constants.UserDefaults.boardManSelectionMemoryEnabled)
+
+        let storeURL = makeTemporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+        let store = BoardManSelectionMemoryStore(fileURL: storeURL)
+        let pasteboard = makePasteboard()
+        defer { pasteboard.clearContents() }
+        let service = BoardManSelectionMemoryService(
+            defaults: defaults,
+            store: store,
+            pasteboard: pasteboard,
+            readSelection: { nil },
+            canUseFeature: { true },
+            sendPaste: { true },
+            markPasteboardHandled: {}
+        )
+
+        let first = try #require(store.append(candidate("first"), capturedAt: Date(timeIntervalSince1970: 1)))
+        #expect(service.paste(entry: first))
+        #expect(store.entries.first(where: { $0.id == first.id })?.pasteCount == 1)
+        try await Task.sleep(nanoseconds: 400_000_000)
+
+        _ = store.append(candidate("second"), capturedAt: Date(timeIntervalSince1970: 2))
+        defaults.set(true, forKey: Constants.UserDefaults.boardManSelectionAutoDeleteUsed)
+        #expect(service.pasteLatest())
+        #expect(store.entries.map(\.text) == ["first"])
+        try await Task.sleep(nanoseconds: 400_000_000)
+
+        let third = try #require(store.append(candidate("third"), capturedAt: Date(timeIntervalSince1970: 3)))
+        let firstAfterUse = try #require(store.entries.first(where: { $0.text == "first" }))
+        #expect(service.paste(entry: firstAfterUse))
+        #expect(store.entries.map(\.id) == [third.id], "Explicit Selection paste must delete the selected item, not the top item.")
+    }
+
+    @Test
+    func productionServiceDoesNotMarkOrDeleteWhenPasteDispatchFails() throws {
+        let suite = "BoardManSelectionMemoryPhase0Tests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: Constants.UserDefaults.boardManSelectionMemoryEnabled)
+        defaults.set(true, forKey: Constants.UserDefaults.boardManSelectionAutoDeleteUsed)
+        let storeURL = makeTemporaryStoreURL()
+        defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+        let store = BoardManSelectionMemoryStore(fileURL: storeURL)
+        let entry = try #require(store.append(candidate("keep me")))
+        let service = BoardManSelectionMemoryService(
+            defaults: defaults,
+            store: store,
+            pasteboard: makePasteboard(),
+            readSelection: { nil },
+            canUseFeature: { true },
+            sendPaste: { false },
+            markPasteboardHandled: {}
+        )
+
+        #expect(!service.paste(entry: entry))
+        #expect(store.latest?.id == entry.id)
+        #expect(store.latest?.pasteCount == 0)
     }
 
     @Test

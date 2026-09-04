@@ -102,6 +102,10 @@ final class BoardManRuntimeSupport {
         defaults[Constants.UserDefaults.collectCrashReport] = true
         defaults[Constants.UserDefaults.boardManSelectionMemoryEnabled] = false
         defaults[Constants.UserDefaults.boardManSelectionHarvestModeEnabled] = false
+        defaults[Constants.UserDefaults.boardManSelectionCapturePreviewEnabled] = true
+        defaults[Constants.UserDefaults.boardManSelectionCapturePreviewPosition] = "center"
+        defaults[Constants.UserDefaults.boardManSelectionCapturePreviewStyle] = "glass"
+        defaults[Constants.UserDefaults.boardManPanelAlwaysOnTop] = false
         defaults[Constants.UserDefaults.menuIconSize] = 16
         defaults[Constants.UserDefaults.maxMenuItemTitleLength] = 20
         defaults[Constants.UserDefaults.numberOfItemsPlaceInline] = 0
@@ -134,6 +138,10 @@ final class BoardManRuntimeSupport {
         defaults[Constants.UserDefaults.boardManTimestampShortcutEnabled] = false
         defaults[Constants.UserDefaults.boardManTimestampShortcutDelay] = 0.1
         defaults[Constants.UserDefaults.boardManPanelHeight] = 680
+        defaults[Constants.UserDefaults.boardManItemRowHeight] = 62
+        defaults[Constants.UserDefaults.boardManSequentialPasteModeEnabled] = false
+        defaults[Constants.UserDefaults.boardManSequentialPasteQueueJSON] = "[]"
+        defaults[Constants.UserDefaults.boardManSequentialPasteQueueCursor] = 0
         defaults[Constants.UserDefaults.boardManShowUsageCount] = true
         defaults[Constants.UserDefaults.boardManUsageCountStyle] = "badge"
         defaults[Constants.UserDefaults.boardManUsedItemStyle] = "Default"

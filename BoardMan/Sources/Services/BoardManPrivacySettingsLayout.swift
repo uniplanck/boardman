@@ -26,12 +26,24 @@ struct BoardManPrivacySettingsLayoutInput: Equatable {
 }
 
 struct BoardManPrivacySettingsLayout: Equatable {
+    let permissionsHeaderFrame: NSRect
+    let permissionsStatusFrame: NSRect
+    let permissionsManageFrame: NSRect
     let privacyHeaderFrame: NSRect
     let selectionMemoryFrame: NSRect
     let selectionHarvestFrame: NSRect
+    let selectionSequentialCaptureFrame: NSRect
     let selectionMemoryStatusFrame: NSRect
     let selectionMemoryOpenFrame: NSRect
     let selectionMemoryClearFrame: NSRect
+    let selectionPreviewEnabledFrame: NSRect
+    let selectionPreviewPositionLabelFrame: NSRect
+    let selectionPreviewPositionFrame: NSRect
+    let selectionPreviewStyleLabelFrame: NSRect
+    let selectionPreviewStyleFrame: NSRect
+    let selectionMetadataPositionLabelFrame: NSRect
+    let selectionMetadataPositionFrame: NSRect
+    let selectionAutoDeleteUsedFrame: NSRect
     let hideMaskedPreviewFrame: NSRect
     let hideMaskedTitleFrame: NSRect
     let excludedAppsSummaryFrame: NSRect
@@ -64,7 +76,8 @@ enum BoardManPrivacySettingsLayoutPolicy {
     }
 
     static func layout(_ input: BoardManPrivacySettingsLayoutInput) -> BoardManPrivacySettingsLayout {
-        let storedOriginY = input.originY - 286
+        let privacyOriginY = input.originY - 86
+        let storedOriginY = privacyOriginY - 522
         let storedTypeFrames = storedTypes(
             originX: input.originX,
             originY: storedOriginY,
@@ -87,29 +100,52 @@ enum BoardManPrivacySettingsLayoutPolicy {
         let actionsWidth = clearWidth + openWidth + actionGap
         let statusWidth = max(120, input.width - actionsWidth - 10)
 
+        let permissionButtonWidth: CGFloat = min(116, max(96, floor(input.width * 0.24)))
         return BoardManPrivacySettingsLayout(
-            privacyHeaderFrame: NSRect(x: input.originX, y: input.originY, width: input.width, height: 18),
-            selectionMemoryFrame: NSRect(x: input.originX, y: input.originY - 38, width: input.width, height: 20),
-            selectionHarvestFrame: NSRect(x: input.originX + 18, y: input.originY - 70, width: input.width - 18, height: 20),
-            selectionMemoryStatusFrame: NSRect(x: input.originX, y: input.originY - 105, width: statusWidth, height: 18),
+            permissionsHeaderFrame: NSRect(x: input.originX, y: input.originY, width: input.width, height: 18),
+            permissionsStatusFrame: NSRect(
+                x: input.originX,
+                y: input.originY - 42,
+                width: max(120, input.width - permissionButtonWidth - 12),
+                height: 30
+            ),
+            permissionsManageFrame: NSRect(
+                x: input.originX + max(0, input.width - permissionButtonWidth),
+                y: input.originY - 48,
+                width: permissionButtonWidth,
+                height: input.controlHeight
+            ),
+            privacyHeaderFrame: NSRect(x: input.originX, y: privacyOriginY, width: input.width, height: 18),
+            selectionMemoryFrame: NSRect(x: input.originX, y: privacyOriginY - 38, width: input.width, height: 20),
+            selectionHarvestFrame: NSRect(x: input.originX + 18, y: privacyOriginY - 70, width: input.width - 18, height: 20),
+            selectionSequentialCaptureFrame: NSRect(x: input.originX + 18, y: privacyOriginY - 100, width: input.width - 18, height: 20),
+            selectionMemoryStatusFrame: NSRect(x: input.originX, y: privacyOriginY - 135, width: statusWidth, height: 18),
             selectionMemoryOpenFrame: NSRect(
                 x: input.originX + max(0, input.width - actionsWidth),
-                y: input.originY - 111,
+                y: privacyOriginY - 141,
                 width: openWidth,
                 height: input.controlHeight
             ),
             selectionMemoryClearFrame: NSRect(
                 x: input.originX + max(0, input.width - clearWidth),
-                y: input.originY - 111,
+                y: privacyOriginY - 141,
                 width: clearWidth,
                 height: input.controlHeight
             ),
-            hideMaskedPreviewFrame: NSRect(x: input.originX, y: input.originY - 148, width: input.width, height: 20),
-            hideMaskedTitleFrame: NSRect(x: input.originX, y: input.originY - 178, width: input.width, height: 20),
-            excludedAppsSummaryFrame: NSRect(x: input.originX, y: input.originY - 212, width: input.width, height: 18),
+            selectionPreviewEnabledFrame: NSRect(x: input.originX + 18, y: privacyOriginY - 178, width: input.width - 18, height: 20),
+            selectionPreviewPositionLabelFrame: NSRect(x: input.originX + 18, y: privacyOriginY - 218, width: 120, height: 18),
+            selectionPreviewPositionFrame: NSRect(x: input.originX + 146, y: privacyOriginY - 224, width: max(120, input.width - 146), height: input.controlHeight),
+            selectionPreviewStyleLabelFrame: NSRect(x: input.originX + 18, y: privacyOriginY - 256, width: 120, height: 18),
+            selectionPreviewStyleFrame: NSRect(x: input.originX + 146, y: privacyOriginY - 262, width: max(120, input.width - 146), height: input.controlHeight),
+            selectionMetadataPositionLabelFrame: NSRect(x: input.originX + 18, y: privacyOriginY - 296, width: 120, height: 18),
+            selectionMetadataPositionFrame: NSRect(x: input.originX + 146, y: privacyOriginY - 302, width: max(120, input.width - 146), height: input.controlHeight),
+            selectionAutoDeleteUsedFrame: NSRect(x: input.originX + 18, y: privacyOriginY - 340, width: input.width - 18, height: 20),
+            hideMaskedPreviewFrame: NSRect(x: input.originX, y: privacyOriginY - 376, width: input.width, height: 20),
+            hideMaskedTitleFrame: NSRect(x: input.originX, y: privacyOriginY - 406, width: input.width, height: 20),
+            excludedAppsSummaryFrame: NSRect(x: input.originX, y: privacyOriginY - 442, width: input.width, height: 18),
             excludedAppsButtonFrame: NSRect(
                 x: input.originX,
-                y: input.originY - 250,
+                y: privacyOriginY - 480,
                 width: min(178, input.width),
                 height: input.controlHeight
             ),

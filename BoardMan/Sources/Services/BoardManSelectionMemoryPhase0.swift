@@ -2,8 +2,8 @@
 //  BoardManSelectionMemoryPhase0.swift
 //  Board-Man
 //
-//  Architecture-spike primitives for Selection Memory. Nothing in this file is wired into
-//  application startup yet; Phase 0 exists to prove capture and pasteboard safety first.
+//  Selection Memory capture, private storage, pasteboard safety, preview HUD, and picker support.
+//  The file keeps the Phase 0 name for source compatibility with the original architecture spike.
 //
 
 import AppKit
@@ -243,181 +243,6 @@ final class BoardManTransientPasteboardTransaction {
 
 // MARK: - Production Selection Clipboard
 
-struct BoardManSelectionMemoryEntry: Codable, Equatable, Identifiable {
-    let id: UUID
-    let text: String
-    let sourceApplicationName: String
-    let sourceBundleIdentifier: String
-    let capturedAt: Date
-
-    init(
-        id: UUID = UUID(),
-        candidate: BoardManSelectionCaptureCandidate,
-        capturedAt: Date = Date()
-    ) {
-        self.id = id
-        self.text = candidate.text
-        self.sourceApplicationName = candidate.sourceApplicationName
-        self.sourceBundleIdentifier = candidate.sourceBundleIdentifier
-        self.capturedAt = capturedAt
-    }
-}
-
-@MainActor
-final class BoardManSelectionMemoryStore {
-    static let shared = BoardManSelectionMemoryStore()
-    static let maximumItems = 100
-    static let maximumTotalCharacters = 250_000
-    static let maximumStackItems = 50
-
-    private let fileURL: URL
-    private let stackFileURL: URL
-    private let fileManager: FileManager
-    private(set) var entries: [BoardManSelectionMemoryEntry]
-    private(set) var stackEntries: [BoardManSelectionMemoryEntry]
-
-    init(
-        fileURL: URL = BoardManSelectionMemoryStore.defaultFileURL(),
-        fileManager: FileManager = .default
-    ) {
-        self.fileURL = fileURL
-        self.stackFileURL = fileURL.deletingLastPathComponent().appendingPathComponent("stack.json", isDirectory: false)
-        self.fileManager = fileManager
-        self.entries = Self.load(from: fileURL, newestFirst: true)
-        self.stackEntries = Self.load(from: stackFileURL, newestFirst: false)
-        trimToBounds()
-        trimStackToBounds()
-    }
-
-    var latest: BoardManSelectionMemoryEntry? { entries.first }
-    var count: Int { entries.count }
-    var stackCount: Int { stackEntries.count }
-
-    @discardableResult
-    func append(
-        _ candidate: BoardManSelectionCaptureCandidate,
-        capturedAt: Date = Date()
-    ) -> BoardManSelectionMemoryEntry? {
-        let text = candidate.text
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-
-        entries.removeAll {
-            $0.text == text && $0.sourceBundleIdentifier == candidate.sourceBundleIdentifier
-        }
-        let entry = BoardManSelectionMemoryEntry(candidate: candidate, capturedAt: capturedAt)
-        entries.insert(entry, at: 0)
-        trimToBounds()
-        persistHistory()
-        return entry
-    }
-
-    @discardableResult
-    func appendToStack(
-        _ candidate: BoardManSelectionCaptureCandidate,
-        capturedAt: Date = Date()
-    ) -> BoardManSelectionMemoryEntry? {
-        guard !candidate.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        let entry = BoardManSelectionMemoryEntry(candidate: candidate, capturedAt: capturedAt)
-        stackEntries.append(entry)
-        trimStackToBounds()
-        persistStack()
-        return entry
-    }
-
-    func clear() {
-        entries.removeAll(keepingCapacity: false)
-        removeFileIfPresent(fileURL, label: "history")
-    }
-
-    func clearStack() {
-        stackEntries.removeAll(keepingCapacity: false)
-        removeFileIfPresent(stackFileURL, label: "stack")
-    }
-
-    private func trimToBounds() {
-        if entries.count > Self.maximumItems {
-            entries.removeLast(entries.count - Self.maximumItems)
-        }
-        trimCharacterBudget(&entries, removeFromFront: false)
-    }
-
-    private func trimStackToBounds() {
-        if stackEntries.count > Self.maximumStackItems {
-            stackEntries.removeFirst(stackEntries.count - Self.maximumStackItems)
-        }
-        trimCharacterBudget(&stackEntries, removeFromFront: true)
-    }
-
-    private func trimCharacterBudget(
-        _ values: inout [BoardManSelectionMemoryEntry],
-        removeFromFront: Bool
-    ) {
-        var totalCharacters = values.reduce(0) { $0 + $1.text.count }
-        while values.count > 1, totalCharacters > Self.maximumTotalCharacters {
-            let removed = removeFromFront ? values.removeFirst() : values.removeLast()
-            totalCharacters -= removed.text.count
-        }
-    }
-
-    private func persistHistory() {
-        persist(entries, to: fileURL, label: "history")
-    }
-
-    private func persistStack() {
-        persist(stackEntries, to: stackFileURL, label: "stack")
-    }
-
-    private func persist(_ values: [BoardManSelectionMemoryEntry], to url: URL, label: String) {
-        do {
-            try fileManager.createDirectory(
-                at: url.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let data = try JSONEncoder().encode(values)
-            try data.write(to: url, options: .atomic)
-        } catch {
-            NSLog("Board-Man Selection Clipboard %@ persist failed: %@", label, error.localizedDescription)
-        }
-    }
-
-    private func removeFileIfPresent(_ url: URL, label: String) {
-        do {
-            if fileManager.fileExists(atPath: url.path) {
-                try fileManager.removeItem(at: url)
-            }
-        } catch {
-            NSLog("Board-Man Selection Clipboard %@ clear failed: %@", label, error.localizedDescription)
-        }
-    }
-
-    private static func load(from fileURL: URL, newestFirst: Bool) -> [BoardManSelectionMemoryEntry] {
-        guard let data = try? Data(contentsOf: fileURL),
-              let decoded = try? JSONDecoder().decode([BoardManSelectionMemoryEntry].self, from: data) else {
-            return []
-        }
-        return decoded.sorted {
-            newestFirst ? $0.capturedAt > $1.capturedAt : $0.capturedAt < $1.capturedAt
-        }
-    }
-
-    nonisolated private static func defaultFileURL() -> URL {
-        if NSClassFromString("XCTestCase") != nil {
-            return FileManager.default.temporaryDirectory
-                .appendingPathComponent(
-                    "Board-Man-SelectionClipboard-Tests-\(ProcessInfo.processInfo.processIdentifier)",
-                    isDirectory: true
-                )
-                .appendingPathComponent("history.json", isDirectory: false)
-        }
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support", isDirectory: true)
-        return base
-            .appendingPathComponent("Board-Man", isDirectory: true)
-            .appendingPathComponent("SelectionClipboard", isDirectory: true)
-            .appendingPathComponent("history.json", isDirectory: false)
-    }
-}
-
 @MainActor
 final class BoardManSelectionMemoryService {
     static let shared = BoardManSelectionMemoryService()
@@ -440,7 +265,7 @@ final class BoardManSelectionMemoryService {
 
     init(
         defaults: UserDefaults = AppEnvironment.current.defaults,
-        store: BoardManSelectionMemoryStore = .shared,
+        store: BoardManSelectionMemoryStore? = nil,
         pasteboard: NSPasteboard = .general,
         readSelection: (() -> BoardManSelectionCaptureCandidate?)? = nil,
         canUseFeature: (() -> Bool)? = nil,
@@ -448,7 +273,7 @@ final class BoardManSelectionMemoryService {
         markPasteboardHandled: (() -> Void)? = nil
     ) {
         self.defaults = defaults
-        self.store = store
+        self.store = store ?? .shared
         self.pasteboard = pasteboard
         self.readSelection = readSelection ?? {
             BoardManSelectionCaptureProbe().readFocusedSelection()
@@ -480,6 +305,12 @@ final class BoardManSelectionMemoryService {
     var latestEntry: BoardManSelectionMemoryEntry? { store.latest }
     var historyEntries: [BoardManSelectionMemoryEntry] { store.entries }
     var stackEntries: [BoardManSelectionMemoryEntry] { store.stackEntries }
+
+    func entry(identifier: String) -> BoardManSelectionMemoryEntry? {
+        guard let id = UUID(uuidString: identifier) else { return nil }
+        return store.entries.first(where: { $0.id == id })
+            ?? store.stackEntries.first(where: { $0.id == id })
+    }
 
     func setEnabled(_ enabled: Bool) -> Bool {
         guard !enabled || canUseFeature() else { return false }
@@ -539,6 +370,15 @@ final class BoardManSelectionMemoryService {
         store.clear()
     }
 
+    @discardableResult
+    func updateEntry(identifier: String, text: String) -> Bool {
+        let updated = store.update(identifier: identifier, text: text)
+        if updated {
+            NotificationCenter.default.post(name: .boardManSelectionMemoryDidChange, object: nil)
+        }
+        return updated
+    }
+
     func clearStack() {
         store.clearStack()
     }
@@ -548,7 +388,7 @@ final class BoardManSelectionMemoryService {
             NSSound.beep()
             return
         }
-        BoardManSelectionMemoryPickerController.shared.show(service: self)
+        AppEnvironment.current.menuManager.showBoardManSelectionPanel()
     }
 
     @discardableResult
@@ -562,7 +402,17 @@ final class BoardManSelectionMemoryService {
 
     @discardableResult
     func paste(entry: BoardManSelectionMemoryEntry) -> Bool {
-        paste(text: entry.text)
+        guard paste(text: entry.text) else { return false }
+        let changed: Bool
+        if defaults.bool(forKey: Constants.UserDefaults.boardManSelectionAutoDeleteUsed) {
+            changed = store.remove(identifier: entry.id.uuidString)
+        } else {
+            changed = store.markUsed(identifier: entry.id.uuidString)
+        }
+        if changed {
+            NotificationCenter.default.post(name: .boardManSelectionMemoryDidChange, object: nil)
+        }
+        return true
     }
 
     @discardableResult
@@ -629,6 +479,14 @@ final class BoardManSelectionMemoryService {
         if isHarvestEnabled {
             _ = store.appendToStack(candidate)
         }
+        BoardManSequentialPasteQueueService.shared.recordCapturedSelection(
+            text: candidate.text,
+            sourceApplicationName: candidate.sourceApplicationName
+        )
+        BoardManSelectionCapturePreviewController.shared.show(
+            sourceApplicationName: candidate.sourceApplicationName
+        )
+        NotificationCenter.default.post(name: .boardManSelectionMemoryDidChange, object: nil)
         NSLog(
             "Board-Man Selection Clipboard captured source=%@ count=%d stack=%d",
             candidate.sourceBundleIdentifier,

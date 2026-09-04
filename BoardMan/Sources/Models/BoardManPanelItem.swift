@@ -10,6 +10,7 @@ import AppKit
 enum BoardManPanelTab: Int, CaseIterable {
     case history = 0
     case snippets
+    case selection
     case settings
 
     var title: String { title(compact: false) }
@@ -29,6 +30,8 @@ enum BoardManPanelTab: Int, CaseIterable {
             case .korean: return "문구"
             case .system, .english: return "Text"
             }
+        case .selection:
+            return boardManText("Selection")
         case .settings:
             return boardManText("Settings")
         }
@@ -38,6 +41,7 @@ enum BoardManPanelTab: Int, CaseIterable {
         switch self {
         case .history: return boardManText("No clipboard history yet")
         case .snippets: return boardManText("No snippets yet")
+        case .selection: return boardManText("No Selection history yet")
         case .settings: return ""
         }
     }
@@ -46,6 +50,7 @@ enum BoardManPanelTab: Int, CaseIterable {
 enum BoardManPanelItemSource {
     case clip
     case snippet
+    case selection
     case favorite
 }
 

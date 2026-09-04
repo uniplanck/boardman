@@ -232,6 +232,8 @@ final class BoardManSearchCoordinator {
             return .history
         case .snippet:
             return .snippet
+        case .selection:
+            return nil
         case .favorite:
             return nil
         }

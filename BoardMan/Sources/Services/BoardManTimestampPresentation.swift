@@ -113,18 +113,55 @@ struct BoardManRelativeTimestampStyle: Equatable {
         entitlementService: EntitlementService = .shared
     ) -> BoardManRelativeTimestampStyle {
         guard EntitlementGate.canUse(.advancedAppearance, service: entitlementService) else {
-            return BoardManRelativeTimestampStyle(
-                number: .single,
-                unit: .symbol,
-                suffix: .none,
-                now: .localized
-            )
+            return defaultStyle
         }
         return BoardManRelativeTimestampStyle(
             number: .allowed(defaults.string(forKey: Constants.UserDefaults.boardManRelativeNumberStyle)),
             unit: .allowed(defaults.string(forKey: Constants.UserDefaults.boardManRelativeUnitStyle)),
             suffix: .allowed(defaults.string(forKey: Constants.UserDefaults.boardManRelativeSuffixStyle)),
             now: .allowed(defaults.string(forKey: Constants.UserDefaults.boardManRelativeNowStyle))
+        )
+    }
+
+    static func selectionCurrent(
+        defaults: UserDefaults = AppEnvironment.current.defaults,
+        entitlementService: EntitlementService = .shared
+    ) -> BoardManRelativeTimestampStyle {
+        guard EntitlementGate.canUse(.advancedAppearance, service: entitlementService) else {
+            return defaultStyle
+        }
+        func value(selectionKey: String, fallbackKey: String) -> String? {
+            if defaults.object(forKey: selectionKey) != nil {
+                return defaults.string(forKey: selectionKey)
+            }
+            return defaults.string(forKey: fallbackKey)
+        }
+        return BoardManRelativeTimestampStyle(
+            number: .allowed(value(
+                selectionKey: Constants.UserDefaults.boardManSelectionRelativeNumberStyle,
+                fallbackKey: Constants.UserDefaults.boardManRelativeNumberStyle
+            )),
+            unit: .allowed(value(
+                selectionKey: Constants.UserDefaults.boardManSelectionRelativeUnitStyle,
+                fallbackKey: Constants.UserDefaults.boardManRelativeUnitStyle
+            )),
+            suffix: .allowed(value(
+                selectionKey: Constants.UserDefaults.boardManSelectionRelativeSuffixStyle,
+                fallbackKey: Constants.UserDefaults.boardManRelativeSuffixStyle
+            )),
+            now: .allowed(value(
+                selectionKey: Constants.UserDefaults.boardManSelectionRelativeNowStyle,
+                fallbackKey: Constants.UserDefaults.boardManRelativeNowStyle
+            ))
+        )
+    }
+
+    private static var defaultStyle: BoardManRelativeTimestampStyle {
+        BoardManRelativeTimestampStyle(
+            number: .single,
+            unit: .symbol,
+            suffix: .none,
+            now: .localized
         )
     }
 

@@ -158,7 +158,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "スニペットを削除"
+            "value": "定型文を削除"
           }
         },
         "zh-Hans": {
@@ -220,7 +220,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "スニペットを編集..."
+            "value": "定型文を編集..."
           }
         },
         "zh-Hans": {
@@ -402,7 +402,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "スニペットの内容を記入してください"
+            "value": "定型文の内容を記入してください"
           }
         },
         "zh-Hans": {
@@ -499,7 +499,7 @@
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "スニペット"
+            "value": "定型文"
           }
         },
         "zh-Hans": {

@@ -10,6 +10,7 @@ import Foundation
 enum BoardManPanelNavigationTarget: Equatable {
     case history
     case snippets(categoryIdentifier: String)
+    case selection
 }
 
 struct BoardManPanelNavigationPolicy {
@@ -35,14 +36,20 @@ struct BoardManPanelNavigationPolicy {
             } else {
                 currentIndex = 1
             }
+        case .selection:
+            currentIndex = snippetCategoryIdentifiers.count + 1
         case .settings:
             return nil
         }
 
-        let nextIndex = min(snippetCategoryIdentifiers.count, max(0, currentIndex + delta))
+        let selectionIndex = snippetCategoryIdentifiers.count + 1
+        let nextIndex = min(selectionIndex, max(0, currentIndex + delta))
         guard nextIndex != currentIndex else { return nil }
         if nextIndex == 0 {
             return .history
+        }
+        if nextIndex == selectionIndex {
+            return .selection
         }
         return .snippets(categoryIdentifier: snippetCategoryIdentifiers[nextIndex - 1])
     }

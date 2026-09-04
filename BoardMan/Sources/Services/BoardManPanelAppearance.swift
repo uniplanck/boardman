@@ -25,6 +25,16 @@ enum BoardManUIStyle: String, CaseIterable {
     case defaultStyle = "Default"
     case simple = "Simple"
     case monochrome = "Monochrome"
+    case depth = "Depth"
+    case future = "Future"
+
+    var usesDepth: Bool {
+        self == .depth || self == .future
+    }
+
+    var usesFutureGlow: Bool {
+        self == .future
+    }
 
     static func allowed(_ value: String?) -> BoardManUIStyle {
         return allCases.first(where: { $0.rawValue == value }) ?? .defaultStyle

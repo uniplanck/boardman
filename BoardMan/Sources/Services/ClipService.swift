@@ -298,6 +298,7 @@ extension ClipService {
                 }
 
                 self.store.upsertClip(clip, searchMetadata: searchMetadata)
+                BoardManSequentialPasteQueueService.shared.recordCapturedClip(clip)
                 if let detectedAt {
                     PasteCountInputService.shared.logBoardManPerformance(
                         "clipboard_capture_to_queryable",
