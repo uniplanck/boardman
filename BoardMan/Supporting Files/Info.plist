@@ -38,6 +38,8 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>BoardManCommercialServiceBaseURL</key>
+	<string>https://uniplanck.com</string>
 	<key>SUFeedURL</key>
 	<string>https://github.com/uniplanck/boardman/releases/latest/download/appcast.xml</string>
 	<key>SUPublicDSAKeyFile</key>
