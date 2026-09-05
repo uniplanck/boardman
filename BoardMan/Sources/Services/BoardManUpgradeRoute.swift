@@ -6,7 +6,7 @@
 import Cocoa
 
 enum BoardManUpgradeRoute {
-    private static let lifetimePageURLString = "https://uniplanck.com/board-man"
+    private static let lifetimePageURLString = "https://uniplanck.com/products/board-man"
 
     static func openLifetimePage() {
         guard let url = URL(string: lifetimePageURLString) else {
