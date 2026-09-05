@@ -847,10 +847,11 @@ final class CommercialLicenseBoundaryTests {
     private func makeOwnerToken(privateKey: P256.Signing.PrivateKey,
                                 deviceID: String,
                                 tokenVersion: Int = 1,
-                                limits: [String: Int]? = nil) throws -> String {
+                                limits: [String: Int]? = nil,
+                                keyID: String = "test-owner-v1") throws -> String {
         let header = try JSONSerialization.data(withJSONObject: [
             "alg": "ES256",
-            "kid": "test-owner-v1",
+            "kid": keyID,
             "typ": "JWT"
         ], options: [.sortedKeys])
         var payloadObject: [String: Any] = [
@@ -916,6 +917,48 @@ final class CommercialLicenseBoundaryTests {
 }
 
 extension CommercialLicenseBoundaryTests {
+    @Test
+    func verifierSelectsCommercialSigningKeyByKeyIDWithoutBreakingOwnerFallback() throws {
+        let ownerKey = P256.Signing.PrivateKey()
+        let commercialKey = P256.Signing.PrivateKey()
+        let deviceID = UUID().uuidString
+        let verifier = P256SignedLicenseTokenVerifier(
+            publicKeyBase64ByKeyID: [
+                "boardman-lifetime-v1": commercialKey.publicKey.x963Representation.base64EncodedString()
+            ],
+            fallbackPublicKeyBase64: ownerKey.publicKey.x963Representation.base64EncodedString()
+        )
+        let context = SignedLicenseTokenVerificationContext(
+            deviceID: deviceID,
+            bundleID: "com.uniplanck.BoardMan",
+            verificationDate: Date()
+        )
+
+        let ownerToken = try makeOwnerToken(
+            privateKey: ownerKey,
+            deviceID: deviceID,
+            keyID: "owner-local-v1"
+        )
+        let commercialToken = try makeOwnerToken(
+            privateKey: commercialKey,
+            deviceID: deviceID,
+            keyID: "boardman-lifetime-v1"
+        )
+        let wrongCommercialToken = try makeOwnerToken(
+            privateKey: ownerKey,
+            deviceID: deviceID,
+            keyID: "boardman-lifetime-v1"
+        )
+
+        if case .verified = verifier.verify(ownerToken, context: context) {} else {
+            Issue.record("Expected Owner fallback key to keep verifying Owner Lifetime tokens.")
+        }
+        if case .verified = verifier.verify(commercialToken, context: context) {} else {
+            Issue.record("Expected the commercial kid to select the commercial public key.")
+        }
+        #expect(verifier.verify(wrongCommercialToken, context: context) == .invalid(.signatureInvalid))
+    }
+
     @Test
     func debugPreviewVerificationKeyOverrideSupportsServiceInterop() throws {
 #if DEBUG

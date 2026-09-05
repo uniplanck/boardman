@@ -52,6 +52,8 @@ protocol SignedLicenseTokenVerifying {
 
 private enum BoardManLicenseVerificationConfiguration {
     static let ownerPublicKeyBase64 = "BGGgQPFnOgKAk821OQGix9fQLDPrqJSCEP98KvCBXqs4YZ6Vfw6QmscEpbZROEjiAavFvNNc1V/fCw1cYa62Cuc="
+    static let commercialKeyID = "boardman-lifetime-v1"
+    static let commercialPublicKeyBase64 = "BDVykLg4UMvNw8BMbLJQy6Ds6Uv+n/+jJvlVnqUcAzK5Ye6M9zmNaPP+/nQyoZLL7m336D6rCNQaUb1a8suFV4I="
 #if DEBUG
     static let previewPublicKeyEnvironmentKey = "BOARDMAN_LICENSE_VERIFICATION_PUBLIC_KEY_BASE64"
 #endif
@@ -71,43 +73,65 @@ private enum BoardManLicenseVerificationConfiguration {
 }
 
 final class P256SignedLicenseTokenVerifier: SignedLicenseTokenVerifying {
-    private let publicKey: P256.Signing.PublicKey?
+    private let fallbackPublicKey: P256.Signing.PublicKey?
+    private let publicKeysByKeyID: [String: P256.Signing.PublicKey]
 
     private static func hasValidCommercialClaims(_ payload: SignedLicenseToken.Payload) -> Bool {
         return payload.isLifetimeCommercialEntitlement || payload.isLegacyProEntitlement
     }
 
     convenience init() {
-        self.init(publicKeyBase64: BoardManLicenseVerificationConfiguration.resolvedPublicKeyBase64())
+        self.init(
+            publicKeyBase64ByKeyID: [
+                BoardManLicenseVerificationConfiguration.commercialKeyID:
+                    BoardManLicenseVerificationConfiguration.commercialPublicKeyBase64
+            ],
+            fallbackPublicKeyBase64: BoardManLicenseVerificationConfiguration.ownerPublicKeyBase64
+        )
     }
 
 #if DEBUG
     convenience init(environment: [String: String]) {
-        self.init(
-            publicKeyBase64: BoardManLicenseVerificationConfiguration.resolvedPublicKeyBase64(
-                environment: environment
-            )
-        )
+        if let previewKey = environment[BoardManLicenseVerificationConfiguration.previewPublicKeyEnvironmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !previewKey.isEmpty {
+            self.init(publicKeyBase64: previewKey)
+        } else {
+            self.init()
+        }
     }
 #endif
 
     init(publicKeyBase64: String) {
-        guard let data = Data(base64Encoded: publicKeyBase64) else {
-            publicKey = nil
-            return
+        fallbackPublicKey = Self.decodePublicKey(publicKeyBase64)
+        publicKeysByKeyID = [:]
+    }
+
+    init(publicKeyBase64ByKeyID: [String: String],
+         fallbackPublicKeyBase64: String) {
+        fallbackPublicKey = Self.decodePublicKey(fallbackPublicKeyBase64)
+        publicKeysByKeyID = publicKeyBase64ByKeyID.reduce(into: [:]) { result, entry in
+            if let key = Self.decodePublicKey(entry.value) {
+                result[entry.key] = key
+            }
         }
-        publicKey = try? P256.Signing.PublicKey(x963Representation: data)
+    }
+
+    private static func decodePublicKey(_ value: String) -> P256.Signing.PublicKey? {
+        guard let data = Data(base64Encoded: value) else { return nil }
+        return try? P256.Signing.PublicKey(x963Representation: data)
     }
 
     func verify(_ token: String,
                 context: SignedLicenseTokenVerificationContext = SignedLicenseTokenVerificationContext()) -> SignedLicenseTokenVerificationResult {
-        guard let publicKey else { return .notConfigured }
         guard let parsedToken = try? SignedLicenseToken(rawValue: token) else {
             return .invalid(.malformedToken)
         }
         guard parsedToken.header.algorithm == "ES256" else {
             return .invalid(.unsupportedAlgorithm)
         }
+        let publicKey = parsedToken.header.keyID.flatMap { publicKeysByKeyID[$0] } ?? fallbackPublicKey
+        guard let publicKey else { return .notConfigured }
 
         let sections = token.split(separator: ".", omittingEmptySubsequences: false)
         guard sections.count == 3,
